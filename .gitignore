@@ -61,3 +61,5 @@ fastlane/test_output
 
 # DS Store
 Treachery-iOS/.DS_Store
+Treachery-iOS/Treachery-iOS/Support Files/GoogleService-Info.plist
+Treachery-iOS/Treachery-iOS/Support Files/GoogleService-Info.plist
