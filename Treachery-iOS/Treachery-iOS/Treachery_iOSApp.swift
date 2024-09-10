@@ -18,15 +18,14 @@ struct Treachery_iOSApp: App {
   var body: some Scene {
     WindowGroup {
       NavigationView {
-        ContentView()
+        ContentView(viewModel: ContentViewModel(firebaseManager: FirebaseManager()))
       }
     }
   }
 }
 // MARK: - AppDelegate
 class AppDelegate: NSObject, UIApplicationDelegate {
-  func application(_ application: UIApplication,
-                   didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey : Any]? = nil) -> Bool {
+  func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey : Any]? = nil) -> Bool {
     FirebaseApp.configure()
 
     return true
