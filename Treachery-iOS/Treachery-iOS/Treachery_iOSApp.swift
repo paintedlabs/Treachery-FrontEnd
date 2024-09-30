@@ -18,7 +18,12 @@ struct Treachery_iOSApp: App {
   var body: some Scene {
     WindowGroup {
       NavigationView {
-        ContentView(viewModel: ContentViewModel(firebaseManager: FirebaseManager()))
+        ContentView(
+          viewModel: ContentViewModel(
+            firebaseManager: FirebaseManager(),
+            cacheManager: CacheManager()
+          )
+        )
       }
     }
   }

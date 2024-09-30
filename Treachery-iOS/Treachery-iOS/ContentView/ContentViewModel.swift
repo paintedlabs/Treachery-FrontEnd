@@ -31,12 +31,17 @@ enum ContentViewModelState {
 class ContentViewModel: ObservableObject {
   
   @Published var state: ContentViewModelState = .notAuthenticated
+  
   var email: String = ""
   var password: String = ""
-  var firebaseManager: FirebaseManager
 
-  init(firebaseManager: FirebaseManager) {
+  var firebaseManager: FirebaseManager
+  var cacheManager: CacheManagerProtocol
+
+
+  init(firebaseManager: FirebaseManager, cacheManager: CacheManagerProtocol) {
     self.firebaseManager = firebaseManager
+    self.cacheManager = cacheManager
   }
 
   func authenticate() {
@@ -47,6 +52,13 @@ class ContentViewModel: ObservableObject {
         case .failure(let failure):
           self?.state = .notAuthenticated
       }
+    }
+  }
+
+  func copyToClipboard() {
+    let pasteboard = UIPasteboard.general
+    if let token = cacheManager.fetchVerificationToken() {
+      pasteboard.string = token
     }
   }
 

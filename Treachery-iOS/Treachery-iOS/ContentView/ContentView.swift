@@ -38,6 +38,13 @@ struct ContentView: View {
         } label: {
           Text("Login")
         }
+
+        Button(action: viewModel.copyToClipboard) {
+          Text("Copy Bearer Token to Clipboard")
+            .padding()
+            .cornerRadius(8)
+        }
+        .padding()
       }
       .padding()
     }
@@ -45,5 +52,5 @@ struct ContentView: View {
 
 //MARK: - Preview
 #Preview {
-  ContentView(viewModel: ContentViewModel(firebaseManager: FirebaseManager()))
+  ContentView(viewModel: ContentViewModel(firebaseManager: FirebaseManager(), cacheManager: CacheManager()))
 }

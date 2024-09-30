@@ -13,7 +13,6 @@ struct APIView {
 
   var body: some View {
     VStack (alignment: .leading, spacing: 0) {
-
       Button {
         viewModel.helloWorld()
       } label: {
@@ -21,6 +20,5 @@ struct APIView {
       }
     }
   }
-
 
 }
