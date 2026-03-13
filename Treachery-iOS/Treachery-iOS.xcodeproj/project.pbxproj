@@ -10,6 +10,7 @@
 		A3AA08222C90AB5B0093EF53 /* FirebaseAnalytics in Frameworks */ = {isa = PBXBuildFile; productRef = A3AA08212C90AB5B0093EF53 /* FirebaseAnalytics */; };
 		A3AA08242C90AB5B0093EF53 /* FirebaseAuth in Frameworks */ = {isa = PBXBuildFile; productRef = A3AA08232C90AB5B0093EF53 /* FirebaseAuth */; };
 		A3AA08262C90AB5B0093EF53 /* FirebaseCrashlytics in Frameworks */ = {isa = PBXBuildFile; productRef = A3AA08252C90AB5B0093EF53 /* FirebaseCrashlytics */; };
+		A3AEF7A62F649FDD006719B7 /* FirebaseFirestore in Frameworks */ = {isa = PBXBuildFile; productRef = A3AEF7A52F649FDD006719B7 /* FirebaseFirestore */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -59,6 +60,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				A3AA08262C90AB5B0093EF53 /* FirebaseCrashlytics in Frameworks */,
+				A3AEF7A62F649FDD006719B7 /* FirebaseFirestore in Frameworks */,
 				A3AA08222C90AB5B0093EF53 /* FirebaseAnalytics in Frameworks */,
 				A3AA08242C90AB5B0093EF53 /* FirebaseAuth in Frameworks */,
 			);
@@ -87,6 +89,7 @@
 				A3AA07E92C90A6DD0093EF53 /* Treachery-iOS */,
 				A3AA07FD2C90A6DF0093EF53 /* Treachery-iOSTests */,
 				A3AA08072C90A6DF0093EF53 /* Treachery-iOSUITests */,
+				A3AEF7A42F649FC9006719B7 /* Frameworks */,
 				A3AA07E82C90A6DD0093EF53 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -99,6 +102,13 @@
 				A3AA08042C90A6DF0093EF53 /* Treachery-iOSUITests.xctest */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		A3AEF7A42F649FC9006719B7 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			name = Frameworks;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -124,6 +134,7 @@
 				A3AA08212C90AB5B0093EF53 /* FirebaseAnalytics */,
 				A3AA08232C90AB5B0093EF53 /* FirebaseAuth */,
 				A3AA08252C90AB5B0093EF53 /* FirebaseCrashlytics */,
+				A3AEF7A52F649FDD006719B7 /* FirebaseFirestore */,
 			);
 			productName = "Treachery-iOS";
 			productReference = A3AA07E72C90A6DD0093EF53 /* Treachery-iOS.app */;
@@ -647,6 +658,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = A3AA08192C90A9300093EF53 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
 			productName = FirebaseCrashlytics;
+		};
+		A3AEF7A52F649FDD006719B7 /* FirebaseFirestore */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = A3AA08192C90A9300093EF53 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseFirestore;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

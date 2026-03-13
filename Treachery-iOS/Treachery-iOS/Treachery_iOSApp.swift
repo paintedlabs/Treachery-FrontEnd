@@ -6,28 +6,28 @@
 //
 
 import SwiftUI
-import SwiftData
 import FirebaseCore
 
 @main
 struct Treachery_iOSApp: App {
-  // register app delegate for Firebase setup
-  @UIApplicationDelegateAdaptor(AppDelegate.self) var delegate
+    @UIApplicationDelegateAdaptor(AppDelegate.self) var delegate
+    @StateObject private var authViewModel = AuthViewModel()
 
-
-  var body: some Scene {
-    WindowGroup {
-      NavigationView {
-        ContentView(viewModel: ContentViewModel(firebaseManager: FirebaseManager()))
-      }
+    var body: some Scene {
+        WindowGroup {
+            RootView()
+                .environmentObject(authViewModel)
+        }
     }
-  }
 }
+
 // MARK: - AppDelegate
 class AppDelegate: NSObject, UIApplicationDelegate {
-  func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey : Any]? = nil) -> Bool {
-    FirebaseApp.configure()
-
-    return true
-  }
+    func application(
+        _ application: UIApplication,
+        didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
+    ) -> Bool {
+        FirebaseApp.configure()
+        return true
+    }
 }
