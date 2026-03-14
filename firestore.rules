@@ -1,0 +1,117 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ============================================================
+    // USERS
+    // ============================================================
+    match /users/{userId} {
+      // Anyone authenticated can read user profiles (needed for search, friends)
+      allow read: if request.auth != null;
+
+      // Users can only create their own document
+      allow create: if request.auth != null && request.auth.uid == userId;
+
+      // Users can update their own document
+      // Other users can update friend_ids (for mutual friend addition)
+      allow update: if request.auth != null
+        && (request.auth.uid == userId
+            || onlyFriendIdsChanged());
+
+      // Users cannot delete their own document (admin only)
+      allow delete: if false;
+    }
+
+    // ============================================================
+    // FRIEND REQUESTS
+    // ============================================================
+    match /friend_requests/{requestId} {
+      // Sender or recipient can read
+      allow read: if request.auth != null
+        && (resource.data.from_user_id == request.auth.uid
+            || resource.data.to_user_id == request.auth.uid);
+
+      // Any authenticated user can create a friend request
+      // but from_user_id must match their own uid
+      allow create: if request.auth != null
+        && request.resource.data.from_user_id == request.auth.uid
+        && request.resource.data.status == 'pending';
+
+      // Only the recipient can accept/decline
+      allow update: if request.auth != null
+        && resource.data.to_user_id == request.auth.uid;
+
+      allow delete: if false;
+    }
+
+    // ============================================================
+    // GAMES
+    // ============================================================
+    match /games/{gameId} {
+      // Any authenticated user can read games (needed for join-by-code lookup)
+      allow read: if request.auth != null;
+
+      // Any authenticated user can create a game (they become the host)
+      allow create: if request.auth != null
+        && request.resource.data.host_id == request.auth.uid
+        && request.resource.data.state == 'waiting';
+
+      // The host can update the game (start game, set winner)
+      // Players can also update to add themselves to player_ids when joining
+      allow update: if request.auth != null
+        && (resource.data.host_id == request.auth.uid
+            || isOnlyAddingSelfToPlayerIds());
+
+      // Only the host can delete the game
+      allow delete: if request.auth != null
+        && resource.data.host_id == request.auth.uid;
+
+      // ----------------------------------------------------------
+      // PLAYERS (subcollection of games)
+      // ----------------------------------------------------------
+      match /players/{playerId} {
+        // Any authenticated user can read players in a game they participate in
+        // NOTE: For role secrecy, the client-side canSeeRole() logic controls
+        // what is displayed. A future enhancement could use Firestore Functions
+        // to redact role/identityCardId fields for non-unveiled, non-self players.
+        allow read: if request.auth != null;
+
+        // Any authenticated user can add themselves as a player
+        allow create: if request.auth != null
+          && request.resource.data.user_id == request.auth.uid;
+
+        // Players can update their own data (life, unveil)
+        // OR the host can update any player (role assignment, elimination)
+        allow update: if request.auth != null
+          && (resource.data.user_id == request.auth.uid
+              || isGameHost(gameId));
+
+        // Players can remove themselves, or the host can remove anyone
+        allow delete: if request.auth != null
+          && (resource.data.user_id == request.auth.uid
+              || isGameHost(gameId));
+      }
+    }
+
+    // ============================================================
+    // HELPER FUNCTIONS
+    // ============================================================
+    function isGameHost(gameId) {
+      return get(/databases/$(database)/documents/games/$(gameId)).data.host_id == request.auth.uid;
+    }
+
+    // Returns true when a player is only adding their own uid to player_ids
+    function isOnlyAddingSelfToPlayerIds() {
+      let affectedKeys = request.resource.data.diff(resource.data).affectedKeys();
+      return affectedKeys.hasOnly(['player_ids'])
+        && request.auth.uid in request.resource.data.player_ids;
+    }
+
+    // Returns true when only friend_ids field is being modified
+    function onlyFriendIdsChanged() {
+      let affectedKeys = request.resource.data.diff(resource.data).affectedKeys();
+      return affectedKeys.hasOnly(['friend_ids']);
+    }
+  }
+}

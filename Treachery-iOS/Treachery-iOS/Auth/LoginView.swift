@@ -13,6 +13,7 @@ struct LoginView: View {
     @State private var email = ""
     @State private var password = ""
     @State private var isShowingSignUp = false
+    @State private var isSigningIn = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -21,32 +22,75 @@ struct LoginView: View {
             Text("Treachery")
                 .font(.largeTitle)
                 .fontWeight(.bold)
+                .accessibilityAddTraits(.isHeader)
 
             TextField("Email", text: $email)
                 .textFieldStyle(.roundedBorder)
                 .textInputAutocapitalization(.never)
                 .disableAutocorrection(true)
                 .keyboardType(.emailAddress)
+                .textContentType(.emailAddress)
+                .accessibilityLabel("Email address")
 
             SecureField("Password", text: $password)
                 .textFieldStyle(.roundedBorder)
                 .textInputAutocapitalization(.never)
                 .disableAutocorrection(true)
+                .textContentType(.password)
+                .accessibilityLabel("Password")
                 .onSubmit {
-                    Task { await authViewModel.signIn(email: email, password: password) }
+                    guard !email.isEmpty && !password.isEmpty else { return }
+                    signIn()
                 }
 
             if let error = authViewModel.errorMessage {
-                Text(error)
-                    .foregroundStyle(.red)
-                    .font(.caption)
+                HStack(spacing: 6) {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .foregroundStyle(.red)
+                        .font(.caption)
+                    Text(error)
+                        .foregroundStyle(.red)
+                        .font(.caption)
+                }
+                .accessibilityElement(children: .combine)
+                .accessibilityLabel("Error: \(error)")
             }
 
-            Button("Sign In") {
-                Task { await authViewModel.signIn(email: email, password: password) }
+            Button {
+                signIn()
+            } label: {
+                if isSigningIn {
+                    HStack(spacing: 8) {
+                        ProgressView()
+                            .controlSize(.small)
+                            .tint(.white)
+                        Text("Signing In...")
+                    }
+                    .frame(maxWidth: .infinity)
+                } else {
+                    Text("Sign In")
+                        .frame(maxWidth: .infinity)
+                }
             }
             .buttonStyle(.borderedProminent)
-            .disabled(email.isEmpty || password.isEmpty)
+            .disabled(email.isEmpty || password.isEmpty || isSigningIn)
+            .accessibilityLabel(isSigningIn ? "Signing in" : "Sign in")
+
+            HStack {
+                VStack { Divider() }
+                Text("or")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                VStack { Divider() }
+            }
+            .padding(.vertical, 4)
+            .accessibilityHidden(true)
+
+            NavigationLink("Sign in with Phone") {
+                PhoneAuthView()
+            }
+            .buttonStyle(.bordered)
+            .accessibilityLabel("Sign in with phone number")
 
             Spacer()
 
@@ -54,13 +98,18 @@ struct LoginView: View {
                 Button("Create Account") {
                     isShowingSignUp = true
                 }
+                .accessibilityLabel("Create a new account")
 
                 Spacer()
 
                 Button("Forgot Password?") {
+                    guard !email.isEmpty else { return }
                     Task { await authViewModel.resetPassword(email: email) }
                 }
                 .font(.footnote)
+                .disabled(email.isEmpty)
+                .accessibilityLabel("Reset password")
+                .accessibilityHint(email.isEmpty ? "Enter your email first" : "Sends a password reset email")
             }
         }
         .padding()
@@ -68,4 +117,21 @@ struct LoginView: View {
             SignUpView()
         }
     }
+
+    private func signIn() {
+        isSigningIn = true
+        Task {
+            await authViewModel.signIn(email: email, password: password)
+            isSigningIn = false
+        }
+    }
 }
+
+#if DEBUG
+#Preview {
+    NavigationStack {
+        LoginView()
+    }
+    .environmentObject(AuthViewModel())
+}
+#endif

@@ -38,17 +38,45 @@ struct FirebaseManager {
         }
         try await user.updatePassword(to: newPassword)
     }
+
+    // MARK: - Phone Auth
+
+    func sendPhoneVerificationCode(to phoneNumber: String) async throws -> String {
+        try await withCheckedThrowingContinuation { continuation in
+            PhoneAuthProvider.provider().verifyPhoneNumber(phoneNumber, uiDelegate: nil) { verificationID, error in
+                if let error = error {
+                    continuation.resume(throwing: error)
+                } else if let verificationID = verificationID {
+                    continuation.resume(returning: verificationID)
+                } else {
+                    continuation.resume(throwing: AuthError.verificationFailed)
+                }
+            }
+        }
+    }
+
+    func verifyPhoneCode(verificationID: String, verificationCode: String) async throws -> User {
+        let credential = PhoneAuthProvider.provider().credential(
+            withVerificationID: verificationID,
+            verificationCode: verificationCode
+        )
+        let result = try await Auth.auth().signIn(with: credential)
+        return result.user
+    }
 }
 
 // MARK: - Errors
 extension FirebaseManager {
     enum AuthError: LocalizedError {
         case notAuthenticated
+        case verificationFailed
 
         var errorDescription: String? {
             switch self {
             case .notAuthenticated:
                 return "No authenticated user found."
+            case .verificationFailed:
+                return "Phone verification failed. Please try again."
             }
         }
     }

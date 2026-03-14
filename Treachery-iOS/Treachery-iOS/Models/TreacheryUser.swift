@@ -10,7 +10,8 @@ import Foundation
 struct TreacheryUser: Codable, Identifiable {
     let id: String
     var displayName: String
-    let email: String
+    let email: String?
+    var phoneNumber: String?
     var friendIds: [String]
     let createdAt: Date
 
@@ -18,6 +19,7 @@ struct TreacheryUser: Codable, Identifiable {
         case id
         case displayName = "display_name"
         case email
+        case phoneNumber = "phone_number"
         case friendIds = "friend_ids"
         case createdAt = "created_at"
     }

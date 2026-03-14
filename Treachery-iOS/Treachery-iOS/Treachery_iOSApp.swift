@@ -7,6 +7,7 @@
 
 import SwiftUI
 import FirebaseCore
+import FirebaseAuth
 
 @main
 struct Treachery_iOSApp: App {
@@ -28,6 +29,46 @@ class AppDelegate: NSObject, UIApplicationDelegate {
         didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
     ) -> Bool {
         FirebaseApp.configure()
+
+        #if DEBUG
+        Auth.auth().settings?.isAppVerificationDisabledForTesting = true
+        #endif
+
+        // Register for remote notifications (required for phone auth silent push)
+        application.registerForRemoteNotifications()
+
         return true
+    }
+
+    // MARK: - Phone Auth APNs Support
+
+    func application(
+        _ application: UIApplication,
+        didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data
+    ) {
+        Auth.auth().setAPNSToken(deviceToken, type: .unknown)
+    }
+
+    func application(
+        _ application: UIApplication,
+        didReceiveRemoteNotification userInfo: [AnyHashable: Any]
+    ) async -> UIBackgroundFetchResult {
+        if Auth.auth().canHandleNotification(userInfo) {
+            return .noData
+        }
+        return .newData
+    }
+
+    // MARK: - reCAPTCHA Fallback URL Handling
+
+    func application(
+        _ app: UIApplication,
+        open url: URL,
+        options: [UIApplication.OpenURLOptionsKey: Any] = [:]
+    ) -> Bool {
+        if Auth.auth().canHandle(url) {
+            return true
+        }
+        return false
     }
 }

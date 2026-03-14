@@ -28,11 +28,78 @@ final class FirestoreManager {
 
     func getUser(id: String) async throws -> TreacheryUser? {
         let snapshot = try await usersCollection.document(id).getDocument()
+        guard snapshot.exists else { return nil }
         return try snapshot.data(as: TreacheryUser.self)
     }
 
     func updateUser(_ user: TreacheryUser) async throws {
         try usersCollection.document(user.id).setData(from: user, merge: true)
+    }
+
+    func searchUsers(byDisplayName name: String) async throws -> [TreacheryUser] {
+        let end = name + "\u{f8ff}"
+        let snapshot = try await usersCollection
+            .whereField("display_name", isGreaterThanOrEqualTo: name)
+            .whereField("display_name", isLessThan: end)
+            .limit(to: 20)
+            .getDocuments()
+        return snapshot.documents.compactMap { try? $0.data(as: TreacheryUser.self) }
+    }
+
+    // MARK: - Friend Requests
+
+    private var friendRequestsCollection: CollectionReference {
+        db.collection("friend_requests")
+    }
+
+    func sendFriendRequest(_ request: FriendRequest) async throws {
+        try friendRequestsCollection.document(request.id).setData(from: request)
+    }
+
+    func getPendingFriendRequests(forUserId userId: String) async throws -> [FriendRequest] {
+        let snapshot = try await friendRequestsCollection
+            .whereField("to_user_id", isEqualTo: userId)
+            .whereField("status", isEqualTo: "pending")
+            .getDocuments()
+        return snapshot.documents.compactMap { try? $0.data(as: FriendRequest.self) }
+    }
+
+    func updateFriendRequest(_ request: FriendRequest) async throws {
+        try friendRequestsCollection.document(request.id).setData(from: request, merge: true)
+    }
+
+    func addFriend(userId: String, friendId: String) async throws {
+        try await usersCollection.document(userId).updateData([
+            "friend_ids": FieldValue.arrayUnion([friendId])
+        ])
+        try await usersCollection.document(friendId).updateData([
+            "friend_ids": FieldValue.arrayUnion([userId])
+        ])
+    }
+
+    func removeFriend(userId: String, friendId: String) async throws {
+        try await usersCollection.document(userId).updateData([
+            "friend_ids": FieldValue.arrayRemove([friendId])
+        ])
+        try await usersCollection.document(friendId).updateData([
+            "friend_ids": FieldValue.arrayRemove([userId])
+        ])
+    }
+
+    func getFriends(forUserId userId: String) async throws -> [TreacheryUser] {
+        guard let user = try await getUser(id: userId) else { return [] }
+        guard !user.friendIds.isEmpty else { return [] }
+
+        var friends: [TreacheryUser] = []
+        for chunk in stride(from: 0, to: user.friendIds.count, by: 30) {
+            let end = min(chunk + 30, user.friendIds.count)
+            let ids = Array(user.friendIds[chunk..<end])
+            let snapshot = try await usersCollection
+                .whereField(FieldPath.documentID(), in: ids)
+                .getDocuments()
+            friends += snapshot.documents.compactMap { try? $0.data(as: TreacheryUser.self) }
+        }
+        return friends.sorted { $0.displayName < $1.displayName }
     }
 
     // MARK: - Games
@@ -43,6 +110,7 @@ final class FirestoreManager {
 
     func getGame(id: String) async throws -> Game? {
         let snapshot = try await gamesCollection.document(id).getDocument()
+        guard snapshot.exists else { return nil }
         return try snapshot.data(as: Game.self)
     }
 
@@ -60,6 +128,22 @@ final class FirestoreManager {
 
     func deleteGame(id: String) async throws {
         try await gamesCollection.document(id).delete()
+    }
+
+    func addPlayerIdToGame(gameId: String, userId: String) async throws {
+        try await gamesCollection.document(gameId).updateData([
+            "player_ids": FieldValue.arrayUnion([userId])
+        ])
+    }
+
+    func getFinishedGames(forUserId userId: String) async throws -> [Game] {
+        let snapshot = try await gamesCollection
+            .whereField("player_ids", arrayContains: userId)
+            .whereField("state", isEqualTo: "finished")
+            .order(by: "created_at", descending: true)
+            .limit(to: 50)
+            .getDocuments()
+        return snapshot.documents.compactMap { try? $0.data(as: Game.self) }
     }
 
     func listenToGame(id: String, onChange: @escaping (Game?) -> Void) -> ListenerRegistration {
