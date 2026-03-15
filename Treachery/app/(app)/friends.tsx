@@ -12,7 +12,7 @@ import {
 import { useAuth } from '@/hooks/useAuth';
 import { useFriends } from '@/hooks/useFriends';
 import { ErrorBanner } from '@/components/ErrorBanner';
-import { colors, spacing } from '@/constants/theme';
+import { colors, spacing, fonts } from '@/constants/theme';
 
 export default function FriendsScreen() {
   const { currentUserId } = useAuth();
@@ -116,6 +116,13 @@ export default function FriendsScreen() {
         </View>
       )}
 
+      {/* Ornate divider */}
+      <View style={styles.ornateDivider}>
+        <View style={styles.ornateLine} />
+        <Text style={styles.ornateDiamond}>&#9670;</Text>
+        <View style={styles.ornateLine} />
+      </View>
+
       {/* Friends list */}
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Friends ({friends.length})</Text>
@@ -131,6 +138,11 @@ export default function FriendsScreen() {
             keyExtractor={(f) => f.id}
             renderItem={({ item }) => (
               <View style={styles.friendRow}>
+                <View style={styles.friendIcon}>
+                  <Text style={styles.friendInitial}>
+                    {item.display_name?.charAt(0)?.toUpperCase() ?? '?'}
+                  </Text>
+                </View>
                 <Text style={styles.friendName}>{item.display_name}</Text>
               </View>
             )}
@@ -152,20 +164,21 @@ const styles = StyleSheet.create({
   searchSection: {
     padding: spacing.lg,
     gap: spacing.sm,
-    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomWidth: 1,
     borderBottomColor: colors.divider,
   },
   section: {
     padding: spacing.lg,
     gap: spacing.sm,
-    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomWidth: 1,
     borderBottomColor: colors.divider,
   },
   sectionTitle: {
     color: colors.textSecondary,
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '600',
     textTransform: 'uppercase',
+    letterSpacing: 1.5,
   },
   searchRow: {
     flexDirection: 'row',
@@ -200,10 +213,12 @@ const styles = StyleSheet.create({
   friendsLabel: {
     color: colors.success,
     fontSize: 12,
+    fontWeight: '500',
   },
   sentLabel: {
     color: colors.warning,
     fontSize: 12,
+    fontStyle: 'italic',
   },
   addButton: {
     borderWidth: 1,
@@ -215,6 +230,7 @@ const styles = StyleSheet.create({
   addButtonText: {
     color: colors.primary,
     fontSize: 12,
+    fontWeight: '600',
   },
   requestRow: {
     flexDirection: 'row',
@@ -226,8 +242,9 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   subtitle: {
-    color: colors.textSecondary,
+    color: colors.textTertiary,
     fontSize: 12,
+    fontStyle: 'italic',
   },
   acceptButton: {
     backgroundColor: colors.primary,
@@ -236,9 +253,9 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
   },
   acceptText: {
-    color: '#FFFFFF',
+    color: '#0d0b1a',
     fontSize: 12,
-    fontWeight: '600',
+    fontWeight: '700',
   },
   declineButton: {
     borderWidth: 1,
@@ -251,18 +268,54 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     fontSize: 12,
   },
+  ornateDivider: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
+    gap: 12,
+  },
+  ornateLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: colors.border,
+  },
+  ornateDiamond: {
+    color: colors.primary,
+    fontSize: 10,
+  },
   emptyText: {
-    color: colors.textSecondary,
+    color: colors.textTertiary,
     fontSize: 14,
     padding: spacing.sm,
+    fontStyle: 'italic',
   },
   list: {
     maxHeight: 400,
   },
   friendRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
     paddingVertical: 10,
-    borderBottomWidth: StyleSheet.hairlineWidth,
+    gap: 10,
+    borderBottomWidth: 1,
     borderBottomColor: colors.divider,
+  },
+  friendIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: colors.surfaceLight,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  friendInitial: {
+    color: colors.primary,
+    fontSize: 14,
+    fontWeight: '600',
+    fontFamily: fonts.serif,
   },
   friendName: {
     color: colors.text,

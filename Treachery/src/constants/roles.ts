@@ -8,10 +8,10 @@ export const ROLE_DISPLAY_NAMES: Record<Role, string> = {
 };
 
 export const ROLE_COLORS: Record<Role, string> = {
-  leader: '#FFD700',   // gold/yellow
-  guardian: '#4A90D9',  // blue
-  assassin: '#E74C3C',  // red
-  traitor: '#9B59B6',   // purple
+  leader: '#e4c96a',   // Royal gold
+  guardian: '#4c8cc9',  // Arcane blue
+  assassin: '#c94c4c',  // Blood red
+  traitor: '#9c4cc9',   // Shadow purple
 };
 
 export const ROLE_WIN_CONDITIONS: Record<Role, string> = {
@@ -29,10 +29,10 @@ export const RARITY_DISPLAY_NAMES: Record<string, string> = {
 };
 
 export const RARITY_COLORS: Record<string, string> = {
-  uncommon: '#2ECC71',
-  rare: '#3498DB',
-  mythic: '#E67E22',
-  special: '#9B59B6',
+  uncommon: '#3ca85c',
+  rare: '#4c8cc9',
+  mythic: '#d4943c',
+  special: '#9c4cc9',
 };
 
 export interface RoleDistribution {

@@ -31,93 +31,121 @@ struct HomeView: View {
 
     var body: some View {
         NavigationStack(path: $path) {
-            VStack(spacing: 24) {
-                #if DEBUG
-                // Dev mode banner
-                if devSettings.devModeEnabled {
-                    HStack(spacing: 6) {
-                        Image(systemName: "hammer.fill")
-                            .font(.caption)
-                        Text("DEV MODE")
-                            .font(.caption)
-                            .fontWeight(.bold)
+            ZStack {
+                Color.mtgBackground.ignoresSafeArea()
+
+                VStack(spacing: 24) {
+                    #if DEBUG
+                    // Dev mode banner
+                    if devSettings.devModeEnabled {
+                        HStack(spacing: 6) {
+                            Image(systemName: "hammer.fill")
+                                .font(.caption)
+                            Text("DEV MODE")
+                                .font(.caption)
+                                .fontWeight(.bold)
+                        }
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .background(.orange)
+                        .clipShape(Capsule())
                     }
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 6)
-                    .background(.orange)
-                    .clipShape(Capsule())
-                }
-                #endif
+                    #endif
 
-                Spacer()
+                    Spacer()
 
-                Text("Treachery")
-                    .font(.largeTitle)
-                    .fontWeight(.bold)
-                    .accessibilityAddTraits(.isHeader)
+                    // Title treatment
+                    VStack(spacing: 8) {
+                        Text("Treachery")
+                            .font(.system(size: 42, weight: .bold, design: .serif))
+                            .foregroundStyle(Color.mtgGoldBright)
+                            .accessibilityAddTraits(.isHeader)
 
-                NavigationLink("Create Game", value: AppDestination.createGame)
-                    .buttonStyle(.borderedProminent)
+                        OrnateDivider()
+                            .padding(.horizontal, 40)
+                    }
+
+                    Spacer()
+                        .frame(height: 16)
+
+                    // Main actions
+                    NavigationLink(value: AppDestination.createGame) {
+                        Text("Create Game")
+                    }
+                    .buttonStyle(MtgPrimaryButtonStyle())
                     .accessibilityLabel("Create a new game")
                     .accessibilityHint("Set up a new Treachery game as host")
+                    .padding(.horizontal)
 
-                NavigationLink("Join Game", value: AppDestination.joinGame)
-                    .buttonStyle(.bordered)
+                    NavigationLink(value: AppDestination.joinGame) {
+                        Text("Join Game")
+                    }
+                    .buttonStyle(MtgSecondaryButtonStyle())
                     .accessibilityLabel("Join an existing game")
                     .accessibilityHint("Enter a game code to join")
+                    .padding(.horizontal)
 
-                Spacer()
+                    Spacer()
 
-                // Bottom navigation
-                HStack(spacing: 24) {
-                    NavigationLink(value: AppDestination.gameHistory) {
-                        VStack(spacing: 4) {
-                            Image(systemName: "clock.fill")
-                            Text("History")
-                                .font(.caption)
+                    // Bottom navigation
+                    HStack(spacing: 24) {
+                        NavigationLink(value: AppDestination.gameHistory) {
+                            VStack(spacing: 4) {
+                                Image(systemName: "clock.fill")
+                                    .font(.title3)
+                                Text("History")
+                                    .font(.caption)
+                            }
+                            .foregroundStyle(Color.mtgTextSecondary)
                         }
-                    }
-                    .accessibilityLabel("Game history")
+                        .accessibilityLabel("Game history")
 
-                    NavigationLink(value: AppDestination.friends) {
-                        VStack(spacing: 4) {
-                            Image(systemName: "person.2.fill")
-                            Text("Friends")
-                                .font(.caption)
+                        NavigationLink(value: AppDestination.friends) {
+                            VStack(spacing: 4) {
+                                Image(systemName: "person.2.fill")
+                                    .font(.title3)
+                                Text("Friends")
+                                    .font(.caption)
+                            }
+                            .foregroundStyle(Color.mtgTextSecondary)
                         }
-                    }
-                    .accessibilityLabel("Friends list")
+                        .accessibilityLabel("Friends list")
 
-                    NavigationLink(value: AppDestination.profile) {
-                        VStack(spacing: 4) {
-                            Image(systemName: "person.circle.fill")
-                            Text("Profile")
-                                .font(.caption)
+                        NavigationLink(value: AppDestination.profile) {
+                            VStack(spacing: 4) {
+                                Image(systemName: "person.circle.fill")
+                                    .font(.title3)
+                                Text("Profile")
+                                    .font(.caption)
+                            }
+                            .foregroundStyle(Color.mtgTextSecondary)
                         }
-                    }
-                    .accessibilityLabel("Your profile")
+                        .accessibilityLabel("Your profile")
 
-                    #if DEBUG
-                    Button {
-                        devSettings.devModeEnabled.toggle()
-                    } label: {
-                        VStack(spacing: 4) {
-                            Image(systemName: devSettings.devModeEnabled ? "hammer.fill" : "hammer")
-                                .foregroundStyle(devSettings.devModeEnabled ? .orange : .secondary)
-                            Text("Dev")
-                                .font(.caption)
-                                .foregroundStyle(devSettings.devModeEnabled ? .orange : .secondary)
+                        #if DEBUG
+                        Button {
+                            devSettings.devModeEnabled.toggle()
+                        } label: {
+                            VStack(spacing: 4) {
+                                Image(systemName: devSettings.devModeEnabled ? "hammer.fill" : "hammer")
+                                    .font(.title3)
+                                    .foregroundStyle(devSettings.devModeEnabled ? .orange : Color.mtgTextSecondary)
+                                Text("Dev")
+                                    .font(.caption)
+                                    .foregroundStyle(devSettings.devModeEnabled ? .orange : Color.mtgTextSecondary)
+                            }
                         }
+                        .accessibilityLabel("Toggle dev mode")
+                        .accessibilityValue(devSettings.devModeEnabled ? "Enabled" : "Disabled")
+                        #endif
                     }
-                    .accessibilityLabel("Toggle dev mode")
-                    .accessibilityValue(devSettings.devModeEnabled ? "Enabled" : "Disabled")
-                    #endif
+                    .padding(.bottom)
                 }
-                .padding(.bottom)
+                .padding()
             }
-            .padding()
             .navigationTitle("Home")
+            .toolbarColorScheme(.dark, for: .navigationBar)
             .navigationDestination(for: AppDestination.self) { destination in
                 switch destination {
                 case .createGame:

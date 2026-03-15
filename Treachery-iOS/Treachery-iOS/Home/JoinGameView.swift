@@ -18,58 +18,74 @@ struct JoinGameView: View {
     private let firestoreManager = FirestoreManager()
 
     var body: some View {
-        VStack(spacing: 24) {
-            Text("Enter the 4-character game code")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
+        ZStack {
+            Color.mtgBackground.ignoresSafeArea()
 
-            TextField("ABCD", text: $gameCode)
-                .textFieldStyle(.roundedBorder)
-                .textInputAutocapitalization(.characters)
-                .disableAutocorrection(true)
-                .font(.title.monospaced())
-                .multilineTextAlignment(.center)
-                .accessibilityLabel("Game code")
-                .accessibilityHint("Enter the 4-character code to join a game")
-                .onChange(of: gameCode) { _, newValue in
-                    gameCode = String(newValue.uppercased().prefix(4))
+            VStack(spacing: 24) {
+                Spacer()
+                    .frame(height: 20)
+
+                // Game code entry card
+                VStack(spacing: 16) {
+                    MtgSectionHeader(title: "Enter Game Code")
+
+                    OrnateDivider()
+
+                    Text("Enter the 4-character game code")
+                        .font(.subheadline)
+                        .foregroundStyle(Color.mtgTextSecondary)
+
+                    TextField("ABCD", text: $gameCode)
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 16)
+                        .foregroundStyle(Color.mtgGoldBright)
+                        .background(Color.mtgCardElevated)
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 8)
+                                .stroke(Color.mtgGold, lineWidth: 1.5)
+                        )
+                        .textInputAutocapitalization(.characters)
+                        .disableAutocorrection(true)
+                        .font(.system(size: 32, weight: .bold, design: .monospaced))
+                        .multilineTextAlignment(.center)
+                        .accessibilityLabel("Game code")
+                        .accessibilityHint("Enter the 4-character code to join a game")
+                        .onChange(of: gameCode) { _, newValue in
+                            gameCode = String(newValue.uppercased().prefix(4))
+                        }
+                }
+                .padding(20)
+                .mtgCardFrame()
+
+                if let error = errorMessage {
+                    MtgErrorBanner(message: error)
                 }
 
-            if let error = errorMessage {
-                HStack(spacing: 6) {
-                    Image(systemName: "exclamationmark.triangle.fill")
-                        .foregroundStyle(.red)
-                        .font(.caption)
-                    Text(error)
-                        .foregroundStyle(.red)
-                        .font(.caption)
-                }
-                .accessibilityElement(children: .combine)
-                .accessibilityLabel("Error: \(error)")
-            }
-
-            Button {
-                Task { await joinGame() }
-            } label: {
-                if isJoining {
-                    HStack(spacing: 8) {
-                        ProgressView()
-                            .controlSize(.small)
-                            .tint(.white)
-                        Text("Joining...")
+                Button {
+                    Task { await joinGame() }
+                } label: {
+                    if isJoining {
+                        HStack(spacing: 8) {
+                            ProgressView()
+                                .controlSize(.small)
+                                .tint(Color.mtgBackground)
+                            Text("Joining...")
+                        }
+                    } else {
+                        Text("Join Game")
                     }
-                } else {
-                    Text("Join Game")
                 }
-            }
-            .buttonStyle(.borderedProminent)
-            .disabled(gameCode.count < 4 || isJoining)
-            .accessibilityLabel(isJoining ? "Joining game" : "Join game")
+                .buttonStyle(MtgPrimaryButtonStyle(isDisabled: gameCode.count < 4 || isJoining))
+                .disabled(gameCode.count < 4 || isJoining)
+                .accessibilityLabel(isJoining ? "Joining game" : "Join game")
 
-            Spacer()
+                Spacer()
+            }
+            .padding()
         }
-        .padding()
         .navigationTitle("Join Game")
+        .toolbarColorScheme(.dark, for: .navigationBar)
     }
 
     private func joinGame() async {

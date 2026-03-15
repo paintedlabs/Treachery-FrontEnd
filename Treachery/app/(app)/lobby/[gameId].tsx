@@ -17,7 +17,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useLobby } from '@/hooks/useLobby';
 import { ErrorBanner } from '@/components/ErrorBanner';
 import { LoadingScreen } from '@/components/LoadingScreen';
-import { colors, spacing } from '@/constants/theme';
+import { colors, spacing, fonts } from '@/constants/theme';
 import { MINIMUM_PLAYER_COUNT } from '@/constants/roles';
 
 export default function LobbyScreen() {
@@ -110,19 +110,27 @@ export default function LobbyScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Game code display */}
+      {/* Game code display - ornate card frame */}
       {game && (
         <View style={styles.codeSection}>
-          <Text style={styles.codeLabel}>Game Code</Text>
-          <Text style={styles.codeText}>{game.code}</Text>
-          <TouchableOpacity style={styles.shareButton} onPress={handleShare}>
-            <Ionicons name="share-outline" size={14} color={colors.primary} />
-            <Text style={styles.shareText}>Share Code</Text>
-          </TouchableOpacity>
+          <View style={styles.codeFrame}>
+            <View style={styles.codeTrim} />
+            <Text style={styles.codeLabel}>Game Code</Text>
+            <Text style={styles.codeText}>{game.code}</Text>
+            <TouchableOpacity style={styles.shareButton} onPress={handleShare}>
+              <Ionicons name="share-outline" size={14} color={colors.primary} />
+              <Text style={styles.shareText}>Share Code</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       )}
 
-      <View style={styles.divider} />
+      {/* Ornate divider */}
+      <View style={styles.ornateDividerRow}>
+        <View style={styles.ornateLine} />
+        <Text style={styles.ornateDiamond}>&#9670;</Text>
+        <View style={styles.ornateLine} />
+      </View>
 
       {/* Player list */}
       <Text style={styles.sectionTitle}>
@@ -137,6 +145,9 @@ export default function LobbyScreen() {
           keyExtractor={(p) => p.id}
           renderItem={({ item }) => (
             <View style={styles.playerRow}>
+              <View style={styles.playerIcon}>
+                <Ionicons name="person" size={14} color={colors.textSecondary} />
+              </View>
               <Text style={[styles.playerName, item.user_id === game?.host_id && styles.bold]}>
                 {item.display_name}
               </Text>
@@ -153,7 +164,7 @@ export default function LobbyScreen() {
 
       {!isHost && (
         <View style={styles.waitingRow}>
-          <ActivityIndicator size="small" color={colors.textSecondary} />
+          <ActivityIndicator size="small" color={colors.primary} />
           <Text style={styles.waitingForHost}>
             Waiting for host to start the game...
           </Text>
@@ -173,7 +184,7 @@ export default function LobbyScreen() {
             >
               {isStartingGame ? (
                 <View style={styles.buttonRow}>
-                  <ActivityIndicator size="small" color="#fff" />
+                  <ActivityIndicator size="small" color="#0d0b1a" />
                   <Text style={styles.buttonText}>Starting...</Text>
                 </View>
               ) : (
@@ -211,20 +222,37 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   codeSection: {
-    alignItems: 'center',
     padding: spacing.lg,
-    gap: 4,
+  },
+  codeFrame: {
+    alignItems: 'center',
+    backgroundColor: colors.surface,
+    borderWidth: 2,
+    borderColor: colors.borderAccent,
+    borderRadius: 12,
+    paddingBottom: 16,
+    overflow: 'hidden',
+  },
+  codeTrim: {
+    height: 3,
+    backgroundColor: colors.primary,
+    alignSelf: 'stretch',
+    marginBottom: 12,
   },
   codeLabel: {
     color: colors.textSecondary,
-    fontSize: 12,
+    fontSize: 11,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 1.5,
   },
   codeText: {
-    color: colors.text,
+    color: colors.primaryBright,
     fontSize: 48,
     fontWeight: 'bold',
     fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
     letterSpacing: 8,
+    marginVertical: 4,
   },
   shareButton: {
     flexDirection: 'row',
@@ -236,24 +264,37 @@ const styles = StyleSheet.create({
     color: colors.primary,
     fontSize: 12,
   },
-  divider: {
-    height: StyleSheet.hairlineWidth,
-    backgroundColor: colors.divider,
+  ornateDividerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: spacing.lg,
+    gap: 12,
+  },
+  ornateLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: colors.border,
+  },
+  ornateDiamond: {
+    color: colors.primary,
+    fontSize: 10,
   },
   sectionTitle: {
     color: colors.textSecondary,
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '600',
     textTransform: 'uppercase',
+    letterSpacing: 1.5,
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.lg,
     paddingBottom: spacing.sm,
   },
   waitingText: {
-    color: colors.textSecondary,
+    color: colors.textTertiary,
     fontSize: 14,
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.sm,
+    fontStyle: 'italic',
   },
   list: {
     flex: 1,
@@ -263,8 +304,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: spacing.lg,
     paddingVertical: 12,
-    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomWidth: 1,
     borderBottomColor: colors.divider,
+  },
+  playerIcon: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: colors.surfaceLight,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 10,
   },
   playerName: {
     color: colors.text,
@@ -275,14 +327,17 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   hostBadge: {
-    backgroundColor: 'rgba(255,255,255,0.1)',
+    backgroundColor: 'rgba(201, 168, 76, 0.15)',
+    borderWidth: 1,
+    borderColor: 'rgba(201, 168, 76, 0.3)',
     paddingHorizontal: 8,
     paddingVertical: 2,
     borderRadius: 10,
   },
   hostBadgeText: {
-    color: colors.textSecondary,
+    color: colors.primary,
     fontSize: 12,
+    fontWeight: '500',
   },
   waitingRow: {
     flexDirection: 'row',
@@ -294,6 +349,7 @@ const styles = StyleSheet.create({
   waitingForHost: {
     color: colors.textSecondary,
     fontSize: 14,
+    fontStyle: 'italic',
   },
   bottomButtons: {
     padding: spacing.lg,
@@ -316,13 +372,14 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   buttonText: {
-    color: '#FFFFFF',
+    color: '#0d0b1a',
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: '700',
   },
   minPlayersText: {
-    color: colors.textSecondary,
+    color: colors.textTertiary,
     fontSize: 12,
+    fontStyle: 'italic',
   },
   leaveButton: {
     padding: 10,
@@ -335,6 +392,7 @@ const styles = StyleSheet.create({
     color: colors.text,
     fontSize: 20,
     fontWeight: 'bold',
+    fontFamily: fonts.serif,
   },
   disbandedText: {
     color: colors.textSecondary,

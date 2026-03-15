@@ -14,7 +14,7 @@ import { ErrorBanner } from '@/components/ErrorBanner';
 import { getCard } from '@/services/cardDatabase';
 import { ROLE_COLORS, ROLE_DISPLAY_NAMES } from '@/constants/roles';
 import { Game, Player, Role } from '@/models/types';
-import { colors, spacing } from '@/constants/theme';
+import { colors, spacing, fonts } from '@/constants/theme';
 
 export default function HistoryScreen() {
   const { currentUserId } = useAuth();
@@ -33,7 +33,7 @@ export default function HistoryScreen() {
   if (games.length === 0) {
     return (
       <View style={styles.centerContainer}>
-        <Ionicons name="time-outline" size={48} color={colors.textSecondary} />
+        <Ionicons name="time-outline" size={48} color={colors.textTertiary} />
         <Text style={styles.emptyTitle}>No games yet</Text>
         <Text style={styles.emptyText}>Finished games will appear here.</Text>
       </View>
@@ -97,8 +97,13 @@ function GameHistoryRow({
     return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   };
 
+  // Use role color for the card border accent
+  const borderColor = myPlayer?.role
+    ? ROLE_COLORS[myPlayer.role] + '60'
+    : colors.border;
+
   return (
-    <View style={styles.gameCard}>
+    <View style={[styles.gameCard, { borderColor }]}>
       {/* Header: date + result */}
       <View style={styles.gameHeader}>
         <View>
@@ -198,19 +203,24 @@ const styles = StyleSheet.create({
   loadingText: {
     color: colors.textSecondary,
     fontSize: 14,
+    fontFamily: fonts.serif,
+    fontStyle: 'italic',
   },
   emptyTitle: {
     color: colors.text,
     fontSize: 18,
     fontWeight: '600',
+    fontFamily: fonts.serif,
   },
   emptyText: {
     color: colors.textSecondary,
     fontSize: 14,
+    fontStyle: 'italic',
   },
   gameCard: {
     backgroundColor: colors.surface,
     borderRadius: 10,
+    borderWidth: 1,
     overflow: 'hidden',
     padding: 12,
     gap: 8,
@@ -236,6 +246,7 @@ const styles = StyleSheet.create({
   resultText: {
     fontSize: 14,
     fontWeight: 'bold',
+    fontFamily: fonts.serif,
   },
   winnerRow: {
     flexDirection: 'row',
@@ -249,9 +260,10 @@ const styles = StyleSheet.create({
   },
   winnerText: {
     fontSize: 12,
+    fontWeight: '500',
   },
   gameDivider: {
-    height: StyleSheet.hairlineWidth,
+    height: 1,
     backgroundColor: colors.divider,
   },
   playerGrid: {
@@ -283,6 +295,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
+    paddingTop: 4,
+    borderTopWidth: 1,
+    borderTopColor: colors.divider,
   },
   myRoleLabel: {
     color: colors.textSecondary,
@@ -293,7 +308,9 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   myCardName: {
-    color: colors.textSecondary,
+    color: colors.textTertiary,
     fontSize: 10,
+    fontFamily: fonts.serif,
+    fontStyle: 'italic',
   },
 });

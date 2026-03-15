@@ -19,16 +19,27 @@ struct PhoneAuthView: View {
             if authViewModel.isAwaitingVerification {
                 // Step 2: Enter verification code
                 Text("Enter Verification Code")
-                    .font(.title2)
+                    .font(.system(.title2, design: .serif))
                     .fontWeight(.semibold)
+                    .foregroundStyle(Color.mtgGoldBright)
                     .accessibilityAddTraits(.isHeader)
 
                 Text("A 6-digit code was sent to \(phoneNumber)")
                     .font(.subheadline)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Color.mtgTextSecondary)
+
+                OrnateDivider()
 
                 TextField("000000", text: $verificationCode)
-                    .textFieldStyle(.roundedBorder)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 14)
+                    .foregroundStyle(Color.mtgTextPrimary)
+                    .background(Color.mtgCardElevated)
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 8)
+                            .stroke(Color.mtgGold, lineWidth: 1.5)
+                    )
                     .keyboardType(.numberPad)
                     .textContentType(.oneTimeCode)
                     .font(.title2.monospaced())
@@ -40,16 +51,7 @@ struct PhoneAuthView: View {
                     }
 
                 if let error = authViewModel.errorMessage {
-                    HStack(spacing: 6) {
-                        Image(systemName: "exclamationmark.triangle.fill")
-                            .foregroundStyle(.red)
-                            .font(.caption)
-                        Text(error)
-                            .foregroundStyle(.red)
-                            .font(.caption)
-                    }
-                    .accessibilityElement(children: .combine)
-                    .accessibilityLabel("Error: \(error)")
+                    MtgErrorBanner(message: error)
                 }
 
                 Button {
@@ -59,16 +61,14 @@ struct PhoneAuthView: View {
                         HStack(spacing: 8) {
                             ProgressView()
                                 .controlSize(.small)
-                                .tint(.white)
+                                .tint(Color.mtgBackground)
                             Text("Verifying...")
                         }
-                        .frame(maxWidth: .infinity)
                     } else {
                         Text("Verify")
-                            .frame(maxWidth: .infinity)
                     }
                 }
-                .buttonStyle(.borderedProminent)
+                .buttonStyle(MtgPrimaryButtonStyle(isDisabled: verificationCode.count < 6 || isVerifying))
                 .disabled(verificationCode.count < 6 || isVerifying)
                 .accessibilityLabel(isVerifying ? "Verifying code" : "Verify code")
 
@@ -77,36 +77,39 @@ struct PhoneAuthView: View {
                     authViewModel.cancelPhoneVerification()
                 }
                 .font(.footnote)
+                .foregroundStyle(Color.mtgTextSecondary)
                 .accessibilityLabel("Go back and use a different phone number")
             } else {
                 // Step 1: Enter phone number
                 Text("Phone Sign In")
-                    .font(.title2)
+                    .font(.system(.title2, design: .serif))
                     .fontWeight(.semibold)
+                    .foregroundStyle(Color.mtgGoldBright)
                     .accessibilityAddTraits(.isHeader)
 
                 Text("Enter your phone number with country code")
                     .font(.subheadline)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Color.mtgTextSecondary)
+
+                OrnateDivider()
 
                 TextField("+1 555-123-4567", text: $phoneNumber)
-                    .textFieldStyle(.roundedBorder)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 14)
+                    .foregroundStyle(Color.mtgTextPrimary)
+                    .background(Color.mtgCardElevated)
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 8)
+                            .stroke(Color.mtgDivider, lineWidth: 1)
+                    )
                     .keyboardType(.phonePad)
                     .textContentType(.telephoneNumber)
                     .accessibilityLabel("Phone number")
                     .accessibilityHint("Include country code, e.g. plus 1 for US")
 
                 if let error = authViewModel.errorMessage {
-                    HStack(spacing: 6) {
-                        Image(systemName: "exclamationmark.triangle.fill")
-                            .foregroundStyle(.red)
-                            .font(.caption)
-                        Text(error)
-                            .foregroundStyle(.red)
-                            .font(.caption)
-                    }
-                    .accessibilityElement(children: .combine)
-                    .accessibilityLabel("Error: \(error)")
+                    MtgErrorBanner(message: error)
                 }
 
                 Button {
@@ -116,16 +119,14 @@ struct PhoneAuthView: View {
                         HStack(spacing: 8) {
                             ProgressView()
                                 .controlSize(.small)
-                                .tint(.white)
+                                .tint(Color.mtgBackground)
                             Text("Sending...")
                         }
-                        .frame(maxWidth: .infinity)
                     } else {
                         Text("Send Verification Code")
-                            .frame(maxWidth: .infinity)
                     }
                 }
-                .buttonStyle(.borderedProminent)
+                .buttonStyle(MtgPrimaryButtonStyle(isDisabled: phoneNumber.isEmpty || authViewModel.isSendingCode))
                 .disabled(phoneNumber.isEmpty || authViewModel.isSendingCode)
                 .accessibilityLabel(authViewModel.isSendingCode ? "Sending verification code" : "Send verification code")
             }
@@ -133,7 +134,9 @@ struct PhoneAuthView: View {
             Spacer()
         }
         .padding()
+        .mtgBackground()
         .navigationTitle("Phone Sign In")
+        .toolbarColorScheme(.dark, for: .navigationBar)
         .onDisappear {
             authViewModel.cancelPhoneVerification()
         }

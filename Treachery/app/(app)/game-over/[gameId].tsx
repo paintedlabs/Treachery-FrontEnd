@@ -6,7 +6,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useGameBoard } from '@/hooks/useGameBoard';
 import { LoadingScreen } from '@/components/LoadingScreen';
 import { ROLE_COLORS, ROLE_DISPLAY_NAMES } from '@/constants/roles';
-import { colors, spacing } from '@/constants/theme';
+import { colors, spacing, fonts } from '@/constants/theme';
 
 export default function GameOverScreen() {
   const { gameId } = useLocalSearchParams<{ gameId: string }>();
@@ -28,8 +28,16 @@ export default function GameOverScreen() {
       {/* Winner announcement */}
       {winningTeam && (
         <View style={styles.announcement}>
-          <Ionicons name="trophy" size={48} color={trophyColor} />
+          <Ionicons name="trophy" size={56} color={trophyColor} />
           <Text style={styles.gameOverText}>Game Over</Text>
+
+          {/* Ornate divider */}
+          <View style={styles.ornateDivider}>
+            <View style={styles.ornateLine} />
+            <Text style={[styles.ornateDiamond, { color: trophyColor }]}>&#9670;</Text>
+            <View style={styles.ornateLine} />
+          </View>
+
           <View style={styles.winnerRow}>
             <View style={[styles.winnerDot, { backgroundColor: trophyColor }]} />
             <Text style={[styles.winnerText, { color: trophyColor }]}>
@@ -48,6 +56,8 @@ export default function GameOverScreen() {
           return (
             <View key={player.id}>
               <View style={styles.playerRow}>
+                {/* Left accent bar */}
+                <View style={[styles.accentBar, { backgroundColor: roleColor }]} />
                 <View style={[styles.roleDot, { backgroundColor: roleColor }]} />
                 <Text style={styles.playerName}>{player.display_name}</Text>
                 <View style={styles.playerRight}>
@@ -96,8 +106,23 @@ const styles = StyleSheet.create({
   },
   gameOverText: {
     color: colors.text,
-    fontSize: 28,
+    fontSize: 32,
     fontWeight: 'bold',
+    fontFamily: fonts.serif,
+  },
+  ornateDivider: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    width: 180,
+  },
+  ornateLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: colors.border,
+  },
+  ornateDiamond: {
+    fontSize: 10,
   },
   winnerRow: {
     flexDirection: 'row',
@@ -110,12 +135,15 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   winnerText: {
-    fontSize: 22,
+    fontSize: 24,
     fontWeight: '600',
+    fontFamily: fonts.serif,
   },
   playerList: {
     backgroundColor: colors.surface,
     borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.border,
     overflow: 'hidden',
   },
   playerRow: {
@@ -123,6 +151,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 12,
     gap: 8,
+  },
+  accentBar: {
+    width: 3,
+    alignSelf: 'stretch',
+    borderRadius: 2,
   },
   roleDot: {
     width: 12,
@@ -141,13 +174,16 @@ const styles = StyleSheet.create({
   },
   roleText: {
     fontSize: 14,
+    fontWeight: '500',
   },
   cardName: {
     color: colors.textSecondary,
     fontSize: 12,
+    fontFamily: fonts.serif,
+    fontStyle: 'italic',
   },
   rowDivider: {
-    height: StyleSheet.hairlineWidth,
+    height: 1,
     backgroundColor: colors.divider,
     marginHorizontal: 12,
   },
@@ -159,8 +195,8 @@ const styles = StyleSheet.create({
     marginBottom: spacing.lg,
   },
   homeButtonText: {
-    color: '#FFFFFF',
+    color: '#0d0b1a',
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: '700',
   },
 });

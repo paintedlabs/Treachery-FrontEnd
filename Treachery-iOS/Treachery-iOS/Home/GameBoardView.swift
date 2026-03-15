@@ -24,128 +24,148 @@ struct GameBoardView: View {
     }
 
     var body: some View {
-        VStack(spacing: 0) {
-            if viewModel.isGameUnavailable {
-                // Game was deleted or became unavailable
-                Spacer()
-                VStack(spacing: 12) {
-                    Image(systemName: "wifi.exclamationmark")
-                        .font(.system(size: 48))
-                        .foregroundStyle(.orange)
-                    Text("Game Unavailable")
-                        .font(.title2)
-                        .fontWeight(.bold)
-                    Text("This game is no longer available. It may have been deleted by the host.")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                        .multilineTextAlignment(.center)
-                    Button("Return to Home") {
-                        navigationPath.removeLast(navigationPath.count)
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .padding(.top)
-                }
-                .padding()
-                Spacer()
-            } else if viewModel.players.isEmpty {
-                // Loading state
-                Spacer()
-                VStack(spacing: 12) {
-                    ProgressView()
-                    Text("Loading game...")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                }
-                Spacer()
-            } else {
-                // Current player's identity card (tappable)
-                if let card = viewModel.currentIdentityCard,
-                   let player = viewModel.currentPlayer {
-                    ZStack {
-                        Button {
-                            showCardDetail = true
-                        } label: {
-                            IdentityCardHeader(card: card, player: player)
-                        }
-                        .buttonStyle(.plain)
-                        .rotation3DEffect(
-                            .degrees(cardFlipDegrees),
-                            axis: (x: 0, y: 1, z: 0),
-                            perspective: 0.5
-                        )
-                        .accessibilityLabel("Your identity card: \(card.name), \(player.role?.displayName ?? "Unknown") role, \(player.lifeTotal) life. Tap for details.")
-                        .accessibilityHint("Opens full identity card view")
+        ZStack {
+            Color.mtgBackground.ignoresSafeArea()
 
-                        // Unveiled banner overlay
-                        if showUnveiledBanner {
-                            VStack {
-                                Text("IDENTITY REVEALED")
-                                    .font(.headline)
-                                    .fontWeight(.black)
-                                    .foregroundStyle(.white)
-                                    .padding(.horizontal, 20)
-                                    .padding(.vertical, 10)
-                                    .background(
-                                        RoundedRectangle(cornerRadius: 8)
-                                            .fill(player.role?.color ?? .blue)
-                                            .shadow(color: (player.role?.color ?? .blue).opacity(0.6), radius: 12)
-                                    )
-                            }
-                            .transition(.scale.combined(with: .opacity))
-                            .zIndex(1)
-                        }
-                    }
-                } else {
-                    // Current player not found (reconnection case)
-                    VStack(spacing: 8) {
-                        Image(systemName: "exclamationmark.triangle.fill")
-                            .font(.title)
-                            .foregroundStyle(.orange)
-                        Text("Unable to find your player data")
+            VStack(spacing: 0) {
+                if viewModel.isGameUnavailable {
+                    // Game was deleted or became unavailable
+                    Spacer()
+                    VStack(spacing: 12) {
+                        Image(systemName: "wifi.exclamationmark")
+                            .font(.system(size: 48))
+                            .foregroundStyle(Color.mtgGold)
+                        Text("Game Unavailable")
+                            .font(.system(.title2, design: .serif))
+                            .fontWeight(.bold)
+                            .foregroundStyle(Color.mtgTextPrimary)
+                        Text("This game is no longer available. It may have been deleted by the host.")
                             .font(.subheadline)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Color.mtgTextSecondary)
+                            .multilineTextAlignment(.center)
+                        Button("Return to Home") {
+                            navigationPath.removeLast(navigationPath.count)
+                        }
+                        .buttonStyle(MtgPrimaryButtonStyle())
+                        .padding(.top)
+                        .padding(.horizontal, 40)
                     }
                     .padding()
-                }
+                    Spacer()
+                } else if viewModel.players.isEmpty {
+                    // Loading state
+                    Spacer()
+                    VStack(spacing: 12) {
+                        ProgressView()
+                            .tint(Color.mtgGold)
+                        Text("Loading game...")
+                            .font(.subheadline)
+                            .foregroundStyle(Color.mtgTextSecondary)
+                    }
+                    Spacer()
+                } else {
+                    // Current player's identity card (tappable)
+                    if let card = viewModel.currentIdentityCard,
+                       let player = viewModel.currentPlayer {
+                        ZStack {
+                            Button {
+                                showCardDetail = true
+                            } label: {
+                                IdentityCardHeader(card: card, player: player)
+                            }
+                            .buttonStyle(.plain)
+                            .rotation3DEffect(
+                                .degrees(cardFlipDegrees),
+                                axis: (x: 0, y: 1, z: 0),
+                                perspective: 0.5
+                            )
+                            .accessibilityLabel("Your identity card: \(card.name), \(player.role?.displayName ?? "Unknown") role, \(player.lifeTotal) life. Tap for details.")
+                            .accessibilityHint("Opens full identity card view")
 
-                Divider()
-
-                // Player list with life controls
-                List {
-                    Section("Players") {
-                        ForEach(viewModel.players) { player in
-                            PlayerRow(player: player, viewModel: viewModel) { tappedPlayer in
-                                inspectedPlayer = tappedPlayer
+                            // Unveiled banner overlay
+                            if showUnveiledBanner {
+                                VStack {
+                                    Text("IDENTITY REVEALED")
+                                        .font(.headline)
+                                        .fontWeight(.black)
+                                        .foregroundStyle(Color.mtgBackground)
+                                        .padding(.horizontal, 20)
+                                        .padding(.vertical, 10)
+                                        .background(
+                                            RoundedRectangle(cornerRadius: 8)
+                                                .fill(player.role?.color ?? Color.mtgGuardian)
+                                                .shadow(color: (player.role?.color ?? Color.mtgGuardian).opacity(0.6), radius: 12)
+                                        )
+                                }
+                                .transition(.scale.combined(with: .opacity))
+                                .zIndex(1)
                             }
                         }
+                    } else {
+                        // Current player not found (reconnection case)
+                        VStack(spacing: 8) {
+                            Image(systemName: "exclamationmark.triangle.fill")
+                                .font(.title)
+                                .foregroundStyle(Color.mtgGold)
+                            Text("Unable to find your player data")
+                                .font(.subheadline)
+                                .foregroundStyle(Color.mtgTextSecondary)
+                        }
+                        .padding()
                     }
-                }
-                .listStyle(.insetGrouped)
-                .sheet(item: $inspectedPlayer) { player in
-                    if let card = viewModel.identityCard(for: player) {
-                        IdentityCardView(card: card, player: player)
-                    }
-                }
 
-                // Error display
-                if let error = viewModel.errorMessage {
-                    HStack(spacing: 6) {
-                        Image(systemName: "exclamationmark.triangle.fill")
-                            .foregroundStyle(.red)
-                            .font(.caption)
-                        Text(error)
-                            .foregroundStyle(.red)
-                            .font(.caption)
-                    }
-                    .padding(.horizontal)
-                    .padding(.vertical, 4)
-                }
+                    OrnateDivider()
+                        .padding(.horizontal)
+                        .padding(.vertical, 4)
 
-                // Action bar
-                ActionBar(viewModel: viewModel, onUnveil: playUnveilAnimation)
+                    // Player list with life controls
+                    ScrollView {
+                        VStack(spacing: 0) {
+                            MtgSectionHeader(title: "Players")
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(.horizontal, 16)
+                                .padding(.bottom, 8)
+
+                            VStack(spacing: 0) {
+                                ForEach(viewModel.players) { player in
+                                    PlayerRow(player: player, viewModel: viewModel) { tappedPlayer in
+                                        inspectedPlayer = tappedPlayer
+                                    }
+                                    .padding(.horizontal, 16)
+                                    .padding(.vertical, 8)
+
+                                    if player.id != viewModel.players.last?.id {
+                                        Rectangle()
+                                            .fill(Color.mtgDivider)
+                                            .frame(height: 1)
+                                            .padding(.horizontal, 16)
+                                    }
+                                }
+                            }
+                            .mtgCardFrame()
+                            .padding(.horizontal)
+                        }
+                    }
+                    .sheet(item: $inspectedPlayer) { player in
+                        if let card = viewModel.identityCard(for: player) {
+                            IdentityCardView(card: card, player: player)
+                        }
+                    }
+
+                    // Error display
+                    if let error = viewModel.errorMessage {
+                        MtgErrorBanner(message: error)
+                            .padding(.horizontal)
+                            .padding(.vertical, 4)
+                    }
+
+                    // Action bar
+                    ActionBar(viewModel: viewModel, onUnveil: playUnveilAnimation)
+                }
             }
         }
         .navigationTitle("Game")
+        .toolbarColorScheme(.dark, for: .navigationBar)
         .navigationBarBackButtonHidden(true)
         .toolbar {
             if !viewModel.isGameUnavailable && !(viewModel.currentPlayer?.isEliminated ?? true) {
@@ -154,7 +174,7 @@ struct GameBoardView: View {
                         showForfeitConfirmation = true
                     } label: {
                         Image(systemName: "flag.fill")
-                            .foregroundStyle(.orange)
+                            .foregroundStyle(Color.mtgGold)
                     }
                     .accessibilityLabel("Forfeit and leave game")
                 }
@@ -199,12 +219,12 @@ struct GameBoardView: View {
     // MARK: - Unveil Animation
 
     private func playUnveilAnimation() {
-        // Phase 1: Flip card away (0 → 90 degrees)
+        // Phase 1: Flip card away (0 -> 90 degrees)
         withAnimation(.easeIn(duration: 0.3)) {
             cardFlipDegrees = 90
         }
 
-        // Phase 2: Perform the unveil at the midpoint, then flip back (90 → 0)
+        // Phase 2: Perform the unveil at the midpoint, then flip back (90 -> 0)
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
             Task { await viewModel.unveilCurrentPlayer() }
 
@@ -243,32 +263,39 @@ private struct IdentityCardHeader: View {
                         .frame(width: 12, height: 12)
                     Text(player.role?.displayName ?? "Unknown")
                         .font(.headline)
-                        .foregroundStyle(player.role?.color ?? .primary)
+                        .foregroundStyle(player.role?.color ?? Color.mtgTextPrimary)
                 }
 
                 Spacer()
 
-                Text("Life: \(player.lifeTotal)")
-                    .font(.title2)
-                    .fontWeight(.bold)
-                    .contentTransition(.numericText())
+                // Life total - large and prominent
+                HStack(spacing: 4) {
+                    Image(systemName: "heart.fill")
+                        .font(.caption)
+                        .foregroundStyle(Color.mtgError)
+                    Text("\(player.lifeTotal)")
+                        .font(.system(size: 28, weight: .bold, design: .serif))
+                        .foregroundStyle(Color.mtgTextPrimary)
+                        .contentTransition(.numericText())
+                }
             }
 
             // Card name
             HStack {
                 Text(card.name)
-                    .font(.title3)
+                    .font(.system(.title3, design: .serif))
                     .fontWeight(.semibold)
+                    .foregroundStyle(Color.mtgTextPrimary)
                 Spacer()
                 Image(systemName: "chevron.right")
                     .font(.caption)
-                    .foregroundStyle(.tertiary)
+                    .foregroundStyle(Color.mtgTextSecondary)
             }
 
             // Ability text
             Text(card.abilityText)
                 .font(.caption)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Color.mtgTextSecondary)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .lineLimit(3)
 
@@ -277,15 +304,20 @@ private struct IdentityCardHeader: View {
                 if !player.isUnveiled {
                     Text("Unveil: \(card.unveilCost)")
                         .font(.caption2)
+                        .foregroundStyle(Color.mtgTextSecondary)
                         .padding(.horizontal, 8)
                         .padding(.vertical, 2)
-                        .background(.secondary.opacity(0.2))
+                        .background(Color.mtgCardElevated)
                         .clipShape(Capsule())
+                        .overlay(
+                            Capsule()
+                                .stroke(Color.mtgDivider, lineWidth: 1)
+                        )
                 } else {
                     Text("UNVEILED")
                         .font(.caption2)
                         .fontWeight(.bold)
-                        .foregroundStyle(.white)
+                        .foregroundStyle(Color.mtgBackground)
                         .padding(.horizontal, 8)
                         .padding(.vertical, 2)
                         .background(player.role?.color ?? .gray)
@@ -294,11 +326,15 @@ private struct IdentityCardHeader: View {
                 Spacer()
                 Text("Tap for details")
                     .font(.caption2)
-                    .foregroundStyle(.tertiary)
+                    .foregroundStyle(Color.mtgTextSecondary)
             }
         }
         .padding()
-        .background(.ultraThinMaterial)
+        .background(Color.mtgSurface)
+        .overlay(
+            RoundedRectangle(cornerRadius: 0)
+                .stroke(Color.mtgBorderAccent, lineWidth: 1)
+        )
     }
 }
 
@@ -314,7 +350,7 @@ private struct PlayerRow: View {
     }
 
     /// Whether this player's card can be inspected by the current user.
-    /// True for unveiled players and leaders (but not yourself — you have the header).
+    /// True for unveiled players and leaders (but not yourself -- you have the header).
     private var canInspectCard: Bool {
         guard !isCurrentUser else { return false }
         guard viewModel.identityCard(for: player) != nil else { return false }
@@ -329,20 +365,21 @@ private struct PlayerRow: View {
                     Text(player.displayName)
                         .fontWeight(isCurrentUser ? .bold : .regular)
                         .strikethrough(player.isEliminated)
-                        .foregroundStyle(player.isEliminated ? .secondary : .primary)
+                        .foregroundStyle(player.isEliminated ? Color.mtgTextSecondary : Color.mtgTextPrimary)
 
                     if isCurrentUser {
                         Text("You")
                             .font(.caption2)
+                            .foregroundStyle(Color.mtgGold)
                             .padding(.horizontal, 6)
                             .padding(.vertical, 1)
-                            .background(.blue.opacity(0.2))
+                            .background(Color.mtgGold.opacity(0.15))
                             .clipShape(Capsule())
                     }
 
                     if player.isEliminated {
                         Image(systemName: "xmark.circle.fill")
-                            .foregroundStyle(.red)
+                            .foregroundStyle(Color.mtgError)
                             .font(.caption)
                     }
                 }
@@ -359,15 +396,15 @@ private struct PlayerRow: View {
                                     .frame(width: 8, height: 8)
                                 Text(player.role?.displayName ?? "")
                                     .font(.caption)
-                                    .foregroundStyle(player.role?.color ?? .secondary)
+                                    .foregroundStyle(player.role?.color ?? Color.mtgTextSecondary)
                                 if player.isUnveiled && player.role != .leader {
                                     Text("(Unveiled)")
                                         .font(.caption2)
-                                        .foregroundStyle(.secondary)
+                                        .foregroundStyle(Color.mtgTextSecondary)
                                 }
                                 Image(systemName: "info.circle")
                                     .font(.caption2)
-                                    .foregroundStyle(player.role?.color ?? .secondary)
+                                    .foregroundStyle(player.role?.color ?? Color.mtgTextSecondary)
                             }
                         }
                         .buttonStyle(.plain)
@@ -380,18 +417,18 @@ private struct PlayerRow: View {
                                 .frame(width: 8, height: 8)
                             Text(player.role?.displayName ?? "")
                                 .font(.caption)
-                                .foregroundStyle(player.role?.color ?? .secondary)
+                                .foregroundStyle(player.role?.color ?? Color.mtgTextSecondary)
                             if player.isUnveiled && !isCurrentUser && player.role != .leader {
                                 Text("(Unveiled)")
                                     .font(.caption2)
-                                    .foregroundStyle(.secondary)
+                                    .foregroundStyle(Color.mtgTextSecondary)
                             }
                         }
                     }
                 } else {
                     Text("Role Hidden")
                         .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Color.mtgTextSecondary)
                 }
             }
 
@@ -405,14 +442,15 @@ private struct PlayerRow: View {
                     } label: {
                         Image(systemName: "minus.circle.fill")
                             .font(.title2)
-                            .foregroundStyle(.red)
+                            .foregroundStyle(Color.mtgAssassin)
                     }
                     .buttonStyle(.plain)
                     .accessibilityLabel("Decrease \(player.displayName)'s life")
 
                     Text("\(player.lifeTotal)")
-                        .font(.title3)
-                        .fontWeight(.semibold)
+                        .font(.system(.title3, design: .serif))
+                        .fontWeight(.bold)
+                        .foregroundStyle(Color.mtgTextPrimary)
                         .frame(minWidth: 36)
                         .multilineTextAlignment(.center)
                         .contentTransition(.numericText())
@@ -423,7 +461,7 @@ private struct PlayerRow: View {
                     } label: {
                         Image(systemName: "plus.circle.fill")
                             .font(.title2)
-                            .foregroundStyle(.green)
+                            .foregroundStyle(Color.mtgSuccess)
                     }
                     .buttonStyle(.plain)
                     .accessibilityLabel("Increase \(player.displayName)'s life")
@@ -431,7 +469,7 @@ private struct PlayerRow: View {
             } else {
                 Text("Eliminated")
                     .font(.caption)
-                    .foregroundStyle(.red)
+                    .foregroundStyle(Color.mtgError)
             }
         }
         .padding(.vertical, 4)
@@ -455,8 +493,8 @@ private struct ActionBar: View {
                 Button("Unveil Identity") {
                     showUnveilConfirmation = true
                 }
-                .buttonStyle(.borderedProminent)
-                .tint(player.role?.color ?? .blue)
+                .buttonStyle(MtgPrimaryButtonStyle())
+                .padding(.horizontal)
                 .accessibilityLabel("Unveil your identity as \(player.role?.displayName ?? "unknown")")
                 .accessibilityHint("Reveals your role to all players. Cannot be undone.")
                 .confirmationDialog(
@@ -479,7 +517,7 @@ private struct ActionBar: View {
             if let player = viewModel.currentPlayer {
                 Text(player.role?.winConditionText ?? "")
                     .font(.caption2)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Color.mtgTextSecondary)
                     .multilineTextAlignment(.center)
                     .accessibilityLabel("Win condition: \(player.role?.winConditionText ?? "")")
             }
@@ -513,19 +551,24 @@ private struct ActionBar: View {
 }
 
 #Preview("Player Row - Active") {
-    List {
-        PlayerRow(
-            player: .sampleGuardian,
-            viewModel: GameBoardViewModel(gameId: "preview")
-        )
-        PlayerRow(
-            player: .sampleAssassin,
-            viewModel: GameBoardViewModel(gameId: "preview")
-        )
-        PlayerRow(
-            player: .sampleEliminated,
-            viewModel: GameBoardViewModel(gameId: "preview")
-        )
+    ZStack {
+        Color.mtgBackground.ignoresSafeArea()
+        VStack(spacing: 0) {
+            PlayerRow(
+                player: .sampleGuardian,
+                viewModel: GameBoardViewModel(gameId: "preview")
+            )
+            PlayerRow(
+                player: .sampleAssassin,
+                viewModel: GameBoardViewModel(gameId: "preview")
+            )
+            PlayerRow(
+                player: .sampleEliminated,
+                viewModel: GameBoardViewModel(gameId: "preview")
+            )
+        }
+        .mtgCardFrame()
+        .padding()
     }
 }
 #endif

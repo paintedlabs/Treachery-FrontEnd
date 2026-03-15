@@ -10,7 +10,7 @@ import {
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/hooks/useAuth';
 import { ErrorBanner } from '@/components/ErrorBanner';
-import { colors, spacing } from '@/constants/theme';
+import { colors, spacing, fonts } from '@/constants/theme';
 
 export default function ForgotPasswordScreen() {
   const router = useRouter();
@@ -72,6 +72,8 @@ const styles = StyleSheet.create({
   description: {
     color: colors.textSecondary,
     fontSize: 14,
+    fontFamily: fonts.serif,
+    fontStyle: 'italic',
   },
   input: {
     backgroundColor: colors.surface,
@@ -92,8 +94,8 @@ const styles = StyleSheet.create({
     opacity: 0.5,
   },
   buttonText: {
-    color: '#FFFFFF',
+    color: '#0d0b1a',
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: '700',
   },
 });

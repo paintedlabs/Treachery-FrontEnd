@@ -16,219 +16,246 @@ struct IdentityCardView: View {
 
     var body: some View {
         NavigationStack {
-            ScrollView {
-                VStack(spacing: 0) {
-                    // Card frame
+            ZStack {
+                Color.mtgBackground.ignoresSafeArea()
+
+                ScrollView {
                     VStack(spacing: 0) {
-                        // Title bar
-                        HStack {
-                            Text(card.name)
-                                .font(.headline)
-                                .fontWeight(.bold)
-                            Spacer()
-                            Text("#\(card.cardNumber)")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 10)
-                        .background(player.role?.color.opacity(0.15) ?? .gray.opacity(0.15))
-                        .accessibilityElement(children: .combine)
-                        .accessibilityLabel("\(card.name), card number \(card.cardNumber)")
-
-                        Divider()
-
-                        // Role & Rarity bar
-                        HStack {
-                            HStack(spacing: 6) {
-                                Circle()
-                                    .fill(player.role?.color ?? .gray)
-                                    .frame(width: 10, height: 10)
-                                Text(player.role?.displayName ?? "Unknown")
-                                    .font(.subheadline)
-                                    .fontWeight(.semibold)
-                                    .foregroundStyle(player.role?.color ?? .primary)
-                            }
-                            Spacer()
-                            Text(card.rarity.displayName)
-                                .font(.caption)
-                                .fontWeight(.medium)
-                                .foregroundStyle(rarityColor)
-                        }
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 8)
-                        .accessibilityElement(children: .combine)
-                        .accessibilityLabel("Role: \(player.role?.displayName ?? "Unknown"), Rarity: \(card.rarity.displayName)")
-
-                        Divider()
-
-                        // Ability text
-                        VStack(alignment: .leading, spacing: 12) {
-                            Text("Ability")
-                                .font(.caption)
-                                .fontWeight(.bold)
-                                .foregroundStyle(.secondary)
-
-                            Text(card.abilityText)
-                                .font(.body)
-                                .fixedSize(horizontal: false, vertical: true)
-                        }
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(16)
-                        .accessibilityElement(children: .combine)
-                        .accessibilityLabel("Ability: \(card.abilityText)")
-
-                        Divider()
-
-                        // Unveil cost
-                        HStack {
-                            Image(systemName: "eye.fill")
-                                .foregroundStyle(player.role?.color ?? .blue)
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text("Unveil Cost")
+                        // Card frame
+                        VStack(spacing: 0) {
+                            // Title bar
+                            HStack {
+                                Text(card.name)
+                                    .font(.system(.headline, design: .serif))
+                                    .fontWeight(.bold)
+                                    .foregroundStyle(Color.mtgTextPrimary)
+                                Spacer()
+                                Text("#\(card.cardNumber)")
                                     .font(.caption)
-                                    .foregroundStyle(.secondary)
-                                Text(card.unveilCost)
-                                    .font(.subheadline)
-                                    .fontWeight(.medium)
+                                    .foregroundStyle(Color.mtgTextSecondary)
                             }
-                            Spacer()
-                            if player.isUnveiled {
-                                Text("UNVEILED")
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 10)
+                            .background(Color.mtgCardElevated)
+                            .accessibilityElement(children: .combine)
+                            .accessibilityLabel("\(card.name), card number \(card.cardNumber)")
+
+                            Rectangle()
+                                .fill(Color.mtgDivider)
+                                .frame(height: 1)
+
+                            // Role & Rarity bar
+                            HStack {
+                                HStack(spacing: 6) {
+                                    Circle()
+                                        .fill(player.role?.color ?? .gray)
+                                        .frame(width: 10, height: 10)
+                                    Text(player.role?.displayName ?? "Unknown")
+                                        .font(.subheadline)
+                                        .fontWeight(.semibold)
+                                        .foregroundStyle(player.role?.color ?? Color.mtgTextPrimary)
+                                }
+                                Spacer()
+                                Text(card.rarity.displayName)
+                                    .font(.caption)
+                                    .fontWeight(.medium)
+                                    .foregroundStyle(rarityColor)
+                            }
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 8)
+                            .accessibilityElement(children: .combine)
+                            .accessibilityLabel("Role: \(player.role?.displayName ?? "Unknown"), Rarity: \(card.rarity.displayName)")
+
+                            Rectangle()
+                                .fill(Color.mtgDivider)
+                                .frame(height: 1)
+
+                            // Ability text
+                            VStack(alignment: .leading, spacing: 12) {
+                                Text("Ability")
                                     .font(.caption)
                                     .fontWeight(.bold)
-                                    .foregroundStyle(.white)
-                                    .padding(.horizontal, 8)
-                                    .padding(.vertical, 4)
-                                    .background(player.role?.color ?? .gray)
-                                    .clipShape(Capsule())
-                            }
-                        }
-                        .padding(16)
-                        .accessibilityElement(children: .combine)
-                        .accessibilityLabel("Unveil cost: \(card.unveilCost)\(player.isUnveiled ? ", currently unveiled" : "")")
+                                    .foregroundStyle(Color.mtgGold)
 
-                        // Undercover condition
-                        if card.hasUndercover, let condition = card.undercoverCondition {
-                            Divider()
-                            HStack(alignment: .top) {
-                                Image(systemName: "theatermasks.fill")
-                                    .foregroundStyle(.purple)
+                                Text(card.abilityText)
+                                    .font(.body)
+                                    .foregroundStyle(Color.mtgTextPrimary)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(16)
+                            .accessibilityElement(children: .combine)
+                            .accessibilityLabel("Ability: \(card.abilityText)")
+
+                            Rectangle()
+                                .fill(Color.mtgDivider)
+                                .frame(height: 1)
+
+                            // Unveil cost
+                            HStack {
+                                Image(systemName: "eye.fill")
+                                    .foregroundStyle(player.role?.color ?? Color.mtgGold)
                                 VStack(alignment: .leading, spacing: 2) {
-                                    Text("Undercover")
+                                    Text("Unveil Cost")
                                         .font(.caption)
-                                        .foregroundStyle(.secondary)
-                                    Text(condition)
+                                        .foregroundStyle(Color.mtgTextSecondary)
+                                    Text(card.unveilCost)
                                         .font(.subheadline)
+                                        .fontWeight(.medium)
+                                        .foregroundStyle(Color.mtgTextPrimary)
                                 }
                                 Spacer()
+                                if player.isUnveiled {
+                                    Text("UNVEILED")
+                                        .font(.caption)
+                                        .fontWeight(.bold)
+                                        .foregroundStyle(Color.mtgBackground)
+                                        .padding(.horizontal, 8)
+                                        .padding(.vertical, 4)
+                                        .background(player.role?.color ?? .gray)
+                                        .clipShape(Capsule())
+                                }
                             }
                             .padding(16)
                             .accessibilityElement(children: .combine)
-                            .accessibilityLabel("Undercover condition: \(condition)")
-                        }
+                            .accessibilityLabel("Unveil cost: \(card.unveilCost)\(player.isUnveiled ? ", currently unveiled" : "")")
 
-                        // Timing restriction
-                        if let timing = card.timingRestriction {
-                            Divider()
-                            HStack(alignment: .top) {
-                                Image(systemName: "clock.fill")
-                                    .foregroundStyle(.orange)
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text("Timing")
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
-                                    Text(timing)
-                                        .font(.subheadline)
-                                }
-                                Spacer()
-                            }
-                            .padding(16)
-                            .accessibilityElement(children: .combine)
-                            .accessibilityLabel("Timing restriction: \(timing)")
-                        }
-
-                        // Modifiers
-                        if card.lifeModifier != nil || card.handSizeModifier != nil {
-                            Divider()
-                            HStack(spacing: 24) {
-                                if let life = card.lifeModifier {
-                                    HStack(spacing: 4) {
-                                        Image(systemName: "heart.fill")
-                                            .foregroundStyle(.red)
-                                        Text(life >= 0 ? "+\(life)" : "\(life)")
-                                            .font(.subheadline)
-                                            .fontWeight(.semibold)
-                                        Text("Life")
+                            // Undercover condition
+                            if card.hasUndercover, let condition = card.undercoverCondition {
+                                Rectangle()
+                                    .fill(Color.mtgDivider)
+                                    .frame(height: 1)
+                                HStack(alignment: .top) {
+                                    Image(systemName: "theatermasks.fill")
+                                        .foregroundStyle(Color.mtgTraitor)
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text("Undercover")
                                             .font(.caption)
-                                            .foregroundStyle(.secondary)
-                                    }
-                                    .accessibilityElement(children: .combine)
-                                    .accessibilityLabel("Life modifier: \(life >= 0 ? "plus" : "minus") \(abs(life))")
-                                }
-                                if let hand = card.handSizeModifier {
-                                    HStack(spacing: 4) {
-                                        Image(systemName: "hand.raised.fill")
-                                            .foregroundStyle(.blue)
-                                        Text(hand >= 0 ? "+\(hand)" : "\(hand)")
+                                            .foregroundStyle(Color.mtgTextSecondary)
+                                        Text(condition)
                                             .font(.subheadline)
-                                            .fontWeight(.semibold)
-                                        Text("Hand Size")
-                                            .font(.caption)
-                                            .foregroundStyle(.secondary)
+                                            .foregroundStyle(Color.mtgTextPrimary)
                                     }
-                                    .accessibilityElement(children: .combine)
-                                    .accessibilityLabel("Hand size modifier: \(hand >= 0 ? "plus" : "minus") \(abs(hand))")
+                                    Spacer()
                                 }
-                                Spacer()
-                            }
-                            .padding(16)
-                        }
-
-                        // Flavor text
-                        if let flavor = card.flavorText, !flavor.isEmpty {
-                            Divider()
-                            Text(flavor)
-                                .font(.caption)
-                                .italic()
-                                .foregroundStyle(.secondary)
-                                .frame(maxWidth: .infinity, alignment: .leading)
                                 .padding(16)
-                                .accessibilityLabel("Flavor text: \(flavor)")
-                        }
-                    }
-                    .background(.regularMaterial)
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 12)
-                            .stroke(player.role?.color ?? .gray, lineWidth: 2)
-                    )
-                    .padding()
+                                .accessibilityElement(children: .combine)
+                                .accessibilityLabel("Undercover condition: \(condition)")
+                            }
 
-                    // Win condition
-                    VStack(spacing: 4) {
-                        Text("Win Condition")
-                            .font(.caption)
-                            .fontWeight(.bold)
-                            .foregroundStyle(.secondary)
-                        Text(player.role?.winConditionText ?? "")
-                            .font(.subheadline)
-                            .multilineTextAlignment(.center)
-                            .foregroundStyle(.secondary)
+                            // Timing restriction
+                            if let timing = card.timingRestriction {
+                                Rectangle()
+                                    .fill(Color.mtgDivider)
+                                    .frame(height: 1)
+                                HStack(alignment: .top) {
+                                    Image(systemName: "clock.fill")
+                                        .foregroundStyle(Color.mtgGold)
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text("Timing")
+                                            .font(.caption)
+                                            .foregroundStyle(Color.mtgTextSecondary)
+                                        Text(timing)
+                                            .font(.subheadline)
+                                            .foregroundStyle(Color.mtgTextPrimary)
+                                    }
+                                    Spacer()
+                                }
+                                .padding(16)
+                                .accessibilityElement(children: .combine)
+                                .accessibilityLabel("Timing restriction: \(timing)")
+                            }
+
+                            // Modifiers
+                            if card.lifeModifier != nil || card.handSizeModifier != nil {
+                                Rectangle()
+                                    .fill(Color.mtgDivider)
+                                    .frame(height: 1)
+                                HStack(spacing: 24) {
+                                    if let life = card.lifeModifier {
+                                        HStack(spacing: 4) {
+                                            Image(systemName: "heart.fill")
+                                                .foregroundStyle(Color.mtgError)
+                                            Text(life >= 0 ? "+\(life)" : "\(life)")
+                                                .font(.subheadline)
+                                                .fontWeight(.semibold)
+                                                .foregroundStyle(Color.mtgTextPrimary)
+                                            Text("Life")
+                                                .font(.caption)
+                                                .foregroundStyle(Color.mtgTextSecondary)
+                                        }
+                                        .accessibilityElement(children: .combine)
+                                        .accessibilityLabel("Life modifier: \(life >= 0 ? "plus" : "minus") \(abs(life))")
+                                    }
+                                    if let hand = card.handSizeModifier {
+                                        HStack(spacing: 4) {
+                                            Image(systemName: "hand.raised.fill")
+                                                .foregroundStyle(Color.mtgGuardian)
+                                            Text(hand >= 0 ? "+\(hand)" : "\(hand)")
+                                                .font(.subheadline)
+                                                .fontWeight(.semibold)
+                                                .foregroundStyle(Color.mtgTextPrimary)
+                                            Text("Hand Size")
+                                                .font(.caption)
+                                                .foregroundStyle(Color.mtgTextSecondary)
+                                        }
+                                        .accessibilityElement(children: .combine)
+                                        .accessibilityLabel("Hand size modifier: \(hand >= 0 ? "plus" : "minus") \(abs(hand))")
+                                    }
+                                    Spacer()
+                                }
+                                .padding(16)
+                            }
+
+                            // Flavor text
+                            if let flavor = card.flavorText, !flavor.isEmpty {
+                                Rectangle()
+                                    .fill(Color.mtgDivider)
+                                    .frame(height: 1)
+                                Text(flavor)
+                                    .font(.caption)
+                                    .italic()
+                                    .foregroundStyle(Color.mtgTextSecondary)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .padding(16)
+                                    .accessibilityLabel("Flavor text: \(flavor)")
+                            }
+                        }
+                        .background(Color.mtgSurface)
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 12)
+                                .stroke(player.role?.color ?? Color.mtgBorderAccent, lineWidth: 2)
+                        )
+                        .padding()
+
+                        // Win condition
+                        VStack(spacing: 4) {
+                            Text("Win Condition")
+                                .font(.caption)
+                                .fontWeight(.bold)
+                                .foregroundStyle(Color.mtgGold)
+                            Text(player.role?.winConditionText ?? "")
+                                .font(.subheadline)
+                                .multilineTextAlignment(.center)
+                                .foregroundStyle(Color.mtgTextSecondary)
+                        }
+                        .padding(.horizontal)
+                        .padding(.bottom)
+                        .accessibilityElement(children: .combine)
+                        .accessibilityLabel("Win condition: \(player.role?.winConditionText ?? "")")
                     }
-                    .padding(.horizontal)
-                    .padding(.bottom)
-                    .accessibilityElement(children: .combine)
-                    .accessibilityLabel("Win condition: \(player.role?.winConditionText ?? "")")
                 }
             }
             .navigationTitle("Identity Card")
             .navigationBarTitleDisplayMode(.inline)
+            .toolbarColorScheme(.dark, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Done") {
                         dismiss()
                     }
+                    .foregroundStyle(Color.mtgGold)
                     .accessibilityLabel("Close identity card")
                 }
             }
@@ -237,10 +264,10 @@ struct IdentityCardView: View {
 
     private var rarityColor: Color {
         switch card.rarity {
-        case .uncommon: return .green
-        case .rare:     return .blue
-        case .mythic:   return .orange
-        case .special:  return .purple
+        case .uncommon: return Color.mtgSuccess
+        case .rare:     return Color.mtgGuardian
+        case .mythic:   return Color.mtgGold
+        case .special:  return Color.mtgTraitor
         }
     }
 }

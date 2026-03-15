@@ -18,6 +18,7 @@ struct Treachery_iOSApp: App {
         WindowGroup {
             RootView()
                 .environmentObject(authViewModel)
+                .preferredColorScheme(.dark)
         }
     }
 }

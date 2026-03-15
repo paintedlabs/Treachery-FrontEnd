@@ -1,18 +1,20 @@
 export const colors = {
-  background: '#1a1a2e',
-  surface: '#16213e',
-  surfaceLight: '#0f3460',
-  card: '#1e2a3a',
-  primary: '#4A90D9',
-  text: '#FFFFFF',
-  textSecondary: '#A0A0B0',
-  textTertiary: '#6B6B80',
-  border: '#2a2a4a',
-  error: '#E74C3C',
-  success: '#2ECC71',
-  warning: '#F39C12',
-  destructive: '#E74C3C',
-  divider: '#2a2a4a',
+  background: '#0d0b1a',
+  surface: '#1a1528',
+  surfaceLight: '#231d35',
+  card: '#231d35',
+  primary: '#c9a84c',
+  primaryBright: '#e4c96a',
+  text: '#ede6d6',
+  textSecondary: '#8b8698',
+  textTertiary: '#5a5468',
+  border: '#3d3552',
+  borderAccent: '#c9a84c',
+  error: '#c43c3c',
+  success: '#3ca85c',
+  warning: '#d4943c',
+  destructive: '#c43c3c',
+  divider: '#2a2340',
 };
 
 export const spacing = {
@@ -33,4 +35,10 @@ export const fontSize = {
   xxl: 24,
   title: 28,
   largeTitle: 34,
+};
+
+export const fonts = {
+  serif: 'Georgia',
+  serifItalic: 'Georgia',
+  body: undefined, // system default sans-serif
 };

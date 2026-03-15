@@ -18,98 +18,111 @@ struct GameOverView: View {
     }
 
     var body: some View {
-        VStack(spacing: 24) {
-            if viewModel.players.isEmpty {
-                Spacer()
-                ProgressView("Loading results...")
-                Spacer()
-            } else {
-                Spacer()
+        ZStack {
+            Color.mtgBackground.ignoresSafeArea()
 
-                // Winner announcement
-                if let winningTeam = viewModel.winningTeam {
-                    VStack(spacing: 8) {
-                        Image(systemName: "trophy.fill")
-                            .font(.system(size: 48))
-                            .foregroundStyle(winningTeam.color)
+            VStack(spacing: 24) {
+                if viewModel.players.isEmpty {
+                    Spacer()
+                    ProgressView("Loading results...")
+                        .tint(Color.mtgGold)
+                        .foregroundStyle(Color.mtgTextSecondary)
+                    Spacer()
+                } else {
+                    Spacer()
 
-                        Text("Game Over")
-                            .font(.largeTitle)
-                            .fontWeight(.bold)
-
-                        HStack(spacing: 8) {
-                            Circle()
-                                .fill(winningTeam.color)
-                                .frame(width: 16, height: 16)
-                            Text("\(winningTeam.displayName) Wins!")
-                                .font(.title)
-                                .fontWeight(.semibold)
+                    // Winner announcement
+                    if let winningTeam = viewModel.winningTeam {
+                        VStack(spacing: 12) {
+                            Image(systemName: "trophy.fill")
+                                .font(.system(size: 48))
                                 .foregroundStyle(winningTeam.color)
+
+                            Text("Game Over")
+                                .font(.system(size: 36, weight: .bold, design: .serif))
+                                .foregroundStyle(Color.mtgTextPrimary)
+
+                            OrnateDivider()
+                                .padding(.horizontal, 40)
+
+                            HStack(spacing: 8) {
+                                Circle()
+                                    .fill(winningTeam.color)
+                                    .frame(width: 16, height: 16)
+                                Text("\(winningTeam.displayName) Wins!")
+                                    .font(.system(.title, design: .serif))
+                                    .fontWeight(.semibold)
+                                    .foregroundStyle(winningTeam.color)
+                            }
+                            .accessibilityElement(children: .combine)
+                            .accessibilityLabel("\(winningTeam.displayName) team wins")
                         }
-                        .accessibilityElement(children: .combine)
-                        .accessibilityLabel("\(winningTeam.displayName) team wins")
                     }
-                }
 
-                // All players revealed
-                VStack(spacing: 0) {
-                    ForEach(viewModel.players) { player in
-                        HStack {
-                            Circle()
-                                .fill(player.role?.color ?? .gray)
-                                .frame(width: 12, height: 12)
+                    // All players revealed
+                    VStack(spacing: 0) {
+                        ForEach(viewModel.players) { player in
+                            HStack {
+                                Circle()
+                                    .fill(player.role?.color ?? .gray)
+                                    .frame(width: 12, height: 12)
 
-                            Text(player.displayName)
-                                .fontWeight(.medium)
+                                Text(player.displayName)
+                                    .fontWeight(.medium)
+                                    .foregroundStyle(Color.mtgTextPrimary)
 
-                            Spacer()
+                                Spacer()
 
-                            VStack(alignment: .trailing, spacing: 2) {
-                                Text(player.role?.displayName ?? "Unknown")
-                                    .font(.subheadline)
-                                    .foregroundStyle(player.role?.color ?? .secondary)
+                                VStack(alignment: .trailing, spacing: 2) {
+                                    Text(player.role?.displayName ?? "Unknown")
+                                        .font(.subheadline)
+                                        .foregroundStyle(player.role?.color ?? Color.mtgTextSecondary)
 
-                                if let card = viewModel.identityCard(for: player) {
-                                    Text(card.name)
+                                    if let card = viewModel.identityCard(for: player) {
+                                        Text(card.name)
+                                            .font(.caption)
+                                            .foregroundStyle(Color.mtgTextSecondary)
+                                    }
+                                }
+
+                                if player.isEliminated {
+                                    Image(systemName: "xmark.circle.fill")
+                                        .foregroundStyle(Color.mtgError)
                                         .font(.caption)
-                                        .foregroundStyle(.secondary)
+                                        .padding(.leading, 4)
                                 }
                             }
+                            .padding(.vertical, 10)
+                            .padding(.horizontal, 16)
+                            .accessibilityElement(children: .combine)
+                            .accessibilityLabel("\(player.displayName), \(player.role?.displayName ?? "Unknown")\(player.isEliminated ? ", eliminated" : "")")
 
-                            if player.isEliminated {
-                                Image(systemName: "xmark.circle.fill")
-                                    .foregroundStyle(.red)
-                                    .font(.caption)
-                                    .padding(.leading, 4)
+                            if player.id != viewModel.players.last?.id {
+                                Rectangle()
+                                    .fill(Color.mtgDivider)
+                                    .frame(height: 1)
+                                    .padding(.horizontal, 16)
                             }
                         }
-                        .padding(.vertical, 8)
-                        .padding(.horizontal)
-                        .accessibilityElement(children: .combine)
-                        .accessibilityLabel("\(player.displayName), \(player.role?.displayName ?? "Unknown")\(player.isEliminated ? ", eliminated" : "")")
-
-                        if player.id != viewModel.players.last?.id {
-                            Divider()
-                                .padding(.horizontal)
-                        }
                     }
-                }
-                .background(.regularMaterial)
-                .clipShape(RoundedRectangle(cornerRadius: 12))
-                .padding(.horizontal)
+                    .mtgCardFrame()
+                    .padding(.horizontal)
 
-                Spacer()
+                    Spacer()
 
-                // Return home
-                Button("Return to Home") {
-                    navigationPath.removeLast(navigationPath.count)
+                    // Return home
+                    Button("Return to Home") {
+                        navigationPath.removeLast(navigationPath.count)
+                    }
+                    .buttonStyle(MtgPrimaryButtonStyle())
+                    .padding(.horizontal)
+                    .padding(.bottom)
+                    .accessibilityLabel("Return to home screen")
                 }
-                .buttonStyle(.borderedProminent)
-                .padding(.bottom)
-                .accessibilityLabel("Return to home screen")
             }
         }
         .navigationTitle("Results")
+        .toolbarColorScheme(.dark, for: .navigationBar)
         .navigationBarBackButtonHidden(true)
         .onAppear {
             viewModel.currentUserId = authViewModel.currentUserId

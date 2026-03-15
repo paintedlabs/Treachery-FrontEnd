@@ -26,10 +26,10 @@ enum Role: String, Codable, CaseIterable, Identifiable {
 
     var color: Color {
         switch self {
-        case .leader:   return .yellow
-        case .guardian:  return .blue
-        case .assassin:  return .red
-        case .traitor:   return .purple
+        case .leader:   return .mtgLeader
+        case .guardian:  return .mtgGuardian
+        case .assassin:  return .mtgAssassin
+        case .traitor:   return .mtgTraitor
         }
     }
 

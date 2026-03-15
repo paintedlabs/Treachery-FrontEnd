@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, ActivityIndicator, StyleSheet } from 'react-native';
-import { colors } from '@/constants/theme';
+import { colors, fonts } from '@/constants/theme';
 
 interface LoadingScreenProps {
   message?: string;
@@ -21,10 +21,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: colors.background,
-    gap: 12,
+    gap: 16,
   },
   text: {
     color: colors.textSecondary,
     fontSize: 14,
+    fontFamily: fonts.serif,
   },
 });

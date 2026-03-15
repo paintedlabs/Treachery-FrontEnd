@@ -17,64 +17,53 @@ struct GameHistoryView: View {
     private let firestoreManager = FirestoreManager()
 
     var body: some View {
-        List {
-            if isLoading {
-                Section {
-                    HStack {
-                        Spacer()
-                        ProgressView("Loading game history...")
-                        Spacer()
-                    }
-                }
-            } else if games.isEmpty {
-                Section {
-                    VStack(spacing: 12) {
-                        Image(systemName: "clock.badge.questionmark")
-                            .font(.largeTitle)
-                            .foregroundStyle(.secondary)
-                        Text("No games yet")
-                            .font(.headline)
-                            .foregroundStyle(.secondary)
-                        Text("Finished games will appear here.")
-                            .font(.subheadline)
-                            .foregroundStyle(.tertiary)
-                    }
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 32)
-                }
-            } else {
-                ForEach(games) { game in
-                    Section {
-                        GameHistoryRow(
-                            game: game,
-                            players: gamePlayers[game.id] ?? [],
-                            currentUserId: authViewModel.currentUserId
-                        )
-                    }
-                }
-            }
+        ZStack {
+            Color.mtgBackground.ignoresSafeArea()
 
-            if let error = errorMessage {
-                Section {
-                    VStack(alignment: .leading, spacing: 8) {
-                        HStack(spacing: 6) {
-                            Image(systemName: "exclamationmark.triangle.fill")
-                                .foregroundStyle(.red)
-                                .font(.caption)
-                            Text("Error loading history")
-                                .foregroundStyle(.red)
-                                .font(.caption)
-                                .fontWeight(.medium)
+            ScrollView {
+                VStack(spacing: 16) {
+                    if isLoading {
+                        Spacer(minLength: 100)
+                        ProgressView("Loading game history...")
+                            .tint(Color.mtgGold)
+                            .foregroundStyle(Color.mtgTextSecondary)
+                        Spacer()
+                    } else if games.isEmpty {
+                        Spacer(minLength: 80)
+                        VStack(spacing: 12) {
+                            Image(systemName: "clock.badge.questionmark")
+                                .font(.largeTitle)
+                                .foregroundStyle(Color.mtgTextSecondary)
+                            Text("No games yet")
+                                .font(.system(.headline, design: .serif))
+                                .foregroundStyle(Color.mtgTextPrimary)
+                            Text("Finished games will appear here.")
+                                .font(.subheadline)
+                                .foregroundStyle(Color.mtgTextSecondary)
                         }
-                        Text(error)
-                            .foregroundStyle(.red)
-                            .font(.caption)
-                            .textSelection(.enabled)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 32)
+                    } else {
+                        ForEach(games) { game in
+                            GameHistoryRow(
+                                game: game,
+                                players: gamePlayers[game.id] ?? [],
+                                currentUserId: authViewModel.currentUserId
+                            )
+                            .padding(.horizontal)
+                        }
+                    }
+
+                    if let error = errorMessage {
+                        MtgErrorBanner(message: error)
+                            .padding(.horizontal)
                     }
                 }
+                .padding(.top)
             }
         }
         .navigationTitle("Game History")
+        .toolbarColorScheme(.dark, for: .navigationBar)
         .task {
             await loadHistory()
         }
@@ -138,9 +127,10 @@ private struct GameHistoryRow: View {
                     Text(game.createdAt, style: .date)
                         .font(.subheadline)
                         .fontWeight(.medium)
+                        .foregroundStyle(Color.mtgTextPrimary)
                     Text(game.createdAt, style: .time)
                         .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Color.mtgTextSecondary)
                 }
 
                 Spacer()
@@ -151,7 +141,7 @@ private struct GameHistoryRow: View {
                         Text(didWin ? "Victory" : "Defeat")
                             .font(.subheadline)
                             .fontWeight(.bold)
-                            .foregroundStyle(didWin ? .green : .red)
+                            .foregroundStyle(didWin ? Color.mtgSuccess : Color.mtgError)
 
                         HStack(spacing: 4) {
                             Circle()
@@ -169,7 +159,7 @@ private struct GameHistoryRow: View {
 
             // Player summary
             if !players.isEmpty {
-                Divider()
+                OrnateDivider()
 
                 LazyVGrid(columns: [
                     GridItem(.flexible()),
@@ -183,11 +173,11 @@ private struct GameHistoryRow: View {
                             Text(player.displayName)
                                 .font(.caption)
                                 .lineLimit(1)
-                                .foregroundStyle(player.userId == currentUserId ? .primary : .secondary)
+                                .foregroundStyle(player.userId == currentUserId ? Color.mtgTextPrimary : Color.mtgTextSecondary)
                                 .fontWeight(player.userId == currentUserId ? .semibold : .regular)
                             if player.isEliminated {
                                 Image(systemName: "xmark.circle.fill")
-                                    .foregroundStyle(.red)
+                                    .foregroundStyle(Color.mtgError)
                                     .font(.system(size: 8))
                             }
                         }
@@ -203,7 +193,7 @@ private struct GameHistoryRow: View {
                 HStack(spacing: 4) {
                     Text("Your role:")
                         .font(.caption2)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Color.mtgTextSecondary)
                     Text(role.displayName)
                         .font(.caption2)
                         .fontWeight(.semibold)
@@ -212,12 +202,13 @@ private struct GameHistoryRow: View {
                        let card = CardDatabase.shared.card(withId: cardId) {
                         Text("(\(card.name))")
                             .font(.caption2)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Color.mtgTextSecondary)
                     }
                 }
             }
         }
-        .padding(.vertical, 4)
+        .padding()
+        .mtgCardFrame()
     }
 }
 

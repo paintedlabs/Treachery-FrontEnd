@@ -20,153 +20,189 @@ struct LobbyView: View {
     }
 
     var body: some View {
-        VStack(spacing: 0) {
-            if viewModel.game == nil && viewModel.errorMessage == nil {
-                // Loading state
-                Spacer()
-                ProgressView("Loading lobby...")
-                Spacer()
-            } else if viewModel.isGameDisbanded {
-                // Host deleted the game
-                Spacer()
-                VStack(spacing: 12) {
-                    Image(systemName: "xmark.octagon.fill")
-                        .font(.largeTitle)
-                        .foregroundStyle(.red)
-                    Text("Game Disbanded")
-                        .font(.title2)
-                        .fontWeight(.bold)
-                    Text("The host has left and the game was closed.")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                        .multilineTextAlignment(.center)
-                    Button("Return Home") {
-                        navigationPath.removeLast(navigationPath.count)
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .padding(.top)
-                }
-                .padding()
-                Spacer()
-            } else {
-                // Game code display
-                if let game = viewModel.game {
-                    VStack(spacing: 4) {
-                        Text("Game Code")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                        Text(game.code)
-                            .font(.system(size: 48, weight: .bold, design: .monospaced))
-                            .kerning(8)
-                            .accessibilityLabel("Game code: \(game.code.map(String.init).joined(separator: " "))")
+        ZStack {
+            Color.mtgBackground.ignoresSafeArea()
 
-                        Button {
-                            showShareSheet = true
-                        } label: {
-                            HStack(spacing: 4) {
-                                Image(systemName: "square.and.arrow.up")
-                                    .font(.caption)
-                                Text("Share Code")
-                                    .font(.caption)
-                            }
+            VStack(spacing: 0) {
+                if viewModel.game == nil && viewModel.errorMessage == nil {
+                    // Loading state
+                    Spacer()
+                    ProgressView("Loading lobby...")
+                        .tint(Color.mtgGold)
+                        .foregroundStyle(Color.mtgTextSecondary)
+                    Spacer()
+                } else if viewModel.isGameDisbanded {
+                    // Host deleted the game
+                    Spacer()
+                    VStack(spacing: 12) {
+                        Image(systemName: "xmark.octagon.fill")
+                            .font(.largeTitle)
+                            .foregroundStyle(Color.mtgError)
+                        Text("Game Disbanded")
+                            .font(.system(.title2, design: .serif))
+                            .fontWeight(.bold)
+                            .foregroundStyle(Color.mtgTextPrimary)
+                        Text("The host has left and the game was closed.")
+                            .font(.subheadline)
+                            .foregroundStyle(Color.mtgTextSecondary)
+                            .multilineTextAlignment(.center)
+                        Button("Return Home") {
+                            navigationPath.removeLast(navigationPath.count)
                         }
-                        .padding(.top, 4)
-                        .accessibilityLabel("Share game code with friends")
+                        .buttonStyle(MtgPrimaryButtonStyle())
+                        .padding(.top)
+                        .padding(.horizontal, 40)
                     }
                     .padding()
-                }
+                    Spacer()
+                } else {
+                    // Game code display
+                    if let game = viewModel.game {
+                        VStack(spacing: 8) {
+                            MtgSectionHeader(title: "Game Code")
 
-                Divider()
+                            Text(game.code)
+                                .font(.system(size: 48, weight: .bold, design: .monospaced))
+                                .foregroundStyle(Color.mtgGoldBright)
+                                .kerning(8)
+                                .accessibilityLabel("Game code: \(game.code.map(String.init).joined(separator: " "))")
 
-                // Player list
-                List {
-                    Section("Players (\(viewModel.players.count)/\(viewModel.game?.maxPlayers ?? 0))") {
-                        if viewModel.players.isEmpty {
-                            Text("Waiting for players to join...")
-                                .foregroundStyle(.secondary)
-                                .font(.subheadline)
-                        } else {
-                            ForEach(viewModel.players) { player in
-                                HStack {
-                                    Text(player.displayName)
-                                        .fontWeight(player.userId == viewModel.game?.hostId ? .semibold : .regular)
-                                    Spacer()
-                                    if player.userId == viewModel.game?.hostId {
-                                        Text("Host")
-                                            .font(.caption)
-                                            .padding(.horizontal, 8)
-                                            .padding(.vertical, 2)
-                                            .background(.secondary.opacity(0.2))
-                                            .clipShape(Capsule())
+                            Button {
+                                showShareSheet = true
+                            } label: {
+                                HStack(spacing: 4) {
+                                    Image(systemName: "square.and.arrow.up")
+                                        .font(.caption)
+                                    Text("Share Code")
+                                        .font(.caption)
+                                }
+                                .foregroundStyle(Color.mtgGold)
+                            }
+                            .padding(.top, 4)
+                            .accessibilityLabel("Share game code with friends")
+                        }
+                        .padding(20)
+                        .mtgCardFrame()
+                        .padding(.horizontal)
+                        .padding(.top, 12)
+                    }
+
+                    OrnateDivider()
+                        .padding(.horizontal)
+                        .padding(.vertical, 12)
+
+                    // Player list
+                    ScrollView {
+                        VStack(spacing: 0) {
+                            MtgSectionHeader(title: "Players (\(viewModel.players.count)/\(viewModel.game?.maxPlayers ?? 0))")
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(.horizontal, 16)
+                                .padding(.bottom, 8)
+
+                            if viewModel.players.isEmpty {
+                                Text("Waiting for players to join...")
+                                    .foregroundStyle(Color.mtgTextSecondary)
+                                    .font(.subheadline)
+                                    .padding(.vertical, 20)
+                            } else {
+                                VStack(spacing: 0) {
+                                    ForEach(viewModel.players) { player in
+                                        HStack {
+                                            Text(player.displayName)
+                                                .fontWeight(player.userId == viewModel.game?.hostId ? .semibold : .regular)
+                                                .foregroundStyle(Color.mtgTextPrimary)
+                                            Spacer()
+                                            if player.userId == viewModel.game?.hostId {
+                                                Text("Host")
+                                                    .font(.caption)
+                                                    .foregroundStyle(Color.mtgGold)
+                                                    .padding(.horizontal, 8)
+                                                    .padding(.vertical, 2)
+                                                    .background(Color.mtgGold.opacity(0.15))
+                                                    .clipShape(Capsule())
+                                            }
+                                        }
+                                        .padding(.horizontal, 16)
+                                        .padding(.vertical, 12)
+                                        .accessibilityLabel("\(player.displayName)\(player.userId == viewModel.game?.hostId ? ", Host" : "")")
+
+                                        if player.id != viewModel.players.last?.id {
+                                            Rectangle()
+                                                .fill(Color.mtgDivider)
+                                                .frame(height: 1)
+                                                .padding(.horizontal, 16)
+                                        }
                                     }
                                 }
-                                .accessibilityLabel("\(player.displayName)\(player.userId == viewModel.game?.hostId ? ", Host" : "")")
+                                .mtgCardFrame()
+                                .padding(.horizontal)
                             }
-                        }
-                    }
 
-                    if !viewModel.isHost {
-                        Section {
-                            HStack {
-                                ProgressView()
-                                    .controlSize(.small)
-                                Text("Waiting for host to start the game...")
-                                    .font(.subheadline)
-                                    .foregroundStyle(.secondary)
-                            }
-                        }
-                    }
-                }
-                .listStyle(.insetGrouped)
-
-                if let error = viewModel.errorMessage {
-                    Text(error)
-                        .foregroundStyle(.red)
-                        .font(.caption)
-                        .padding(.horizontal)
-                }
-
-                // Bottom buttons
-                VStack(spacing: 12) {
-                    if viewModel.isHost {
-                        Button {
-                            Task { await viewModel.startGame() }
-                        } label: {
-                            if viewModel.isStartingGame {
+                            if !viewModel.isHost {
                                 HStack(spacing: 8) {
                                     ProgressView()
                                         .controlSize(.small)
-                                        .tint(.white)
-                                    Text("Starting...")
+                                        .tint(Color.mtgGold)
+                                    Text("Waiting for host to start the game...")
+                                        .font(.subheadline)
+                                        .foregroundStyle(Color.mtgTextSecondary)
                                 }
-                            } else {
-                                Text("Start Game")
-                            }
-                        }
-                        .buttonStyle(.borderedProminent)
-                        .disabled(!viewModel.canStartGame || viewModel.isStartingGame)
-
-                        if !viewModel.canStartGame && viewModel.players.count < Role.minimumPlayerCount {
-                            Text("Need at least \(Role.minimumPlayerCount) player\(Role.minimumPlayerCount == 1 ? "" : "s") to start")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-
-                    Button("Leave Game", role: .destructive) {
-                        Task {
-                            if let userId = authViewModel.currentUserId {
-                                await viewModel.leaveGame(userId: userId)
-                                navigationPath.removeLast(navigationPath.count)
+                                .padding(.top, 16)
                             }
                         }
                     }
-                    .accessibilityLabel("Leave game")
+
+                    if let error = viewModel.errorMessage {
+                        Text(error)
+                            .foregroundStyle(Color.mtgError)
+                            .font(.caption)
+                            .padding(.horizontal)
+                    }
+
+                    // Bottom buttons
+                    VStack(spacing: 12) {
+                        if viewModel.isHost {
+                            Button {
+                                Task { await viewModel.startGame() }
+                            } label: {
+                                if viewModel.isStartingGame {
+                                    HStack(spacing: 8) {
+                                        ProgressView()
+                                            .controlSize(.small)
+                                            .tint(Color.mtgBackground)
+                                        Text("Starting...")
+                                    }
+                                } else {
+                                    Text("Start Game")
+                                }
+                            }
+                            .buttonStyle(MtgPrimaryButtonStyle(isDisabled: !viewModel.canStartGame || viewModel.isStartingGame))
+                            .disabled(!viewModel.canStartGame || viewModel.isStartingGame)
+
+                            if !viewModel.canStartGame && viewModel.players.count < Role.minimumPlayerCount {
+                                Text("Need at least \(Role.minimumPlayerCount) player\(Role.minimumPlayerCount == 1 ? "" : "s") to start")
+                                    .font(.caption)
+                                    .foregroundStyle(Color.mtgTextSecondary)
+                            }
+                        }
+
+                        Button("Leave Game") {
+                            Task {
+                                if let userId = authViewModel.currentUserId {
+                                    await viewModel.leaveGame(userId: userId)
+                                    navigationPath.removeLast(navigationPath.count)
+                                }
+                            }
+                        }
+                        .foregroundStyle(Color.mtgError)
+                        .accessibilityLabel("Leave game")
+                    }
+                    .padding()
                 }
-                .padding()
             }
         }
         .navigationTitle("Lobby")
+        .toolbarColorScheme(.dark, for: .navigationBar)
         .navigationBarBackButtonHidden(true)
         .onChange(of: viewModel.isGameStarted) { _, started in
             if started {

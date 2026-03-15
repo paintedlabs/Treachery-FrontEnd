@@ -19,76 +19,91 @@ struct CreateGameView: View {
     private let firestoreManager = FirestoreManager()
 
     var body: some View {
-        VStack(spacing: 24) {
-            #if DEBUG
-            if DevSettings.shared.devModeEnabled {
-                HStack(spacing: 6) {
-                    Image(systemName: "hammer.fill")
-                        .foregroundStyle(.orange)
-                        .font(.caption)
-                    Text("Dev Mode: 1-player minimum")
-                        .font(.caption)
-                        .foregroundStyle(.orange)
-                }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 6)
-                .background(.orange.opacity(0.1))
-                .clipShape(Capsule())
-            }
-            #endif
+        ZStack {
+            Color.mtgBackground.ignoresSafeArea()
 
-            Stepper("Players: \(maxPlayers)", value: $maxPlayers, in: Role.minimumPlayerCount...8)
-                .accessibilityValue("\(maxPlayers) players")
-
-            Stepper("Starting Life: \(startingLife)", value: $startingLife, in: 20...60, step: 5)
-                .accessibilityValue("\(startingLife) life")
-
-            // Role distribution preview
-            let dist = Role.distribution(forPlayerCount: maxPlayers)
-            HStack(spacing: 12) {
-                RoleBadge(count: dist.leaders, role: .leader)
-                RoleBadge(count: dist.guardians, role: .guardian)
-                RoleBadge(count: dist.assassins, role: .assassin)
-                RoleBadge(count: dist.traitors, role: .traitor)
-            }
-            .accessibilityElement(children: .combine)
-            .accessibilityLabel("Role distribution: \(dist.leaders) leaders, \(dist.guardians) guardians, \(dist.assassins) assassins, \(dist.traitors) traitors")
-
-            if let error = errorMessage {
-                HStack(spacing: 6) {
-                    Image(systemName: "exclamationmark.triangle.fill")
-                        .foregroundStyle(.red)
-                        .font(.caption)
-                    Text(error)
-                        .foregroundStyle(.red)
-                        .font(.caption)
-                }
-                .accessibilityElement(children: .combine)
-                .accessibilityLabel("Error: \(error)")
-            }
-
-            Button {
-                Task { await createGame() }
-            } label: {
-                if isCreating {
-                    HStack(spacing: 8) {
-                        ProgressView()
-                            .controlSize(.small)
-                            .tint(.white)
-                        Text("Creating...")
+            ScrollView {
+                VStack(spacing: 24) {
+                    #if DEBUG
+                    if DevSettings.shared.devModeEnabled {
+                        HStack(spacing: 6) {
+                            Image(systemName: "hammer.fill")
+                                .foregroundStyle(.orange)
+                                .font(.caption)
+                            Text("Dev Mode: 1-player minimum")
+                                .font(.caption)
+                                .foregroundStyle(.orange)
+                        }
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .background(.orange.opacity(0.1))
+                        .clipShape(Capsule())
                     }
-                } else {
-                    Text("Create Game")
-                }
-            }
-            .buttonStyle(.borderedProminent)
-            .disabled(isCreating)
-            .accessibilityLabel(isCreating ? "Creating game" : "Create game")
+                    #endif
 
-            Spacer()
+                    // Game settings card
+                    VStack(spacing: 20) {
+                        MtgSectionHeader(title: "Game Settings")
+
+                        OrnateDivider()
+
+                        Stepper("Players: \(maxPlayers)", value: $maxPlayers, in: Role.minimumPlayerCount...8)
+                            .foregroundStyle(Color.mtgTextPrimary)
+                            .accessibilityValue("\(maxPlayers) players")
+
+                        Stepper("Starting Life: \(startingLife)", value: $startingLife, in: 20...60, step: 5)
+                            .foregroundStyle(Color.mtgTextPrimary)
+                            .accessibilityValue("\(startingLife) life")
+                    }
+                    .padding(16)
+                    .mtgCardFrame()
+
+                    // Role distribution preview
+                    VStack(spacing: 16) {
+                        MtgSectionHeader(title: "Role Distribution")
+
+                        OrnateDivider()
+
+                        let dist = Role.distribution(forPlayerCount: maxPlayers)
+                        HStack(spacing: 12) {
+                            RoleBadge(count: dist.leaders, role: .leader)
+                            RoleBadge(count: dist.guardians, role: .guardian)
+                            RoleBadge(count: dist.assassins, role: .assassin)
+                            RoleBadge(count: dist.traitors, role: .traitor)
+                        }
+                        .accessibilityElement(children: .combine)
+                        .accessibilityLabel("Role distribution: \(dist.leaders) leaders, \(dist.guardians) guardians, \(dist.assassins) assassins, \(dist.traitors) traitors")
+                    }
+                    .padding(16)
+                    .mtgCardFrame()
+
+                    if let error = errorMessage {
+                        MtgErrorBanner(message: error)
+                    }
+
+                    Button {
+                        Task { await createGame() }
+                    } label: {
+                        if isCreating {
+                            HStack(spacing: 8) {
+                                ProgressView()
+                                    .controlSize(.small)
+                                    .tint(Color.mtgBackground)
+                                Text("Creating...")
+                            }
+                        } else {
+                            Text("Create Game")
+                        }
+                    }
+                    .buttonStyle(MtgPrimaryButtonStyle(isDisabled: isCreating))
+                    .disabled(isCreating)
+                    .accessibilityLabel(isCreating ? "Creating game" : "Create game")
+                }
+                .padding()
+            }
         }
-        .padding()
         .navigationTitle("Create Game")
+        .toolbarColorScheme(.dark, for: .navigationBar)
     }
 
     private func createGame() async {
@@ -155,15 +170,23 @@ private struct RoleBadge: View {
     let role: Role
 
     var body: some View {
-        VStack(spacing: 2) {
+        VStack(spacing: 4) {
             Text("\(count)")
                 .font(.title2)
                 .fontWeight(.bold)
                 .foregroundStyle(role.color)
             Text(role.displayName)
                 .font(.caption2)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Color.mtgTextSecondary)
         }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 10)
+        .background(Color.mtgCardElevated)
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(role.color.opacity(0.3), lineWidth: 1)
+        )
         .accessibilityElement(children: .combine)
         .accessibilityLabel("\(count) \(role.displayName)")
     }

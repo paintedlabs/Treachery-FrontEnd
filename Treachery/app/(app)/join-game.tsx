@@ -14,7 +14,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { ErrorBanner } from '@/components/ErrorBanner';
 import * as firestoreService from '@/services/firestore';
 import { Player } from '@/models/types';
-import { colors, spacing } from '@/constants/theme';
+import { colors, spacing, fonts } from '@/constants/theme';
 
 function generateId(): string {
   return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
@@ -84,17 +84,21 @@ export default function JoinGameScreen() {
     <View style={styles.container}>
       <Text style={styles.subtitle}>Enter the 4-character game code</Text>
 
-      <TextInput
-        style={styles.codeInput}
-        placeholder="ABCD"
-        placeholderTextColor={colors.textTertiary}
-        value={gameCode}
-        onChangeText={(text) => setGameCode(text.toUpperCase().slice(0, 4))}
-        autoCapitalize="characters"
-        autoCorrect={false}
-        maxLength={4}
-        textAlign="center"
-      />
+      {/* Card-frame style code input */}
+      <View style={styles.codeFrame}>
+        <View style={styles.codeTrim} />
+        <TextInput
+          style={styles.codeInput}
+          placeholder="ABCD"
+          placeholderTextColor={colors.textTertiary}
+          value={gameCode}
+          onChangeText={(text) => setGameCode(text.toUpperCase().slice(0, 4))}
+          autoCapitalize="characters"
+          autoCorrect={false}
+          maxLength={4}
+          textAlign="center"
+        />
+      </View>
 
       {errorMessage && <ErrorBanner message={errorMessage} />}
 
@@ -105,7 +109,7 @@ export default function JoinGameScreen() {
       >
         {isJoining ? (
           <View style={styles.buttonRow}>
-            <ActivityIndicator size="small" color="#fff" />
+            <ActivityIndicator size="small" color="#0d0b1a" />
             <Text style={styles.buttonText}>Joining...</Text>
           </View>
         ) : (
@@ -129,18 +133,27 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     fontSize: 14,
     textAlign: 'center',
+    fontFamily: fonts.serif,
+    fontStyle: 'italic',
+  },
+  codeFrame: {
+    backgroundColor: colors.surface,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: colors.borderAccent,
+    overflow: 'hidden',
+  },
+  codeTrim: {
+    height: 3,
+    backgroundColor: colors.primary,
   },
   codeInput: {
-    backgroundColor: colors.surface,
-    color: colors.text,
-    borderRadius: 8,
-    padding: 16,
-    fontSize: 28,
+    color: colors.primaryBright,
+    padding: 20,
+    fontSize: 36,
     fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
     fontWeight: 'bold',
-    letterSpacing: 12,
-    borderWidth: 1,
-    borderColor: colors.border,
+    letterSpacing: 16,
     textAlign: 'center',
   },
   joinButton: {
@@ -158,8 +171,8 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   buttonText: {
-    color: '#FFFFFF',
+    color: '#0d0b1a',
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: '700',
   },
 });

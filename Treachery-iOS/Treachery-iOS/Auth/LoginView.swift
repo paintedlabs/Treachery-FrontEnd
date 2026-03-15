@@ -20,22 +20,23 @@ struct LoginView: View {
             Spacer()
 
             Text("Treachery")
-                .font(.largeTitle)
+                .font(.system(.largeTitle, design: .serif))
                 .fontWeight(.bold)
+                .foregroundStyle(Color.mtgGoldBright)
                 .accessibilityAddTraits(.isHeader)
 
-            TextField("Email", text: $email)
-                .textFieldStyle(.roundedBorder)
-                .textInputAutocapitalization(.never)
-                .disableAutocorrection(true)
-                .keyboardType(.emailAddress)
+            Text("Enter the battlefield")
+                .font(.subheadline)
+                .foregroundStyle(Color.mtgTextSecondary)
+
+            OrnateDivider()
+                .padding(.vertical, 4)
+
+            MtgTextField(placeholder: "Email", text: $email, keyboardType: .emailAddress)
                 .textContentType(.emailAddress)
                 .accessibilityLabel("Email address")
 
-            SecureField("Password", text: $password)
-                .textFieldStyle(.roundedBorder)
-                .textInputAutocapitalization(.never)
-                .disableAutocorrection(true)
+            MtgTextField(placeholder: "Password", text: $password, isSecure: true)
                 .textContentType(.password)
                 .accessibilityLabel("Password")
                 .onSubmit {
@@ -44,16 +45,7 @@ struct LoginView: View {
                 }
 
             if let error = authViewModel.errorMessage {
-                HStack(spacing: 6) {
-                    Image(systemName: "exclamationmark.triangle.fill")
-                        .foregroundStyle(.red)
-                        .font(.caption)
-                    Text(error)
-                        .foregroundStyle(.red)
-                        .font(.caption)
-                }
-                .accessibilityElement(children: .combine)
-                .accessibilityLabel("Error: \(error)")
+                MtgErrorBanner(message: error)
             }
 
             Button {
@@ -63,25 +55,27 @@ struct LoginView: View {
                     HStack(spacing: 8) {
                         ProgressView()
                             .controlSize(.small)
-                            .tint(.white)
+                            .tint(Color.mtgBackground)
                         Text("Signing In...")
                     }
-                    .frame(maxWidth: .infinity)
                 } else {
                     Text("Sign In")
-                        .frame(maxWidth: .infinity)
                 }
             }
-            .buttonStyle(.borderedProminent)
+            .buttonStyle(MtgPrimaryButtonStyle(isDisabled: email.isEmpty || password.isEmpty || isSigningIn))
             .disabled(email.isEmpty || password.isEmpty || isSigningIn)
             .accessibilityLabel(isSigningIn ? "Signing in" : "Sign in")
 
-            HStack {
-                VStack { Divider() }
+            HStack(spacing: 12) {
+                Rectangle()
+                    .fill(Color.mtgDivider)
+                    .frame(height: 1)
                 Text("or")
                     .font(.caption)
-                    .foregroundStyle(.secondary)
-                VStack { Divider() }
+                    .foregroundStyle(Color.mtgTextSecondary)
+                Rectangle()
+                    .fill(Color.mtgDivider)
+                    .frame(height: 1)
             }
             .padding(.vertical, 4)
             .accessibilityHidden(true)
@@ -89,7 +83,7 @@ struct LoginView: View {
             NavigationLink("Sign in with Phone") {
                 PhoneAuthView()
             }
-            .buttonStyle(.bordered)
+            .buttonStyle(MtgSecondaryButtonStyle())
             .accessibilityLabel("Sign in with phone number")
 
             Spacer()
@@ -98,6 +92,7 @@ struct LoginView: View {
                 Button("Create Account") {
                     isShowingSignUp = true
                 }
+                .foregroundStyle(Color.mtgGold)
                 .accessibilityLabel("Create a new account")
 
                 Spacer()
@@ -107,12 +102,14 @@ struct LoginView: View {
                     Task { await authViewModel.resetPassword(email: email) }
                 }
                 .font(.footnote)
+                .foregroundStyle(Color.mtgTextSecondary)
                 .disabled(email.isEmpty)
                 .accessibilityLabel("Reset password")
                 .accessibilityHint(email.isEmpty ? "Enter your email first" : "Sends a password reset email")
             }
         }
         .padding()
+        .mtgBackground()
         .navigationDestination(isPresented: $isShowingSignUp) {
             SignUpView()
         }

@@ -116,7 +116,7 @@ export default function SignUpScreen() {
         >
           {isCreating ? (
             <View style={styles.buttonRow}>
-              <ActivityIndicator size="small" color="#fff" />
+              <ActivityIndicator size="small" color="#0d0b1a" />
               <Text style={styles.buttonText}>Creating Account...</Text>
             </View>
           ) : (
@@ -172,12 +172,13 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   buttonText: {
-    color: '#FFFFFF',
+    color: '#0d0b1a',
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: '700',
   },
   hint: {
-    color: colors.textSecondary,
+    color: colors.textTertiary,
     fontSize: 11,
+    fontStyle: 'italic',
   },
 });

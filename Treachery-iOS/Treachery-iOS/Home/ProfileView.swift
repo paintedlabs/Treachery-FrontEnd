@@ -19,161 +19,193 @@ struct ProfileView: View {
     private let firestoreManager = FirestoreManager()
 
     var body: some View {
-        List {
-            // Profile info
-            Section("Profile") {
-                if let user = user {
-                    HStack {
-                        Text("Display Name")
-                        Spacer()
-                        if isEditingName {
-                            TextField("Name", text: $editedName)
-                                .multilineTextAlignment(.trailing)
-                                .textInputAutocapitalization(.words)
-                        } else {
-                            Text(user.displayName)
-                                .foregroundStyle(.secondary)
-                        }
-                    }
+        ZStack {
+            Color.mtgBackground.ignoresSafeArea()
 
-                    if let email = user.email {
-                        HStack {
-                            Text("Email")
-                            Spacer()
-                            Text(email)
-                                .foregroundStyle(.secondary)
-                        }
-                    }
+            ScrollView {
+                VStack(spacing: 20) {
+                    // Profile info card
+                    VStack(spacing: 0) {
+                        MtgSectionHeader(title: "Profile")
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.horizontal, 16)
+                            .padding(.top, 16)
+                            .padding(.bottom, 8)
 
-                    if let phone = user.phoneNumber {
-                        HStack {
-                            Text("Phone")
-                            Spacer()
-                            Text(phone)
-                                .foregroundStyle(.secondary)
-                        }
-                    }
+                        OrnateDivider()
+                            .padding(.horizontal, 16)
+                            .padding(.bottom, 8)
 
-                    HStack {
-                        Text("Member Since")
-                        Spacer()
-                        Text(user.createdAt, style: .date)
-                            .foregroundStyle(.secondary)
-                    }
-                } else {
-                    HStack {
-                        Spacer()
-                        ProgressView()
-                        Spacer()
-                    }
-                }
-            }
-
-            // Game stats
-            Section("Game Stats") {
-                if let stats = gameStats {
-                    HStack {
-                        StatBox(value: "\(stats.totalGames)", label: "Games", color: .primary)
-                        StatBox(value: "\(stats.wins)", label: "Wins", color: .green)
-                        StatBox(value: "\(stats.losses)", label: "Losses", color: .red)
-                        StatBox(value: stats.winRateText, label: "Win %", color: .blue)
-                    }
-                    .padding(.vertical, 4)
-
-                    // Role breakdown
-                    if !stats.roleBreakdown.isEmpty {
-                        VStack(alignment: .leading, spacing: 6) {
-                            Text("Roles Played")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                            ForEach(stats.roleBreakdown.sorted(by: { $0.value > $1.value }), id: \.key) { role, count in
-                                HStack(spacing: 6) {
-                                    Circle()
-                                        .fill(role.color)
-                                        .frame(width: 8, height: 8)
-                                    Text(role.displayName)
-                                        .font(.subheadline)
-                                    Spacer()
-                                    Text("\(count)")
-                                        .font(.subheadline)
-                                        .foregroundStyle(.secondary)
+                        if let user = user {
+                            ProfileRow(label: "Display Name", value: isEditingName ? nil : user.displayName) {
+                                if isEditingName {
+                                    TextField("Name", text: $editedName)
+                                        .multilineTextAlignment(.trailing)
+                                        .textInputAutocapitalization(.words)
+                                        .foregroundStyle(Color.mtgGoldBright)
                                 }
                             }
+
+                            if let email = user.email {
+                                ProfileRow(label: "Email", value: email)
+                            }
+
+                            if let phone = user.phoneNumber {
+                                ProfileRow(label: "Phone", value: phone)
+                            }
+
+                            ProfileRow(label: "Member Since") {
+                                Text(user.createdAt, style: .date)
+                                    .foregroundStyle(Color.mtgTextSecondary)
+                            }
+                        } else {
+                            HStack {
+                                Spacer()
+                                ProgressView()
+                                    .tint(Color.mtgGold)
+                                Spacer()
+                            }
+                            .padding()
                         }
                     }
+                    .mtgCardFrame()
 
-                    NavigationLink {
-                        GameHistoryView()
-                    } label: {
-                        Text("View Game History")
-                    }
-                } else {
-                    HStack {
-                        Spacer()
-                        ProgressView("Loading stats...")
-                        Spacer()
-                    }
-                }
-            }
+                    // Game stats card
+                    VStack(spacing: 0) {
+                        MtgSectionHeader(title: "Game Stats")
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.horizontal, 16)
+                            .padding(.top, 16)
+                            .padding(.bottom, 8)
 
-            // Friends
-            if let user = user {
-                Section {
-                    NavigationLink {
-                        FriendsListView()
-                    } label: {
-                        HStack {
-                            Text("Friends")
-                            Spacer()
-                            Text("\(user.friendIds.count)")
-                                .foregroundStyle(.secondary)
+                        OrnateDivider()
+                            .padding(.horizontal, 16)
+                            .padding(.bottom, 12)
+
+                        if let stats = gameStats {
+                            HStack(spacing: 8) {
+                                MtgStatBox(value: "\(stats.totalGames)", label: "Games", color: Color.mtgTextPrimary)
+                                MtgStatBox(value: "\(stats.wins)", label: "Wins", color: Color.mtgSuccess)
+                                MtgStatBox(value: "\(stats.losses)", label: "Losses", color: Color.mtgError)
+                                MtgStatBox(value: stats.winRateText, label: "Win %", color: Color.mtgGuardian)
+                            }
+                            .padding(.horizontal, 16)
+                            .padding(.bottom, 12)
+
+                            // Role breakdown
+                            if !stats.roleBreakdown.isEmpty {
+                                VStack(alignment: .leading, spacing: 6) {
+                                    Text("Roles Played")
+                                        .font(.caption)
+                                        .foregroundStyle(Color.mtgTextSecondary)
+                                    ForEach(stats.roleBreakdown.sorted(by: { $0.value > $1.value }), id: \.key) { role, count in
+                                        HStack(spacing: 6) {
+                                            Circle()
+                                                .fill(role.color)
+                                                .frame(width: 8, height: 8)
+                                            Text(role.displayName)
+                                                .font(.subheadline)
+                                                .foregroundStyle(Color.mtgTextPrimary)
+                                            Spacer()
+                                            Text("\(count)")
+                                                .font(.subheadline)
+                                                .foregroundStyle(Color.mtgTextSecondary)
+                                        }
+                                    }
+                                }
+                                .padding(.horizontal, 16)
+                                .padding(.bottom, 12)
+                            }
+
+                            NavigationLink {
+                                GameHistoryView()
+                            } label: {
+                                HStack {
+                                    Text("View Game History")
+                                        .foregroundStyle(Color.mtgGold)
+                                    Spacer()
+                                    Image(systemName: "chevron.right")
+                                        .font(.caption)
+                                        .foregroundStyle(Color.mtgTextSecondary)
+                                }
+                                .padding(.horizontal, 16)
+                                .padding(.vertical, 12)
+                            }
+                        } else {
+                            HStack {
+                                Spacer()
+                                ProgressView("Loading stats...")
+                                    .tint(Color.mtgGold)
+                                    .foregroundStyle(Color.mtgTextSecondary)
+                                Spacer()
+                            }
+                            .padding()
                         }
                     }
-                }
-            }
+                    .mtgCardFrame()
 
-            // Error
-            if let error = errorMessage {
-                Section {
-                    VStack(alignment: .leading, spacing: 8) {
-                        HStack(spacing: 6) {
-                            Image(systemName: "exclamationmark.triangle.fill")
-                                .foregroundStyle(.red)
+                    // Friends card
+                    if let user = user {
+                        NavigationLink {
+                            FriendsListView()
+                        } label: {
+                            HStack {
+                                Text("Friends")
+                                    .foregroundStyle(Color.mtgTextPrimary)
+                                Spacer()
+                                Text("\(user.friendIds.count)")
+                                    .foregroundStyle(Color.mtgTextSecondary)
+                                Image(systemName: "chevron.right")
+                                    .font(.caption)
+                                    .foregroundStyle(Color.mtgTextSecondary)
+                            }
+                            .padding(16)
+                        }
+                        .mtgCardFrame()
+                    }
+
+                    // Error
+                    if let error = errorMessage {
+                        VStack(alignment: .leading, spacing: 8) {
+                            MtgErrorBanner(message: "Error loading profile")
+                            Text(error)
+                                .foregroundStyle(Color.mtgError)
                                 .font(.caption)
-                            Text("Error loading profile")
-                                .foregroundStyle(.red)
-                                .font(.caption)
-                                .fontWeight(.medium)
+                                .textSelection(.enabled)
                         }
-                        Text(error)
-                            .foregroundStyle(.red)
-                            .font(.caption)
-                            .textSelection(.enabled)
+                        .padding(16)
+                        .mtgCardFrame(borderColor: Color.mtgError)
                     }
-                }
-            }
 
-            // Sign out
-            Section {
-                Button("Sign Out", role: .destructive) {
-                    authViewModel.signOut()
+                    // Sign out
+                    Button("Sign Out") {
+                        authViewModel.signOut()
+                    }
+                    .foregroundStyle(Color.mtgError)
+                    .padding(16)
+                    .frame(maxWidth: .infinity)
+                    .mtgCardFrame(borderColor: Color.mtgError.opacity(0.5))
+                    .accessibilityLabel("Sign out of your account")
                 }
-                .accessibilityLabel("Sign out of your account")
+                .padding()
             }
         }
         .navigationTitle("Profile")
+        .toolbarColorScheme(.dark, for: .navigationBar)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 if isEditingName {
                     Button(isSaving ? "Saving..." : "Save") {
                         Task { await saveName() }
                     }
+                    .foregroundStyle(Color.mtgGold)
                     .disabled(editedName.isEmpty || isSaving)
                 } else {
                     Button("Edit") {
                         editedName = user?.displayName ?? ""
                         isEditingName = true
                     }
+                    .foregroundStyle(Color.mtgGold)
                     .disabled(user == nil)
                 }
             }
@@ -260,6 +292,49 @@ struct ProfileView: View {
     }
 }
 
+// MARK: - Profile Row
+
+private struct ProfileRow<Content: View>: View {
+    let label: String
+    var value: String? = nil
+    var content: (() -> Content)? = nil
+
+    init(label: String, value: String?, @ViewBuilder content: @escaping () -> Content) {
+        self.label = label
+        self.value = value
+        self.content = content
+    }
+
+    init(label: String, value: String) where Content == EmptyView {
+        self.label = label
+        self.value = value
+        self.content = nil
+    }
+
+    init(label: String, @ViewBuilder content: @escaping () -> Content) {
+        self.label = label
+        self.value = nil
+        self.content = content
+    }
+
+    var body: some View {
+        HStack {
+            Text(label)
+                .foregroundStyle(Color.mtgTextPrimary)
+            Spacer()
+            if let value = value {
+                Text(value)
+                    .foregroundStyle(Color.mtgTextSecondary)
+            }
+            if let content = content {
+                content()
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 10)
+    }
+}
+
 // MARK: - Game Stats
 
 private struct GameStats {
@@ -269,32 +344,9 @@ private struct GameStats {
     let roleBreakdown: [Role: Int]
 
     var winRateText: String {
-        guard totalGames > 0 else { return "—" }
+        guard totalGames > 0 else { return "--" }
         let rate = Double(wins) / Double(totalGames) * 100
         return "\(Int(rate))%"
-    }
-}
-
-// MARK: - Stat Box
-
-private struct StatBox: View {
-    let value: String
-    let label: String
-    let color: Color
-
-    var body: some View {
-        VStack(spacing: 2) {
-            Text(value)
-                .font(.title2)
-                .fontWeight(.bold)
-                .foregroundStyle(color)
-            Text(label)
-                .font(.caption2)
-                .foregroundStyle(.secondary)
-        }
-        .frame(maxWidth: .infinity)
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(value) \(label)")
     }
 }
 

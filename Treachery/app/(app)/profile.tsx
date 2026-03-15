@@ -15,7 +15,7 @@ import { StatBox } from '@/components/StatBox';
 import { ErrorBanner } from '@/components/ErrorBanner';
 import { ROLE_COLORS, ROLE_DISPLAY_NAMES } from '@/constants/roles';
 import { Role } from '@/models/types';
-import { colors, spacing } from '@/constants/theme';
+import { colors, spacing, fonts } from '@/constants/theme';
 
 export default function ProfileScreen() {
   const router = useRouter();
@@ -83,7 +83,7 @@ export default function ProfileScreen() {
               </View>
             )}
 
-            <View style={styles.row}>
+            <View style={[styles.row, { borderBottomWidth: 0 }]}>
               <Text style={styles.label}>Member Since</Text>
               <Text style={styles.value}>{formatDate(user.created_at)}</Text>
             </View>
@@ -114,6 +114,13 @@ export default function ProfileScreen() {
         )}
       </View>
 
+      {/* Ornate divider */}
+      <View style={styles.ornateDivider}>
+        <View style={styles.ornateLine} />
+        <Text style={styles.ornateDiamond}>&#9670;</Text>
+        <View style={styles.ornateLine} />
+      </View>
+
       {/* Game stats */}
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Game Stats</Text>
@@ -139,7 +146,7 @@ export default function ProfileScreen() {
                     <View key={role} style={styles.roleRow}>
                       <View style={[styles.roleDot, { backgroundColor: ROLE_COLORS[role] }]} />
                       <Text style={styles.roleText}>{ROLE_DISPLAY_NAMES[role]}</Text>
-                      <Text style={styles.roleCount}>{count}</Text>
+                      <Text style={[styles.roleCount, { color: ROLE_COLORS[role] }]}>{count}</Text>
                     </View>
                   ))}
               </View>
@@ -162,7 +169,7 @@ export default function ProfileScreen() {
             style={styles.card}
             onPress={() => router.push('/(app)/friends')}
           >
-            <View style={styles.row}>
+            <View style={[styles.row, { borderBottomWidth: 0 }]}>
               <Text style={styles.label}>Friends</Text>
               <Text style={styles.value}>{user.friend_ids?.length ?? 0}</Text>
             </View>
@@ -195,13 +202,16 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     color: colors.textSecondary,
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '600',
     textTransform: 'uppercase',
+    letterSpacing: 1.5,
   },
   card: {
     backgroundColor: colors.surface,
     borderRadius: 10,
+    borderWidth: 1,
+    borderColor: colors.border,
     overflow: 'hidden',
   },
   row: {
@@ -209,7 +219,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     padding: 14,
-    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomWidth: 1,
     borderBottomColor: colors.divider,
   },
   label: {
@@ -241,21 +251,38 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
   },
+  ornateDivider: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  ornateLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: colors.border,
+  },
+  ornateDiamond: {
+    color: colors.primary,
+    fontSize: 10,
+  },
   statsRow: {
     flexDirection: 'row',
     padding: 14,
-    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomWidth: 1,
     borderBottomColor: colors.divider,
   },
   roleBreakdown: {
     padding: 14,
     gap: 6,
-    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomWidth: 1,
     borderBottomColor: colors.divider,
   },
   subLabel: {
     color: colors.textSecondary,
-    fontSize: 12,
+    fontSize: 11,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 1,
     marginBottom: 4,
   },
   roleRow: {
@@ -274,8 +301,9 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   roleCount: {
-    color: colors.textSecondary,
     fontSize: 14,
+    fontWeight: '600',
+    fontFamily: fonts.serif,
   },
   historyLink: {
     padding: 14,
@@ -287,6 +315,8 @@ const styles = StyleSheet.create({
   signOutButton: {
     backgroundColor: colors.surface,
     borderRadius: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(196, 60, 60, 0.3)',
     padding: 14,
     alignItems: 'center',
   },

@@ -3,7 +3,7 @@ import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Player, Role } from '@/models/types';
 import { ROLE_COLORS, ROLE_DISPLAY_NAMES } from '@/constants/roles';
-import { colors } from '@/constants/theme';
+import { colors, fonts } from '@/constants/theme';
 
 interface PlayerRowProps {
   player: Player;
@@ -25,7 +25,12 @@ export function PlayerRow({
   const roleColor = player.role ? ROLE_COLORS[player.role] : colors.textSecondary;
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, isCurrentUser && styles.containerHighlight]}>
+      {/* Left role accent bar */}
+      {canSeeRole && player.role && (
+        <View style={[styles.accentBar, { backgroundColor: roleColor }]} />
+      )}
+
       <View style={styles.info}>
         <View style={styles.nameRow}>
           <Text
@@ -74,7 +79,9 @@ export function PlayerRow({
           <TouchableOpacity onPress={() => onAdjustLife(-1)}>
             <Ionicons name="remove-circle" size={28} color={colors.error} />
           </TouchableOpacity>
-          <Text style={styles.lifeText}>{player.life_total}</Text>
+          <View style={styles.lifeBox}>
+            <Text style={styles.lifeText}>{player.life_total}</Text>
+          </View>
           <TouchableOpacity onPress={() => onAdjustLife(1)}>
             <Ionicons name="add-circle" size={28} color={colors.success} />
           </TouchableOpacity>
@@ -92,8 +99,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 10,
     paddingHorizontal: 16,
-    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomWidth: 1,
     borderBottomColor: colors.divider,
+    backgroundColor: colors.surface,
+  },
+  containerHighlight: {
+    backgroundColor: colors.surfaceLight,
+  },
+  accentBar: {
+    width: 3,
+    alignSelf: 'stretch',
+    borderRadius: 2,
+    marginRight: 10,
   },
   info: {
     flex: 1,
@@ -116,7 +133,9 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
   },
   youBadge: {
-    backgroundColor: 'rgba(74, 144, 217, 0.2)',
+    backgroundColor: 'rgba(201, 168, 76, 0.2)',
+    borderWidth: 1,
+    borderColor: 'rgba(201, 168, 76, 0.3)',
     paddingHorizontal: 6,
     paddingVertical: 1,
     borderRadius: 10,
@@ -124,6 +143,7 @@ const styles = StyleSheet.create({
   youText: {
     color: colors.primary,
     fontSize: 10,
+    fontWeight: '600',
   },
   roleRow: {
     flexDirection: 'row',
@@ -137,29 +157,43 @@ const styles = StyleSheet.create({
   },
   roleText: {
     fontSize: 12,
+    fontWeight: '500',
   },
   unveiledText: {
     fontSize: 10,
     color: colors.textSecondary,
+    fontStyle: 'italic',
   },
   hiddenText: {
     fontSize: 12,
-    color: colors.textSecondary,
+    color: colors.textTertiary,
+    fontStyle: 'italic',
   },
   lifeControls: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: 8,
+  },
+  lifeBox: {
+    backgroundColor: colors.surfaceLight,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 6,
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    minWidth: 44,
+    alignItems: 'center',
   },
   lifeText: {
     color: colors.text,
     fontSize: 20,
-    fontWeight: '600',
-    minWidth: 36,
+    fontWeight: '700',
+    fontFamily: fonts.serif,
     textAlign: 'center',
   },
   eliminatedText: {
     color: colors.error,
     fontSize: 12,
+    fontStyle: 'italic',
   },
 });

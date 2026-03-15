@@ -14,7 +14,16 @@ struct RootView: View {
         Group {
             switch authViewModel.authState {
             case .loading:
-                ProgressView("Loading...")
+                ZStack {
+                    Color.mtgBackground.ignoresSafeArea()
+                    VStack(spacing: 16) {
+                        Text("Treachery")
+                            .font(.system(size: 36, weight: .bold, design: .serif))
+                            .foregroundStyle(Color.mtgGoldBright)
+                        ProgressView()
+                            .tint(Color.mtgGold)
+                    }
+                }
             case .authenticated:
                 HomeView()
             case .unauthenticated:
@@ -23,6 +32,7 @@ struct RootView: View {
                 }
             }
         }
+        .preferredColorScheme(.dark)
     }
 }
 

@@ -21,107 +21,194 @@ struct FriendsListView: View {
     private let firestoreManager = FirestoreManager()
 
     var body: some View {
-        List {
-            // Search section
-            Section("Add Friends") {
-                HStack {
-                    TextField("Search by display name", text: $searchText)
-                        .textInputAutocapitalization(.never)
-                        .disableAutocorrection(true)
-                        .onSubmit {
-                            Task { await searchUsers() }
-                        }
-                    if isSearching {
-                        ProgressView()
-                    } else if !searchText.isEmpty {
-                        Button("Search") {
-                            Task { await searchUsers() }
-                        }
-                    }
-                }
+        ZStack {
+            Color.mtgBackground.ignoresSafeArea()
 
-                ForEach(searchResults) { user in
-                    if user.id != authViewModel.currentUserId {
-                        HStack {
-                            Text(user.displayName)
-                            Spacer()
-                            if isFriend(user) {
-                                Text("Friends")
-                                    .font(.caption)
-                                    .foregroundStyle(.green)
-                            } else if sentRequestUserIds.contains(user.id) {
-                                Text("Request Sent")
-                                    .font(.caption)
-                                    .foregroundStyle(.orange)
-                            } else {
-                                Button("Add") {
-                                    Task { await sendRequest(to: user) }
+            ScrollView {
+                VStack(spacing: 20) {
+                    // Search section
+                    VStack(spacing: 12) {
+                        MtgSectionHeader(title: "Add Friends")
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.horizontal, 16)
+                            .padding(.top, 16)
+
+                        OrnateDivider()
+                            .padding(.horizontal, 16)
+
+                        HStack(spacing: 8) {
+                            TextField("Search by display name", text: $searchText)
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 10)
+                                .foregroundStyle(Color.mtgTextPrimary)
+                                .background(Color.mtgCardElevated)
+                                .clipShape(RoundedRectangle(cornerRadius: 8))
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 8)
+                                        .stroke(Color.mtgDivider, lineWidth: 1)
+                                )
+                                .textInputAutocapitalization(.never)
+                                .autocorrectionDisabled()
+                                .onSubmit {
+                                    Task { await searchUsers() }
                                 }
-                                .buttonStyle(.bordered)
-                                .font(.caption)
-                                .accessibilityLabel("Send friend request to \(user.displayName)")
+
+                            if isSearching {
+                                ProgressView()
+                                    .tint(Color.mtgGold)
+                            } else if !searchText.isEmpty {
+                                Button("Search") {
+                                    Task { await searchUsers() }
+                                }
+                                .foregroundStyle(Color.mtgGold)
+                                .font(.subheadline)
                             }
                         }
-                        .accessibilityElement(children: .combine)
-                    }
-                }
-            }
+                        .padding(.horizontal, 16)
 
-            // Pending requests
-            if !pendingRequests.isEmpty {
-                Section("Friend Requests (\(pendingRequests.count))") {
-                    ForEach(pendingRequests) { request in
-                        HStack {
-                            VStack(alignment: .leading) {
-                                Text(request.fromDisplayName)
-                                    .fontWeight(.medium)
-                                Text("Wants to be friends")
+                        ForEach(searchResults) { user in
+                            if user.id != authViewModel.currentUserId {
+                                HStack {
+                                    Text(user.displayName)
+                                        .foregroundStyle(Color.mtgTextPrimary)
+                                    Spacer()
+                                    if isFriend(user) {
+                                        Text("Friends")
+                                            .font(.caption)
+                                            .foregroundStyle(Color.mtgSuccess)
+                                    } else if sentRequestUserIds.contains(user.id) {
+                                        Text("Request Sent")
+                                            .font(.caption)
+                                            .foregroundStyle(Color.mtgGold)
+                                    } else {
+                                        Button("Add") {
+                                            Task { await sendRequest(to: user) }
+                                        }
+                                        .font(.caption)
+                                        .foregroundStyle(Color.mtgBackground)
+                                        .padding(.horizontal, 12)
+                                        .padding(.vertical, 4)
+                                        .background(Color.mtgGold)
+                                        .clipShape(Capsule())
+                                        .accessibilityLabel("Send friend request to \(user.displayName)")
+                                    }
+                                }
+                                .padding(.horizontal, 16)
+                                .padding(.vertical, 6)
+                                .accessibilityElement(children: .combine)
+                            }
+                        }
+                    }
+                    .padding(.bottom, 8)
+                    .mtgCardFrame()
+
+                    // Pending requests
+                    if !pendingRequests.isEmpty {
+                        VStack(spacing: 0) {
+                            MtgSectionHeader(title: "Friend Requests (\(pendingRequests.count))")
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(.horizontal, 16)
+                                .padding(.top, 16)
+                                .padding(.bottom, 8)
+
+                            OrnateDivider()
+                                .padding(.horizontal, 16)
+                                .padding(.bottom, 8)
+
+                            ForEach(pendingRequests) { request in
+                                HStack {
+                                    VStack(alignment: .leading) {
+                                        Text(request.fromDisplayName)
+                                            .fontWeight(.medium)
+                                            .foregroundStyle(Color.mtgTextPrimary)
+                                        Text("Wants to be friends")
+                                            .font(.caption)
+                                            .foregroundStyle(Color.mtgTextSecondary)
+                                    }
+                                    Spacer()
+                                    Button("Accept") {
+                                        Task { await acceptRequest(request) }
+                                    }
                                     .font(.caption)
-                                    .foregroundStyle(.secondary)
-                            }
-                            Spacer()
-                            Button("Accept") {
-                                Task { await acceptRequest(request) }
-                            }
-                            .buttonStyle(.borderedProminent)
-                            .font(.caption)
-                            .accessibilityLabel("Accept friend request from \(request.fromDisplayName)")
+                                    .foregroundStyle(Color.mtgBackground)
+                                    .padding(.horizontal, 12)
+                                    .padding(.vertical, 4)
+                                    .background(Color.mtgSuccess)
+                                    .clipShape(Capsule())
+                                    .accessibilityLabel("Accept friend request from \(request.fromDisplayName)")
 
-                            Button("Decline") {
-                                Task { await declineRequest(request) }
+                                    Button("Decline") {
+                                        Task { await declineRequest(request) }
+                                    }
+                                    .font(.caption)
+                                    .foregroundStyle(Color.mtgTextSecondary)
+                                    .padding(.horizontal, 12)
+                                    .padding(.vertical, 4)
+                                    .overlay(
+                                        Capsule()
+                                            .stroke(Color.mtgDivider, lineWidth: 1)
+                                    )
+                                    .accessibilityLabel("Decline friend request from \(request.fromDisplayName)")
+                                }
+                                .padding(.horizontal, 16)
+                                .padding(.vertical, 8)
                             }
-                            .buttonStyle(.bordered)
-                            .font(.caption)
-                            .accessibilityLabel("Decline friend request from \(request.fromDisplayName)")
+                        }
+                        .mtgCardFrame()
+                    }
+
+                    // Friends list
+                    VStack(spacing: 0) {
+                        MtgSectionHeader(title: "Friends (\(friends.count))")
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.horizontal, 16)
+                            .padding(.top, 16)
+                            .padding(.bottom, 8)
+
+                        OrnateDivider()
+                            .padding(.horizontal, 16)
+                            .padding(.bottom, 8)
+
+                        if isLoading {
+                            ProgressView()
+                                .tint(Color.mtgGold)
+                                .padding()
+                        } else if friends.isEmpty {
+                            Text("No friends yet. Search for players above.")
+                                .foregroundStyle(Color.mtgTextSecondary)
+                                .font(.subheadline)
+                                .padding(16)
+                        } else {
+                            ForEach(friends) { friend in
+                                HStack {
+                                    Text(friend.displayName)
+                                        .foregroundStyle(Color.mtgTextPrimary)
+                                    Spacer()
+                                }
+                                .padding(.horizontal, 16)
+                                .padding(.vertical, 10)
+
+                                if friend.id != friends.last?.id {
+                                    Rectangle()
+                                        .fill(Color.mtgDivider)
+                                        .frame(height: 1)
+                                        .padding(.horizontal, 16)
+                                }
+                            }
                         }
                     }
-                }
-            }
+                    .mtgCardFrame()
 
-            // Friends list
-            Section("Friends (\(friends.count))") {
-                if isLoading {
-                    ProgressView()
-                } else if friends.isEmpty {
-                    Text("No friends yet. Search for players above.")
-                        .foregroundStyle(.secondary)
-                        .font(.subheadline)
-                } else {
-                    ForEach(friends) { friend in
-                        Text(friend.displayName)
+                    if let error = errorMessage {
+                        MtgErrorBanner(message: error)
+                            .padding(.horizontal)
                     }
                 }
-            }
-
-            if let error = errorMessage {
-                Section {
-                    Text(error)
-                        .foregroundStyle(.red)
-                        .font(.caption)
-                }
+                .padding()
             }
         }
         .navigationTitle("Friends")
+        .toolbarColorScheme(.dark, for: .navigationBar)
         .task {
             await loadData()
         }
@@ -194,8 +281,7 @@ struct FriendsListView: View {
 
         do {
             // Update request status
-            var updatedRequest = request
-            updatedRequest = FriendRequest(
+            let updatedRequest = FriendRequest(
                 id: request.id,
                 fromUserId: request.fromUserId,
                 fromDisplayName: request.fromDisplayName,

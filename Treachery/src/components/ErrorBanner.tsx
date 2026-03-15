@@ -22,7 +22,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 6,
     paddingHorizontal: 16,
-    paddingVertical: 8,
+    paddingVertical: 10,
+    backgroundColor: 'rgba(196, 60, 60, 0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(196, 60, 60, 0.3)',
+    borderRadius: 6,
   },
   text: {
     color: colors.error,

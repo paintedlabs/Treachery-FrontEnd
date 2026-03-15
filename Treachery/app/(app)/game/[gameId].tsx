@@ -19,7 +19,7 @@ import { ErrorBanner } from '@/components/ErrorBanner';
 import { LoadingScreen } from '@/components/LoadingScreen';
 import { ROLE_COLORS, ROLE_DISPLAY_NAMES, ROLE_WIN_CONDITIONS } from '@/constants/roles';
 import { Player } from '@/models/types';
-import { colors, spacing } from '@/constants/theme';
+import { colors, spacing, fonts } from '@/constants/theme';
 
 export default function GameBoardScreen() {
   const { gameId } = useLocalSearchParams<{ gameId: string }>();
@@ -144,7 +144,12 @@ export default function GameBoardScreen() {
         />
       )}
 
-      <View style={styles.divider} />
+      {/* Ornate divider */}
+      <View style={styles.ornateDividerRow}>
+        <View style={styles.ornateLine} />
+        <Text style={styles.ornateDiamond}>&#9670;</Text>
+        <View style={styles.ornateLine} />
+      </View>
 
       {/* Player list */}
       <FlatList
@@ -182,14 +187,17 @@ export default function GameBoardScreen() {
               ]}
               onPress={handleUnveil}
             >
-              <Text style={styles.buttonText}>Unveil Identity</Text>
+              <Text style={styles.unveilButtonText}>Unveil Identity</Text>
             </TouchableOpacity>
           )}
 
         {currentPlayer?.role && (
-          <Text style={styles.winConditionText}>
-            {ROLE_WIN_CONDITIONS[currentPlayer.role]}
-          </Text>
+          <View style={styles.winConditionBox}>
+            <Text style={styles.winConditionLabel}>Win Condition</Text>
+            <Text style={styles.winConditionText}>
+              {ROLE_WIN_CONDITIONS[currentPlayer.role]}
+            </Text>
+          </View>
         )}
       </View>
 
@@ -237,9 +245,21 @@ const styles = StyleSheet.create({
     padding: spacing.lg,
     gap: 12,
   },
-  divider: {
-    height: StyleSheet.hairlineWidth,
-    backgroundColor: colors.divider,
+  ornateDividerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: spacing.lg,
+    paddingVertical: 4,
+    gap: 8,
+  },
+  ornateLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: colors.border,
+  },
+  ornateDiamond: {
+    color: colors.primary,
+    fontSize: 8,
   },
   list: {
     flex: 1,
@@ -248,12 +268,19 @@ const styles = StyleSheet.create({
     padding: spacing.lg,
     alignItems: 'center',
     gap: 12,
+    borderTopWidth: 1,
+    borderTopColor: colors.divider,
   },
   unveilButton: {
     borderRadius: 8,
     padding: 14,
     alignItems: 'center',
     width: '100%',
+  },
+  unveilButtonText: {
+    color: '#0d0b1a',
+    fontSize: 16,
+    fontWeight: '700',
   },
   primaryButton: {
     backgroundColor: colors.primary,
@@ -263,14 +290,27 @@ const styles = StyleSheet.create({
     minWidth: 200,
   },
   buttonText: {
-    color: '#FFFFFF',
+    color: '#0d0b1a',
     fontSize: 16,
+    fontWeight: '700',
+  },
+  winConditionBox: {
+    alignItems: 'center',
+    gap: 4,
+  },
+  winConditionLabel: {
+    color: colors.primary,
+    fontSize: 10,
     fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 1,
   },
   winConditionText: {
     color: colors.textSecondary,
     fontSize: 11,
     textAlign: 'center',
+    fontFamily: fonts.serif,
+    fontStyle: 'italic',
   },
   forfeitButton: {
     flexDirection: 'row',
@@ -287,6 +327,7 @@ const styles = StyleSheet.create({
     color: colors.text,
     fontSize: 20,
     fontWeight: 'bold',
+    fontFamily: fonts.serif,
   },
   unavailableText: {
     color: colors.textSecondary,

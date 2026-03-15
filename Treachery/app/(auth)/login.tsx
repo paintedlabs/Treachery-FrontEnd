@@ -12,7 +12,7 @@ import {
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/hooks/useAuth';
 import { ErrorBanner } from '@/components/ErrorBanner';
-import { colors, spacing, fontSize } from '@/constants/theme';
+import { colors, spacing, fontSize, fonts } from '@/constants/theme';
 
 export default function LoginScreen() {
   const router = useRouter();
@@ -41,6 +41,14 @@ export default function LoginScreen() {
       <View style={styles.spacer} />
 
       <Text style={styles.title}>Treachery</Text>
+      <Text style={styles.subtitle}>A Game of Hidden Allegiance</Text>
+
+      {/* Ornate divider */}
+      <View style={styles.ornateDivider}>
+        <View style={styles.ornateLine} />
+        <Text style={styles.ornateDiamond}>&#9670;</Text>
+        <View style={styles.ornateLine} />
+      </View>
 
       <View style={styles.form}>
         <TextInput
@@ -83,7 +91,7 @@ export default function LoginScreen() {
         >
           {isSigningIn ? (
             <View style={styles.buttonRow}>
-              <ActivityIndicator size="small" color="#fff" />
+              <ActivityIndicator size="small" color="#0d0b1a" />
               <Text style={styles.buttonText}>Signing In...</Text>
             </View>
           ) : (
@@ -132,10 +140,37 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   title: {
-    color: colors.text,
-    fontSize: fontSize.largeTitle,
+    color: colors.primaryBright,
+    fontSize: 42,
     fontWeight: 'bold',
+    fontFamily: fonts.serif,
+    textAlign: 'center',
+    letterSpacing: 2,
+  },
+  subtitle: {
+    color: colors.textSecondary,
+    fontSize: 14,
+    fontFamily: fonts.serif,
+    fontStyle: 'italic',
+    textAlign: 'center',
+    marginTop: 4,
+    marginBottom: spacing.lg,
+  },
+  ornateDivider: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
     marginBottom: spacing.xl,
+    paddingHorizontal: 32,
+  },
+  ornateLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: colors.border,
+  },
+  ornateDiamond: {
+    color: colors.primary,
+    fontSize: 10,
   },
   form: {
     gap: spacing.lg,
@@ -164,9 +199,9 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   buttonText: {
-    color: '#FFFFFF',
+    color: '#0d0b1a',
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: '700',
   },
   secondaryButton: {
     borderRadius: 8,
@@ -192,8 +227,10 @@ const styles = StyleSheet.create({
     backgroundColor: colors.divider,
   },
   dividerText: {
-    color: colors.textSecondary,
+    color: colors.textTertiary,
     fontSize: 12,
+    fontFamily: fonts.serif,
+    fontStyle: 'italic',
   },
   bottomRow: {
     flexDirection: 'row',

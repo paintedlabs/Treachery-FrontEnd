@@ -11,7 +11,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Player, IdentityCard, Rarity } from '@/models/types';
 import { ROLE_COLORS, ROLE_DISPLAY_NAMES, ROLE_WIN_CONDITIONS } from '@/constants/roles';
 import { RARITY_DISPLAY_NAMES, RARITY_COLORS } from '@/constants/roles';
-import { colors } from '@/constants/theme';
+import { colors, fonts } from '@/constants/theme';
 
 interface IdentityCardDetailProps {
   card: IdentityCard;
@@ -43,8 +43,11 @@ export function IdentityCardDetail({ card, player, visible, onClose }: IdentityC
         <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent}>
           {/* Card frame */}
           <View style={[styles.cardFrame, { borderColor: roleColor }]}>
+            {/* Top gold trim */}
+            <View style={[styles.topTrim, { backgroundColor: roleColor }]} />
+
             {/* Title bar */}
-            <View style={[styles.titleBar, { backgroundColor: roleColor + '25' }]}>
+            <View style={[styles.titleBar, { backgroundColor: roleColor + '15' }]}>
               <Text style={styles.cardName}>{card.name}</Text>
               <Text style={styles.cardNumber}>#{card.card_number}</Text>
             </View>
@@ -64,7 +67,12 @@ export function IdentityCardDetail({ card, player, visible, onClose }: IdentityC
               </Text>
             </View>
 
-            <View style={styles.divider} />
+            {/* Ornate divider */}
+            <View style={styles.ornateDividerRow}>
+              <View style={styles.ornateLine} />
+              <Text style={[styles.ornateDiamond, { color: roleColor }]}>&#9670;</Text>
+              <View style={styles.ornateLine} />
+            </View>
 
             {/* Ability */}
             <View style={styles.section}>
@@ -93,7 +101,7 @@ export function IdentityCardDetail({ card, player, visible, onClose }: IdentityC
               <>
                 <View style={styles.divider} />
                 <View style={styles.infoRow}>
-                  <Ionicons name="glasses" size={18} color="#9B59B6" />
+                  <Ionicons name="glasses" size={18} color="#9c4cc9" />
                   <View style={styles.infoContent}>
                     <Text style={styles.sectionLabel}>Undercover</Text>
                     <Text style={styles.infoText}>{card.undercover_condition}</Text>
@@ -122,7 +130,7 @@ export function IdentityCardDetail({ card, player, visible, onClose }: IdentityC
                 <View style={styles.divider} />
                 <View style={styles.modifiersRow}>
                   {card.life_modifier !== null && (
-                    <View style={styles.modifier}>
+                    <View style={styles.modifierBox}>
                       <Ionicons name="heart" size={14} color={colors.error} />
                       <Text style={styles.modifierValue}>
                         {card.life_modifier >= 0 ? '+' : ''}
@@ -132,7 +140,7 @@ export function IdentityCardDetail({ card, player, visible, onClose }: IdentityC
                     </View>
                   )}
                   {card.hand_size_modifier !== null && (
-                    <View style={styles.modifier}>
+                    <View style={styles.modifierBox}>
                       <Ionicons name="hand-left" size={14} color={colors.primary} />
                       <Text style={styles.modifierValue}>
                         {card.hand_size_modifier >= 0 ? '+' : ''}
@@ -159,6 +167,12 @@ export function IdentityCardDetail({ card, player, visible, onClose }: IdentityC
           {/* Win condition */}
           {player.role && (
             <View style={styles.winCondition}>
+              {/* Ornate divider */}
+              <View style={styles.ornateDividerRow}>
+                <View style={styles.ornateLine} />
+                <Text style={styles.ornateDiamondGold}>&#9670;</Text>
+                <View style={styles.ornateLine} />
+              </View>
               <Text style={styles.winConditionLabel}>Win Condition</Text>
               <Text style={styles.winConditionText}>
                 {ROLE_WIN_CONDITIONS[player.role]}
@@ -182,13 +196,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 16,
     paddingVertical: 12,
-    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomWidth: 1,
     borderBottomColor: colors.divider,
+    backgroundColor: colors.surface,
   },
   headerTitle: {
     color: colors.text,
     fontSize: 17,
     fontWeight: '600',
+    fontFamily: fonts.serif,
   },
   doneButton: {
     color: colors.primary,
@@ -207,6 +223,9 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     overflow: 'hidden',
   },
+  topTrim: {
+    height: 4,
+  },
   titleBar: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -216,15 +235,17 @@ const styles = StyleSheet.create({
   },
   cardName: {
     color: colors.text,
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: 'bold',
+    fontFamily: fonts.serif,
+    fontStyle: 'italic',
   },
   cardNumber: {
     color: colors.textSecondary,
     fontSize: 12,
   },
   divider: {
-    height: StyleSheet.hairlineWidth,
+    height: 1,
     backgroundColor: colors.divider,
   },
   roleRarityRow: {
@@ -247,10 +268,30 @@ const styles = StyleSheet.create({
   roleText: {
     fontSize: 14,
     fontWeight: '600',
+    fontFamily: fonts.serif,
   },
   rarityText: {
     fontSize: 12,
     fontWeight: '500',
+    fontStyle: 'italic',
+  },
+  ornateDividerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    gap: 8,
+  },
+  ornateLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: colors.border,
+  },
+  ornateDiamond: {
+    fontSize: 8,
+  },
+  ornateDiamondGold: {
+    color: colors.primary,
+    fontSize: 8,
   },
   section: {
     padding: 16,
@@ -261,6 +302,7 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     marginBottom: 4,
     textTransform: 'uppercase',
+    letterSpacing: 1,
   },
   abilityText: {
     color: colors.text,
@@ -282,14 +324,15 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   unveiledBadge: {
-    paddingHorizontal: 8,
+    paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 10,
   },
   unveiledText: {
-    color: '#FFFFFF',
+    color: '#0d0b1a',
     fontSize: 11,
     fontWeight: 'bold',
+    letterSpacing: 1,
   },
   infoRow: {
     flexDirection: 'row',
@@ -309,39 +352,49 @@ const styles = StyleSheet.create({
     gap: 24,
     padding: 16,
   },
-  modifier: {
+  modifierBox: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
+    backgroundColor: colors.surfaceLight,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 6,
+    paddingVertical: 4,
+    paddingHorizontal: 8,
   },
   modifierValue: {
     color: colors.text,
     fontSize: 14,
     fontWeight: '600',
+    fontFamily: fonts.serif,
   },
   modifierLabel: {
     color: colors.textSecondary,
     fontSize: 12,
   },
   flavorText: {
-    color: colors.textSecondary,
-    fontSize: 12,
+    color: colors.textTertiary,
+    fontSize: 13,
     fontStyle: 'italic',
+    fontFamily: fonts.serif,
   },
   winCondition: {
     alignItems: 'center',
-    paddingVertical: 16,
-    gap: 4,
+    paddingVertical: 20,
+    gap: 8,
   },
   winConditionLabel: {
-    color: colors.textSecondary,
+    color: colors.primary,
     fontSize: 11,
     fontWeight: 'bold',
     textTransform: 'uppercase',
+    letterSpacing: 1,
   },
   winConditionText: {
     color: colors.textSecondary,
     fontSize: 14,
     textAlign: 'center',
+    fontFamily: fonts.serif,
   },
 });

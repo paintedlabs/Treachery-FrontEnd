@@ -3,7 +3,7 @@ import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '@/hooks/useAuth';
-import { colors, spacing, fontSize } from '@/constants/theme';
+import { colors, spacing, fontSize, fonts } from '@/constants/theme';
 
 export default function HomeScreen() {
   const router = useRouter();
@@ -15,7 +15,18 @@ export default function HomeScreen() {
     <View style={styles.container}>
       <View style={styles.spacer} />
 
-      <Text style={styles.title}>Treachery</Text>
+      {/* Title treatment */}
+      <View style={styles.titleSection}>
+        <Text style={styles.title}>Treachery</Text>
+        <Text style={styles.subtitle}>A Game of Hidden Allegiance</Text>
+
+        {/* Ornate divider */}
+        <View style={styles.ornateDivider}>
+          <View style={styles.ornateLine} />
+          <Text style={styles.ornateDiamond}>&#9670;</Text>
+          <View style={styles.ornateLine} />
+        </View>
+      </View>
 
       <TouchableOpacity
         style={styles.primaryButton}
@@ -74,30 +85,58 @@ const styles = StyleSheet.create({
   spacer: {
     flex: 1,
   },
+  titleSection: {
+    alignItems: 'center',
+    marginBottom: spacing.lg,
+  },
   title: {
-    color: colors.text,
-    fontSize: fontSize.largeTitle,
+    color: colors.primaryBright,
+    fontSize: 48,
     fontWeight: 'bold',
-    marginBottom: spacing.xl,
+    fontFamily: fonts.serif,
+    letterSpacing: 3,
+  },
+  subtitle: {
+    color: colors.textSecondary,
+    fontSize: 14,
+    fontFamily: fonts.serif,
+    fontStyle: 'italic',
+    marginTop: 4,
+    marginBottom: spacing.lg,
+  },
+  ornateDivider: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    width: 200,
+  },
+  ornateLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: colors.border,
+  },
+  ornateDiamond: {
+    color: colors.primary,
+    fontSize: 10,
   },
   primaryButton: {
     backgroundColor: colors.primary,
     borderRadius: 8,
     paddingVertical: 14,
     paddingHorizontal: 48,
-    minWidth: 200,
+    minWidth: 220,
     alignItems: 'center',
   },
   primaryButtonText: {
-    color: '#FFFFFF',
+    color: '#0d0b1a',
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: '700',
   },
   secondaryButton: {
     borderRadius: 8,
     paddingVertical: 14,
     paddingHorizontal: 48,
-    minWidth: 200,
+    minWidth: 220,
     alignItems: 'center',
     borderWidth: 1,
     borderColor: colors.primary,

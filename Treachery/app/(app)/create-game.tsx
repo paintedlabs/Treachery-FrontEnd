@@ -140,6 +140,16 @@ export default function CreateGameScreen() {
         </View>
       </View>
 
+      {/* Ornate divider */}
+      <View style={styles.ornateDivider}>
+        <View style={styles.ornateLine} />
+        <Text style={styles.ornateDiamond}>&#9670;</Text>
+        <View style={styles.ornateLine} />
+      </View>
+
+      {/* Section header */}
+      <Text style={styles.sectionHeader}>Role Distribution</Text>
+
       {/* Role distribution */}
       <View style={styles.roleBadges}>
         <RoleBadge count={dist.leaders} role="leader" />
@@ -157,7 +167,7 @@ export default function CreateGameScreen() {
       >
         {isCreating ? (
           <View style={styles.buttonRow}>
-            <ActivityIndicator size="small" color="#fff" />
+            <ActivityIndicator size="small" color="#0d0b1a" />
             <Text style={styles.buttonText}>Creating...</Text>
           </View>
         ) : (
@@ -184,6 +194,8 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     borderRadius: 8,
     padding: 14,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
   stepperLabel: {
     color: colors.text,
@@ -202,6 +214,28 @@ const styles = StyleSheet.create({
   },
   disabled: {
     opacity: 0.3,
+  },
+  ornateDivider: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  ornateLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: colors.border,
+  },
+  ornateDiamond: {
+    color: colors.primary,
+    fontSize: 10,
+  },
+  sectionHeader: {
+    color: colors.textSecondary,
+    fontSize: 12,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 1.5,
+    textAlign: 'center',
   },
   roleBadges: {
     flexDirection: 'row',
@@ -222,8 +256,8 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   buttonText: {
-    color: '#FFFFFF',
+    color: '#0d0b1a',
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: '700',
   },
 });
