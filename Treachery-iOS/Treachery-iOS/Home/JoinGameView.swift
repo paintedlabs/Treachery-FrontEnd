@@ -14,7 +14,6 @@ struct JoinGameView: View {
     @State private var gameCode = ""
     @State private var isJoining = false
     @State private var errorMessage: String?
-    @State private var joinedGame: Game?
 
     private let firestoreManager = FirestoreManager()
 
@@ -71,9 +70,6 @@ struct JoinGameView: View {
         }
         .padding()
         .navigationTitle("Join Game")
-        .navigationDestination(item: $joinedGame) { game in
-            LobbyView(gameId: game.id, isHost: false, navigationPath: $navigationPath)
-        }
     }
 
     private func joinGame() async {
@@ -100,7 +96,7 @@ struct JoinGameView: View {
 
             // Check if user is already in the game
             if existingPlayers.contains(where: { $0.userId == userId }) {
-                joinedGame = game
+                navigationPath.append(AppDestination.lobby(gameId: game.id, isHost: false))
                 isJoining = false
                 return
             }
@@ -124,7 +120,7 @@ struct JoinGameView: View {
             // Add user to game's playerIds for history queries
             try await firestoreManager.addPlayerIdToGame(gameId: game.id, userId: userId)
 
-            joinedGame = game
+            navigationPath.append(AppDestination.lobby(gameId: game.id, isHost: false))
         } catch {
             errorMessage = error.localizedDescription
         }

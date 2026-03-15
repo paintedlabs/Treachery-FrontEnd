@@ -10,9 +10,7 @@ import SwiftUI
 struct LobbyView: View {
     @EnvironmentObject var authViewModel: AuthViewModel
     @StateObject private var viewModel: LobbyViewModel
-    @Environment(\.dismiss) var dismiss
     @Binding var navigationPath: NavigationPath
-    @State private var navigateToGame = false
     @State private var showHostLeftAlert = false
     @State private var showShareSheet = false
 
@@ -43,7 +41,7 @@ struct LobbyView: View {
                         .foregroundStyle(.secondary)
                         .multilineTextAlignment(.center)
                     Button("Return Home") {
-                        dismiss()
+                        navigationPath.removeLast(navigationPath.count)
                     }
                     .buttonStyle(.borderedProminent)
                     .padding(.top)
@@ -159,7 +157,7 @@ struct LobbyView: View {
                         Task {
                             if let userId = authViewModel.currentUserId {
                                 await viewModel.leaveGame(userId: userId)
-                                dismiss()
+                                navigationPath.removeLast(navigationPath.count)
                             }
                         }
                     }
@@ -172,7 +170,7 @@ struct LobbyView: View {
         .navigationBarBackButtonHidden(true)
         .onChange(of: viewModel.isGameStarted) { _, started in
             if started {
-                navigateToGame = true
+                navigationPath.append(AppDestination.gameBoard(gameId: viewModel.gameId))
             }
         }
         .onChange(of: viewModel.isGameDisbanded) { _, disbanded in
@@ -180,12 +178,9 @@ struct LobbyView: View {
                 showHostLeftAlert = true
             }
         }
-        .navigationDestination(isPresented: $navigateToGame) {
-            GameBoardView(gameId: viewModel.gameId, navigationPath: $navigationPath)
-        }
         .alert("Game Disbanded", isPresented: $showHostLeftAlert) {
             Button("OK") {
-                dismiss()
+                navigationPath.removeLast(navigationPath.count)
             }
         } message: {
             Text("The host has left and the game was closed.")

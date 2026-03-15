@@ -11,7 +11,6 @@ struct GameBoardView: View {
     @EnvironmentObject var authViewModel: AuthViewModel
     @StateObject private var viewModel: GameBoardViewModel
     @Binding var navigationPath: NavigationPath
-    @State private var showGameOver = false
     @State private var showCardDetail = false
     @State private var cardFlipDegrees: Double = 0
     @State private var showUnveiledBanner = false
@@ -181,16 +180,13 @@ struct GameBoardView: View {
         }
         .onChange(of: viewModel.isGameFinished) { _, finished in
             if finished {
-                showGameOver = true
+                navigationPath.append(AppDestination.gameOver(gameId: viewModel.gameId))
             }
         }
         .onChange(of: viewModel.isGameUnavailable) { _, unavailable in
             if unavailable {
                 showGameUnavailableAlert = true
             }
-        }
-        .navigationDestination(isPresented: $showGameOver) {
-            GameOverView(gameId: viewModel.gameId, navigationPath: $navigationPath)
         }
         .sheet(isPresented: $showCardDetail) {
             if let card = viewModel.currentIdentityCard,
@@ -311,9 +307,18 @@ private struct IdentityCardHeader: View {
 private struct PlayerRow: View {
     let player: Player
     @ObservedObject var viewModel: GameBoardViewModel
+    var onViewCard: ((Player) -> Void)?
 
     private var isCurrentUser: Bool {
         player.userId == viewModel.currentUserId
+    }
+
+    /// Whether this player's card can be inspected by the current user.
+    /// True for unveiled players and leaders (but not yourself — you have the header).
+    private var canInspectCard: Bool {
+        guard !isCurrentUser else { return false }
+        guard viewModel.identityCard(for: player) != nil else { return false }
+        return player.isUnveiled || player.role == .leader
     }
 
     var body: some View {
@@ -344,17 +349,43 @@ private struct PlayerRow: View {
 
                 // Role visibility
                 if viewModel.canSeeRole(of: player) {
-                    HStack(spacing: 4) {
-                        Circle()
-                            .fill(player.role?.color ?? .gray)
-                            .frame(width: 8, height: 8)
-                        Text(player.role?.displayName ?? "")
-                            .font(.caption)
-                            .foregroundStyle(player.role?.color ?? .secondary)
-                        if player.isUnveiled && !isCurrentUser && player.role != .leader {
-                            Text("(Unveiled)")
-                                .font(.caption2)
-                                .foregroundStyle(.secondary)
+                    if canInspectCard {
+                        Button {
+                            onViewCard?(player)
+                        } label: {
+                            HStack(spacing: 4) {
+                                Circle()
+                                    .fill(player.role?.color ?? .gray)
+                                    .frame(width: 8, height: 8)
+                                Text(player.role?.displayName ?? "")
+                                    .font(.caption)
+                                    .foregroundStyle(player.role?.color ?? .secondary)
+                                if player.isUnveiled && player.role != .leader {
+                                    Text("(Unveiled)")
+                                        .font(.caption2)
+                                        .foregroundStyle(.secondary)
+                                }
+                                Image(systemName: "info.circle")
+                                    .font(.caption2)
+                                    .foregroundStyle(player.role?.color ?? .secondary)
+                            }
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("View \(player.displayName)'s identity card")
+                        .accessibilityHint("Shows their role ability and card details")
+                    } else {
+                        HStack(spacing: 4) {
+                            Circle()
+                                .fill(player.role?.color ?? .gray)
+                                .frame(width: 8, height: 8)
+                            Text(player.role?.displayName ?? "")
+                                .font(.caption)
+                                .foregroundStyle(player.role?.color ?? .secondary)
+                            if player.isUnveiled && !isCurrentUser && player.role != .leader {
+                                Text("(Unveiled)")
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
+                            }
                         }
                     }
                 } else {

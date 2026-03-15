@@ -135,13 +135,20 @@ struct ProfileView: View {
             // Error
             if let error = errorMessage {
                 Section {
-                    HStack(spacing: 6) {
-                        Image(systemName: "exclamationmark.triangle.fill")
-                            .foregroundStyle(.red)
-                            .font(.caption)
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack(spacing: 6) {
+                            Image(systemName: "exclamationmark.triangle.fill")
+                                .foregroundStyle(.red)
+                                .font(.caption)
+                            Text("Error loading profile")
+                                .foregroundStyle(.red)
+                                .font(.caption)
+                                .fontWeight(.medium)
+                        }
                         Text(error)
                             .foregroundStyle(.red)
                             .font(.caption)
+                            .textSelection(.enabled)
                     }
                 }
             }

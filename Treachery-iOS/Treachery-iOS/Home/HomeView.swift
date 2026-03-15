@@ -7,6 +7,21 @@
 
 import SwiftUI
 
+// MARK: - Navigation Destinations
+
+/// All navigation destinations managed by the root NavigationStack.
+/// Using a single enum lets `path.removeLast(path.count)` pop to root reliably.
+enum AppDestination: Hashable {
+    case createGame
+    case joinGame
+    case lobby(gameId: String, isHost: Bool)
+    case gameBoard(gameId: String)
+    case gameOver(gameId: String)
+    case profile
+    case friends
+    case gameHistory
+}
+
 struct HomeView: View {
     @EnvironmentObject var authViewModel: AuthViewModel
     @State private var path = NavigationPath()
@@ -42,27 +57,21 @@ struct HomeView: View {
                     .fontWeight(.bold)
                     .accessibilityAddTraits(.isHeader)
 
-                NavigationLink("Create Game") {
-                    CreateGameView(navigationPath: $path)
-                }
-                .buttonStyle(.borderedProminent)
-                .accessibilityLabel("Create a new game")
-                .accessibilityHint("Set up a new Treachery game as host")
+                NavigationLink("Create Game", value: AppDestination.createGame)
+                    .buttonStyle(.borderedProminent)
+                    .accessibilityLabel("Create a new game")
+                    .accessibilityHint("Set up a new Treachery game as host")
 
-                NavigationLink("Join Game") {
-                    JoinGameView(navigationPath: $path)
-                }
-                .buttonStyle(.bordered)
-                .accessibilityLabel("Join an existing game")
-                .accessibilityHint("Enter a game code to join")
+                NavigationLink("Join Game", value: AppDestination.joinGame)
+                    .buttonStyle(.bordered)
+                    .accessibilityLabel("Join an existing game")
+                    .accessibilityHint("Enter a game code to join")
 
                 Spacer()
 
                 // Bottom navigation
                 HStack(spacing: 24) {
-                    NavigationLink {
-                        GameHistoryView()
-                    } label: {
+                    NavigationLink(value: AppDestination.gameHistory) {
                         VStack(spacing: 4) {
                             Image(systemName: "clock.fill")
                             Text("History")
@@ -71,9 +80,7 @@ struct HomeView: View {
                     }
                     .accessibilityLabel("Game history")
 
-                    NavigationLink {
-                        FriendsListView()
-                    } label: {
+                    NavigationLink(value: AppDestination.friends) {
                         VStack(spacing: 4) {
                             Image(systemName: "person.2.fill")
                             Text("Friends")
@@ -82,9 +89,7 @@ struct HomeView: View {
                     }
                     .accessibilityLabel("Friends list")
 
-                    NavigationLink {
-                        ProfileView()
-                    } label: {
+                    NavigationLink(value: AppDestination.profile) {
                         VStack(spacing: 4) {
                             Image(systemName: "person.circle.fill")
                             Text("Profile")
@@ -113,6 +118,26 @@ struct HomeView: View {
             }
             .padding()
             .navigationTitle("Home")
+            .navigationDestination(for: AppDestination.self) { destination in
+                switch destination {
+                case .createGame:
+                    CreateGameView(navigationPath: $path)
+                case .joinGame:
+                    JoinGameView(navigationPath: $path)
+                case .lobby(let gameId, let isHost):
+                    LobbyView(gameId: gameId, isHost: isHost, navigationPath: $path)
+                case .gameBoard(let gameId):
+                    GameBoardView(gameId: gameId, navigationPath: $path)
+                case .gameOver(let gameId):
+                    GameOverView(gameId: gameId, navigationPath: $path)
+                case .profile:
+                    ProfileView()
+                case .friends:
+                    FriendsListView()
+                case .gameHistory:
+                    GameHistoryView()
+                }
+            }
         }
     }
 }

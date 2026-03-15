@@ -15,7 +15,6 @@ struct CreateGameView: View {
     @State private var startingLife = 40
     @State private var isCreating = false
     @State private var errorMessage: String?
-    @State private var createdGame: Game?
 
     private let firestoreManager = FirestoreManager()
 
@@ -90,9 +89,6 @@ struct CreateGameView: View {
         }
         .padding()
         .navigationTitle("Create Game")
-        .navigationDestination(item: $createdGame) { game in
-            LobbyView(gameId: game.id, isHost: true, navigationPath: $navigationPath)
-        }
     }
 
     private func createGame() async {
@@ -131,7 +127,7 @@ struct CreateGameView: View {
             )
             try await firestoreManager.addPlayer(player, toGame: game.id)
 
-            createdGame = game
+            navigationPath.append(AppDestination.lobby(gameId: game.id, isHost: true))
         } catch {
             errorMessage = error.localizedDescription
         }
