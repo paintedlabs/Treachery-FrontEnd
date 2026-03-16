@@ -6,131 +6,115 @@ import {
   TouchableOpacity,
   StyleSheet,
   ActivityIndicator,
-  KeyboardAvoidingView,
-  Platform,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 import { useAuth } from '@/hooks/useAuth';
 import { ErrorBanner } from '@/components/ErrorBanner';
-import { colors, spacing } from '@/constants/theme';
+import { colors, spacing, fonts } from '@/constants/theme';
 
 export default function SignUpScreen() {
+  const router = useRouter();
   const { signUp, errorMessage, clearError } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [validationError, setValidationError] = useState<string | null>(null);
-  const [isCreating, setIsCreating] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [localError, setLocalError] = useState<string | null>(null);
 
-  const passwordsMatch = password.length > 0 && password === confirmPassword;
+  const handleSignUp = async () => {
+    setLocalError(null);
+    clearError();
 
-  const handleCreate = async () => {
+    if (!email.trim() || !password.trim()) return;
     if (password !== confirmPassword) {
-      setValidationError('Passwords do not match.');
+      setLocalError('Passwords do not match.');
       return;
     }
     if (password.length < 6) {
-      setValidationError('Password must be at least 6 characters.');
+      setLocalError('Password must be at least 6 characters.');
       return;
     }
-    setValidationError(null);
-    setIsCreating(true);
-    await signUp(email, password);
-    setIsCreating(false);
+
+    setIsLoading(true);
+    await signUp(email.trim(), password.trim());
+    setIsLoading(false);
   };
 
-  const displayError = validationError || errorMessage;
+  const displayError = localError || errorMessage;
 
   return (
-    <KeyboardAvoidingView
-      style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-    >
-      <View style={styles.form}>
-        <TextInput
-          style={styles.input}
-          placeholder="Email"
-          placeholderTextColor={colors.textTertiary}
-          value={email}
-          onChangeText={(text) => {
-            setEmail(text);
-            clearError();
-          }}
-          keyboardType="email-address"
-          autoCapitalize="none"
-          autoCorrect={false}
-          textContentType="emailAddress"
-        />
+    <View style={styles.container}>
+      <View style={styles.spacer} />
 
-        <TextInput
-          style={styles.input}
-          placeholder="Password"
-          placeholderTextColor={colors.textTertiary}
-          value={password}
-          onChangeText={(text) => {
-            setPassword(text);
-            setValidationError(null);
-          }}
-          secureTextEntry
-          autoCapitalize="none"
-          textContentType="newPassword"
-        />
+      <Text style={styles.title}>Create Account</Text>
+      <Text style={styles.subtitle}>Join the game of hidden allegiance</Text>
 
-        <TextInput
-          style={styles.input}
-          placeholder="Confirm Password"
-          placeholderTextColor={colors.textTertiary}
-          value={confirmPassword}
-          onChangeText={(text) => {
-            setConfirmPassword(text);
-            setValidationError(null);
-          }}
-          secureTextEntry
-          autoCapitalize="none"
-          textContentType="newPassword"
-        />
+      {displayError && <ErrorBanner message={displayError} />}
 
-        {/* Password match indicator */}
-        {confirmPassword.length > 0 && (
-          <View style={styles.matchRow}>
-            <Ionicons
-              name={passwordsMatch ? 'checkmark-circle' : 'close-circle'}
-              size={14}
-              color={passwordsMatch ? colors.success : colors.error}
-            />
-            <Text style={{ color: passwordsMatch ? colors.success : colors.error, fontSize: 12 }}>
-              {passwordsMatch ? 'Passwords match' : 'Passwords do not match'}
-            </Text>
+      <TextInput
+        style={styles.input}
+        placeholder="Email"
+        placeholderTextColor={colors.textTertiary}
+        value={email}
+        onChangeText={setEmail}
+        autoCapitalize="none"
+        keyboardType="email-address"
+        textContentType="emailAddress"
+        editable={!isLoading}
+        accessibilityLabel="Email"
+      />
+
+      <TextInput
+        style={styles.input}
+        placeholder="Password"
+        placeholderTextColor={colors.textTertiary}
+        value={password}
+        onChangeText={setPassword}
+        secureTextEntry
+        textContentType="newPassword"
+        editable={!isLoading}
+        accessibilityLabel="Password"
+      />
+
+      <TextInput
+        style={styles.input}
+        placeholder="Confirm Password"
+        placeholderTextColor={colors.textTertiary}
+        value={confirmPassword}
+        onChangeText={setConfirmPassword}
+        secureTextEntry
+        textContentType="newPassword"
+        editable={!isLoading}
+        accessibilityLabel="Confirm password"
+      />
+
+      <TouchableOpacity
+        style={[styles.primaryButton, isLoading && styles.buttonDisabled]}
+        onPress={handleSignUp}
+        disabled={isLoading}
+        accessibilityLabel="Create account"
+        accessibilityRole="button"
+      >
+        {isLoading ? (
+          <View style={styles.buttonRow}>
+            <ActivityIndicator size="small" color="#0d0b1a" />
+            <Text style={styles.buttonText}>Creating Account...</Text>
           </View>
+        ) : (
+          <Text style={styles.buttonText}>Create Account</Text>
         )}
+      </TouchableOpacity>
 
-        {displayError && <ErrorBanner message={displayError} />}
+      <TouchableOpacity
+        style={styles.backLink}
+        onPress={() => router.back()}
+        disabled={isLoading}
+      >
+        <Text style={styles.linkText}>Already have an account? Sign In</Text>
+      </TouchableOpacity>
 
-        <TouchableOpacity
-          style={[
-            styles.primaryButton,
-            (!email || !password || !confirmPassword || isCreating) && styles.buttonDisabled,
-          ]}
-          onPress={handleCreate}
-          disabled={!email || !password || !confirmPassword || isCreating}
-        >
-          {isCreating ? (
-            <View style={styles.buttonRow}>
-              <ActivityIndicator size="small" color="#0d0b1a" />
-              <Text style={styles.buttonText}>Creating Account...</Text>
-            </View>
-          ) : (
-            <Text style={styles.buttonText}>Create Account</Text>
-          )}
-        </TouchableOpacity>
-
-        {password.length === 0 && (
-          <Text style={styles.hint}>Password must be at least 6 characters</Text>
-        )}
-      </View>
-
-      <View style={{ flex: 1 }} />
-    </KeyboardAvoidingView>
+      <View style={styles.spacer} />
+    </View>
   );
 }
 
@@ -140,28 +124,42 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
     padding: spacing.lg,
   },
-  form: {
-    gap: spacing.lg,
+  spacer: {
+    flex: 1,
+  },
+  title: {
+    color: colors.primaryBright,
+    fontSize: 28,
+    fontWeight: 'bold',
+    fontFamily: fonts.serif,
+    textAlign: 'center',
+    letterSpacing: 1,
+  },
+  subtitle: {
+    color: colors.textSecondary,
+    fontSize: 14,
+    fontFamily: fonts.serif,
+    fontStyle: 'italic',
+    textAlign: 'center',
+    marginTop: 4,
+    marginBottom: spacing.xl,
   },
   input: {
     backgroundColor: colors.surface,
-    color: colors.text,
-    borderRadius: 8,
-    padding: 14,
-    fontSize: 16,
     borderWidth: 1,
     borderColor: colors.border,
-  },
-  matchRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
+    borderRadius: 8,
+    padding: 14,
+    color: colors.text,
+    fontSize: 16,
+    marginBottom: 12,
   },
   primaryButton: {
     backgroundColor: colors.primary,
     borderRadius: 8,
     padding: 14,
     alignItems: 'center',
+    marginTop: 4,
   },
   buttonDisabled: {
     opacity: 0.5,
@@ -176,9 +174,12 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '700',
   },
-  hint: {
-    color: colors.textTertiary,
-    fontSize: 11,
-    fontStyle: 'italic',
+  backLink: {
+    alignItems: 'center',
+    marginTop: spacing.lg,
+  },
+  linkText: {
+    color: colors.primary,
+    fontSize: 14,
   },
 });

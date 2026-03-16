@@ -28,6 +28,8 @@ struct GameBoardView: View {
             Color.mtgBackground.ignoresSafeArea()
 
             VStack(spacing: 0) {
+                ConnectionBanner()
+
                 if viewModel.isGameUnavailable {
                     // Game was deleted or became unavailable
                     Spacer()
@@ -159,8 +161,46 @@ struct GameBoardView: View {
                             .padding(.vertical, 4)
                     }
 
-                    // Action bar
-                    ActionBar(viewModel: viewModel, onUnveil: playUnveilAnimation)
+                    // Spectator overlay for eliminated players
+                    if let player = viewModel.currentPlayer, player.isEliminated {
+                        VStack(spacing: 8) {
+                            HStack(spacing: 8) {
+                                Image(systemName: "person.slash.fill")
+                                    .foregroundStyle(Color.mtgError)
+                                Text("You've Been Eliminated")
+                                    .font(.system(.headline, design: .serif))
+                                    .fontWeight(.bold)
+                                    .foregroundStyle(Color.mtgError)
+                            }
+
+                            Text("You're now spectating. Watch the game unfold or leave.")
+                                .font(.caption)
+                                .foregroundStyle(Color.mtgTextSecondary)
+                                .italic()
+                                .multilineTextAlignment(.center)
+
+                            Button("Leave Game") {
+                                navigationPath.removeLast(navigationPath.count)
+                                navigationPath.append(AppDestination.gameOver(gameId: viewModel.gameId))
+                            }
+                            .foregroundStyle(Color.mtgError)
+                            .padding(.top, 4)
+                        }
+                        .padding()
+                        .frame(maxWidth: .infinity)
+                        .background(Color.mtgError.opacity(0.1))
+                        .overlay(
+                            Rectangle()
+                                .fill(Color.mtgError)
+                                .frame(height: 1),
+                            alignment: .top
+                        )
+                    }
+
+                    // Action bar (only for non-eliminated players)
+                    if !(viewModel.currentPlayer?.isEliminated ?? true) {
+                        ActionBar(viewModel: viewModel, onUnveil: playUnveilAnimation)
+                    }
                 }
             }
         }
@@ -189,6 +229,7 @@ struct GameBoardView: View {
                 Task {
                     await viewModel.eliminateAndLeave()
                     navigationPath.removeLast(navigationPath.count)
+                    navigationPath.append(AppDestination.gameOver(gameId: viewModel.gameId))
                 }
             }
             Button("Cancel", role: .cancel) {}
@@ -438,7 +479,7 @@ private struct PlayerRow: View {
             if !player.isEliminated {
                 HStack(spacing: 12) {
                     Button {
-                        Task { await viewModel.adjustLife(for: player.id, by: -1) }
+                        viewModel.adjustLife(for: player.id, by: -1)
                     } label: {
                         Image(systemName: "minus.circle.fill")
                             .font(.title2)
@@ -457,7 +498,7 @@ private struct PlayerRow: View {
                         .accessibilityLabel("\(player.lifeTotal) life")
 
                     Button {
-                        Task { await viewModel.adjustLife(for: player.id, by: 1) }
+                        viewModel.adjustLife(for: player.id, by: 1)
                     } label: {
                         Image(systemName: "plus.circle.fill")
                             .font(.title2)
@@ -493,7 +534,8 @@ private struct ActionBar: View {
                 Button("Unveil Identity") {
                     showUnveilConfirmation = true
                 }
-                .buttonStyle(MtgPrimaryButtonStyle())
+                .buttonStyle(MtgPrimaryButtonStyle(isDisabled: viewModel.isPending))
+                .disabled(viewModel.isPending)
                 .padding(.horizontal)
                 .accessibilityLabel("Unveil your identity as \(player.role?.displayName ?? "unknown")")
                 .accessibilityHint("Reveals your role to all players. Cannot be undone.")

@@ -90,14 +90,25 @@ final class FirestoreManager {
         guard let user = try await getUser(id: userId) else { return [] }
         guard !user.friendIds.isEmpty else { return [] }
 
-        var friends: [TreacheryUser] = []
-        for chunk in stride(from: 0, to: user.friendIds.count, by: 30) {
-            let end = min(chunk + 30, user.friendIds.count)
-            let ids = Array(user.friendIds[chunk..<end])
-            let snapshot = try await usersCollection
-                .whereField(FieldPath.documentID(), in: ids)
-                .getDocuments()
-            friends += snapshot.documents.compactMap { try? $0.data(as: TreacheryUser.self) }
+        // Run all batch queries in parallel
+        let chunks = stride(from: 0, to: user.friendIds.count, by: 30).map { start in
+            Array(user.friendIds[start..<min(start + 30, user.friendIds.count)])
+        }
+
+        let friends = try await withThrowingTaskGroup(of: [TreacheryUser].self) { group in
+            for ids in chunks {
+                group.addTask {
+                    let snapshot = try await self.usersCollection
+                        .whereField(FieldPath.documentID(), in: ids)
+                        .getDocuments()
+                    return snapshot.documents.compactMap { try? $0.data(as: TreacheryUser.self) }
+                }
+            }
+            var result: [TreacheryUser] = []
+            for try await batch in group {
+                result += batch
+            }
+            return result
         }
         return friends.sorted { $0.displayName < $1.displayName }
     }
@@ -134,6 +145,30 @@ final class FirestoreManager {
         try await gamesCollection.document(gameId).updateData([
             "player_ids": FieldValue.arrayUnion([userId])
         ])
+    }
+
+    func getActiveGame(forUserId userId: String) async throws -> Game? {
+        // Check in_progress games first
+        let inProgressSnapshot = try await gamesCollection
+            .whereField("player_ids", arrayContains: userId)
+            .whereField("state", isEqualTo: "in_progress")
+            .limit(to: 1)
+            .getDocuments()
+        if let doc = inProgressSnapshot.documents.first {
+            return try doc.data(as: Game.self)
+        }
+
+        // Then check waiting games
+        let waitingSnapshot = try await gamesCollection
+            .whereField("player_ids", arrayContains: userId)
+            .whereField("state", isEqualTo: "waiting")
+            .limit(to: 1)
+            .getDocuments()
+        if let doc = waitingSnapshot.documents.first {
+            return try doc.data(as: Game.self)
+        }
+
+        return nil
     }
 
     func getFinishedGames(forUserId userId: String) async throws -> [Game] {

@@ -24,6 +24,8 @@ struct LobbyView: View {
             Color.mtgBackground.ignoresSafeArea()
 
             VStack(spacing: 0) {
+                ConnectionBanner()
+
                 if viewModel.game == nil && viewModel.errorMessage == nil {
                     // Loading state
                     Spacer()

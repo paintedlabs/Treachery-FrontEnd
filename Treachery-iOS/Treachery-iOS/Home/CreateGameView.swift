@@ -122,7 +122,8 @@ struct CreateGameView: View {
                 startingLife: startingLife,
                 winningTeam: nil,
                 playerIds: [userId],
-                createdAt: Date()
+                createdAt: Date(),
+                lastActivityAt: Date()
             )
             try await firestoreManager.createGame(game)
 

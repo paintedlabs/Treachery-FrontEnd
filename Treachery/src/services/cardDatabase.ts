@@ -2,13 +2,14 @@ import { IdentityCard, Role } from '@/models/types';
 import cardsJson from '@/assets/IdentityCards.json';
 
 const cards: IdentityCard[] = cardsJson as IdentityCard[];
+const cardById = new Map<string, IdentityCard>(cards.map((c) => [c.id, c]));
 
 export function getAllCards(): IdentityCard[] {
   return cards;
 }
 
 export function getCard(id: string): IdentityCard | undefined {
-  return cards.find((c) => c.id === id);
+  return cardById.get(id);
 }
 
 export function getCardsForRole(role: Role): IdentityCard[] {

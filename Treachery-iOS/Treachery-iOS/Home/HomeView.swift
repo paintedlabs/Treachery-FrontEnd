@@ -25,6 +25,8 @@ enum AppDestination: Hashable {
 struct HomeView: View {
     @EnvironmentObject var authViewModel: AuthViewModel
     @State private var path = NavigationPath()
+    @State private var activeGame: Game?
+    private let firestoreManager = FirestoreManager()
     #if DEBUG
     @ObservedObject private var devSettings = DevSettings.shared
     #endif
@@ -68,6 +70,47 @@ struct HomeView: View {
 
                     Spacer()
                         .frame(height: 16)
+
+                    // Rejoin active game banner
+                    if let game = activeGame {
+                        Button {
+                            if game.state == .inProgress {
+                                path.append(AppDestination.gameBoard(gameId: game.id))
+                            } else {
+                                let isHost = game.hostId == authViewModel.currentUserId
+                                path.append(AppDestination.lobby(gameId: game.id, isHost: isHost))
+                            }
+                        } label: {
+                            HStack(spacing: 12) {
+                                Image(systemName: "gamecontroller.fill")
+                                    .font(.title3)
+                                    .foregroundStyle(Color.mtgGoldBright)
+                                    .frame(width: 40, height: 40)
+                                    .background(Color.mtgGold.opacity(0.15))
+                                    .clipShape(Circle())
+
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(game.state == .inProgress ? "Game in Progress" : "Game Waiting")
+                                        .font(.subheadline)
+                                        .fontWeight(.semibold)
+                                        .foregroundStyle(Color.mtgGoldBright)
+                                    Text("Tap to rejoin")
+                                        .font(.caption)
+                                        .foregroundStyle(Color.mtgTextSecondary)
+                                }
+
+                                Spacer()
+
+                                Image(systemName: "chevron.right")
+                                    .foregroundStyle(Color.mtgGold)
+                            }
+                            .padding(12)
+                            .mtgCardFrame()
+                        }
+                        .buttonStyle(.plain)
+                        .padding(.horizontal)
+                        .accessibilityLabel("Rejoin \(game.state == .inProgress ? "active" : "waiting") game")
+                    }
 
                     // Main actions
                     NavigationLink(value: AppDestination.createGame) {
@@ -146,6 +189,16 @@ struct HomeView: View {
             }
             .navigationTitle("Home")
             .toolbarColorScheme(.dark, for: .navigationBar)
+            .task(id: path.count) {
+                // Re-check every time we return to the home screen (path becomes empty)
+                guard path.isEmpty,
+                      let userId = authViewModel.currentUserId else { return }
+                do {
+                    activeGame = try await firestoreManager.getActiveGame(forUserId: userId)
+                } catch {
+                    activeGame = nil
+                }
+            }
             .navigationDestination(for: AppDestination.self) { destination in
                 switch destination {
                 case .createGame:

@@ -20,11 +20,6 @@ final class AuthViewModel: ObservableObject {
     @Published var authState: AuthState = .loading
     @Published var errorMessage: String?
 
-    // Phone auth state
-    @Published var verificationID: String?
-    @Published var isAwaitingVerification = false
-    @Published var isSendingCode = false
-
     private let firebaseManager: FirebaseManager
     private let firestoreManager: FirestoreManager
     private var authStateHandle: AuthStateDidChangeListenerHandle?
@@ -71,12 +66,25 @@ final class AuthViewModel: ObservableObject {
         }
     }
 
-    // MARK: - Email/Password Actions
+    // MARK: - Guest Auth
+
+    func signInAsGuest() async {
+        errorMessage = nil
+        do {
+            let user = try await firebaseManager.signInAnonymously()
+            await createUserDocumentIfNeeded(for: user)
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    // MARK: - Email/Password Auth
 
     func signIn(email: String, password: String) async {
         errorMessage = nil
         do {
-            _ = try await firebaseManager.signIn(email: email, password: password)
+            let user = try await firebaseManager.signIn(email: email, password: password)
+            await createUserDocumentIfNeeded(for: user)
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -92,15 +100,6 @@ final class AuthViewModel: ObservableObject {
         }
     }
 
-    func signOut() {
-        errorMessage = nil
-        do {
-            try firebaseManager.signOut()
-        } catch {
-            errorMessage = error.localizedDescription
-        }
-    }
-
     func resetPassword(email: String) async {
         errorMessage = nil
         do {
@@ -110,43 +109,37 @@ final class AuthViewModel: ObservableObject {
         }
     }
 
-    // MARK: - Phone Auth Actions
+    // MARK: - Phone Auth
 
-    func sendVerificationCode(phoneNumber: String) async {
+    func verifyPhoneNumber(_ phoneNumber: String) async -> String? {
         errorMessage = nil
-        isSendingCode = true
         do {
-            let id = try await firebaseManager.sendPhoneVerificationCode(to: phoneNumber)
-            verificationID = id
-            isAwaitingVerification = true
+            return try await firebaseManager.verifyPhoneNumber(phoneNumber)
         } catch {
             errorMessage = error.localizedDescription
+            return nil
         }
-        isSendingCode = false
     }
 
-    func verifyCode(_ code: String) async {
-        guard let verificationID = verificationID else {
-            errorMessage = "No verification ID. Please request a new code."
-            return
-        }
+    func signInWithPhoneCode(verificationID: String, code: String) async {
         errorMessage = nil
         do {
-            let user = try await firebaseManager.verifyPhoneCode(
-                verificationID: verificationID,
-                verificationCode: code
-            )
+            let user = try await firebaseManager.signInWithPhoneCode(verificationID: verificationID, code: code)
             await createUserDocumentIfNeeded(for: user)
-            // Auth state listener will fire and update authState
         } catch {
             errorMessage = error.localizedDescription
         }
     }
 
-    func cancelPhoneVerification() {
-        verificationID = nil
-        isAwaitingVerification = false
+    // MARK: - Sign Out
+
+    func signOut() {
         errorMessage = nil
+        do {
+            try firebaseManager.signOut()
+        } catch {
+            errorMessage = error.localizedDescription
+        }
     }
 
     // MARK: - User Document Creation
@@ -155,9 +148,10 @@ final class AuthViewModel: ObservableObject {
         do {
             let existingUser = try await firestoreManager.getUser(id: user.uid)
             if existingUser == nil {
+                let displayName = user.displayName ?? user.email ?? "Guest"
                 let newUser = TreacheryUser(
                     id: user.uid,
-                    displayName: user.displayName ?? user.phoneNumber ?? "Player",
+                    displayName: displayName,
                     email: user.email,
                     phoneNumber: user.phoneNumber,
                     friendIds: [],
@@ -166,7 +160,6 @@ final class AuthViewModel: ObservableObject {
                 try await firestoreManager.createUser(newUser)
             }
         } catch {
-            // Non-fatal: user can still use the app
             print("Failed to create user document: \(error)")
         }
     }

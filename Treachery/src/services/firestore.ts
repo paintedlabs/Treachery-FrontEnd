@@ -98,14 +98,19 @@ export async function getFriends(userId: string): Promise<TreacheryUser[]> {
   const user = await getUser(userId);
   if (!user || !user.friend_ids || user.friend_ids.length === 0) return [];
 
-  const friends: TreacheryUser[] = [];
-  // Firestore 'in' queries limited to 30 items
+  // Firestore 'in' queries limited to 30 items — run all chunks in parallel
+  const chunks: string[][] = [];
   for (let i = 0; i < user.friend_ids.length; i += 30) {
-    const chunk = user.friend_ids.slice(i, i + 30);
-    const q = query(usersCol(), where(documentId(), 'in', chunk));
-    const snap = await getDocs(q);
-    friends.push(...snap.docs.map((d) => d.data() as TreacheryUser));
+    chunks.push(user.friend_ids.slice(i, i + 30));
   }
+
+  const results = await Promise.all(
+    chunks.map((chunk) => getDocs(query(usersCol(), where(documentId(), 'in', chunk))))
+  );
+
+  const friends = results.flatMap((snap) =>
+    snap.docs.map((d) => d.data() as TreacheryUser)
+  );
   return friends.sort((a, b) => a.display_name.localeCompare(b.display_name));
 }
 
@@ -142,10 +147,38 @@ export async function addPlayerIdToGame(gameId: string, userId: string): Promise
   });
 }
 
+export async function getActiveGame(userId: string): Promise<Game | null> {
+  // Check for in_progress games
+  const inProgressQ = query(
+    gamesCol(),
+    where('player_ids', 'array-contains', userId),
+    where('state', '==', 'in_progress'),
+    limit(1)
+  );
+  const inProgressSnap = await getDocs(inProgressQ);
+  if (!inProgressSnap.empty) {
+    return inProgressSnap.docs[0].data() as Game;
+  }
+
+  // Check for waiting games (lobby)
+  const waitingQ = query(
+    gamesCol(),
+    where('player_ids', 'array-contains', userId),
+    where('state', '==', 'waiting'),
+    limit(1)
+  );
+  const waitingSnap = await getDocs(waitingQ);
+  if (!waitingSnap.empty) {
+    return waitingSnap.docs[0].data() as Game;
+  }
+
+  return null;
+}
+
 export async function getFinishedGames(userId: string): Promise<Game[]> {
   const q = query(
     gamesCol(),
-    where('player_ids', 'arrayContains', userId),
+    where('player_ids', 'array-contains', userId),
     where('state', '==', 'finished'),
     orderBy('created_at', 'desc'),
     limit(50)

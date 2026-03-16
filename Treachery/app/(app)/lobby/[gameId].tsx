@@ -17,6 +17,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useLobby } from '@/hooks/useLobby';
 import { ErrorBanner } from '@/components/ErrorBanner';
 import { LoadingScreen } from '@/components/LoadingScreen';
+import { ConnectionBanner } from '@/components/ConnectionBanner';
 import { colors, spacing, fonts } from '@/constants/theme';
 import { MINIMUM_PLAYER_COUNT } from '@/constants/roles';
 
@@ -40,6 +41,20 @@ export default function LobbyScreen() {
     startGame,
     leaveGame,
   } = useLobby(gameId!, isHost);
+
+  // On web, intercept browser back button — prevent accidental lobby exit
+  useEffect(() => {
+    if (Platform.OS !== 'web') return;
+
+    window.history.pushState(null, '', window.location.href);
+
+    const handlePopState = () => {
+      window.history.pushState(null, '', window.location.href);
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
 
   // Navigate to game board when game starts
   useEffect(() => {
@@ -101,6 +116,8 @@ export default function LobbyScreen() {
         <TouchableOpacity
           style={styles.primaryButton}
           onPress={() => router.replace('/(app)')}
+          accessibilityLabel="Return home"
+          accessibilityRole="button"
         >
           <Text style={styles.buttonText}>Return Home</Text>
         </TouchableOpacity>
@@ -110,6 +127,8 @@ export default function LobbyScreen() {
 
   return (
     <View style={styles.container}>
+      <ConnectionBanner />
+
       {/* Game code display - ornate card frame */}
       {game && (
         <View style={styles.codeSection}>
@@ -117,7 +136,12 @@ export default function LobbyScreen() {
             <View style={styles.codeTrim} />
             <Text style={styles.codeLabel}>Game Code</Text>
             <Text style={styles.codeText}>{game.code}</Text>
-            <TouchableOpacity style={styles.shareButton} onPress={handleShare}>
+            <TouchableOpacity
+              style={styles.shareButton}
+              onPress={handleShare}
+              accessibilityLabel="Share game code"
+              accessibilityRole="button"
+            >
               <Ionicons name="share-outline" size={14} color={colors.primary} />
               <Text style={styles.shareText}>Share Code</Text>
             </TouchableOpacity>
@@ -181,6 +205,8 @@ export default function LobbyScreen() {
               style={[styles.primaryButton, (!canStartGame || isStartingGame) && styles.buttonDisabled]}
               onPress={startGame}
               disabled={!canStartGame || isStartingGame}
+              accessibilityLabel={isStartingGame ? 'Starting game' : 'Start game'}
+              accessibilityRole="button"
             >
               {isStartingGame ? (
                 <View style={styles.buttonRow}>
@@ -200,7 +226,12 @@ export default function LobbyScreen() {
           </>
         )}
 
-        <TouchableOpacity style={styles.leaveButton} onPress={handleLeave}>
+        <TouchableOpacity
+          style={styles.leaveButton}
+          onPress={handleLeave}
+          accessibilityLabel="Leave game"
+          accessibilityRole="button"
+        >
           <Text style={styles.leaveText}>Leave Game</Text>
         </TouchableOpacity>
       </View>

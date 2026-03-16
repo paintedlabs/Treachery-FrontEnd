@@ -12,10 +12,11 @@ interface AuthContextType {
   user: User | null;
   currentUserId: string | null;
   errorMessage: string | null;
+  signInAsGuest: () => Promise<void>;
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (email: string, password: string) => Promise<void>;
-  signOut: () => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
+  signOut: () => Promise<void>;
   clearError: () => void;
 }
 
@@ -46,7 +47,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (!existing) {
         const newUser: TreacheryUser = {
           id: firebaseUser.uid,
-          display_name: firebaseUser.displayName || firebaseUser.phoneNumber || 'Player',
+          display_name: firebaseUser.displayName || 'Guest',
           email: firebaseUser.email || null,
           phone_number: firebaseUser.phoneNumber || null,
           friend_ids: [],
@@ -59,12 +60,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const signInAsGuest = useCallback(async () => {
+    setErrorMessage(null);
+    try {
+      const result = await authService.signInAsGuest();
+      await createUserDocumentIfNeeded(result.user);
+    } catch (error: any) {
+      setErrorMessage(error.message || 'Failed to sign in.');
+    }
+  }, []);
+
   const signIn = useCallback(async (email: string, password: string) => {
     setErrorMessage(null);
     try {
-      await authService.signIn(email, password);
+      const result = await authService.signIn(email, password);
+      await createUserDocumentIfNeeded(result.user);
     } catch (error: any) {
-      setErrorMessage(error.message || 'Sign in failed.');
+      setErrorMessage(error.message || 'Failed to sign in.');
     }
   }, []);
 
@@ -74,7 +86,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const result = await authService.signUp(email, password);
       await createUserDocumentIfNeeded(result.user);
     } catch (error: any) {
-      setErrorMessage(error.message || 'Sign up failed.');
+      setErrorMessage(error.message || 'Failed to create account.');
+    }
+  }, []);
+
+  const resetPassword = useCallback(async (email: string) => {
+    setErrorMessage(null);
+    try {
+      await authService.resetPassword(email);
+    } catch (error: any) {
+      setErrorMessage(error.message || 'Failed to send reset email.');
     }
   }, []);
 
@@ -87,15 +108,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  const resetPassword = useCallback(async (email: string) => {
-    setErrorMessage(null);
-    try {
-      await authService.resetPassword(email);
-    } catch (error: any) {
-      setErrorMessage(error.message || 'Password reset failed.');
-    }
-  }, []);
-
   const clearError = useCallback(() => setErrorMessage(null), []);
 
   return (
@@ -105,10 +117,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         user,
         currentUserId: user?.uid ?? null,
         errorMessage,
+        signInAsGuest,
         signIn,
         signUp,
-        signOut,
         resetPassword,
+        signOut,
         clearError,
       }}
     >

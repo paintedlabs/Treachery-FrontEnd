@@ -8,6 +8,7 @@
 import SwiftUI
 import FirebaseCore
 import FirebaseAuth
+import FirebaseMessaging
 
 @main
 struct Treachery_iOSApp: App {
@@ -24,7 +25,7 @@ struct Treachery_iOSApp: App {
 }
 
 // MARK: - AppDelegate
-class AppDelegate: NSObject, UIApplicationDelegate {
+class AppDelegate: NSObject, UIApplicationDelegate, MessagingDelegate, UNUserNotificationCenterDelegate {
     func application(
         _ application: UIApplication,
         didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
@@ -35,7 +36,14 @@ class AppDelegate: NSObject, UIApplicationDelegate {
         Auth.auth().settings?.isAppVerificationDisabledForTesting = true
         #endif
 
-        // Register for remote notifications (required for phone auth silent push)
+        // Push notification setup
+        UNUserNotificationCenter.current().delegate = self
+        Messaging.messaging().delegate = self
+
+        // Request notification permission
+        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .badge, .sound]) { _, _ in }
+
+        // Register for remote notifications (required for phone auth + FCM)
         application.registerForRemoteNotifications()
 
         return true
@@ -48,6 +56,7 @@ class AppDelegate: NSObject, UIApplicationDelegate {
         didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data
     ) {
         Auth.auth().setAPNSToken(deviceToken, type: .unknown)
+        Messaging.messaging().apnsToken = deviceToken
     }
 
     func application(
@@ -71,5 +80,29 @@ class AppDelegate: NSObject, UIApplicationDelegate {
             return true
         }
         return false
+    }
+
+    // MARK: - FCM Token
+
+    func messaging(_ messaging: Messaging, didReceiveRegistrationToken fcmToken: String?) {
+        guard let token = fcmToken else { return }
+        // Register token with server when user is authenticated
+        guard Auth.auth().currentUser != nil else { return }
+        Task {
+            do {
+                try await CloudFunctions().registerFcmToken(token)
+            } catch {
+                print("Failed to register FCM token: \(error)")
+            }
+        }
+    }
+
+    // MARK: - Foreground Notification Display
+
+    func userNotificationCenter(
+        _ center: UNUserNotificationCenter,
+        willPresent notification: UNNotification
+    ) async -> UNNotificationPresentationOptions {
+        return [.banner, .sound]
     }
 }

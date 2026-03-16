@@ -15,6 +15,7 @@ export interface TreacheryUser {
   email: string | null;
   phone_number: string | null;
   friend_ids: string[];
+  fcm_token?: string | null;
   created_at: Timestamp;
 }
 
@@ -28,6 +29,7 @@ export interface Game {
   winning_team: string | null;
   player_ids: string[];
   created_at: Timestamp;
+  last_activity_at?: Timestamp;
 }
 
 export interface Player {

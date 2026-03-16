@@ -1,8 +1,13 @@
 import React from 'react';
 import { Stack } from 'expo-router';
+import { useAuth } from '@/hooks/useAuth';
+import { useNotifications } from '@/hooks/useNotifications';
 import { colors } from '@/constants/theme';
 
 export default function AppLayout() {
+  const { authState } = useAuth();
+  useNotifications(authState === 'authenticated');
+
   return (
     <Stack
       screenOptions={{

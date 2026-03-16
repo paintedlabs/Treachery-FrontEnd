@@ -12,11 +12,13 @@ struct LoginView: View {
 
     @State private var email = ""
     @State private var password = ""
-    @State private var isShowingSignUp = false
-    @State private var isSigningIn = false
+    @State private var isLoading = false
+    @State private var isGuestLoading = false
+
+    private var busy: Bool { isLoading || isGuestLoading }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .center, spacing: 16) {
             Spacer()
 
             Text("Treachery")
@@ -25,33 +27,50 @@ struct LoginView: View {
                 .foregroundStyle(Color.mtgGoldBright)
                 .accessibilityAddTraits(.isHeader)
 
-            Text("Enter the battlefield")
+            Text("A Game of Hidden Allegiance")
                 .font(.subheadline)
                 .foregroundStyle(Color.mtgTextSecondary)
 
             OrnateDivider()
                 .padding(.vertical, 4)
 
-            MtgTextField(placeholder: "Email", text: $email, keyboardType: .emailAddress)
-                .textContentType(.emailAddress)
-                .accessibilityLabel("Email address")
-
-            MtgTextField(placeholder: "Password", text: $password, isSecure: true)
-                .textContentType(.password)
-                .accessibilityLabel("Password")
-                .onSubmit {
-                    guard !email.isEmpty && !password.isEmpty else { return }
-                    signIn()
-                }
-
             if let error = authViewModel.errorMessage {
                 MtgErrorBanner(message: error)
             }
 
+            // Email/Password fields
+            TextField("Email", text: $email)
+                .textContentType(.emailAddress)
+                .keyboardType(.emailAddress)
+                .autocapitalization(.none)
+                .disableAutocorrection(true)
+                .padding()
+                .background(Color.mtgSurface)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8)
+                        .stroke(Color.mtgDivider, lineWidth: 1)
+                )
+                .cornerRadius(8)
+                .foregroundStyle(Color.mtgTextPrimary)
+                .disabled(busy)
+
+            SecureField("Password", text: $password)
+                .textContentType(.password)
+                .padding()
+                .background(Color.mtgSurface)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8)
+                        .stroke(Color.mtgDivider, lineWidth: 1)
+                )
+                .cornerRadius(8)
+                .foregroundStyle(Color.mtgTextPrimary)
+                .disabled(busy)
+
+            // Sign In button
             Button {
                 signIn()
             } label: {
-                if isSigningIn {
+                if isLoading {
                     HStack(spacing: 8) {
                         ProgressView()
                             .controlSize(.small)
@@ -62,64 +81,101 @@ struct LoginView: View {
                     Text("Sign In")
                 }
             }
-            .buttonStyle(MtgPrimaryButtonStyle(isDisabled: email.isEmpty || password.isEmpty || isSigningIn))
-            .disabled(email.isEmpty || password.isEmpty || isSigningIn)
-            .accessibilityLabel(isSigningIn ? "Signing in" : "Sign in")
+            .buttonStyle(MtgPrimaryButtonStyle(isDisabled: busy))
+            .disabled(busy)
 
+            // Links row
+            HStack {
+                NavigationLink("Create Account") {
+                    SignUpView()
+                }
+                .font(.subheadline)
+                .foregroundStyle(Color.mtgGold)
+
+                Spacer()
+
+                NavigationLink("Forgot Password?") {
+                    ForgotPasswordView()
+                }
+                .font(.subheadline)
+                .foregroundStyle(Color.mtgGold)
+            }
+
+            // Phone sign in
+            NavigationLink {
+                PhoneAuthView()
+            } label: {
+                Text("Sign In with Phone")
+                    .font(.headline)
+                    .fontWeight(.semibold)
+                    .foregroundStyle(Color.mtgTextPrimary)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 14)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 8)
+                            .stroke(Color.mtgDivider, lineWidth: 1)
+                    )
+            }
+            .disabled(busy)
+
+            // Divider
             HStack(spacing: 12) {
                 Rectangle()
-                    .fill(Color.mtgDivider)
                     .frame(height: 1)
+                    .foregroundStyle(Color.mtgDivider)
                 Text("or")
                     .font(.caption)
                     .foregroundStyle(Color.mtgTextSecondary)
                 Rectangle()
-                    .fill(Color.mtgDivider)
                     .frame(height: 1)
+                    .foregroundStyle(Color.mtgDivider)
             }
-            .padding(.vertical, 4)
-            .accessibilityHidden(true)
 
-            NavigationLink("Sign in with Phone") {
-                PhoneAuthView()
+            // Guest button
+            Button {
+                playAsGuest()
+            } label: {
+                if isGuestLoading {
+                    HStack(spacing: 8) {
+                        ProgressView()
+                            .controlSize(.small)
+                            .tint(Color.mtgGold)
+                        Text("Joining...")
+                    }
+                } else {
+                    Text("Play as Guest")
+                }
             }
             .buttonStyle(MtgSecondaryButtonStyle())
-            .accessibilityLabel("Sign in with phone number")
+            .disabled(busy)
 
             Spacer()
 
-            HStack {
-                Button("Create Account") {
-                    isShowingSignUp = true
-                }
-                .foregroundStyle(Color.mtgGold)
-                .accessibilityLabel("Create a new account")
-
-                Spacer()
-
-                Button("Forgot Password?") {
-                    guard !email.isEmpty else { return }
-                    Task { await authViewModel.resetPassword(email: email) }
-                }
-                .font(.footnote)
+            Link("Learn the rules at MTGTreachery.net",
+                 destination: URL(string: "https://mtgtreachery.net")!)
+                .font(.system(.caption, design: .serif))
+                .italic()
                 .foregroundStyle(Color.mtgTextSecondary)
-                .disabled(email.isEmpty)
-                .accessibilityLabel("Reset password")
-                .accessibilityHint(email.isEmpty ? "Enter your email first" : "Sends a password reset email")
-            }
+                .frame(maxWidth: .infinity, alignment: .center)
         }
         .padding()
         .mtgBackground()
-        .navigationDestination(isPresented: $isShowingSignUp) {
-            SignUpView()
-        }
     }
 
     private func signIn() {
-        isSigningIn = true
+        guard !email.isEmpty, !password.isEmpty else { return }
+        isLoading = true
         Task {
             await authViewModel.signIn(email: email, password: password)
-            isSigningIn = false
+            isLoading = false
+        }
+    }
+
+    private func playAsGuest() {
+        isGuestLoading = true
+        Task {
+            await authViewModel.signInAsGuest()
+            isGuestLoading = false
         }
     }
 }

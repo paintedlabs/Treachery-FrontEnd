@@ -1,9 +1,8 @@
 import { initializeApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
+import { getFunctions } from "firebase/functions";
 
-// TODO: Replace apiKey and appId with your web app values from Firebase Console
-// Go to: Firebase Console > Project Settings > Your Apps > Add app > Web
 const firebaseConfig = {
   apiKey: "AIzaSyD2DvkawVBP3kcR0rHIycEhAUFFvQFVfBs",
   authDomain: "treachery-71922.firebaseapp.com",
@@ -16,3 +15,4 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 export const db = getFirestore(app);
+export const functions = getFunctions(app);

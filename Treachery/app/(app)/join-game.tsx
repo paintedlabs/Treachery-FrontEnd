@@ -97,6 +97,9 @@ export default function JoinGameScreen() {
           autoCorrect={false}
           maxLength={4}
           textAlign="center"
+          accessibilityLabel="Game code"
+          accessibilityRole="text"
+          accessibilityHint="Enter the 4-character game code"
         />
       </View>
 
@@ -106,6 +109,8 @@ export default function JoinGameScreen() {
         style={[styles.joinButton, (gameCode.length < 4 || isJoining) && styles.buttonDisabled]}
         onPress={handleJoin}
         disabled={gameCode.length < 4 || isJoining}
+        accessibilityLabel={isJoining ? 'Joining game' : 'Join game'}
+        accessibilityRole="button"
       >
         {isJoining ? (
           <View style={styles.buttonRow}>

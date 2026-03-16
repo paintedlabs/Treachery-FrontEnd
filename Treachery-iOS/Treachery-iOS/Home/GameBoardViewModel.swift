@@ -18,12 +18,20 @@ final class GameBoardViewModel: ObservableObject {
     @Published var players: [Player] = []
     @Published var errorMessage: String?
     @Published var isGameUnavailable = false
+    @Published var isPending = false
+
+    // MARK: - Optimistic Life Tracking
+
+    private var lifeDeltas: [String: Int] = [:]
+    private var debounceTimers: [String: Task<Void, Never>] = [:]
+    private var serverPlayers: [Player] = []
 
     // MARK: - Properties
 
     let gameId: String
     var currentUserId: String?
     private let firestoreManager = FirestoreManager()
+    private let cloudFunctions = CloudFunctions()
     private var gameListener: ListenerRegistration?
     private var playersListener: ListenerRegistration?
     private var hasReceivedFirstGameSnapshot = false
@@ -63,6 +71,9 @@ final class GameBoardViewModel: ObservableObject {
     deinit {
         gameListener?.remove()
         playersListener?.remove()
+        for timer in debounceTimers.values {
+            timer.cancel()
+        }
     }
 
     // MARK: - Listeners
@@ -81,121 +92,95 @@ final class GameBoardViewModel: ObservableObject {
         }
         playersListener = firestoreManager.listenToPlayers(gameId: gameId) { [weak self] players in
             Task { @MainActor in
+                guard let self else { return }
+                self.serverPlayers = players
                 withAnimation(.easeInOut(duration: 0.3)) {
-                    self?.players = players
+                    self.applyOptimisticDeltas()
                 }
             }
         }
     }
 
-    // MARK: - Life Adjustment
+    // MARK: - Optimistic Helpers
 
-    func adjustLife(for playerId: String, by amount: Int) async {
-        guard var player = players.first(where: { $0.id == playerId }) else { return }
+    private func applyOptimisticDeltas() {
+        players = serverPlayers.map { player in
+            guard let delta = lifeDeltas[player.id], delta != 0 else { return player }
+            var p = player
+            p.lifeTotal = max(0, p.lifeTotal + delta)
+            return p
+        }
+    }
+
+    // MARK: - Life Adjustment (optimistic + debounced)
+
+    func adjustLife(for playerId: String, by amount: Int) {
+        guard let player = serverPlayers.first(where: { $0.id == playerId }) else { return }
         guard !player.isEliminated else { return }
         errorMessage = nil
 
-        player.lifeTotal += amount
+        // Accumulate optimistic delta
+        lifeDeltas[playerId, default: 0] += amount
+        applyOptimisticDeltas()
 
-        // Check for elimination
-        if player.lifeTotal <= 0 {
-            player.lifeTotal = 0
-            player.isEliminated = true
+        // Cancel existing debounce timer for this player
+        debounceTimers[playerId]?.cancel()
+
+        // Flush after 500ms of inactivity
+        debounceTimers[playerId] = Task { [weak self] in
+            try? await Task.sleep(nanoseconds: 500_000_000)
+            guard !Task.isCancelled else { return }
+            await self?.flushLifeDelta(for: playerId)
         }
+    }
+
+    private func flushLifeDelta(for playerId: String) async {
+        guard let delta = lifeDeltas[playerId], delta != 0 else { return }
+
+        // Clear delta before sending so new taps start fresh
+        lifeDeltas[playerId] = 0
 
         do {
-            try await firestoreManager.updatePlayer(player, inGame: gameId)
-
-            // After elimination, check win conditions
-            if player.isEliminated {
-                await checkWinConditions()
-            }
+            try await cloudFunctions.adjustLife(gameId: gameId, playerId: playerId, amount: delta)
         } catch {
+            // Revert on failure
+            lifeDeltas[playerId, default: 0] += delta
+            applyOptimisticDeltas()
             errorMessage = error.localizedDescription
         }
     }
 
-    // MARK: - Unveil
+    // MARK: - Unveil (via Cloud Function)
 
     func unveilCurrentPlayer() async {
-        guard var player = currentPlayer else { return }
+        guard let player = currentPlayer else { return }
         guard !player.isUnveiled else { return }
+        guard !isPending else { return }
         errorMessage = nil
-
-        player.isUnveiled = true
+        isPending = true
 
         do {
-            try await firestoreManager.updatePlayer(player, inGame: gameId)
+            try await cloudFunctions.unveilPlayer(gameId: gameId)
         } catch {
             errorMessage = error.localizedDescription
         }
+        isPending = false
     }
 
-    // MARK: - Win Condition Checking
-
-    func checkWinConditions() async {
-        let alive = alivePlayers
-
-        // Traitor wins: last player standing and is a traitor
-        if alive.count == 1, alive.first?.role == .traitor {
-            await endGame(winningTeam: .traitor)
-            return
-        }
-
-        let leaderAlive = alive.contains { $0.role == .leader }
-        let assassinAlive = alive.contains { $0.role == .assassin }
-        let traitorAlive = alive.contains { $0.role == .traitor }
-
-        // Assassin wins: Leader is eliminated AND at least 1 assassin survives
-        if !leaderAlive && assassinAlive {
-            await endGame(winningTeam: .assassin)
-            return
-        }
-
-        // Leader/Guardian wins: Leader alive + all assassins AND all traitors eliminated
-        if leaderAlive && !assassinAlive && !traitorAlive {
-            await endGame(winningTeam: .leader)
-            return
-        }
-
-        // Edge: Leader dead + no assassins alive + no traitors alive
-        // Assassins get credit (their mission to kill the leader succeeded)
-        if !leaderAlive && !assassinAlive && !traitorAlive {
-            await endGame(winningTeam: .assassin)
-            return
-        }
-    }
-
-    // MARK: - End Game
-
-    private func endGame(winningTeam: Role) async {
-        guard var game = game else { return }
-        game.state = .finished
-        game.winningTeam = winningTeam.rawValue
-
-        do {
-            try await firestoreManager.updateGame(game)
-        } catch {
-            errorMessage = error.localizedDescription
-        }
-    }
-
-    // MARK: - Leave Game
+    // MARK: - Leave Game (via Cloud Function)
 
     func eliminateAndLeave() async {
-        guard var player = currentPlayer else { return }
+        guard currentPlayer != nil else { return }
+        guard !isPending else { return }
         errorMessage = nil
-
-        // Mark player as eliminated before leaving
-        player.isEliminated = true
-        player.lifeTotal = 0
+        isPending = true
 
         do {
-            try await firestoreManager.updatePlayer(player, inGame: gameId)
-            await checkWinConditions()
+            try await cloudFunctions.eliminatePlayer(gameId: gameId)
         } catch {
             errorMessage = error.localizedDescription
         }
+        isPending = false
     }
 
     // MARK: - Helpers

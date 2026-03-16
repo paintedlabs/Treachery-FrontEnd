@@ -9,58 +9,76 @@ import SwiftUI
 
 struct SignUpView: View {
     @EnvironmentObject var authViewModel: AuthViewModel
-    @Environment(\.dismiss) var dismiss
+    @Environment(\.dismiss) private var dismiss
 
     @State private var email = ""
     @State private var password = ""
     @State private var confirmPassword = ""
-    @State private var validationError: String?
-    @State private var isCreating = false
-
-    private var passwordsMatch: Bool {
-        !password.isEmpty && password == confirmPassword
-    }
+    @State private var isLoading = false
+    @State private var localError: String?
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            MtgSectionHeader(title: "Create Your Account")
-                .padding(.top, 8)
+        VStack(alignment: .center, spacing: 16) {
+            Spacer()
 
-            OrnateDivider()
+            Text("Create Account")
+                .font(.system(.title, design: .serif))
+                .fontWeight(.bold)
+                .foregroundStyle(Color.mtgGoldBright)
+                .accessibilityAddTraits(.isHeader)
 
-            MtgTextField(placeholder: "Email", text: $email, keyboardType: .emailAddress)
-                .textContentType(.emailAddress)
-                .accessibilityLabel("Email address")
+            Text("Join the game of hidden allegiance")
+                .font(.system(.subheadline, design: .serif))
+                .italic()
+                .foregroundStyle(Color.mtgTextSecondary)
 
-            MtgTextField(placeholder: "Password", text: $password, isSecure: true)
-                .textContentType(.newPassword)
-                .accessibilityLabel("Password")
-
-            MtgTextField(placeholder: "Confirm Password", text: $confirmPassword, isSecure: true)
-                .textContentType(.newPassword)
-                .accessibilityLabel("Confirm password")
-
-            // Password match indicator
-            if !confirmPassword.isEmpty {
-                HStack(spacing: 4) {
-                    Image(systemName: passwordsMatch ? "checkmark.circle.fill" : "xmark.circle.fill")
-                        .foregroundStyle(passwordsMatch ? Color.mtgSuccess : Color.mtgError)
-                        .font(.caption)
-                    Text(passwordsMatch ? "Passwords match" : "Passwords do not match")
-                        .foregroundStyle(passwordsMatch ? Color.mtgSuccess : Color.mtgError)
-                        .font(.caption)
-                }
-                .accessibilityElement(children: .combine)
-            }
-
-            if let error = validationError ?? authViewModel.errorMessage {
+            if let error = localError ?? authViewModel.errorMessage {
                 MtgErrorBanner(message: error)
             }
 
+            TextField("Email", text: $email)
+                .textContentType(.emailAddress)
+                .keyboardType(.emailAddress)
+                .autocapitalization(.none)
+                .disableAutocorrection(true)
+                .padding()
+                .background(Color.mtgSurface)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8)
+                        .stroke(Color.mtgDivider, lineWidth: 1)
+                )
+                .cornerRadius(8)
+                .foregroundStyle(Color.mtgTextPrimary)
+                .disabled(isLoading)
+
+            SecureField("Password", text: $password)
+                .textContentType(.newPassword)
+                .padding()
+                .background(Color.mtgSurface)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8)
+                        .stroke(Color.mtgDivider, lineWidth: 1)
+                )
+                .cornerRadius(8)
+                .foregroundStyle(Color.mtgTextPrimary)
+                .disabled(isLoading)
+
+            SecureField("Confirm Password", text: $confirmPassword)
+                .textContentType(.newPassword)
+                .padding()
+                .background(Color.mtgSurface)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8)
+                        .stroke(Color.mtgDivider, lineWidth: 1)
+                )
+                .cornerRadius(8)
+                .foregroundStyle(Color.mtgTextPrimary)
+                .disabled(isLoading)
+
             Button {
-                createAccount()
+                signUp()
             } label: {
-                if isCreating {
+                if isLoading {
                     HStack(spacing: 8) {
                         ProgressView()
                             .controlSize(.small)
@@ -71,48 +89,42 @@ struct SignUpView: View {
                     Text("Create Account")
                 }
             }
-            .buttonStyle(MtgPrimaryButtonStyle(isDisabled: email.isEmpty || password.isEmpty || confirmPassword.isEmpty || isCreating))
-            .disabled(email.isEmpty || password.isEmpty || confirmPassword.isEmpty || isCreating)
-            .accessibilityLabel(isCreating ? "Creating account" : "Create account")
+            .buttonStyle(MtgPrimaryButtonStyle(isDisabled: isLoading))
+            .disabled(isLoading)
 
-            // Password requirements hint
-            if password.isEmpty {
-                Text("Password must be at least 6 characters")
-                    .font(.caption2)
-                    .foregroundStyle(Color.mtgTextSecondary)
+            Button("Already have an account? Sign In") {
+                dismiss()
             }
+            .font(.subheadline)
+            .foregroundStyle(Color.mtgGold)
+            .disabled(isLoading)
 
             Spacer()
         }
         .padding()
         .mtgBackground()
-        .navigationTitle("Sign Up")
-        .toolbarColorScheme(.dark, for: .navigationBar)
+        .navigationBarBackButtonHidden(isLoading)
     }
 
-    private func createAccount() {
+    private func signUp() {
+        localError = nil
+        authViewModel.errorMessage = nil
+
+        guard !email.isEmpty, !password.isEmpty else { return }
+
         guard password == confirmPassword else {
-            validationError = "Passwords do not match."
+            localError = "Passwords do not match."
             return
         }
         guard password.count >= 6 else {
-            validationError = "Password must be at least 6 characters."
+            localError = "Password must be at least 6 characters."
             return
         }
-        validationError = nil
-        isCreating = true
+
+        isLoading = true
         Task {
             await authViewModel.signUp(email: email, password: password)
-            isCreating = false
+            isLoading = false
         }
     }
 }
-
-#if DEBUG
-#Preview {
-    NavigationStack {
-        SignUpView()
-    }
-    .environmentObject(AuthViewModel())
-}
-#endif

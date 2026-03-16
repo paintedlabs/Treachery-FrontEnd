@@ -46,14 +46,6 @@ struct ProfileView: View {
                                 }
                             }
 
-                            if let email = user.email {
-                                ProfileRow(label: "Email", value: email)
-                            }
-
-                            if let phone = user.phoneNumber {
-                                ProfileRow(label: "Phone", value: phone)
-                            }
-
                             ProfileRow(label: "Member Since") {
                                 Text(user.createdAt, style: .date)
                                     .foregroundStyle(Color.mtgTextSecondary)

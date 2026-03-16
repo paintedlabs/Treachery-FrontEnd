@@ -83,6 +83,8 @@ export default function GameOverScreen() {
       <TouchableOpacity
         style={styles.homeButton}
         onPress={() => router.replace('/(app)')}
+        accessibilityLabel="Return to home"
+        accessibilityRole="button"
       >
         <Text style={styles.homeButtonText}>Return to Home</Text>
       </TouchableOpacity>

@@ -7,7 +7,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Timestamp } from 'firebase/firestore';
+import { Timestamp, serverTimestamp } from 'firebase/firestore';
 import { useAuth } from '@/hooks/useAuth';
 import { RoleBadge } from '@/components/RoleBadge';
 import { ErrorBanner } from '@/components/ErrorBanner';
@@ -69,7 +69,8 @@ export default function CreateGameScreen() {
         winning_team: null,
         player_ids: [currentUserId],
         created_at: Timestamp.now(),
-      };
+        last_activity_at: Timestamp.now(),
+      } as Game;
       await firestoreService.createGame(game);
 
       // Add host as first player
@@ -107,6 +108,8 @@ export default function CreateGameScreen() {
           <TouchableOpacity
             onPress={() => setMaxPlayers(Math.max(MINIMUM_PLAYER_COUNT, maxPlayers - 1))}
             disabled={maxPlayers <= MINIMUM_PLAYER_COUNT}
+            accessibilityLabel="Decrease player count"
+            accessibilityRole="button"
           >
             <Text style={[styles.stepperBtn, maxPlayers <= MINIMUM_PLAYER_COUNT && styles.disabled]}>
               −
@@ -115,6 +118,8 @@ export default function CreateGameScreen() {
           <TouchableOpacity
             onPress={() => setMaxPlayers(Math.min(8, maxPlayers + 1))}
             disabled={maxPlayers >= 8}
+            accessibilityLabel="Increase player count"
+            accessibilityRole="button"
           >
             <Text style={[styles.stepperBtn, maxPlayers >= 8 && styles.disabled]}>+</Text>
           </TouchableOpacity>
@@ -128,12 +133,16 @@ export default function CreateGameScreen() {
           <TouchableOpacity
             onPress={() => setStartingLife(Math.max(20, startingLife - 5))}
             disabled={startingLife <= 20}
+            accessibilityLabel="Decrease starting life"
+            accessibilityRole="button"
           >
             <Text style={[styles.stepperBtn, startingLife <= 20 && styles.disabled]}>−</Text>
           </TouchableOpacity>
           <TouchableOpacity
             onPress={() => setStartingLife(Math.min(60, startingLife + 5))}
             disabled={startingLife >= 60}
+            accessibilityLabel="Increase starting life"
+            accessibilityRole="button"
           >
             <Text style={[styles.stepperBtn, startingLife >= 60 && styles.disabled]}>+</Text>
           </TouchableOpacity>
@@ -164,6 +173,8 @@ export default function CreateGameScreen() {
         style={[styles.createButton, isCreating && styles.buttonDisabled]}
         onPress={handleCreate}
         disabled={isCreating}
+        accessibilityLabel={isCreating ? 'Creating game' : 'Create game'}
+        accessibilityRole="button"
       >
         {isCreating ? (
           <View style={styles.buttonRow}>

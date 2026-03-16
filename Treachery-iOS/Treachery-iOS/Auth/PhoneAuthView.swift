@@ -2,120 +2,63 @@
 //  PhoneAuthView.swift
 //  Treachery-iOS
 //
-//  Created by Luke Solomon on 3/13/26.
+//  Created by Luke Solomon on 3/16/26.
 //
 
 import SwiftUI
 
 struct PhoneAuthView: View {
     @EnvironmentObject var authViewModel: AuthViewModel
+    @Environment(\.dismiss) private var dismiss
 
     @State private var phoneNumber = ""
     @State private var verificationCode = ""
-    @State private var isVerifying = false
+    @State private var verificationID: String?
+    @State private var isLoading = false
+
+    private var isCodeStep: Bool { verificationID != nil }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            if authViewModel.isAwaitingVerification {
-                // Step 2: Enter verification code
-                Text("Enter Verification Code")
-                    .font(.system(.title2, design: .serif))
-                    .fontWeight(.semibold)
-                    .foregroundStyle(Color.mtgGoldBright)
-                    .accessibilityAddTraits(.isHeader)
+        VStack(alignment: .center, spacing: 16) {
+            Spacer()
 
-                Text("A 6-digit code was sent to \(phoneNumber)")
-                    .font(.subheadline)
-                    .foregroundStyle(Color.mtgTextSecondary)
+            Text("Phone Sign In")
+                .font(.system(.title, design: .serif))
+                .fontWeight(.bold)
+                .foregroundStyle(Color.mtgGoldBright)
+                .accessibilityAddTraits(.isHeader)
 
-                OrnateDivider()
-
-                TextField("000000", text: $verificationCode)
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 14)
-                    .foregroundStyle(Color.mtgTextPrimary)
-                    .background(Color.mtgCardElevated)
-                    .clipShape(RoundedRectangle(cornerRadius: 8))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 8)
-                            .stroke(Color.mtgGold, lineWidth: 1.5)
-                    )
-                    .keyboardType(.numberPad)
-                    .textContentType(.oneTimeCode)
-                    .font(.title2.monospaced())
-                    .multilineTextAlignment(.center)
-                    .accessibilityLabel("Verification code")
-                    .accessibilityHint("Enter the 6-digit code sent to your phone")
-                    .onChange(of: verificationCode) { _, newValue in
-                        verificationCode = String(newValue.prefix(6))
-                    }
-
-                if let error = authViewModel.errorMessage {
-                    MtgErrorBanner(message: error)
-                }
-
-                Button {
-                    verify()
-                } label: {
-                    if isVerifying {
-                        HStack(spacing: 8) {
-                            ProgressView()
-                                .controlSize(.small)
-                                .tint(Color.mtgBackground)
-                            Text("Verifying...")
-                        }
-                    } else {
-                        Text("Verify")
-                    }
-                }
-                .buttonStyle(MtgPrimaryButtonStyle(isDisabled: verificationCode.count < 6 || isVerifying))
-                .disabled(verificationCode.count < 6 || isVerifying)
-                .accessibilityLabel(isVerifying ? "Verifying code" : "Verify code")
-
-                Button("Use a different number") {
-                    verificationCode = ""
-                    authViewModel.cancelPhoneVerification()
-                }
-                .font(.footnote)
+            Text(isCodeStep
+                 ? "Enter the 6-digit code sent to your phone"
+                 : "Enter your phone number to receive a code")
+                .font(.system(.subheadline, design: .serif))
+                .italic()
                 .foregroundStyle(Color.mtgTextSecondary)
-                .accessibilityLabel("Go back and use a different phone number")
-            } else {
-                // Step 1: Enter phone number
-                Text("Phone Sign In")
-                    .font(.system(.title2, design: .serif))
-                    .fontWeight(.semibold)
-                    .foregroundStyle(Color.mtgGoldBright)
-                    .accessibilityAddTraits(.isHeader)
+                .multilineTextAlignment(.center)
 
-                Text("Enter your phone number with country code")
-                    .font(.subheadline)
-                    .foregroundStyle(Color.mtgTextSecondary)
+            if let error = authViewModel.errorMessage {
+                MtgErrorBanner(message: error)
+            }
 
-                OrnateDivider()
-
-                TextField("+1 555-123-4567", text: $phoneNumber)
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 14)
-                    .foregroundStyle(Color.mtgTextPrimary)
-                    .background(Color.mtgCardElevated)
-                    .clipShape(RoundedRectangle(cornerRadius: 8))
+            if !isCodeStep {
+                // Phone number entry
+                TextField("Phone number (e.g. +15551234567)", text: $phoneNumber)
+                    .textContentType(.telephoneNumber)
+                    .keyboardType(.phonePad)
+                    .padding()
+                    .background(Color.mtgSurface)
                     .overlay(
                         RoundedRectangle(cornerRadius: 8)
                             .stroke(Color.mtgDivider, lineWidth: 1)
                     )
-                    .keyboardType(.phonePad)
-                    .textContentType(.telephoneNumber)
-                    .accessibilityLabel("Phone number")
-                    .accessibilityHint("Include country code, e.g. plus 1 for US")
-
-                if let error = authViewModel.errorMessage {
-                    MtgErrorBanner(message: error)
-                }
+                    .cornerRadius(8)
+                    .foregroundStyle(Color.mtgTextPrimary)
+                    .disabled(isLoading)
 
                 Button {
-                    Task { await authViewModel.sendVerificationCode(phoneNumber: phoneNumber) }
+                    sendCode()
                 } label: {
-                    if authViewModel.isSendingCode {
+                    if isLoading {
                         HStack(spacing: 8) {
                             ProgressView()
                                 .controlSize(.small)
@@ -123,39 +66,89 @@ struct PhoneAuthView: View {
                             Text("Sending...")
                         }
                     } else {
-                        Text("Send Verification Code")
+                        Text("Send Code")
                     }
                 }
-                .buttonStyle(MtgPrimaryButtonStyle(isDisabled: phoneNumber.isEmpty || authViewModel.isSendingCode))
-                .disabled(phoneNumber.isEmpty || authViewModel.isSendingCode)
-                .accessibilityLabel(authViewModel.isSendingCode ? "Sending verification code" : "Send verification code")
+                .buttonStyle(MtgPrimaryButtonStyle(isDisabled: isLoading))
+                .disabled(isLoading)
+            } else {
+                // Verification code entry
+                TextField("6-digit code", text: $verificationCode)
+                    .textContentType(.oneTimeCode)
+                    .keyboardType(.numberPad)
+                    .padding()
+                    .background(Color.mtgSurface)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 8)
+                            .stroke(Color.mtgDivider, lineWidth: 1)
+                    )
+                    .cornerRadius(8)
+                    .foregroundStyle(Color.mtgTextPrimary)
+                    .disabled(isLoading)
+
+                Button {
+                    verifyCode()
+                } label: {
+                    if isLoading {
+                        HStack(spacing: 8) {
+                            ProgressView()
+                                .controlSize(.small)
+                                .tint(Color.mtgBackground)
+                            Text("Verifying...")
+                        }
+                    } else {
+                        Text("Verify Code")
+                    }
+                }
+                .buttonStyle(MtgPrimaryButtonStyle(isDisabled: isLoading))
+                .disabled(isLoading)
+
+                Button("Use a different number") {
+                    verificationID = nil
+                    verificationCode = ""
+                    authViewModel.errorMessage = nil
+                }
+                .font(.subheadline)
+                .foregroundStyle(Color.mtgGold)
+                .disabled(isLoading)
             }
+
+            Button("Back to Sign In") {
+                dismiss()
+            }
+            .font(.subheadline)
+            .foregroundStyle(Color.mtgGold)
+            .disabled(isLoading)
 
             Spacer()
         }
         .padding()
         .mtgBackground()
-        .navigationTitle("Phone Sign In")
-        .toolbarColorScheme(.dark, for: .navigationBar)
-        .onDisappear {
-            authViewModel.cancelPhoneVerification()
-        }
+        .navigationBarBackButtonHidden(isLoading)
     }
 
-    private func verify() {
-        isVerifying = true
+    private func sendCode() {
+        let formatted = phoneNumber.trimmingCharacters(in: .whitespaces)
+        let number = formatted.hasPrefix("+") ? formatted : "+1\(formatted)"
+        guard number.count >= 10 else {
+            authViewModel.errorMessage = "Please enter a valid phone number."
+            return
+        }
+
+        isLoading = true
         Task {
-            await authViewModel.verifyCode(verificationCode)
-            isVerifying = false
+            let id = await authViewModel.verifyPhoneNumber(number)
+            verificationID = id
+            isLoading = false
+        }
+    }
+
+    private func verifyCode() {
+        guard let id = verificationID, !verificationCode.isEmpty else { return }
+        isLoading = true
+        Task {
+            await authViewModel.signInWithPhoneCode(verificationID: id, code: verificationCode)
+            isLoading = false
         }
     }
 }
-
-#if DEBUG
-#Preview("Enter Phone Number") {
-    NavigationStack {
-        PhoneAuthView()
-    }
-    .environmentObject(AuthViewModel())
-}
-#endif

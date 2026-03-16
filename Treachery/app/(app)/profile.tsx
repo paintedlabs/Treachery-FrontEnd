@@ -63,25 +63,13 @@ export default function ProfileScreen() {
                   value={editedName}
                   onChangeText={setEditedName}
                   autoCapitalize="words"
+                  accessibilityLabel="Display name"
+                  accessibilityRole="text"
                 />
               ) : (
                 <Text style={styles.value}>{user.display_name}</Text>
               )}
             </View>
-
-            {user.email && (
-              <View style={styles.row}>
-                <Text style={styles.label}>Email</Text>
-                <Text style={styles.value}>{user.email}</Text>
-              </View>
-            )}
-
-            {user.phone_number && (
-              <View style={styles.row}>
-                <Text style={styles.label}>Phone</Text>
-                <Text style={styles.value}>{user.phone_number}</Text>
-              </View>
-            )}
 
             <View style={[styles.row, { borderBottomWidth: 0 }]}>
               <Text style={styles.label}>Member Since</Text>
@@ -98,6 +86,8 @@ export default function ProfileScreen() {
             style={[styles.editButton, (isSaving || !editedName.trim()) && styles.buttonDisabled]}
             onPress={handleSave}
             disabled={isSaving || !editedName.trim()}
+            accessibilityLabel={isSaving ? 'Saving display name' : 'Save display name'}
+            accessibilityRole="button"
           >
             <Text style={styles.editButtonText}>
               {isSaving ? 'Saving...' : 'Save'}
@@ -108,6 +98,8 @@ export default function ProfileScreen() {
             style={styles.editButton}
             onPress={handleEdit}
             disabled={!user}
+            accessibilityLabel="Edit display name"
+            accessibilityRole="button"
           >
             <Text style={styles.editButtonText}>Edit</Text>
           </TouchableOpacity>
@@ -155,6 +147,8 @@ export default function ProfileScreen() {
             <TouchableOpacity
               style={styles.historyLink}
               onPress={() => router.push('/(app)/history')}
+              accessibilityLabel="View game history"
+              accessibilityRole="link"
             >
               <Text style={styles.linkText}>View Game History</Text>
             </TouchableOpacity>
@@ -168,6 +162,8 @@ export default function ProfileScreen() {
           <TouchableOpacity
             style={styles.card}
             onPress={() => router.push('/(app)/friends')}
+            accessibilityLabel={`Friends: ${user.friend_ids?.length ?? 0}`}
+            accessibilityRole="link"
           >
             <View style={[styles.row, { borderBottomWidth: 0 }]}>
               <Text style={styles.label}>Friends</Text>
@@ -180,7 +176,12 @@ export default function ProfileScreen() {
       {errorMessage && <ErrorBanner message={errorMessage} />}
 
       {/* Sign out */}
-      <TouchableOpacity style={styles.signOutButton} onPress={handleSignOut}>
+      <TouchableOpacity
+        style={styles.signOutButton}
+        onPress={handleSignOut}
+        accessibilityLabel="Sign out"
+        accessibilityRole="button"
+      >
         <Text style={styles.signOutText}>Sign Out</Text>
       </TouchableOpacity>
     </ScrollView>

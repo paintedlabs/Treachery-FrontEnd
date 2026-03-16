@@ -23,6 +23,7 @@ struct Game: Codable, Identifiable, Hashable {
     var winningTeam: String?
     var playerIds: [String]
     let createdAt: Date
+    var lastActivityAt: Date?
 
     enum CodingKeys: String, CodingKey {
         case id
@@ -34,6 +35,7 @@ struct Game: Codable, Identifiable, Hashable {
         case winningTeam = "winning_team"
         case playerIds = "player_ids"
         case createdAt = "created_at"
+        case lastActivityAt = "last_activity_at"
     }
 
     // Custom decoder: defaults playerIds to [] for documents created before
@@ -49,6 +51,7 @@ struct Game: Codable, Identifiable, Hashable {
         winningTeam = try container.decodeIfPresent(String.self, forKey: .winningTeam)
         playerIds = try container.decodeIfPresent([String].self, forKey: .playerIds) ?? []
         createdAt = try container.decode(Date.self, forKey: .createdAt)
+        lastActivityAt = try container.decodeIfPresent(Date.self, forKey: .lastActivityAt)
     }
 
     init(
@@ -60,7 +63,8 @@ struct Game: Codable, Identifiable, Hashable {
         startingLife: Int,
         winningTeam: String?,
         playerIds: [String],
-        createdAt: Date
+        createdAt: Date,
+        lastActivityAt: Date? = nil
     ) {
         self.id = id
         self.code = code
@@ -71,6 +75,7 @@ struct Game: Codable, Identifiable, Hashable {
         self.winningTeam = winningTeam
         self.playerIds = playerIds
         self.createdAt = createdAt
+        self.lastActivityAt = lastActivityAt
     }
 }
 

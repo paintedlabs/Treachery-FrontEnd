@@ -17,6 +17,7 @@ import { IdentityCardDetail } from '@/components/IdentityCardDetail';
 import { PlayerRow } from '@/components/PlayerRow';
 import { ErrorBanner } from '@/components/ErrorBanner';
 import { LoadingScreen } from '@/components/LoadingScreen';
+import { ConnectionBanner } from '@/components/ConnectionBanner';
 import { ROLE_COLORS, ROLE_DISPLAY_NAMES, ROLE_WIN_CONDITIONS } from '@/constants/roles';
 import { Player } from '@/models/types';
 import { colors, spacing, fonts } from '@/constants/theme';
@@ -34,6 +35,7 @@ export default function GameBoardScreen() {
     isGameFinished,
     currentPlayer,
     currentIdentityCard,
+    isPending,
     adjustLife,
     unveilCurrentPlayer,
     eliminateAndLeave,
@@ -44,6 +46,22 @@ export default function GameBoardScreen() {
   const [showCardDetail, setShowCardDetail] = useState(false);
   const [inspectedPlayer, setInspectedPlayer] = useState<Player | null>(null);
   const [showUnveilConfirm, setShowUnveilConfirm] = useState(false);
+
+  // On web, intercept browser back button — push user back into the game
+  useEffect(() => {
+    if (Platform.OS !== 'web') return;
+
+    // Push a duplicate history entry so pressing back stays on this page
+    window.history.pushState(null, '', window.location.href);
+
+    const handlePopState = () => {
+      // Re-push so the user can't back out
+      window.history.pushState(null, '', window.location.href);
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
 
   // Navigate to game over when finished
   useEffect(() => {
@@ -64,11 +82,18 @@ export default function GameBoardScreen() {
     }
   }, [isGameUnavailable, router]);
 
+  const navigateToGameOver = () => {
+    router.replace({
+      pathname: '/(app)/game-over/[gameId]',
+      params: { gameId: gameId! },
+    });
+  };
+
   const handleForfeit = () => {
     if (Platform.OS === 'web') {
       const confirmed = window.confirm('Forfeit Game?\n\nYou will be eliminated from the game. This cannot be undone.');
       if (confirmed) {
-        eliminateAndLeave().then(() => router.replace('/(app)'));
+        eliminateAndLeave().then(navigateToGameOver);
       }
     } else {
       Alert.alert(
@@ -81,7 +106,7 @@ export default function GameBoardScreen() {
             style: 'destructive',
             onPress: async () => {
               await eliminateAndLeave();
-              router.replace('/(app)');
+              navigateToGameOver();
             },
           },
         ]
@@ -120,6 +145,8 @@ export default function GameBoardScreen() {
         <TouchableOpacity
           style={styles.primaryButton}
           onPress={() => router.replace('/(app)')}
+          accessibilityLabel="Return to home"
+          accessibilityRole="button"
         >
           <Text style={styles.buttonText}>Return to Home</Text>
         </TouchableOpacity>
@@ -135,6 +162,8 @@ export default function GameBoardScreen() {
 
   return (
     <View style={styles.container}>
+      <ConnectionBanner />
+
       {/* Identity card header */}
       {currentIdentityCard && currentPlayer && (
         <IdentityCardHeader
@@ -163,6 +192,7 @@ export default function GameBoardScreen() {
             isUnveiledOrLeader={item.is_unveiled || item.role === 'leader'}
             onAdjustLife={(amount) => adjustLife(item.id, amount)}
             onViewCard={() => setInspectedPlayer(item)}
+            isDisabled={false}
           />
         )}
         style={styles.list}
@@ -170,40 +200,73 @@ export default function GameBoardScreen() {
 
       {errorMessage && <ErrorBanner message={errorMessage} />}
 
-      {/* Action bar */}
-      <View style={styles.actionBar}>
-        {currentPlayer &&
-          !currentPlayer.is_unveiled &&
-          !currentPlayer.is_eliminated &&
-          currentPlayer.role !== 'leader' && (
-            <TouchableOpacity
-              style={[
-                styles.unveilButton,
-                {
-                  backgroundColor: currentPlayer.role
-                    ? ROLE_COLORS[currentPlayer.role]
-                    : colors.primary,
-                },
-              ]}
-              onPress={handleUnveil}
-            >
-              <Text style={styles.unveilButtonText}>Unveil Identity</Text>
-            </TouchableOpacity>
-          )}
-
-        {currentPlayer?.role && (
-          <View style={styles.winConditionBox}>
-            <Text style={styles.winConditionLabel}>Win Condition</Text>
-            <Text style={styles.winConditionText}>
-              {ROLE_WIN_CONDITIONS[currentPlayer.role]}
-            </Text>
+      {/* Spectator overlay for eliminated players */}
+      {currentPlayer?.is_eliminated && (
+        <View style={styles.spectatorBar}>
+          <View style={styles.spectatorBanner}>
+            <Ionicons name="skull" size={20} color={colors.error} />
+            <Text style={styles.spectatorTitle}>You've Been Eliminated</Text>
           </View>
-        )}
-      </View>
+          <Text style={styles.spectatorSubtitle}>
+            You're now spectating. Watch the game unfold or leave.
+          </Text>
+          <TouchableOpacity
+            style={styles.spectatorLeaveButton}
+            onPress={navigateToGameOver}
+            accessibilityLabel="Leave game"
+            accessibilityRole="button"
+          >
+            <Text style={styles.spectatorLeaveText}>Leave Game</Text>
+          </TouchableOpacity>
+        </View>
+      )}
 
-      {/* Forfeit button */}
+      {/* Action bar (only for non-eliminated players) */}
       {currentPlayer && !currentPlayer.is_eliminated && (
-        <TouchableOpacity style={styles.forfeitButton} onPress={handleForfeit}>
+        <View style={styles.actionBar}>
+          {!currentPlayer.is_unveiled &&
+            currentPlayer.role !== 'leader' && (
+              <TouchableOpacity
+                style={[
+                  styles.unveilButton,
+                  {
+                    backgroundColor: currentPlayer.role
+                      ? ROLE_COLORS[currentPlayer.role]
+                      : colors.primary,
+                  },
+                  isPending && styles.buttonDisabled,
+                ]}
+                onPress={handleUnveil}
+                disabled={isPending}
+                accessibilityLabel="Unveil identity"
+                accessibilityRole="button"
+                accessibilityHint="Reveals your role and card to all players"
+              >
+                <Text style={styles.unveilButtonText}>Unveil Identity</Text>
+              </TouchableOpacity>
+            )}
+
+          {currentPlayer.role && (
+            <View style={styles.winConditionBox}>
+              <Text style={styles.winConditionLabel}>Win Condition</Text>
+              <Text style={styles.winConditionText}>
+                {ROLE_WIN_CONDITIONS[currentPlayer.role]}
+              </Text>
+            </View>
+          )}
+        </View>
+      )}
+
+      {/* Forfeit button (only for non-eliminated players) */}
+      {currentPlayer && !currentPlayer.is_eliminated && (
+        <TouchableOpacity
+          style={[styles.forfeitButton, isPending && { opacity: 0.5 }]}
+          onPress={handleForfeit}
+          disabled={isPending}
+          accessibilityLabel="Forfeit"
+          accessibilityRole="button"
+          accessibilityHint="Eliminates you from the game"
+        >
           <Ionicons name="flag" size={16} color={colors.warning} />
           <Text style={styles.forfeitText}>Forfeit</Text>
         </TouchableOpacity>
@@ -282,6 +345,9 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '700',
   },
+  buttonDisabled: {
+    opacity: 0.5,
+  },
   primaryButton: {
     backgroundColor: colors.primary,
     borderRadius: 8,
@@ -311,6 +377,44 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     fontFamily: fonts.serif,
     fontStyle: 'italic',
+  },
+  spectatorBar: {
+    borderTopWidth: 1,
+    borderTopColor: colors.error,
+    backgroundColor: 'rgba(196, 60, 60, 0.1)',
+    padding: spacing.lg,
+    alignItems: 'center',
+    gap: 8,
+  },
+  spectatorBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  spectatorTitle: {
+    color: colors.error,
+    fontSize: 18,
+    fontWeight: '700',
+    fontFamily: fonts.serif,
+  },
+  spectatorSubtitle: {
+    color: colors.textSecondary,
+    fontSize: 13,
+    textAlign: 'center',
+    fontStyle: 'italic',
+  },
+  spectatorLeaveButton: {
+    borderWidth: 1,
+    borderColor: colors.error,
+    borderRadius: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 24,
+    marginTop: 4,
+  },
+  spectatorLeaveText: {
+    color: colors.error,
+    fontSize: 14,
+    fontWeight: '600',
   },
   forfeitButton: {
     flexDirection: 'row',

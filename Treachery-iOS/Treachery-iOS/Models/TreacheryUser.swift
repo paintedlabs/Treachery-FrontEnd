@@ -13,6 +13,7 @@ struct TreacheryUser: Codable, Identifiable {
     let email: String?
     var phoneNumber: String?
     var friendIds: [String]
+    var fcmToken: String?
     let createdAt: Date
 
     enum CodingKeys: String, CodingKey {
@@ -21,6 +22,7 @@ struct TreacheryUser: Codable, Identifiable {
         case email
         case phoneNumber = "phone_number"
         case friendIds = "friend_ids"
+        case fcmToken = "fcm_token"
         case createdAt = "created_at"
     }
 }

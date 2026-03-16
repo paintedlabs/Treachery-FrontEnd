@@ -55,11 +55,17 @@ export default function FriendsScreen() {
             autoCorrect={false}
             onSubmitEditing={handleSearch}
             returnKeyType="search"
+            accessibilityLabel="Search friends by display name"
+            accessibilityRole="search"
           />
           {isSearching ? (
             <ActivityIndicator size="small" color={colors.primary} />
           ) : searchText.length > 0 ? (
-            <TouchableOpacity onPress={handleSearch}>
+            <TouchableOpacity
+              onPress={handleSearch}
+              accessibilityLabel="Search"
+              accessibilityRole="button"
+            >
               <Text style={styles.searchButton}>Search</Text>
             </TouchableOpacity>
           ) : null}
@@ -79,6 +85,8 @@ export default function FriendsScreen() {
                 <TouchableOpacity
                   style={styles.addButton}
                   onPress={() => sendRequest(user)}
+                  accessibilityLabel={`Send friend request to ${user.display_name}`}
+                  accessibilityRole="button"
                 >
                   <Text style={styles.addButtonText}>Add</Text>
                 </TouchableOpacity>
@@ -102,12 +110,16 @@ export default function FriendsScreen() {
               <TouchableOpacity
                 style={styles.acceptButton}
                 onPress={() => acceptRequest(request)}
+                accessibilityLabel={`Accept friend request from ${request.from_display_name}`}
+                accessibilityRole="button"
               >
                 <Text style={styles.acceptText}>Accept</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={styles.declineButton}
                 onPress={() => declineRequest(request)}
+                accessibilityLabel={`Decline friend request from ${request.from_display_name}`}
+                accessibilityRole="button"
               >
                 <Text style={styles.declineText}>Decline</Text>
               </TouchableOpacity>

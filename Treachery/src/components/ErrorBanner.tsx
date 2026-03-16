@@ -9,7 +9,7 @@ interface ErrorBannerProps {
 
 export function ErrorBanner({ message }: ErrorBannerProps) {
   return (
-    <View style={styles.container}>
+    <View style={styles.container} accessibilityRole="alert">
       <Ionicons name="warning" size={14} color={colors.error} />
       <Text style={styles.text}>{message}</Text>
     </View>

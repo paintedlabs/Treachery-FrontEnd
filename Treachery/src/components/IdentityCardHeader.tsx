@@ -20,6 +20,7 @@ export function IdentityCardHeader({ card, player, onPress }: IdentityCardHeader
       onPress={onPress}
       activeOpacity={0.7}
       accessibilityLabel={`Your identity card: ${card.name}, ${player.role ? ROLE_DISPLAY_NAMES[player.role] : 'Unknown'} role, ${player.life_total} life`}
+      accessibilityRole="button"
       accessibilityHint="Opens full identity card view"
     >
       {/* Top gold trim */}

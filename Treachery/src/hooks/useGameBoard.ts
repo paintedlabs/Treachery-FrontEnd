@@ -1,6 +1,8 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { httpsCallable } from 'firebase/functions';
 import { Game, Player, Role, IdentityCard } from '@/models/types';
 import * as firestoreService from '@/services/firestore';
+import { functions } from '@/config/firebase';
 import { getCard } from '@/services/cardDatabase';
 
 interface UseGameBoardReturn {
@@ -13,7 +15,8 @@ interface UseGameBoardReturn {
   currentPlayer: Player | null;
   currentIdentityCard: IdentityCard | undefined;
   alivePlayers: Player[];
-  adjustLife: (playerId: string, amount: number) => Promise<void>;
+  isPending: boolean;
+  adjustLife: (playerId: string, amount: number) => void;
   unveilCurrentPlayer: () => Promise<void>;
   eliminateAndLeave: () => Promise<void>;
   canSeeRole: (player: Player) => boolean;
@@ -22,10 +25,16 @@ interface UseGameBoardReturn {
 
 export function useGameBoard(gameId: string, currentUserId: string | null): UseGameBoardReturn {
   const [game, setGame] = useState<Game | null>(null);
-  const [players, setPlayers] = useState<Player[]>([]);
+  const [serverPlayers, setServerPlayers] = useState<Player[]>([]);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isGameUnavailable, setIsGameUnavailable] = useState(false);
+  const [isPending, setIsPending] = useState(false);
   const hasReceivedFirstSnapshot = useRef(false);
+
+  // Optimistic life deltas: playerId -> pending delta
+  const lifeDeltasRef = useRef<Record<string, number>>({});
+  const debounceTimersRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+  const [lifeDeltas, setLifeDeltas] = useState<Record<string, number>>({});
 
   useEffect(() => {
     const unsubGame = firestoreService.listenToGame(gameId, (g) => {
@@ -37,20 +46,47 @@ export function useGameBoard(gameId: string, currentUserId: string | null): UseG
     });
 
     const unsubPlayers = firestoreService.listenToPlayers(gameId, (p) => {
-      setPlayers(p);
+      setServerPlayers(p);
+      // Clear optimistic deltas for players whose server state has caught up
+      setLifeDeltas((prev) => {
+        const next = { ...prev };
+        let changed = false;
+        for (const id of Object.keys(next)) {
+          if (next[id] === 0) {
+            delete next[id];
+            changed = true;
+          }
+        }
+        return changed ? next : prev;
+      });
     });
 
     return () => {
       unsubGame();
       unsubPlayers();
+      // Clean up debounce timers
+      for (const timer of Object.values(debounceTimersRef.current)) {
+        clearTimeout(timer);
+      }
     };
   }, [gameId]);
 
+  // Merge server players with optimistic deltas
+  const players = useMemo(() => {
+    if (Object.keys(lifeDeltas).length === 0) return serverPlayers;
+    return serverPlayers.map((p) => {
+      const delta = lifeDeltas[p.id];
+      if (delta === undefined || delta === 0) return p;
+      return { ...p, life_total: Math.max(0, p.life_total + delta) };
+    });
+  }, [serverPlayers, lifeDeltas]);
+
   const currentPlayer = players.find((p) => p.user_id === currentUserId) ?? null;
 
-  const currentIdentityCard = currentPlayer?.identity_card_id
-    ? getCard(currentPlayer.identity_card_id)
-    : undefined;
+  const currentIdentityCard = useMemo(
+    () => currentPlayer?.identity_card_id ? getCard(currentPlayer.identity_card_id) : undefined,
+    [currentPlayer?.identity_card_id]
+  );
 
   const isGameFinished = game?.state === 'finished';
 
@@ -58,125 +94,86 @@ export function useGameBoard(gameId: string, currentUserId: string | null): UseG
 
   const alivePlayers = players.filter((p) => !p.is_eliminated);
 
-  const checkWinConditions = useCallback(
-    async (currentPlayers: Player[], currentGame: Game | null) => {
-      const alive = currentPlayers.filter((p) => !p.is_eliminated);
+  // All game actions now go through Cloud Functions.
+  // Win condition checking happens server-side automatically.
 
-      // Traitor wins: last player standing and is a traitor
-      if (alive.length === 1 && alive[0].role === 'traitor') {
-        await endGame('traitor', currentGame);
-        return;
-      }
+  const flushLifeDelta = useCallback(
+    (playerId: string) => {
+      const delta = lifeDeltasRef.current[playerId];
+      if (!delta) return;
 
-      const leaderAlive = alive.some((p) => p.role === 'leader');
-      const assassinAlive = alive.some((p) => p.role === 'assassin');
-      const traitorAlive = alive.some((p) => p.role === 'traitor');
+      // Clear the delta before sending so new taps start fresh
+      lifeDeltasRef.current[playerId] = 0;
+      setLifeDeltas((prev) => ({ ...prev, [playerId]: 0 }));
 
-      // Assassin wins: Leader eliminated AND at least 1 assassin survives
-      if (!leaderAlive && assassinAlive) {
-        await endGame('assassin', currentGame);
-        return;
-      }
-
-      // Leader/Guardian wins: Leader alive + all assassins AND traitors eliminated
-      if (leaderAlive && !assassinAlive && !traitorAlive) {
-        await endGame('leader', currentGame);
-        return;
-      }
-
-      // Edge: Leader dead + no assassins + no traitors
-      if (!leaderAlive && !assassinAlive && !traitorAlive) {
-        await endGame('assassin', currentGame);
-        return;
-      }
+      const adjustLifeFn = httpsCallable(functions, 'adjustLife');
+      adjustLifeFn({ gameId, playerId, amount: delta }).catch((error: any) => {
+        // Revert: re-apply the delta that failed
+        lifeDeltasRef.current[playerId] = (lifeDeltasRef.current[playerId] || 0) + delta;
+        setLifeDeltas((prev) => ({
+          ...prev,
+          [playerId]: (prev[playerId] || 0) + delta,
+        }));
+        setErrorMessage(error.message || 'Failed to adjust life.');
+      });
     },
-    []
+    [gameId]
   );
 
-  const endGame = async (winningRole: Role, currentGame: Game | null) => {
-    if (!currentGame) return;
-    const updatedGame: Game = {
-      ...currentGame,
-      state: 'finished',
-      winning_team: winningRole,
-    };
-    try {
-      await firestoreService.updateGame(updatedGame);
-    } catch (error: any) {
-      setErrorMessage(error.message || 'Failed to end game.');
-    }
-  };
-
   const adjustLife = useCallback(
-    async (playerId: string, amount: number) => {
-      const player = players.find((p) => p.id === playerId);
+    (playerId: string, amount: number) => {
+      const player = serverPlayers.find((p) => p.id === playerId);
       if (!player || player.is_eliminated) return;
       setErrorMessage(null);
 
-      let newLife = player.life_total + amount;
-      let eliminated = false;
+      // Accumulate optimistic delta
+      lifeDeltasRef.current[playerId] = (lifeDeltasRef.current[playerId] || 0) + amount;
+      setLifeDeltas((prev) => ({
+        ...prev,
+        [playerId]: (prev[playerId] || 0) + amount,
+      }));
 
-      if (newLife <= 0) {
-        newLife = 0;
-        eliminated = true;
+      // Debounce: reset timer and flush after 500ms of inactivity
+      if (debounceTimersRef.current[playerId]) {
+        clearTimeout(debounceTimersRef.current[playerId]);
       }
-
-      const updatedPlayer: Player = {
-        ...player,
-        life_total: newLife,
-        is_eliminated: eliminated,
-      };
-
-      try {
-        await firestoreService.updatePlayer(updatedPlayer, gameId);
-
-        if (eliminated) {
-          // Use updated player list for win condition check
-          const updatedPlayers = players.map((p) =>
-            p.id === playerId ? updatedPlayer : p
-          );
-          await checkWinConditions(updatedPlayers, game);
-        }
-      } catch (error: any) {
-        setErrorMessage(error.message || 'Failed to adjust life.');
-      }
+      debounceTimersRef.current[playerId] = setTimeout(() => {
+        flushLifeDelta(playerId);
+        delete debounceTimersRef.current[playerId];
+      }, 500);
     },
-    [players, gameId, game, checkWinConditions]
+    [serverPlayers, flushLifeDelta]
   );
 
   const unveilCurrentPlayer = useCallback(async () => {
-    if (!currentPlayer || currentPlayer.is_unveiled) return;
+    if (!currentPlayer || currentPlayer.is_unveiled || isPending) return;
     setErrorMessage(null);
-
-    const updatedPlayer: Player = { ...currentPlayer, is_unveiled: true };
+    setIsPending(true);
 
     try {
-      await firestoreService.updatePlayer(updatedPlayer, gameId);
+      const unveilFn = httpsCallable(functions, 'unveilPlayer');
+      await unveilFn({ gameId });
     } catch (error: any) {
       setErrorMessage(error.message || 'Failed to unveil.');
+    } finally {
+      setIsPending(false);
     }
-  }, [currentPlayer, gameId]);
+  }, [currentPlayer, gameId, isPending]);
 
   const eliminateAndLeave = useCallback(async () => {
-    if (!currentPlayer) return;
+    if (!currentPlayer || isPending) return;
     setErrorMessage(null);
-
-    const updatedPlayer: Player = {
-      ...currentPlayer,
-      is_eliminated: true,
-      life_total: 0,
-    };
+    setIsPending(true);
 
     try {
-      await firestoreService.updatePlayer(updatedPlayer, gameId);
-      const updatedPlayers = players.map((p) =>
-        p.id === currentPlayer.id ? updatedPlayer : p
-      );
-      await checkWinConditions(updatedPlayers, game);
+      const eliminateFn = httpsCallable(functions, 'eliminatePlayer');
+      await eliminateFn({ gameId });
     } catch (error: any) {
       setErrorMessage(error.message || 'Failed to forfeit.');
+    } finally {
+      setIsPending(false);
     }
-  }, [currentPlayer, players, gameId, game, checkWinConditions]);
+  }, [currentPlayer, gameId, isPending]);
 
   const canSeeRole = useCallback(
     (player: Player): boolean => {
@@ -203,6 +200,7 @@ export function useGameBoard(gameId: string, currentUserId: string | null): UseG
     currentPlayer,
     currentIdentityCard,
     alivePlayers,
+    isPending,
     adjustLife,
     unveilCurrentPlayer,
     eliminateAndLeave,

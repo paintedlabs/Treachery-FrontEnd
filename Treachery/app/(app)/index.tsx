@@ -1,15 +1,79 @@
-import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
-import { useRouter } from 'expo-router';
+import React, { useState, useEffect, useCallback } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, Platform } from 'react-native';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '@/hooks/useAuth';
+import { Game } from '@/models/types';
+import * as firestoreService from '@/services/firestore';
 import { colors, spacing, fontSize, fonts } from '@/constants/theme';
 
 export default function HomeScreen() {
   const router = useRouter();
-  const { authState } = useAuth();
+  const { authState, currentUserId } = useAuth();
+  const [activeGame, setActiveGame] = useState<Game | null>(null);
+  const [checkingActiveGame, setCheckingActiveGame] = useState(true);
+
+  const checkForActiveGame = useCallback(async () => {
+    if (!currentUserId) return;
+    try {
+      const game = await firestoreService.getActiveGame(currentUserId);
+      setActiveGame(game);
+    } catch (error) {
+      console.warn('Failed to check active game:', error);
+    } finally {
+      setCheckingActiveGame(false);
+    }
+  }, [currentUserId]);
+
+  // Run on mount and whenever auth changes
+  useEffect(() => {
+    if (authState === 'authenticated') {
+      checkForActiveGame();
+    }
+  }, [authState, checkForActiveGame]);
+
+  // Re-check when screen regains focus (native back navigation)
+  useFocusEffect(
+    useCallback(() => {
+      if (authState === 'authenticated') {
+        checkForActiveGame();
+      }
+    }, [authState, checkForActiveGame])
+  );
+
+  // On web, also listen for popstate (browser back button) and visibility changes
+  useEffect(() => {
+    if (Platform.OS !== 'web') return;
+
+    const handlePopState = () => {
+      if (authState === 'authenticated') {
+        checkForActiveGame();
+      }
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, [authState, checkForActiveGame]);
 
   if (authState !== 'authenticated') return null;
+
+  const handleRejoin = () => {
+    if (!activeGame) return;
+    if (activeGame.state === 'in_progress') {
+      router.push({
+        pathname: '/(app)/game/[gameId]',
+        params: { gameId: activeGame.id },
+      });
+    } else {
+      router.push({
+        pathname: '/(app)/lobby/[gameId]',
+        params: {
+          gameId: activeGame.id,
+          isHost: activeGame.host_id === currentUserId ? 'true' : 'false',
+        },
+      });
+    }
+  };
 
   return (
     <View style={styles.container}>
@@ -28,9 +92,32 @@ export default function HomeScreen() {
         </View>
       </View>
 
+      {/* Rejoin active game banner */}
+      {activeGame && (
+        <TouchableOpacity
+          style={styles.rejoinBanner}
+          onPress={handleRejoin}
+          accessibilityLabel={activeGame?.state === 'in_progress' ? 'Rejoin game in progress' : 'Rejoin waiting game'}
+          accessibilityRole="button"
+        >
+          <View style={styles.rejoinIcon}>
+            <Ionicons name="game-controller" size={20} color={colors.primaryBright} />
+          </View>
+          <View style={styles.rejoinInfo}>
+            <Text style={styles.rejoinTitle}>
+              {activeGame.state === 'in_progress' ? 'Game in Progress' : 'Game Waiting'}
+            </Text>
+            <Text style={styles.rejoinSubtitle}>Tap to rejoin</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={20} color={colors.primary} />
+        </TouchableOpacity>
+      )}
+
       <TouchableOpacity
         style={styles.primaryButton}
         onPress={() => router.push('/(app)/create-game')}
+        accessibilityLabel="Create game"
+        accessibilityRole="button"
       >
         <Text style={styles.primaryButtonText}>Create Game</Text>
       </TouchableOpacity>
@@ -38,6 +125,8 @@ export default function HomeScreen() {
       <TouchableOpacity
         style={styles.secondaryButton}
         onPress={() => router.push('/(app)/join-game')}
+        accessibilityLabel="Join game"
+        accessibilityRole="button"
       >
         <Text style={styles.secondaryButtonText}>Join Game</Text>
       </TouchableOpacity>
@@ -49,6 +138,8 @@ export default function HomeScreen() {
         <TouchableOpacity
           style={styles.navItem}
           onPress={() => router.push('/(app)/history')}
+          accessibilityLabel="History"
+          accessibilityRole="button"
         >
           <Ionicons name="time" size={24} color={colors.textSecondary} />
           <Text style={styles.navLabel}>History</Text>
@@ -57,6 +148,8 @@ export default function HomeScreen() {
         <TouchableOpacity
           style={styles.navItem}
           onPress={() => router.push('/(app)/friends')}
+          accessibilityLabel="Friends"
+          accessibilityRole="button"
         >
           <Ionicons name="people" size={24} color={colors.textSecondary} />
           <Text style={styles.navLabel}>Friends</Text>
@@ -65,6 +158,8 @@ export default function HomeScreen() {
         <TouchableOpacity
           style={styles.navItem}
           onPress={() => router.push('/(app)/profile')}
+          accessibilityLabel="Profile"
+          accessibilityRole="button"
         >
           <Ionicons name="person-circle" size={24} color={colors.textSecondary} />
           <Text style={styles.navLabel}>Profile</Text>
@@ -118,6 +213,38 @@ const styles = StyleSheet.create({
   ornateDiamond: {
     color: colors.primary,
     fontSize: 10,
+  },
+  rejoinBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.borderAccent,
+    borderRadius: 12,
+    padding: spacing.md,
+    gap: 12,
+    width: '100%',
+    maxWidth: 280,
+  },
+  rejoinIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(201, 168, 76, 0.15)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  rejoinInfo: {
+    flex: 1,
+  },
+  rejoinTitle: {
+    color: colors.primaryBright,
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  rejoinSubtitle: {
+    color: colors.textSecondary,
+    fontSize: 12,
   },
   primaryButton: {
     backgroundColor: colors.primary,

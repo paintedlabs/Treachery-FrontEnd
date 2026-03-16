@@ -6,38 +6,40 @@ import {
   TouchableOpacity,
   StyleSheet,
   ActivityIndicator,
-  KeyboardAvoidingView,
-  Platform,
+  Linking,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/hooks/useAuth';
 import { ErrorBanner } from '@/components/ErrorBanner';
-import { colors, spacing, fontSize, fonts } from '@/constants/theme';
+import { colors, spacing, fonts } from '@/constants/theme';
 
 export default function LoginScreen() {
   const router = useRouter();
-  const { signIn, resetPassword, errorMessage, clearError } = useAuth();
+  const { signIn, signInAsGuest, errorMessage, clearError } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [isSigningIn, setIsSigningIn] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isGuestLoading, setIsGuestLoading] = useState(false);
 
   const handleSignIn = async () => {
-    if (!email || !password) return;
-    setIsSigningIn(true);
-    await signIn(email, password);
-    setIsSigningIn(false);
+    if (!email.trim() || !password.trim()) return;
+    clearError();
+    setIsLoading(true);
+    await signIn(email.trim(), password.trim());
+    setIsLoading(false);
   };
 
-  const handleResetPassword = async () => {
-    if (!email) return;
-    await resetPassword(email);
+  const handlePlayAsGuest = async () => {
+    clearError();
+    setIsGuestLoading(true);
+    await signInAsGuest();
+    setIsGuestLoading(false);
   };
+
+  const busy = isLoading || isGuestLoading;
 
   return (
-    <KeyboardAvoidingView
-      style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-    >
+    <View style={styles.container}>
       <View style={styles.spacer} />
 
       <Text style={styles.title}>Treachery</Text>
@@ -50,83 +52,104 @@ export default function LoginScreen() {
         <View style={styles.ornateLine} />
       </View>
 
-      <View style={styles.form}>
-        <TextInput
-          style={styles.input}
-          placeholder="Email"
-          placeholderTextColor={colors.textTertiary}
-          value={email}
-          onChangeText={(text) => {
-            setEmail(text);
-            clearError();
-          }}
-          keyboardType="email-address"
-          autoCapitalize="none"
-          autoCorrect={false}
-          textContentType="emailAddress"
-        />
+      {errorMessage && <ErrorBanner message={errorMessage} />}
 
-        <TextInput
-          style={styles.input}
-          placeholder="Password"
-          placeholderTextColor={colors.textTertiary}
-          value={password}
-          onChangeText={(text) => {
-            setPassword(text);
-            clearError();
-          }}
-          secureTextEntry
-          autoCapitalize="none"
-          autoCorrect={false}
-          textContentType="password"
-          onSubmitEditing={handleSignIn}
-        />
+      <TextInput
+        style={styles.input}
+        placeholder="Email"
+        placeholderTextColor={colors.textTertiary}
+        value={email}
+        onChangeText={setEmail}
+        autoCapitalize="none"
+        keyboardType="email-address"
+        textContentType="emailAddress"
+        editable={!busy}
+        accessibilityLabel="Email"
+      />
 
-        {errorMessage && <ErrorBanner message={errorMessage} />}
+      <TextInput
+        style={styles.input}
+        placeholder="Password"
+        placeholderTextColor={colors.textTertiary}
+        value={password}
+        onChangeText={setPassword}
+        secureTextEntry
+        textContentType="password"
+        editable={!busy}
+        accessibilityLabel="Password"
+      />
 
-        <TouchableOpacity
-          style={[styles.primaryButton, (!email || !password || isSigningIn) && styles.buttonDisabled]}
-          onPress={handleSignIn}
-          disabled={!email || !password || isSigningIn}
-        >
-          {isSigningIn ? (
-            <View style={styles.buttonRow}>
-              <ActivityIndicator size="small" color="#0d0b1a" />
-              <Text style={styles.buttonText}>Signing In...</Text>
-            </View>
-          ) : (
-            <Text style={styles.buttonText}>Sign In</Text>
-          )}
+      <TouchableOpacity
+        style={[styles.primaryButton, busy && styles.buttonDisabled]}
+        onPress={handleSignIn}
+        disabled={busy}
+        accessibilityLabel="Sign in"
+        accessibilityRole="button"
+      >
+        {isLoading ? (
+          <View style={styles.buttonRow}>
+            <ActivityIndicator size="small" color="#0d0b1a" />
+            <Text style={styles.buttonText}>Signing In...</Text>
+          </View>
+        ) : (
+          <Text style={styles.buttonText}>Sign In</Text>
+        )}
+      </TouchableOpacity>
+
+      <View style={styles.linkRow}>
+        <TouchableOpacity onPress={() => router.push('/(auth)/signup')} disabled={busy}>
+          <Text style={styles.linkText}>Create Account</Text>
         </TouchableOpacity>
-
-        {/* Divider */}
-        <View style={styles.dividerRow}>
-          <View style={styles.divider} />
-          <Text style={styles.dividerText}>or</Text>
-          <View style={styles.divider} />
-        </View>
-
-        <TouchableOpacity
-          style={styles.secondaryButton}
-          onPress={() => router.push('/(auth)/signup')}
-        >
-          <Text style={styles.secondaryButtonText}>Create Account</Text>
+        <TouchableOpacity onPress={() => router.push('/(auth)/forgot-password')} disabled={busy}>
+          <Text style={styles.linkText}>Forgot Password?</Text>
         </TouchableOpacity>
       </View>
+
+      <TouchableOpacity
+        style={[styles.phoneButton, busy && styles.buttonDisabled]}
+        onPress={() => router.push('/(auth)/phone-login')}
+        disabled={busy}
+        accessibilityLabel="Sign in with phone number"
+        accessibilityRole="button"
+      >
+        <Text style={styles.phoneButtonText}>Sign In with Phone</Text>
+      </TouchableOpacity>
+
+      {/* Divider */}
+      <View style={styles.separatorRow}>
+        <View style={styles.separatorLine} />
+        <Text style={styles.separatorText}>or</Text>
+        <View style={styles.separatorLine} />
+      </View>
+
+      <TouchableOpacity
+        style={[styles.guestButton, busy && styles.buttonDisabled]}
+        onPress={handlePlayAsGuest}
+        disabled={busy}
+        accessibilityLabel="Play as Guest"
+        accessibilityRole="button"
+      >
+        {isGuestLoading ? (
+          <View style={styles.buttonRow}>
+            <ActivityIndicator size="small" color={colors.primary} />
+            <Text style={styles.guestButtonText}>Joining...</Text>
+          </View>
+        ) : (
+          <Text style={styles.guestButtonText}>Play as Guest</Text>
+        )}
+      </TouchableOpacity>
 
       <View style={styles.spacer} />
 
-      <View style={styles.bottomRow}>
-        <TouchableOpacity onPress={() => router.push('/(auth)/signup')}>
-          <Text style={styles.linkText}>Create Account</Text>
-        </TouchableOpacity>
-        <TouchableOpacity onPress={handleResetPassword} disabled={!email}>
-          <Text style={[styles.linkTextSmall, !email && styles.linkDisabled]}>
-            Forgot Password?
-          </Text>
-        </TouchableOpacity>
-      </View>
-    </KeyboardAvoidingView>
+      <TouchableOpacity
+        style={styles.rulesLink}
+        onPress={() => Linking.openURL('https://mtgtreachery.net')}
+        accessibilityLabel="Learn the rules at MTGTreachery.net"
+        accessibilityRole="link"
+      >
+        <Text style={styles.rulesLinkText}>Learn the rules at MTGTreachery.net</Text>
+      </TouchableOpacity>
+    </View>
   );
 }
 
@@ -172,23 +195,22 @@ const styles = StyleSheet.create({
     color: colors.primary,
     fontSize: 10,
   },
-  form: {
-    gap: spacing.lg,
-  },
   input: {
     backgroundColor: colors.surface,
-    color: colors.text,
-    borderRadius: 8,
-    padding: 14,
-    fontSize: 16,
     borderWidth: 1,
     borderColor: colors.border,
+    borderRadius: 8,
+    padding: 14,
+    color: colors.text,
+    fontSize: 16,
+    marginBottom: 12,
   },
   primaryButton: {
     backgroundColor: colors.primary,
     borderRadius: 8,
     padding: 14,
     alignItems: 'center',
+    marginTop: 4,
   },
   buttonDisabled: {
     opacity: 0.5,
@@ -203,49 +225,63 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '700',
   },
-  secondaryButton: {
-    borderRadius: 8,
-    padding: 14,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: colors.primary,
-  },
-  secondaryButtonText: {
-    color: colors.primary,
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  dividerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    paddingVertical: 4,
-  },
-  divider: {
-    flex: 1,
-    height: StyleSheet.hairlineWidth,
-    backgroundColor: colors.divider,
-  },
-  dividerText: {
-    color: colors.textTertiary,
-    fontSize: 12,
-    fontFamily: fonts.serif,
-    fontStyle: 'italic',
-  },
-  bottomRow: {
+  linkRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingBottom: spacing.lg,
+    marginTop: 12,
   },
   linkText: {
     color: colors.primary,
     fontSize: 14,
   },
-  linkTextSmall: {
-    color: colors.primary,
-    fontSize: 12,
+  separatorRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginVertical: spacing.lg,
   },
-  linkDisabled: {
-    opacity: 0.4,
+  separatorLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: colors.border,
+  },
+  separatorText: {
+    color: colors.textTertiary,
+    fontSize: 13,
+  },
+  phoneButton: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 8,
+    padding: 14,
+    alignItems: 'center',
+    marginTop: spacing.md,
+  },
+  phoneButtonText: {
+    color: colors.text,
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  guestButton: {
+    borderWidth: 1,
+    borderColor: colors.primary,
+    borderRadius: 8,
+    padding: 14,
+    alignItems: 'center',
+  },
+  guestButtonText: {
+    color: colors.primary,
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  rulesLink: {
+    alignItems: 'center',
+    paddingBottom: spacing.md,
+  },
+  rulesLinkText: {
+    color: colors.textTertiary,
+    fontSize: 12,
+    fontFamily: fonts.serif,
+    fontStyle: 'italic',
   },
 });

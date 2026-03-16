@@ -12,6 +12,7 @@ interface PlayerRowProps {
   isUnveiledOrLeader: boolean;
   onAdjustLife: (amount: number) => void;
   onViewCard?: () => void;
+  isDisabled?: boolean;
 }
 
 export function PlayerRow({
@@ -21,6 +22,7 @@ export function PlayerRow({
   isUnveiledOrLeader,
   onAdjustLife,
   onViewCard,
+  isDisabled,
 }: PlayerRowProps) {
   const roleColor = player.role ? ROLE_COLORS[player.role] : colors.textSecondary;
 
@@ -57,6 +59,8 @@ export function PlayerRow({
             onPress={isUnveiledOrLeader && !isCurrentUser ? onViewCard : undefined}
             style={styles.roleRow}
             disabled={!isUnveiledOrLeader || isCurrentUser}
+            accessibilityLabel={`${player.role ? ROLE_DISPLAY_NAMES[player.role] : 'Unknown'} role${isUnveiledOrLeader && !isCurrentUser ? ', view card' : ''}`}
+            accessibilityRole="button"
           >
             <View style={[styles.roleDot, { backgroundColor: roleColor }]} />
             <Text style={[styles.roleText, { color: roleColor }]}>
@@ -75,14 +79,24 @@ export function PlayerRow({
       </View>
 
       {!player.is_eliminated ? (
-        <View style={styles.lifeControls}>
-          <TouchableOpacity onPress={() => onAdjustLife(-1)}>
+        <View style={[styles.lifeControls, isDisabled && { opacity: 0.5 }]}>
+          <TouchableOpacity
+            onPress={() => onAdjustLife(-1)}
+            disabled={isDisabled}
+            accessibilityLabel={`Decrease ${player.display_name} life`}
+            accessibilityRole="button"
+          >
             <Ionicons name="remove-circle" size={28} color={colors.error} />
           </TouchableOpacity>
           <View style={styles.lifeBox}>
             <Text style={styles.lifeText}>{player.life_total}</Text>
           </View>
-          <TouchableOpacity onPress={() => onAdjustLife(1)}>
+          <TouchableOpacity
+            onPress={() => onAdjustLife(1)}
+            disabled={isDisabled}
+            accessibilityLabel={`Increase ${player.display_name} life`}
+            accessibilityRole="button"
+          >
             <Ionicons name="add-circle" size={28} color={colors.success} />
           </TouchableOpacity>
         </View>

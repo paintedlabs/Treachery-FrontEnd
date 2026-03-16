@@ -35,7 +35,11 @@ export function IdentityCardDetail({ card, player, visible, onClose }: IdentityC
         {/* Header bar */}
         <View style={styles.header}>
           <Text style={styles.headerTitle}>Identity Card</Text>
-          <TouchableOpacity onPress={onClose}>
+          <TouchableOpacity
+            onPress={onClose}
+            accessibilityLabel="Close identity card"
+            accessibilityRole="button"
+          >
             <Text style={styles.doneButton}>Done</Text>
           </TouchableOpacity>
         </View>
