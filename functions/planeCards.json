@@ -1,0 +1,1650 @@
+[
+  {
+    "id": "15b979de-c8ee-4664-9ca7-6c4eb3346967",
+    "name": "Academy at Tolaria West",
+    "type_line": "Plane — Dominaria",
+    "oracle_text": "At the beginning of your end step, if you have no cards in hand, draw seven cards.\nWhenever chaos ensues, discard your hand.",
+    "image_uri": "https://cards.scryfall.io/normal/front/e/d/ed4f4210-9871-4cec-9b46-100c80f93cd4.jpg?1645050357",
+    "is_phenomenon": false
+  },
+  {
+    "id": "38f84e55-049c-441e-b4e2-1e207ab5dbe5",
+    "name": "Agyrem",
+    "type_line": "Plane — Ravnica",
+    "oracle_text": "Whenever a white creature dies, return it to the battlefield under its owner's control at the beginning of the next end step.\nWhenever a nonwhite creature dies, return it to its owner's hand at the beginning of the next end step.\nWhenever chaos ensues, creatures can't attack you until a player planeswalks.",
+    "image_uri": "https://cards.scryfall.io/normal/front/6/c/6caf8b21-1807-442c-a461-c89c7591df70.jpg?1547432309",
+    "is_phenomenon": false
+  },
+  {
+    "id": "25650a32-4014-4065-ad01-7357c3ad3995",
+    "name": "Akoum",
+    "type_line": "Plane — Zendikar",
+    "oracle_text": "Players may cast enchantment spells as though they had flash.\nWhenever chaos ensues, destroy target creature that isn't enchanted.",
+    "image_uri": "https://cards.scryfall.io/normal/front/a/1/a1c7f2eb-0654-46f9-ae3d-11efcac837b8.jpg?1547432330",
+    "is_phenomenon": false
+  },
+  {
+    "id": "5b200e41-126d-4017-8e01-f50582b31af0",
+    "name": "Amy's Home",
+    "type_line": "Plane — Earth",
+    "oracle_text": "When you planeswalk to Amy's Home and at the beginning of your upkeep, you may exile a nonland card from your hand with a number of time counters on it equal to its mana value. If it doesn't have suspend, it gains suspend.\nWhenever chaos ensues, time travel. (For each suspended card you own and each permanent you control with a time counter on it, you may add or remove a time counter.)",
+    "image_uri": "https://cards.scryfall.io/normal/front/a/c/ac0615cc-860a-4fed-9e9c-4377ba8ed22a.jpg?1696637704",
+    "is_phenomenon": false
+  },
+  {
+    "id": "d65ff607-1ff5-42bd-8db2-f082cc2f0b5e",
+    "name": "Antarctic Research Base",
+    "type_line": "Plane — Earth",
+    "oracle_text": "When you planeswalk to Antarctic Research Base and at the beginning of your upkeep, investigate.\nWhenever chaos ensues, put X +1/+1 counters on target creature you control, where X is the number of artifacts you control. It becomes a Plant in addition to its other types.",
+    "image_uri": "https://cards.scryfall.io/normal/front/3/c/3cc61f60-2f9d-4f67-8390-62873b4b8ddb.jpg?1696637706",
+    "is_phenomenon": false
+  },
+  {
+    "id": "7c9d6193-1d50-4035-8c85-98c384f461be",
+    "name": "Aplan Mortarium",
+    "type_line": "Plane — Alfava Metraxis",
+    "oracle_text": "Byzantium Radiation — At the beginning of your upkeep, put an exposure counter on Aplan Mortarium. Then you lose life equal to the number of exposure counters on it.\nWhenever chaos ensues, create two 2/2 black Alien Angel artifact creature tokens with first strike, vigilance, and \"Whenever an opponent casts a creature spell, this token isn't a creature until end of turn.\"",
+    "image_uri": "https://cards.scryfall.io/normal/front/8/5/855978a6-c81c-4e5e-a34f-41a54fef0c10.jpg?1696637707",
+    "is_phenomenon": false
+  },
+  {
+    "id": "d6ab4159-e04e-4991-8a9b-9da302c98e9d",
+    "name": "Aretopolis",
+    "type_line": "Plane — Kephalai",
+    "oracle_text": "When you planeswalk to Aretopolis and at the beginning of your upkeep, put a scroll counter on Aretopolis, then you gain life equal to the number of scroll counters on it.\nWhen Aretopolis has ten or more scroll counters on it, planeswalk.\nWhenever chaos ensues, put a scroll counter on Aretopolis, then draw cards equal to the number of scroll counters on it.",
+    "image_uri": "https://cards.scryfall.io/normal/front/d/6/d6dc655e-d8ef-443a-bb3e-46c7ca1555ba.jpg?1547432302",
+    "is_phenomenon": false
+  },
+  {
+    "id": "e72339e4-222e-44a2-89ad-bef9835fb1d7",
+    "name": "Artist Alley",
+    "type_line": "Plane — MagicCon",
+    "oracle_text": "Whenever you planeswalk here and at the beginning of your upkeep, exile the top card of your library. You may play that card this turn.\nWhenever Chaos ensues, exile the top six cards of your library. An opponent or player outside the game chooses a nonland card with their favorite art. Then you may cast that spell without paying its mana cost.",
+    "image_uri": "https://cards.scryfall.io/normal/front/4/1/4122eda0-f33e-41bd-84f2-15b3a797d108.jpg?1760626954",
+    "is_phenomenon": false
+  },
+  {
+    "id": "1d2bad25-dbe3-4b51-a78b-4a95dd5669fe",
+    "name": "Asmoranomardicadaistinaculdacar's Kitchen",
+    "type_line": "Plane — Hell",
+    "oracle_text": "Whenever you planeswalk here and whenever a creature enters under your control, create a Food token.\nWhenever you gain life, target opponent loses that much life.\nWhenever Chaos ensues, you may sacrifice any number of artifacts or creatures. Draw that many cards and lose that much life.",
+    "image_uri": "https://cards.scryfall.io/normal/front/8/4/847b7b50-9262-4c35-be7a-00e9d2fb581e.jpg?1760627248",
+    "is_phenomenon": false
+  },
+  {
+    "id": "805f9dc2-e172-481d-bae7-9a136a3d1e49",
+    "name": "Astral Arena",
+    "type_line": "Plane — Kolbahan",
+    "oracle_text": "No more than one creature can attack each combat.\nNo more than one creature can block each combat.\nWhenever chaos ensues, Astral Arena deals 2 damage to each creature.",
+    "image_uri": "https://cards.scryfall.io/normal/front/5/6/56c735c0-9346-431b-869f-3accfa193016.jpg?1547432337",
+    "is_phenomenon": false
+  },
+  {
+    "id": "706720f6-bb04-4a7b-8471-0f3d662d6eeb",
+    "name": "Bad Wolf Bay",
+    "type_line": "Plane — Earth",
+    "oracle_text": "At the beginning of combat on your turn, exile up to one target creature. Return it to the battlefield under its owner's control at the beginning of the next end step.\nWhen chaos ensues, cards can't enter from exile this turn. Then planeswalk.",
+    "image_uri": "https://cards.scryfall.io/normal/front/a/0/a068875e-9294-403d-a6db-15092b6c42d3.jpg?1696637715",
+    "is_phenomenon": false
+  },
+  {
+    "id": "82e67c57-6d7a-44cc-ba63-77ce887ab075",
+    "name": "Bant",
+    "type_line": "Plane — Alara",
+    "oracle_text": "All creatures have exalted. (Whenever a creature attacks alone, it gets +1/+1 until end of turn for each instance of exalted among permanents its controller controls.)\nWhenever chaos ensues, put a divinity counter on target green, white, or blue creature. That creature has indestructible for as long as it has a divinity counter on it.",
+    "image_uri": "https://cards.scryfall.io/normal/front/4/3/434a2d09-5776-4168-b863-f3b0a736d19b.jpg?1547432701",
+    "is_phenomenon": false
+  },
+  {
+    "id": "75206757-dae7-4a1e-a391-862699a100d7",
+    "name": "Besieged Viking Village",
+    "type_line": "Plane — Earth",
+    "oracle_text": "All creatures have \"Boast — {1}: Put a +1/+1 counter on this creature.\" (Activate only if that creature attacked this turn and only once each turn.)\nWhenever chaos ensues, put an indestructible counter on target creature you control that attacked this turn.",
+    "image_uri": "https://cards.scryfall.io/normal/front/8/b/8bb62bd5-79e5-4af0-aafd-c1bd53765c67.jpg?1696637715",
+    "is_phenomenon": false
+  },
+  {
+    "id": "9580cf0a-0c0d-4e78-a6cc-bb14c5cc5d23",
+    "name": "Bicycle Rack",
+    "type_line": "Plane — Amsterdam",
+    "oracle_text": "Cards in each player's hand have cycling {2}.\nChaos: Until end of turn, creatures you control have \"This creature gets +1/+1 for each card you've discarded this turn.\"",
+    "image_uri": "https://cards.scryfall.io/normal/front/6/0/6080747e-7d56-404d-a08c-e6a35af60698.jpg?1760626964",
+    "is_phenomenon": false
+  },
+  {
+    "id": "ddea0dcf-e8d1-44ea-9ce4-009fa8bbfb95",
+    "name": "Black Lotus Lounge",
+    "type_line": "Plane — MagicCon",
+    "oracle_text": "When you planeswalk here and at the beginning of your upkeep, create a Black Lotus artifact token.\nWhenever Chaos ensues, each player draws a card for each artifact token they control.",
+    "image_uri": "https://cards.scryfall.io/normal/front/0/e/0ee28cd1-b50d-4de5-8d07-0e22cd9b011b.jpg?1760626956",
+    "is_phenomenon": false
+  },
+  {
+    "id": "ce8139b9-31f3-464d-86ea-7efbdbfce478",
+    "name": "Bloodhill Bastion",
+    "type_line": "Plane — Equilor",
+    "oracle_text": "Whenever a creature enters, it gains double strike and haste until end of turn.\nWhenever chaos ensues, exile target nontoken creature you control, then return it to the battlefield under your control.",
+    "image_uri": "https://cards.scryfall.io/normal/front/9/9/9944763b-07b1-447d-b07c-b585ec00e883.jpg?1680815516",
+    "is_phenomenon": false
+  },
+  {
+    "id": "7076bc0c-9cc7-4cd7-aba5-f2f236aab0f7",
+    "name": "Bowie Base One",
+    "type_line": "Plane — Mars",
+    "oracle_text": "At the beginning of your end step, goad target creature controlled by the player to your left. (Until your next turn, that creature attacks each combat if able and attacks a player other than you if able.)\nWhenever chaos ensues, target creature gains islandwalk until end of turn. (It can't be blocked as long as defending player controls an Island.)",
+    "image_uri": "https://cards.scryfall.io/normal/front/2/2/22e3ec5a-4bd5-452f-873a-3801253754dd.jpg?1696637721",
+    "is_phenomenon": false
+  },
+  {
+    "id": "c265447b-a8ce-4d77-b620-865f7d4e0722",
+    "name": "Caught in a Parallel Universe",
+    "type_line": "Phenomenon",
+    "oracle_text": "When you encounter Caught in a Parallel Universe, each player chooses a creature controlled by the player to their left. Each player creates a token that's a copy of the creature they chose, except it has menace. (Then planeswalk away from this phenomenon.)",
+    "image_uri": "https://cards.scryfall.io/normal/front/d/8/d8ddc6d0-50cc-4914-a6f2-00fb93d4402a.jpg?1696637724",
+    "is_phenomenon": true
+  },
+  {
+    "id": "2979597d-c3cc-4585-a9b7-7fa15641b030",
+    "name": "Celestine Reef",
+    "type_line": "Plane — Luvion",
+    "oracle_text": "Creatures without flying or islandwalk can't attack.\nWhenever chaos ensues, until a player planeswalks, you can't lose the game and your opponents can't win the game.",
+    "image_uri": "https://cards.scryfall.io/normal/front/0/c/0cf339cb-04c0-40e8-a64c-b80229a32cec.jpg?1547432757",
+    "is_phenomenon": false
+  },
+  {
+    "id": "6dc67a65-31bf-4535-9e02-8f6d6ecefde5",
+    "name": "Chaotic Aether",
+    "type_line": "Phenomenon",
+    "oracle_text": "When you encounter Chaotic Aether, each blank roll of the planar die is a {CHAOS} roll until a player planeswalks away from a plane. (Then planeswalk away from this phenomenon.)",
+    "image_uri": "https://cards.scryfall.io/normal/front/e/6/e6632cd1-aa23-46d0-8e72-0850de4873e1.jpg?1680815517",
+    "is_phenomenon": true
+  },
+  {
+    "id": "fb061505-a3d6-45a4-a9ba-2adb1883c77d",
+    "name": "Circus of the Sun",
+    "type_line": "Plane — Las Vegas",
+    "oracle_text": "Whenever you planeswalk here or at the beginning of your upkeep, create two 1/1 red performer creature tokens with flying and haste.\nWhenever one or more creatures you control with flying deal combat damage to a player, you may return it to your hand. If you do, draw cards equal to its power.\nWhenever Chaos ensues, put a flying counter on up to one target creature. It becomes a Performer in addition to its other types.",
+    "image_uri": "https://cards.scryfall.io/normal/front/c/1/c1fd6112-f71c-4f3d-979a-9a1178132338.jpg?1760627251",
+    "is_phenomenon": false
+  },
+  {
+    "id": "36aac8aa-d6f0-4e53-a280-73b01e040f35",
+    "name": "City Hall",
+    "type_line": "Plane — Chicago",
+    "oracle_text": "When you planeswalk here, you become the Monarch.\nWhenever Chaos ensues, each player may create two tapped treasure tokens. Each player who does can't attack you during their next turn.",
+    "image_uri": "https://cards.scryfall.io/normal/front/7/2/72d646af-0572-49fb-bb40-2390f40ed709.jpg?1760627312",
+    "is_phenomenon": false
+  },
+  {
+    "id": "a2ef6b79-faeb-4183-a510-f10b14dff417",
+    "name": "City of the Daleks",
+    "type_line": "Plane — Skaro",
+    "oracle_text": "Whenever you attack, target opponent loses X life, where X is the number of artifacts you control.\nWhenever chaos ensues, for each opponent, you create a 3/3 black Dalek artifact creature token with menace that attacks that opponent this turn if able. Those tokens gain haste. Sacrifice them at the beginning of the next end step.",
+    "image_uri": "https://cards.scryfall.io/normal/front/4/f/4f82f5b7-b4b9-489a-bbd7-98faaa566515.jpg?1696637738",
+    "is_phenomenon": false
+  },
+  {
+    "id": "e60e8f90-8c9d-4e9d-823e-2c9c4ab21443",
+    "name": "Clamilton Estate",
+    "type_line": "Plane — Clamhattan",
+    "oracle_text": "If a wordy permanent entering the battlefield would cause an ability of that permanent or another wordy permanent to trigger, that ability triggers an additional time. (A permanent is wordy if it has four or more lines of rules text.)\nWhenever Chaos ensues, exile cards from the top of your library until you exile a wordy nonland card, Put that card into your hand. Put each card not cast this way on the bottom of your library in a random order.",
+    "image_uri": "https://cards.scryfall.io/normal/front/b/1/b1440f8e-49cc-4f62-b80c-33c89d709dc6.jpg?1760626966",
+    "is_phenomenon": false
+  },
+  {
+    "id": "b21a71d7-f236-43e2-b576-0b5c9280f0cc",
+    "name": "Cliffside Market",
+    "type_line": "Plane — Mercadia",
+    "oracle_text": "When you planeswalk to Cliffside Market and at the beginning of your upkeep, you may exchange life totals with target player.\nWhenever chaos ensues, exchange control of two target permanents that share a card type.",
+    "image_uri": "https://cards.scryfall.io/normal/front/f/f/ff65643b-e8bb-49d6-8887-13a146ee5174.jpg?1547432708",
+    "is_phenomenon": false
+  },
+  {
+    "id": "51a53042-6baa-442a-84ec-2f16fdc12087",
+    "name": "Coal Hill School",
+    "type_line": "Plane — Earth",
+    "oracle_text": "Whenever a player casts a historic spell, that player draws a card. (Artifacts, legendaries, and Sagas are historic.)\nWhenever chaos ensues, return target historic card from your graveyard to your hand.",
+    "image_uri": "https://cards.scryfall.io/normal/front/8/2/82e09673-c7f0-4377-abbd-b1ea4922d4b3.jpg?1696637738",
+    "is_phenomenon": false
+  },
+  {
+    "id": "2edd018b-6d82-4ff1-b9d0-5da9b628af3f",
+    "name": "Dalek Intensive Care",
+    "type_line": "Plane — The Dalek Asylum",
+    "oracle_text": "When you planeswalk to Dalek Intensive Care and at the beginning of your upkeep, exile a non-Dalek creature you control. If you do, create a 3/3 black Dalek artifact creature token with menace. It gains haste until end of turn.\nWhenever chaos ensues, target Dalek you control deals damage equal to its power to target creature you don't control.",
+    "image_uri": "https://cards.scryfall.io/normal/front/1/3/13dd9d2c-f1d3-4dbf-8101-e4fab9f42e40.jpg?1696637741",
+    "is_phenomenon": false
+  },
+  {
+    "id": "97f33045-8b89-47fb-ba28-fa06f42c4b5e",
+    "name": "Deceptive Divination",
+    "type_line": "Plane — Secret Lair",
+    "oracle_text": "Change the text of each sorcery spell and sorcery card not on the stack by replacing \"sorcery\" with \"instant.\"\nWhenever chaos ensues, choose two target players. Each of them searches their library for a card, then shuffles and puts that card on top.",
+    "image_uri": "https://cards.scryfall.io/normal/front/6/d/6d241115-60b8-4fab-9877-4e2d35d638b9.jpg?1751866195",
+    "is_phenomenon": false
+  },
+  {
+    "id": "cb467901-a68d-4922-8ceb-867b582c8fe7",
+    "name": "Edge of Malacol",
+    "type_line": "Plane — Belenon",
+    "oracle_text": "If a creature you control would untap during your untap step, put two +1/+1 counters on it instead.\nWhenever chaos ensues, untap each creature you control.",
+    "image_uri": "https://cards.scryfall.io/normal/front/c/a/ca4c429a-ca40-4656-aea5-86eb450e47b7.jpg?1547432589",
+    "is_phenomenon": false
+  },
+  {
+    "id": "23fe1c21-c396-4ebf-a8b0-22d697952b34",
+    "name": "Eloren Wilds",
+    "type_line": "Plane — Shandalar",
+    "oracle_text": "Whenever a player taps a permanent for mana, that player adds one mana of any type that permanent produced.\nWhenever chaos ensues, target player can't cast spells until a player planeswalks.",
+    "image_uri": "https://cards.scryfall.io/normal/front/b/e/bec61f7a-cf02-4150-aff9-9465fa14c779.jpg?1547432617",
+    "is_phenomenon": false
+  },
+  {
+    "id": "23a1cd82-75bc-4e3b-bbab-8a1ca9b9be88",
+    "name": "Elvish Impersonation Contest",
+    "type_line": "Plane — Las Vegas",
+    "oracle_text": "Whenever you planeswalk here and at the beginning of your upkeep, create an Elvish Impersonators token. (It's a {3}{G} Elf creature with \"As this creature enters, roll a six-sided die twice. Its base power becomes the first result and its base toughness becomes the second result.\")\nThank you very much—Whenever Chaos ensues, target Elvish Impersonators becomes a 6/6. Its controller creates a Treasure token.",
+    "image_uri": "https://cards.scryfall.io/normal/front/4/6/46e49a31-3023-4fe7-8928-38658d71462b.jpg?1760627257",
+    "is_phenomenon": false
+  },
+  {
+    "id": "93b3acc1-2d41-4f5f-9225-7a30ea2d8158",
+    "name": "Enigma Ridges",
+    "type_line": "Plane — Echoir",
+    "oracle_text": "When you planeswalk to Enigma Ridges, each player who controls fewer lands than the player who controls the most lands searches their library for a number of basic land cards less than or equal to the difference, reveals them, puts them into their hand, then shuffles.\nWhenever chaos ensues, draw a card, then you may put a land card from your hand onto the battlefield.",
+    "image_uri": "https://cards.scryfall.io/normal/front/a/4/a4400c14-2aed-4018-a3fb-7de2b0456c07.jpg?1680815445",
+    "is_phenomenon": false
+  },
+  {
+    "id": "4eebfaf3-18da-4661-b6a5-d874585e170a",
+    "name": "Esper",
+    "type_line": "Plane — Alara",
+    "oracle_text": "Artifact spells cost {1} less to cast.\nWhenever chaos ensues, creatures you control that are white, blue, and/or black become artifacts in addition to their other types until end of turn. Then each artifact creature you control gains vigilance, menace, and lifelink until end of turn.",
+    "image_uri": "https://cards.scryfall.io/normal/front/f/f/ffdf27d3-80b4-4aa1-b943-d247e502d32c.jpg?1680815445",
+    "is_phenomenon": false
+  },
+  {
+    "id": "41babf95-a5f8-42a8-92f5-df2032b1ba2a",
+    "name": "Event Horizon",
+    "type_line": "Plane — Blind Eternities",
+    "oracle_text": "Nonbasic lands are Wastes.\nWhenever you tap a permanent for {C}, add an additional {C}.\nWhenever chaos ensues, choose one —\n• Draw four cards.\n• Destroy target permanent.\n• You may return target creature card from your graveyard to the battlefield.",
+    "image_uri": "https://cards.scryfall.io/normal/front/3/e/3ec0f146-e732-4524-b8f2-4220367fb528.jpg?1760626968",
+    "is_phenomenon": false
+  },
+  {
+    "id": "ec2f6e72-8a2b-44f0-8241-7fe29c601d96",
+    "name": "Fblthp: Completely, Utterly, Totally Lost",
+    "type_line": "Plane — Secret Lair",
+    "oracle_text": "When you planeswalk to this plane and at the beginning of your upkeep, create a Map token. (It's an artifact with \"{1}, {T}, Sacrifice this token: Target creature you control explores. Activate only as a sorcery.\")\nWhenever chaos ensues, draw two cards, then discard two cards. Untap up to three lands.",
+    "image_uri": "https://cards.scryfall.io/normal/front/5/6/56826f4f-2bbe-464a-b023-faa83aa1c392.jpg?1751866314",
+    "is_phenomenon": false
+  },
+  {
+    "id": "b1eff630-b56c-48a5-ac21-836a60157b35",
+    "name": "Feeding Grounds",
+    "type_line": "Plane — Muraganda",
+    "oracle_text": "Red spells cost {1} less to cast.\nGreen spells cost {1} less to cast.\nWhenever chaos ensues, put X +1/+1 counters on target creature, where X is that creature's mana value.",
+    "image_uri": "https://cards.scryfall.io/normal/front/1/d/1dde33fa-f748-43c9-9ead-9461332e9e67.jpg?1547432400",
+    "is_phenomenon": false
+  },
+  {
+    "id": "81a0d96a-7ac8-4947-8779-2102c9b33d38",
+    "name": "Fields of Summer",
+    "type_line": "Plane — Moag",
+    "oracle_text": "Whenever a player casts a spell, that player may gain 2 life.\nWhenever chaos ensues, you may gain 10 life.",
+    "image_uri": "https://cards.scryfall.io/normal/front/b/5/b52a233b-cc51-4f3e-94d0-a4b75ecb248e.jpg?1547432568",
+    "is_phenomenon": false
+  },
+  {
+    "id": "9befbb7e-a44d-448a-802f-5a0cfa616d91",
+    "name": "Finally! Left-Handed Magic Cards",
+    "type_line": "Plane — Secret Lair",
+    "oracle_text": "Each creature's base power is equal to its printed toughness.\nEach creature's base toughness is equal to its printed power.\nWhenever chaos ensues, draw a card from the bottom of your library.",
+    "image_uri": "https://cards.scryfall.io/normal/front/4/c/4c2d1022-3aaa-4139-bd11-ddc18a7c9cef.jpg?1751866397",
+    "is_phenomenon": false
+  },
+  {
+    "id": "be9870be-cf1b-44ea-a129-8f3711901b16",
+    "name": "Fixed Point in Time",
+    "type_line": "Phenomenon",
+    "oracle_text": "When you encounter Fixed Point in Time, until your next turn, if a player would planeswalk as a result of rolling the planar die, chaos ensues instead. (Then planeswalk away from this phenomenon.)",
+    "image_uri": "https://cards.scryfall.io/normal/front/a/0/a05478f9-3a9a-4887-a8e7-63550eaa6030.jpg?1696637756",
+    "is_phenomenon": true
+  },
+  {
+    "id": "1799d361-85e7-4c04-aa04-6f83e6499573",
+    "name": "Furnace Layer",
+    "type_line": "Plane — New Phyrexia",
+    "oracle_text": "When you planeswalk to Furnace Layer and at the beginning of your upkeep, select target player at random. That player discards a card. If that player discards a land card this way, they lose 3 life.\nWhenever chaos ensues, you may destroy target nonland permanent.",
+    "image_uri": "https://cards.scryfall.io/normal/front/d/8/d89133d1-06e7-4b8f-8f42-e0551fd93a5b.jpg?1547432505",
+    "is_phenomenon": false
+  },
+  {
+    "id": "6d606b8c-5f9c-4a65-a321-403d85451c9c",
+    "name": "Game Knights Live",
+    "type_line": "Plane — MagicCon",
+    "oracle_text": "Whenever a player casts their commander or attacks with their commander, they may say \"Only one may stand.\" If they do, that commander becomes a Knight in addition to its other types until a player planeswalks away from Game Knights Live.\nKnights you control have double strike and trample.\nWhenever chaos ensues, commanders you control can't be blocked this turn and gain \"Whenever this creature deals combat damage to a player, draw a card\" until end of turn.",
+    "image_uri": "https://cards.scryfall.io/normal/front/7/7/77abe064-5185-434f-9364-8fb0854c0d31.jpg?1760627314",
+    "is_phenomenon": false
+  },
+  {
+    "id": "d45692d5-19e8-45ec-92bf-b79cb3919acd",
+    "name": "Gardens of Tranquil Repose",
+    "type_line": "Plane — Necros",
+    "oracle_text": "Suspended Animation — Whenever a creature dies, exile it. Its controller scries 1.\nWhenever chaos ensues, create X 3/3 black Dalek artifact creature tokens with menace, where X is one plus the number of cards exiled with Gardens of Tranquil Repose.",
+    "image_uri": "https://cards.scryfall.io/normal/front/e/b/eb753c00-303d-49f3-ad98-b7772cc4a274.jpg?1696637759",
+    "is_phenomenon": false
+  },
+  {
+    "id": "2387edac-765b-4502-bd3d-88be8ba7d0a4",
+    "name": "Gavony",
+    "type_line": "Plane — Innistrad",
+    "oracle_text": "All creatures have vigilance.\nWhenever chaos ensues, creatures you control gain indestructible until end of turn.",
+    "image_uri": "https://cards.scryfall.io/normal/front/c/b/cb03f60c-d317-4b4c-9747-380abf5fa7ef.jpg?1680815520",
+    "is_phenomenon": false
+  },
+  {
+    "id": "a7c6b72c-f9ec-4048-8e4c-99210e4e7b85",
+    "name": "Ghirapur",
+    "type_line": "Plane — Avishkar",
+    "oracle_text": "At the beginning of combat on your turn, until end of turn, each noncreature, non-Vehicle artifact you control becomes a 5/3 Vehicle in addition to its other types and gains trample, haste, and crew 2.\nWhenever chaos ensues, return target noncreature artifact card from your graveyard to your hand.",
+    "image_uri": "https://cards.scryfall.io/normal/front/0/c/0c8456bd-d290-43af-b2b9-06823bab65a2.jpg?1738881258",
+    "is_phenomenon": false
+  },
+  {
+    "id": "6515e8d6-26ff-4716-a62d-a5847d0933e7",
+    "name": "Ghirapur Grand Prix",
+    "type_line": "Plane — Avishkar",
+    "oracle_text": "When you planeswalk here, all players start their engines! (If you have no speed, it starts at 1. It increases once on each of your turns when an opponent loses life. Max speed is 4.)\nAt the beginning of your end step, put X +1/+1 counters on target creature you control, where X is your speed.\nWhen you planeswalk away from Ghirapur Grand Prix, each player with the highest speed among players creates three Treasure tokens.",
+    "image_uri": "https://cards.scryfall.io/normal/front/f/8/f8a197a4-1e89-4772-8851-73dd2ffbf329.jpg?1760627317",
+    "is_phenomenon": false
+  },
+  {
+    "id": "662e5245-73e4-49ba-aece-c73f1bea7b6a",
+    "name": "Glen Elendra",
+    "type_line": "Plane — Lorwyn",
+    "oracle_text": "At end of combat, you may exchange control of target creature you control that dealt combat damage to a player this combat and target creature that player controls.\nWhenever chaos ensues, gain control of target creature you own.",
+    "image_uri": "https://cards.scryfall.io/normal/front/f/d/fdaaef56-0c95-404a-8de5-e8f21e0282d3.jpg?1547432763",
+    "is_phenomenon": false
+  },
+  {
+    "id": "43a23de7-0738-4b03-b87d-5a7d1144825c",
+    "name": "Glimmervoid Basin",
+    "type_line": "Plane — Mirrodin",
+    "oracle_text": "Whenever a player casts an instant or sorcery spell with a single target, that player copies that spell for each other spell, permanent, card not on the battlefield, and/or player the spell could target. Each copy targets a different one of them.\nWhenever chaos ensues, choose target creature. Each player except that creature's controller creates a token that's a copy of that creature.",
+    "image_uri": "https://cards.scryfall.io/normal/front/a/0/a075316c-eb94-46a5-98f2-061b1674186f.jpg?1680815529",
+    "is_phenomenon": false
+  },
+  {
+    "id": "f12400e5-8288-48e1-b3b7-0cc4f8d9ca67",
+    "name": "Goldmeadow",
+    "type_line": "Plane — Lorwyn",
+    "oracle_text": "Whenever a land enters, that land's controller creates three 0/1 white Goat creature tokens.\nWhenever chaos ensues, create a 0/1 white Goat creature token.",
+    "image_uri": "https://cards.scryfall.io/normal/front/8/3/830c7c81-335e-4f0b-81b9-209732408093.jpg?1547432666",
+    "is_phenomenon": false
+  },
+  {
+    "id": "fb9651f5-1aec-4812-a044-3c1b60e6651f",
+    "name": "Grand Ossuary",
+    "type_line": "Plane — Ravnica",
+    "oracle_text": "Whenever a creature dies, its controller distributes a number of +1/+1 counters equal to its power among any number of target creatures they control.\nWhenever chaos ensues, each player exiles all creatures they control and creates X 1/1 green Saproling creature tokens, where X is the total power of the creatures they exiled this way. Then planeswalk.",
+    "image_uri": "https://cards.scryfall.io/normal/front/3/d/3dfccef2-4d55-423f-8375-4e349bbf615e.jpg?1547432407",
+    "is_phenomenon": false
+  },
+  {
+    "id": "1aaa60e4-47a8-4255-8a09-5f00922ccf6d",
+    "name": "Grixis",
+    "type_line": "Plane — Alara",
+    "oracle_text": "Blue, black, and/or red creature cards in your graveyard have unearth. The unearth cost is equal to the card's mana cost. (Pay the card's mana cost: Return it to the battlefield. The creature gains haste. Exile it at the beginning of the next end step or if it would leave the battlefield. Unearth only as a sorcery.)\nWhenever chaos ensues, put target creature card from a graveyard onto the battlefield under your control.",
+    "image_uri": "https://cards.scryfall.io/normal/front/e/c/ecbe3339-2cd1-45e2-bac1-8ea995238c30.jpg?1547432743",
+    "is_phenomenon": false
+  },
+  {
+    "id": "3e553881-bac7-4830-b739-3b8c6aa0ded6",
+    "name": "Grove of the Dreampods",
+    "type_line": "Plane — Fabacin",
+    "oracle_text": "When you planeswalk to Grove of the Dreampods and at the beginning of your upkeep, reveal cards from the top of your library until you reveal a creature card. Put that card onto the battlefield and the rest on the bottom of your library in a random order.\nWhenever chaos ensues, return target creature card from your graveyard to the battlefield.",
+    "image_uri": "https://cards.scryfall.io/normal/front/c/2/c2cd3e28-cc48-416d-83d2-74208d2f4aa9.jpg?1680815530",
+    "is_phenomenon": false
+  },
+  {
+    "id": "c62f3f46-530d-4002-be8c-d78008dce98a",
+    "name": "Happy Yargle Day!",
+    "type_line": "Plane — Secret Lair",
+    "oracle_text": "At the beginning of each player's end step, if that player doesn't control a creature named Yargle, Glutton of Urborg, that player puts a bargle counter on a creature they control. It becomes a copy of Yargle, Glutton of Urborg, except it isn't legendary.\nWhenever chaos ensues, choose Swords to Plowshares, Opt, Fatal Push, Anger of the Gods, or Explore at random. Copy the chosen card. You may cast the copy without paying its mana cost.",
+    "image_uri": "https://cards.scryfall.io/normal/front/d/0/d0ff1a68-0424-4a9d-b07e-8426a38f86a6.jpg?1751866547",
+    "is_phenomenon": false
+  },
+  {
+    "id": "1f7daaf2-3206-4f52-928a-f5116b782367",
+    "name": "Hedron Fields of Agadeem",
+    "type_line": "Plane — Zendikar",
+    "oracle_text": "Creatures with power 7 or greater can't attack or block.\nWhenever chaos ensues, create a 7/7 colorless Eldrazi creature token with annihilator 1. (Whenever it attacks, defending player sacrifices a permanent of their choice.)",
+    "image_uri": "https://cards.scryfall.io/normal/front/2/5/2588d0a3-0e63-4976-8fcc-cd6bc52b61aa.jpg?1680815532",
+    "is_phenomenon": false
+  },
+  {
+    "id": "4b0e9c83-867a-4dc1-ac15-3b00952f75c7",
+    "name": "High and Dry Black Market",
+    "type_line": "Phenomenon",
+    "oracle_text": "Whenever you planeswalk here, starting with you, each player chooses up to 5 ♦ worth of modes and may choose the same mode more than once. (Then Planeswalk away from this phenomenon.)\n♦ — Create a Treasure Token.\n♦ ♦ — Draw a card.\n♦ ♦ ♦ — Create a 3/2 colorless Shapeshifter creature token with Changeling.",
+    "image_uri": "https://cards.scryfall.io/normal/front/a/4/a422e17c-f0a3-48f4-ad55-1b78adc2ecf8.jpg?1760633318",
+    "is_phenomenon": true
+  },
+  {
+    "id": "88386fa3-4f4f-4af1-a159-2c87d9890596",
+    "name": "High Noon At Thunder Junction",
+    "type_line": "Plane — Thunder Junction",
+    "oracle_text": "Whenever a player draws their second card each turn, any of their opponents may say \"DRAW!\". The first opponent to do so clashes with that player. The player that wins the clash creates two 1/1 black Assassin creature tokens. (Each clashing player reveals the top card of their library, then puts that card on the top or bottom. A player wins if their card had a higher mana value.)\nWhenever Chaos ensues, draw a card.",
+    "image_uri": "https://cards.scryfall.io/normal/front/5/7/57e2826a-7d0f-4227-981f-161587a70830.jpg?1760626977",
+    "is_phenomenon": false
+  },
+  {
+    "id": "065346cd-cd81-478e-8a62-2c7ea421bdcd",
+    "name": "Horizon Boughs",
+    "type_line": "Plane — Pyrulea",
+    "oracle_text": "All permanents untap during each player's untap step.\nWhenever chaos ensues, you may search your library for up to three basic land cards, put them onto the battlefield tapped, then shuffle.",
+    "image_uri": "https://cards.scryfall.io/normal/front/6/1/61471ab4-749a-40e4-b06b-153edec80daa.jpg?1547432323",
+    "is_phenomenon": false
+  },
+  {
+    "id": "79d3e356-9eb9-49bb-b4ba-f4f71876869e",
+    "name": "Hotel of Fears",
+    "type_line": "Plane — Spacecraft",
+    "oracle_text": "At the beginning of your upkeep, exile the top card of your library. You lose life equal to its mana value. You may play that card this turn.\nPraise Him — Whenever chaos ensues, choose a color. Put X +1/+1 counters on target creature you control, where X is your devotion to that color. Then sacrifice another creature. (Your devotion to a color is the number of mana symbols of that color in the mana costs of permanents you control.)",
+    "image_uri": "https://cards.scryfall.io/normal/front/8/b/8b164271-6438-4135-b7a9-8573c3921052.jpg?1696637761",
+    "is_phenomenon": false
+  },
+  {
+    "id": "96e26369-ae5d-4a77-adaa-d34b25af076f",
+    "name": "Human—Time Lord Meta-Crisis",
+    "type_line": "Phenomenon",
+    "oracle_text": "When you encounter Human—Time Lord Meta-Crisis, each player chooses one or two creatures they control. Each player creates a token that's a copy of the first creature they chose, except it isn't legendary. Then each player who chose a second creature puts a number of +1/+1 counters on the token they created equal to the power of the second creature they chose. (Then planeswalk away from this phenomenon.)",
+    "image_uri": "https://cards.scryfall.io/normal/front/f/5/f5def75a-f511-42e8-a652-7de4abfbd968.jpg?1770968540",
+    "is_phenomenon": true
+  },
+  {
+    "id": "ae9aa9e8-a522-4a9a-9acf-0b1c6d48e8e8",
+    "name": "Imaginary Friends (Plane)",
+    "type_line": "Plane — Secret Lair",
+    "oracle_text": "Players may cast spells as though they were other cards legal in this game's format with the same type and mana cost. (Mana cost includes color.)\nWhenever chaos ensues, exile cards from the top of your library until you reveal a nonland card. You may cast that card without paying its mana cost, but only as another card following this plane's first ability. Put the rest on the bottom of your library in a random order.",
+    "image_uri": "https://cards.scryfall.io/normal/front/f/8/f82a89a6-f558-476c-a57d-5a1e5405320a.jpg?1751868478",
+    "is_phenomenon": false
+  },
+  {
+    "id": "ece3b5ed-3c07-4586-bf99-72bc1aa6ccef",
+    "name": "Immersturm",
+    "type_line": "Plane — Valla",
+    "oracle_text": "Whenever a creature enters, that creature's controller may have it deal damage equal to its power to any target of their choice.\nWhenever chaos ensues, exile target creature, then return it to the battlefield under its owner's control.",
+    "image_uri": "https://cards.scryfall.io/normal/front/d/4/d44a959c-7a04-4342-8827-882349f786fc.jpg?1547432603",
+    "is_phenomenon": false
+  },
+  {
+    "id": "7812174b-2dc1-43e8-b98f-639905e20ab7",
+    "name": "Interplanar Tunnel",
+    "type_line": "Phenomenon",
+    "oracle_text": "When you encounter Interplanar Tunnel, reveal cards from the top of your planar deck until you reveal five plane cards. Put a plane card from among them on top of your planar deck, then put the rest of the revealed cards on the bottom in a random order. (Then planeswalk away from this phenomenon.)",
+    "image_uri": "https://cards.scryfall.io/normal/front/5/6/56e4874c-9d3d-4a1c-a027-186a33ce0da7.jpg?1547432164",
+    "is_phenomenon": true
+  },
+  {
+    "id": "61c5f2cb-f39c-487c-9786-a8dad4663f4f",
+    "name": "Inys Haen",
+    "type_line": "Plane — Cridhe",
+    "oracle_text": "When you planeswalk to Inys Haen and at the beginning of your upkeep, mill three cards.\nWhen you planeswalk away from Inys Haen, each player returns all land cards from their graveyard to the battlefield tapped.\nWhenever chaos ensues, return target nonland card from your graveyard to your hand.",
+    "image_uri": "https://cards.scryfall.io/normal/front/6/a/6a9b4ba6-12cb-488c-b9d5-245e094f72c3.jpg?1680815459",
+    "is_phenomenon": false
+  },
+  {
+    "id": "f017380f-97db-4a36-b111-b257aa17ebaf",
+    "name": "Isle of Vesuva",
+    "type_line": "Plane — Dominaria",
+    "oracle_text": "Whenever a nontoken creature enters, its controller creates a token that's a copy of that creature.\nWhenever chaos ensues, destroy target creature and all other creatures with the same name as that creature.",
+    "image_uri": "https://cards.scryfall.io/normal/front/5/f/5fa27faa-f72c-4925-8ad5-c984113245bf.jpg?1680815534",
+    "is_phenomenon": false
+  },
+  {
+    "id": "e5f8b2bb-e9bb-4a0a-aa88-7fa0299f52a9",
+    "name": "Izzet Steam Maze",
+    "type_line": "Plane — Ravnica",
+    "oracle_text": "Whenever a player casts an instant or sorcery spell, that player copies it. The player may choose new targets for the copy.\nWhenever chaos ensues, instant and sorcery spells you cast this turn cost {3} less to cast.",
+    "image_uri": "https://cards.scryfall.io/normal/front/d/0/d01d1b4f-5ac5-40b0-b4ad-34ac70aeb488.jpg?1547432427",
+    "is_phenomenon": false
+  },
+  {
+    "id": "eea700a1-a5f5-4b9e-aa03-8e092deb7396",
+    "name": "Jalira's Show",
+    "type_line": "Plane — Las Vegas",
+    "oracle_text": "Whenever you attack, create a 1/1 red Performer creature token with flying.\nWhenever you planeswalk here or chaos ensues, destroy up to one target creature. When you do, its controller reveals cards from the top of their library until they reveal a creature card. The player puts that card onto the battlefield, then puts the rest on the bottom of their library in a random order.",
+    "image_uri": "https://cards.scryfall.io/normal/front/b/b/bb4c608e-07d2-4fd8-b291-5c102afca5f6.jpg?1760627259",
+    "is_phenomenon": false
+  },
+  {
+    "id": "9aa94de8-b114-4479-a771-c7bc0297be58",
+    "name": "Jund",
+    "type_line": "Plane — Alara",
+    "oracle_text": "Whenever a player casts a creature spell that's black, red, or green, it gains devour 5. (As that creature enters, you may sacrifice any number of creatures. It enters with five times that many +1/+1 counters on it.)\nWhenever chaos ensues, create two 1/1 red Goblin creature tokens.",
+    "image_uri": "https://cards.scryfall.io/normal/front/5/8/585fde63-4cb5-4235-8c95-2a7a511e7c3f.jpg?1680815543",
+    "is_phenomenon": false
+  },
+  {
+    "id": "71bff56b-733c-4d74-9e0c-85371a8b3787",
+    "name": "Kerblam! Warehouse",
+    "type_line": "Plane — Kandoka",
+    "oracle_text": "Whenever one or more creatures you control deal combat damage to a player, create a Treasure token.\nWhenever chaos ensues, until your next turn, noncreature artifacts you control gain \"{T}, Sacrifice this artifact: Flip a coin. If you win the flip, this artifact deals 3 damage to any target.\"",
+    "image_uri": "https://cards.scryfall.io/normal/front/4/c/4c46b6c1-0c84-4bd3-b317-9b8191ad937e.jpg?1696637769",
+    "is_phenomenon": false
+  },
+  {
+    "id": "b54d9a4a-1d55-4ceb-96fd-2b1d5e46de14",
+    "name": "Kessig",
+    "type_line": "Plane — Innistrad",
+    "oracle_text": "Prevent all combat damage that would be dealt by non-Werewolf creatures.\nWhenever chaos ensues, each creature you control gets +2/+2, gains trample, and becomes a Werewolf in addition to its other types until end of turn.",
+    "image_uri": "https://cards.scryfall.io/normal/front/5/2/5271d8fd-3657-45a3-8147-00cc1d19425f.jpg?1547432218",
+    "is_phenomenon": false
+  },
+  {
+    "id": "f3b27908-ca10-4793-ab8e-6639c73cfadd",
+    "name": "Ketria",
+    "type_line": "Plane — Ikoria",
+    "oracle_text": "When you planeswalk to Ketria and at the beginning of your upkeep, put your choice of a vigilance, menace, or trample counter on target creature you control.\nWhenever chaos ensues, exile cards from the top of your library until you exile a nonland permanent card. Put that card onto the battlefield or into your hand.",
+    "image_uri": "https://cards.scryfall.io/normal/front/8/d/8d63dc8a-101c-4b12-bf56-06a8a3cea64e.jpg?1680815461",
+    "is_phenomenon": false
+  },
+  {
+    "id": "256770fe-c17d-45dd-bf05-36eeee240324",
+    "name": "Kharasha Foothills",
+    "type_line": "Plane — Mongseng",
+    "oracle_text": "Whenever a creature you control attacks a player, for each other opponent, you may create a token that's a copy of that creature, tapped and attacking that opponent. Exile those tokens at the beginning of the next end step.\nWhenever chaos ensues, you may sacrifice any number of creatures. If you do, Kharasha Foothills deals that much damage to target creature.",
+    "image_uri": "https://cards.scryfall.io/normal/front/f/9/f9724517-9e6b-4cb3-a3f7-ea8706f49fe9.jpg?1680815545",
+    "is_phenomenon": false
+  },
+  {
+    "id": "fc650404-991c-4639-b311-c35df81a254a",
+    "name": "Kilnspire District",
+    "type_line": "Plane — Ravnica",
+    "oracle_text": "When you planeswalk to Kilnspire District and at the beginning of your first main phase, put a charge counter on Kilnspire District, then add {R} for each charge counter on it.\nWhenever chaos ensues, you may pay {X}. If you do, Kilnspire District deals X damage to any target.",
+    "image_uri": "https://cards.scryfall.io/normal/front/9/3/93f386a5-08ce-4f76-944f-f38620a41027.jpg?1547432540",
+    "is_phenomenon": false
+  },
+  {
+    "id": "2732b605-7c88-4995-b46e-62dc09e68919",
+    "name": "Krosa",
+    "type_line": "Plane — Dominaria",
+    "oracle_text": "All creatures get +2/+2.\nWhenever chaos ensues, you may add {W}{U}{B}{R}{G}.",
+    "image_uri": "https://cards.scryfall.io/normal/front/8/6/86b5e553-c871-4750-a839-82b7581c5a2d.jpg?1680815546",
+    "is_phenomenon": false
+  },
+  {
+    "id": "ac4fe2a2-76ff-49d9-b506-26a17b4bf892",
+    "name": "Lair of the Ashen Idol",
+    "type_line": "Plane — Azgol",
+    "oracle_text": "At the beginning of your upkeep, sacrifice a creature. If you can't, planeswalk.\nWhenever chaos ensues, any number of target players each create a 2/2 black Zombie creature token.",
+    "image_uri": "https://cards.scryfall.io/normal/front/b/6/b6078774-f681-46dd-a68e-1cefa8261d16.jpg?1547432736",
+    "is_phenomenon": false
+  },
+  {
+    "id": "4dffc1cb-e9bd-4410-9b08-184eabd2c4da",
+    "name": "Lake Silencio",
+    "type_line": "Plane — Earth",
+    "oracle_text": "Still Point in Time — All spells have split second. (As long as a spell with split second is on the stack, players can't cast spells or activate abilities that aren't mana abilities.)\nWhenever chaos ensues, Lake Silencio deals 6 damage to target creature an opponent controls. If a creature dealt damage this way would die this turn, exile it instead.",
+    "image_uri": "https://cards.scryfall.io/normal/front/4/5/45091d2b-d872-4beb-af87-7675aaf0c2c8.jpg?1696637770",
+    "is_phenomenon": false
+  },
+  {
+    "id": "85592710-8637-4726-8b92-552b9be677c0",
+    "name": "Lethe Lake",
+    "type_line": "Plane — Arkhos",
+    "oracle_text": "At the beginning of your upkeep, mill ten cards.\nWhenever chaos ensues, target player mills ten cards.",
+    "image_uri": "https://cards.scryfall.io/normal/front/7/a/7a049235-2fda-48a7-b46e-d150a4893397.jpg?1547432694",
+    "is_phenomenon": false
+  },
+  {
+    "id": "5b35fbd0-65a0-4973-b2c9-841b11c0d426",
+    "name": "Li'l Giri Saves the Day",
+    "type_line": "Plane — Secret Lair",
+    "oracle_text": "Legendary Food tokens you control have hexproof and indestructible.\nWhen you planeswalk to this plane, create Li'l Giri, a legendary 1/1 colorless Food Warrior artifact creature token.\nWhenever chaos ensues, put X +1/+1 counters on target legendary artifact creature you control, where X is the number of times you've rolled the planar die this turn.",
+    "image_uri": "https://cards.scryfall.io/normal/front/a/1/a10f326e-51eb-44b8-9208-ee9db7e7c328.jpg?1751868551",
+    "is_phenomenon": false
+  },
+  {
+    "id": "0ff2bbed-e435-4108-b02a-564a75abba40",
+    "name": "Littjara",
+    "type_line": "Plane — Kaldheim",
+    "oracle_text": "When you planeswalk to Littjara and at the beginning of your upkeep, create a 2/2 blue Shapeshifter creature token with changeling. (It is every creature type.)\nWhenever chaos ensues, choose a creature type. Put a +1/+1 counter on each creature you control of that type.",
+    "image_uri": "https://cards.scryfall.io/normal/front/2/a/2a098e3b-00e7-48d5-bc0d-f153e7cc5dfd.jpg?1680881378",
+    "is_phenomenon": false
+  },
+  {
+    "id": "11b3fcb2-0b66-4d8b-8e66-a21a5da1c1f5",
+    "name": "Llanowar",
+    "type_line": "Plane — Dominaria",
+    "oracle_text": "All creatures have \"{T}: Add {G}{G}.\"\nWhenever chaos ensues, untap all creatures you control.",
+    "image_uri": "https://cards.scryfall.io/normal/front/0/0/00832a47-dec8-411e-9708-b3ebbd3a2dfc.jpg?1547432491",
+    "is_phenomenon": false
+  },
+  {
+    "id": "c8cebdce-16d0-440f-8f4d-8d21483b16a3",
+    "name": "Mad Labs",
+    "type_line": "Phenomenon",
+    "oracle_text": "When you encounter this phenomenon, starting with the next player in turn order, that player chooses a permanent type. The next player chooses a number between 1 and 10. The next player chooses a keyword counter. Then reveal and resolve the following ability with those words. (don't reveal the second ability before the words have been chosen!)\nEach player creates a token that's a copy of a [permanent] and puts [number] +1/+1 counters on it. If it's not a creature, it becomes a 0/0 creature in addition to its other types. It enters with [keyword] counter.",
+    "image_uri": "https://cards.scryfall.io/normal/front/2/2/22cfcc84-3709-4e1c-8100-b6d7d4e226b8.jpg?1764108160",
+    "is_phenomenon": true
+  },
+  {
+    "id": "22463f1b-4331-4200-bf11-49a5a2cdc9b3",
+    "name": "Math is for Blockers (Plane)",
+    "type_line": "Plane — Secret Lair",
+    "oracle_text": "Whenever a nontoken creature attacks, exile it. Return it to the battlefield under its owner's control tapped and attacking at the beginning of that player's next declare attackers step.\nWhenever chaos ensues, goad target creature. (Until your next turn, It attacks each combat if able and attacks a player other than you if able.)",
+    "image_uri": "https://cards.scryfall.io/normal/front/e/d/ed9d28e4-e317-458f-a5ab-40faedc53826.jpg?1751868655",
+    "is_phenomenon": false
+  },
+  {
+    "id": "c907333b-eae8-444f-9da3-b193289f19e2",
+    "name": "Megaflora Jungle",
+    "type_line": "Plane — Gargantikar",
+    "oracle_text": "Each creature with mana value 2 or less gets +2/+2.\nWhenever chaos ensues, create a 1/1 green Insect creature token with flying named Butterfly.",
+    "image_uri": "https://cards.scryfall.io/normal/front/5/3/53f91325-e95a-4b68-9491-4249c2e940b4.jpg?1681019079",
+    "is_phenomenon": false
+  },
+  {
+    "id": "6491f511-87e6-4504-84f5-fe5cf44768d7",
+    "name": "Minamo",
+    "type_line": "Plane — Kamigawa",
+    "oracle_text": "Whenever a player casts a spell, that player may draw a card.\nWhenever chaos ensues, each player may return a blue card from their graveyard to their hand.",
+    "image_uri": "https://cards.scryfall.io/normal/front/9/c/9c155a59-afee-4821-9715-10dafb9f9d9a.jpg?1547432196",
+    "is_phenomenon": false
+  },
+  {
+    "id": "b6329c2f-ea7f-4611-986c-f82bacf2a872",
+    "name": "Mirrored Depths",
+    "type_line": "Plane — Karsus",
+    "oracle_text": "Whenever a player casts a spell, that player flips a coin. If the player loses the flip, counter that spell.\nWhenever chaos ensues, target player reveals the top card of their library. If it's a nonland card, you may cast it without paying its mana cost.",
+    "image_uri": "https://cards.scryfall.io/normal/front/d/7/d7a2b02e-3ff2-4c71-9022-b08472f53664.jpg?1547432351",
+    "is_phenomenon": false
+  },
+  {
+    "id": "8c30e40a-6224-49a3-842c-662036d88e87",
+    "name": "Mojave Desert",
+    "type_line": "Plane — Las Vegas",
+    "oracle_text": "Whenever you planeswalk here, each player searches their library for up to two basic land or Desert cards and puts them onto the battlefield tapped, then shuffles their library. If a Desert entered the battlefield under a player's control this way, they create a 1/1 black Snake creature token with deathtouch.\nWhenever Chaos ensues, create X 1/1 black Snake creature token with deathtouch, where X is 1 plus the number of nonbasic land types among lands that player controls.",
+    "image_uri": "https://cards.scryfall.io/normal/front/8/9/894be3e2-455f-4f9b-a2a4-6dfeaf7402d2.jpg?1760627261",
+    "is_phenomenon": false
+  },
+  {
+    "id": "9cc34a5b-550d-4d3e-b3e5-4d4630649882",
+    "name": "Mondassian Colony Ship",
+    "type_line": "Plane — Spacecraft",
+    "oracle_text": "Whenever a creature attacks, it gets +1/+1 until end of turn for each other creature its controller controls that shares a creature type with it.\nWhenever chaos ensues, turn target creature face down. It becomes a 2/2 Cyberman artifact creature.",
+    "image_uri": "https://cards.scryfall.io/normal/front/b/a/ba6728e1-12f0-40a7-90f9-520f3572b190.jpg?1696637779",
+    "is_phenomenon": false
+  },
+  {
+    "id": "302e4ac2-522b-4a0a-850a-d856639ea2a4",
+    "name": "Morphic Tide",
+    "type_line": "Phenomenon",
+    "oracle_text": "When you encounter Morphic Tide, each player shuffles all permanents they own into their library, then reveals that many cards from the top of their library. Each player puts all artifact, creature, land, and planeswalker cards revealed this way onto the battlefield, then does the same for enchantment cards, then puts all cards revealed this way that weren't put onto the battlefield on the bottom of their library in any order. (Then planeswalk away from this phenomenon.)",
+    "image_uri": "https://cards.scryfall.io/normal/front/5/4/54327aa2-319d-4430-a266-03cadeed6146.jpg?1547432267",
+    "is_phenomenon": true
+  },
+  {
+    "id": "e0dc9986-1099-4189-bfff-8f41bab9019d",
+    "name": "Mount Keralia",
+    "type_line": "Plane — Regatha",
+    "oracle_text": "At the beginning of your end step, put a pressure counter on Mount Keralia.\nWhen you planeswalk away from Mount Keralia, it deals damage equal to the number of pressure counters on it to each creature and each planeswalker.\nWhenever chaos ensues, prevent all damage that planes named Mount Keralia would deal this game to permanents you control.",
+    "image_uri": "https://cards.scryfall.io/normal/front/a/4/a4d3edeb-4a78-4de3-a167-4565c494ba23.jpg?1547432596",
+    "is_phenomenon": false
+  },
+  {
+    "id": "123f4a6b-34eb-4383-bacd-4f5ac64a67fa",
+    "name": "Multiversal High Council",
+    "type_line": "Plane — Universia Beyondia",
+    "oracle_text": "Universes Beyond spells you cast cost {1} less to cast.\nEach creature gets +1/+1 for each different Universe among permanents its controller controls. (Magic: The Gathering and D&D each count as a universe.)\nWhenever Chaos ensues, for each universe, return up to one target card from that Universe from your graveyard to your hand.",
+    "image_uri": "https://cards.scryfall.io/normal/front/f/7/f7d4a7fe-df1d-46de-8509-f021f2edd0ca.jpg?1760626974",
+    "is_phenomenon": false
+  },
+  {
+    "id": "07cc253d-e23c-450c-bfaf-5cb6a3a588ce",
+    "name": "Murasa",
+    "type_line": "Plane — Zendikar",
+    "oracle_text": "Whenever a nontoken creature enters, its controller may search their library for a basic land card, put it onto the battlefield tapped, then shuffle.\nWhenever chaos ensues, target land becomes a 4/4 creature that's still a land.",
+    "image_uri": "https://cards.scryfall.io/normal/front/4/6/46daa243-7c4e-4b0c-8ec2-e70cba8e72c3.jpg?1547432171",
+    "is_phenomenon": false
+  },
+  {
+    "id": "c871974e-54e6-411f-8408-3708823fa2df",
+    "name": "Mutual Epiphany",
+    "type_line": "Phenomenon",
+    "oracle_text": "When you encounter Mutual Epiphany, each player draws four cards. (Then planeswalk away from this phenomenon.)",
+    "image_uri": "https://cards.scryfall.io/normal/front/b/e/be4da23c-bc51-4601-8f86-4e6f4eb27e6a.jpg?1680815547",
+    "is_phenomenon": true
+  },
+  {
+    "id": "422f0c13-6bd5-40d1-af03-00af5c01780e",
+    "name": "Mycosynthwave",
+    "type_line": "Plane — Secret Lair",
+    "oracle_text": "All permanents are artifacts in addition to their other types.\nAll cards that aren't on the battlefield, spells, and permanents are colorless.\nPlayers may spend mana as though it were mana of any color.\nWhenever chaos ensues, the next spell you cast this turn has affinity for artifacts.",
+    "image_uri": "https://cards.scryfall.io/normal/front/9/9/9935490b-9bc7-48f5-9a11-59a043e346fb.jpg?1751869247",
+    "is_phenomenon": false
+  },
+  {
+    "id": "3e0bcf65-1eaf-440f-a59b-0b11e1106135",
+    "name": "Naar Isle",
+    "type_line": "Plane — Wildfire",
+    "oracle_text": "At the beginning of your upkeep, put a flame counter on Naar Isle, then Naar Isle deals damage to you equal to the number of flame counters on it.\nWhenever chaos ensues, Naar Isle deals 3 damage to target player or planeswalker.",
+    "image_uri": "https://cards.scryfall.io/normal/front/f/6/f63b82f9-ebc4-465c-b25e-5ee710525143.jpg?1547432449",
+    "is_phenomenon": false
+  },
+  {
+    "id": "a2048704-0d22-435d-b819-269291f2981e",
+    "name": "Naktamun",
+    "type_line": "Plane — Amonkhet",
+    "oracle_text": "Each creature card in your graveyard has embalm. Its embalm cost is equal to its mana cost. (Exile a creature card from your graveyard and pay its embalm cost: Create a token that's a copy of it, except it's a white Zombie in addition to its other types with no mana cost. Embalm only as a sorcery.)\nWhenever chaos ensues, you may discard a card. If you do, draw a card.",
+    "image_uri": "https://cards.scryfall.io/normal/front/7/f/7ff092bb-e284-4397-a584-6a046145424b.jpg?1680815473",
+    "is_phenomenon": false
+  },
+  {
+    "id": "5ed6be01-af06-4f3d-8b43-ef8993c52c97",
+    "name": "Naya",
+    "type_line": "Plane — Alara",
+    "oracle_text": "You may play any number of lands on each of your turns.\nWhenever chaos ensues, target red, green, or white creature you control gets +1/+1 until end of turn for each land you control.",
+    "image_uri": "https://cards.scryfall.io/normal/front/1/5/15611e29-6f96-4c5c-a919-c8fe590581b0.jpg?1547432519",
+    "is_phenomenon": false
+  },
+  {
+    "id": "72af7529-75bb-488f-801d-7148631b9e9b",
+    "name": "Nephalia",
+    "type_line": "Plane — Innistrad",
+    "oracle_text": "At the beginning of your end step, mill seven cards. Then return a card at random from your graveyard to your hand.\nWhenever chaos ensues, return target card from your graveyard to your hand.",
+    "image_uri": "https://cards.scryfall.io/normal/front/9/f/9f4b51ac-3e56-494f-aad7-ff5b0c3ed6ed.jpg?1547432372",
+    "is_phenomenon": false
+  },
+  {
+    "id": "08427dab-3874-4a29-bd63-cbd16c1d229d",
+    "name": "New Argive",
+    "type_line": "Plane — Dominaria",
+    "oracle_text": "Whenever a historic creature you control attacks, it gets +2/+2 until end of turn. (Artifacts, legendaries, and Sagas are historic.)\nWhenever chaos ensues, reveal cards from the top of your library until you reveal a historic card. Put that card into your hand and the rest on the bottom of your library in a random order.",
+    "image_uri": "https://cards.scryfall.io/normal/front/e/2/e22ac94f-03a7-49ee-a059-fc123708962e.jpg?1680815475",
+    "is_phenomenon": false
+  },
+  {
+    "id": "4f8cf1ab-1359-44af-a989-dd254fa6c7b5",
+    "name": "New New York",
+    "type_line": "Plane — New Earth",
+    "oracle_text": "At the beginning of combat on your turn, until end of turn, noncreature artifacts you control become 3/3 Vehicles in addition to their other types and gain flying, haste, and crew 1.\nWhenever chaos ensues, create a Treasure token and a 2/2 white Alien creature token.",
+    "image_uri": "https://cards.scryfall.io/normal/front/5/1/5185dfce-d3ad-4509-b356-f6750d7c6a09.jpg?1696637785",
+    "is_phenomenon": false
+  },
+  {
+    "id": "e7092928-3d70-4c7f-aea6-4532b0c5e5eb",
+    "name": "New Player's Journey",
+    "type_line": "Plane — Foundations",
+    "oracle_text": "When you planeswalk here, each player may search their library for a basic land card, put it into their hand, then shuffle.\nWhenever you play a card from Foundations or a core set (including Alpha!), draw a card.\nWhenever chaos ensues, you gain life equal to the number of years you've played Magic, rounded up. Then planeswalk.",
+    "image_uri": "https://cards.scryfall.io/normal/front/6/7/67156703-f6e2-4804-8cb0-57d7a98845b4.jpg?1760627316",
+    "is_phenomenon": false
+  },
+  {
+    "id": "995eede5-d3aa-42f8-9883-6e47a7c041bc",
+    "name": "No Way Out (Playtest)",
+    "type_line": "Plane — Duskmourn",
+    "oracle_text": "No Way Out enters with three dread counters.\nYou can never leave — If a player would planeswalk while this plane has dread counters, chaos ensues instead.\nWhenever you roll the planar die, manifest dread. (Look at the top two cards of your library. Put one onto the battlefield face down as a 2/2 creature and the other into your graveyard. Turn it face up any time for its mana cost if it's a creature card.)\nWhenever Chaos ensures each player may turn a face-down permanent they control face-up. Remove a dread counter from this plane.",
+    "image_uri": "https://cards.scryfall.io/normal/front/4/4/44f6daf9-e3fa-474e-a6af-356c619f8d22.jpg?1760627263",
+    "is_phenomenon": false
+  },
+  {
+    "id": "9d58f647-3f83-4f65-a944-c6236db7c422",
+    "name": "Norn's Dominion",
+    "type_line": "Plane — New Phyrexia",
+    "oracle_text": "When you planeswalk away from Norn's Dominion, destroy each nonland permanent without a fate counter on it, then remove all fate counters from all permanents.\nWhenever chaos ensues, you may put a fate counter on target permanent.",
+    "image_uri": "https://cards.scryfall.io/normal/front/2/0/20d23638-74fb-481d-a3c4-d7f5fd666211.jpg?1547432295",
+    "is_phenomenon": false
+  },
+  {
+    "id": "ab72ff80-738a-4468-aecf-5d806143f791",
+    "name": "Norn's Seedcore",
+    "type_line": "Plane — New Phyrexia",
+    "oracle_text": "When you planeswalk to Norn's Seedcore, chaos ensues.\nWhenever chaos ensues, reveal cards from the top of your planar deck until you reveal a plane card. Planeswalk to it, except don't planeswalk away from any plane. Put the rest of the revealed cards on the bottom of your planar deck in any order.",
+    "image_uri": "https://cards.scryfall.io/normal/front/1/a/1a4238ce-2a8f-404f-a893-9bb8b3f26835.jpg?1680815475",
+    "is_phenomenon": false
+  },
+  {
+    "id": "a2dfbb3e-3d5f-4b6a-b910-4c7b0c9dc17a",
+    "name": "North Pole Research Base",
+    "type_line": "Plane — Earth",
+    "oracle_text": "At the beginning of your upkeep, target opponent draws a card and creates a Treasure token.\nWhenever chaos ensues, create a 2/2 white Alien creature token. When you do, tap target nontoken creature an opponent controls. Put a stun counter on it. (If a permanent with a stun counter would become untapped, remove one from it instead.)",
+    "image_uri": "https://cards.scryfall.io/normal/front/6/4/6489955c-1571-41dd-9419-5c071a8b3e30.jpg?1696637786",
+    "is_phenomenon": false
+  },
+  {
+    "id": "6552e3dd-ce35-4267-a25e-f5d4dceb8311",
+    "name": "Nyx",
+    "type_line": "Plane — Theros",
+    "oracle_text": "Nontoken creatures are enchantments in addition to their other types.\nConstellation — Whenever an enchantment you control enters, you gain 1 life.\nWhenever chaos ensues, choose a color. Add an amount of mana of that color equal to your devotion to that color.",
+    "image_uri": "https://cards.scryfall.io/normal/front/d/8/d8da872d-55e0-4596-ba8e-f9ff7b2c0a86.jpg?1680815480",
+    "is_phenomenon": false
+  },
+  {
+    "id": "c3b5f778-8857-498e-9b1c-f89cfb6f34b2",
+    "name": "Omenpath Instability",
+    "type_line": "Phenomenon",
+    "oracle_text": "When you encounter this phenomenon, each player creates an Entropy enchantment token with \"Sacrifice this enchantment: Chaos ensues. Activate only as a sorcery\" and an Omenpath enchantment token with \"Sacrifice this enchantment: Planeswalk. Activate only as a sorcery.\" (Then Planeswalk away from this phenomenon.)",
+    "image_uri": "https://cards.scryfall.io/normal/front/d/2/d248f19c-6fe5-4e42-ab77-81c41bacebbb.jpg?1760633325",
+    "is_phenomenon": true
+  },
+  {
+    "id": "69f06edb-dade-4e94-b563-e36a05e567f0",
+    "name": "Onakke Catacomb",
+    "type_line": "Plane — Shandalar",
+    "oracle_text": "All creatures are black and have deathtouch.\nWhenever chaos ensues, creatures you control get +1/+0 and gain first strike until end of turn.",
+    "image_uri": "https://cards.scryfall.io/normal/front/2/e/2eef332f-d47f-4bc3-b39d-572dce4997b2.jpg?1547432470",
+    "is_phenomenon": false
+  },
+  {
+    "id": "8bf638e5-8325-48ca-9039-37a19761ef56",
+    "name": "Ood Sphere",
+    "type_line": "Plane — Horsehead Nebula",
+    "oracle_text": "Song of the Ood — Noncreature spells have convoke. (A player's creatures can help cast those spells. Each creature they tap while casting a noncreature spell pays for {1} or one mana of that creature's color.)\nRed-Eye — Whenever chaos ensues, for each opponent, goad up to one target creature that opponent controls. Until your next turn, those creatures can't become tapped unless they're being declared as attackers.",
+    "image_uri": "https://cards.scryfall.io/normal/front/6/4/642c9e68-4d5f-4e7f-894b-56dec4081fc7.jpg?1696637791",
+    "is_phenomenon": false
+  },
+  {
+    "id": "6e008fdc-48f2-40ef-95bd-80d014535ca3",
+    "name": "Orochi Colony",
+    "type_line": "Plane — Kamigawa",
+    "oracle_text": "Whenever a creature you control deals combat damage to a player, you may search your library for a basic land card, put it onto the battlefield tapped, then shuffle.\nWhenever chaos ensues, target creature can't be blocked this turn.",
+    "image_uri": "https://cards.scryfall.io/normal/front/1/2/12655e0d-bb32-4aff-940a-fe14675629ca.jpg?1680815549",
+    "is_phenomenon": false
+  },
+  {
+    "id": "c7241e4b-d2c7-4801-96a3-91bb998953a1",
+    "name": "Orzhova",
+    "type_line": "Plane — Ravnica",
+    "oracle_text": "When you planeswalk away from Orzhova, each player returns all creature cards from their graveyard to the battlefield.\nWhenever chaos ensues, for each opponent, exile up to one target creature card from that player's graveyard.",
+    "image_uri": "https://cards.scryfall.io/normal/front/b/e/be92be0a-e10d-478b-bc09-9cd09bfb269e.jpg?1547432253",
+    "is_phenomenon": false
+  },
+  {
+    "id": "29e3371d-aa41-46a9-921a-96565be47eff",
+    "name": "Otaria",
+    "type_line": "Plane — Dominaria",
+    "oracle_text": "Instant and sorcery cards in graveyards have flashback. The flashback cost is equal to the card's mana cost. (Its owner may cast the card from their graveyard for its mana cost. Then they exile it.)\nWhenever chaos ensues, take an extra turn after this one.",
+    "image_uri": "https://cards.scryfall.io/normal/front/3/5/35add85f-a70a-497d-9a11-593325a1a4ef.jpg?1547432456",
+    "is_phenomenon": false
+  },
+  {
+    "id": "24b2ba5b-c1cb-4c73-89bf-94d47f468622",
+    "name": "Oteclán",
+    "type_line": "Plane — Ixalan",
+    "oracle_text": "When you planeswalk to Oteclán and at the beginning of your upkeep, chaos ensues.\nWhenever chaos ensues, discover 3. (Exile cards from the top of your library until you exile a nonland card with that mana value or less. Cast it without paying its mana cost or put it into your hand. Put the rest on the bottom in a random order.)",
+    "image_uri": "https://cards.scryfall.io/normal/front/d/e/de1a9f98-bbfc-4ae7-b919-a5f652825138.jpg?1764108156",
+    "is_phenomenon": false
+  },
+  {
+    "id": "c5f0da12-b76f-42fb-a52e-cd09535e72fb",
+    "name": "Paliano",
+    "type_line": "Plane — Fiora",
+    "oracle_text": "When one or more creatures you control deal combat damage to a player, if there is no monarch, you become the monarch.\nWhenever chaos ensues, create a 1/1 black Assassin creature token with deathtouch and haste.",
+    "image_uri": "https://cards.scryfall.io/normal/front/f/e/fe509cef-83e5-48d9-a9ec-e187ab65b5e0.jpg?1680815487",
+    "is_phenomenon": false
+  },
+  {
+    "id": "cd8ce6f1-9753-40a7-a625-5ed63c15c29e",
+    "name": "Panopticon",
+    "type_line": "Plane — Mirrodin",
+    "oracle_text": "When you planeswalk to Panopticon, draw a card.\nAt the beginning of your draw step, draw an additional card.\nWhenever chaos ensues, draw a card.",
+    "image_uri": "https://cards.scryfall.io/normal/front/e/c/ecab1a2d-a47a-4572-a133-aca40384a908.jpg?1680815558",
+    "is_phenomenon": false
+  },
+  {
+    "id": "93a2967d-b7e3-497f-af7e-56984d0f8386",
+    "name": "Pin Collector's Booth",
+    "type_line": "Plane — MagicCon",
+    "oracle_text": "Whenever you attack, create a Pin token attached to target attacking creature you control. It's an Pin Aura enchantment with enchant creature and \"Enchanted creature gets +1/+1.\"\nWhenever Chaos ensues, each opponent loses X life, where X is the total number of pins attached to you and creatures you control. (This includes pins on your backpack.)",
+    "image_uri": "https://cards.scryfall.io/normal/front/8/6/864746af-2a6c-49d8-953d-6e2dfa9e2c2a.jpg?1760626960",
+    "is_phenomenon": false
+  },
+  {
+    "id": "133d8c07-4de5-4142-b141-235e5255fb6d",
+    "name": "Pin Trading",
+    "type_line": "Phenomenon",
+    "oracle_text": "When you encounter this, draw a card for each pin you are wearing and each Pin token attached to creatures you control. (This includes pins on your backpack.) (Then planeswalk away from this phenomenon.)",
+    "image_uri": "https://cards.scryfall.io/normal/front/7/6/76fa548a-8c93-458f-b0e2-bc1074359ae2.jpg?1760633334",
+    "is_phenomenon": true
+  },
+  {
+    "id": "a34b272b-084b-4ff1-8b02-d95116ccfeab",
+    "name": "Planewide Disaster",
+    "type_line": "Phenomenon",
+    "oracle_text": "When you encounter Planewide Disaster, destroy all creatures. (Then planeswalk away from this phenomenon.)",
+    "image_uri": "https://cards.scryfall.io/normal/front/0/5/0518b7a0-3bbb-4802-9faf-3f4256671e9e.jpg?1680815558",
+    "is_phenomenon": true
+  },
+  {
+    "id": "5dc1deab-ce04-45c0-a4ff-c526a948e500",
+    "name": "Pompeii",
+    "type_line": "Plane — Earth",
+    "oracle_text": "When you planeswalk to Pompeii and at the beginning of your upkeep, put an eruption counter on it.\nWhenever you roll a blank on the planar die, scry 2. Then put an eruption counter on Pompeii.\nWhen chaos ensues, Pompeii deals damage to each creature and each player equal to the number of eruption counters on Pompeii. Each player sacrifices a land of their choice. Then planeswalk.",
+    "image_uri": "https://cards.scryfall.io/normal/front/a/5/a549ee7a-276b-45eb-a2c7-f74c85dc6a0d.jpg?1696637791",
+    "is_phenomenon": false
+  },
+  {
+    "id": "f133e42a-2962-4781-b413-ce2127f17c26",
+    "name": "Pools of Becoming",
+    "type_line": "Plane — Bolas's Meditation Realm",
+    "oracle_text": "At the beginning of your end step, put the cards in your hand on the bottom of your library in any order, then draw that many cards.\nWhenever chaos ensues, reveal the top three cards of your planar deck. Each of the revealed cards' chaos abilities triggers. Then put the revealed cards on the bottom of your planar deck in any order.",
+    "image_uri": "https://cards.scryfall.io/normal/front/5/5/559007a6-c515-413a-8d3c-8ce1df0742ff.jpg?1547432526",
+    "is_phenomenon": false
+  },
+  {
+    "id": "34a31865-b701-4ce1-8912-29fc41ecdda3",
+    "name": "Prahv",
+    "type_line": "Plane — Ravnica",
+    "oracle_text": "If you cast a spell this turn, you can't attack with creatures.\nIf you attacked with creatures this turn, you can't cast spells.\nWhenever chaos ensues, you gain life equal to the number of cards in your hand.",
+    "image_uri": "https://cards.scryfall.io/normal/front/8/6/86ff49dd-9845-459e-baaf-f65126ccb648.jpg?1547432729",
+    "is_phenomenon": false
+  },
+  {
+    "id": "804c913e-7dcd-4e83-a8d2-47b26e796c2e",
+    "name": "Preston's Stage",
+    "type_line": "Plane — Las Vegas",
+    "oracle_text": "Whenever a player performs a magic trick, they create a Hat token. (You perform a magic trick when you cast an instant or spell with flash, or turn a face-down creature face-up. Hat tokens are artifact tokens with \"{1}, {T}, Sacrifice this artifact: Create a 1/1 white Rabbit creature token.\")\nWhenever Chaos ensues, until your next turn, creature cards in your hand have flash.",
+    "image_uri": "https://cards.scryfall.io/normal/front/e/e/ee17ba4a-18b0-46a0-adad-c5db51b0367d.jpg?1760627273",
+    "is_phenomenon": false
+  },
+  {
+    "id": "b3acbacd-7e97-4bcf-9281-fffa5ea3e70b",
+    "name": "Prime Minister's Cabinet Room",
+    "type_line": "Plane — Earth",
+    "oracle_text": "At the beginning of combat on your turn, up to one target creature you control becomes a copy of target creature an opponent controls.\nWill of the council — Whenever chaos ensues, starting with you, each player votes for a creature you don't control. Exile each creature with the most votes or tied for most votes.",
+    "image_uri": "https://cards.scryfall.io/normal/front/2/9/291478b8-a8f6-4449-8cd8-9d70484d3398.jpg?1696637797",
+    "is_phenomenon": false
+  },
+  {
+    "id": "b3a7f6b9-1a07-4da8-a90c-6f53a1c4eb28",
+    "name": "Probability Flux",
+    "type_line": "Phenomenon",
+    "oracle_text": "Until your next turn, if a player would roll one or more dice, instead they roll that many dice plus one and ignore one.",
+    "image_uri": "https://cards.scryfall.io/normal/front/f/d/fd836214-3995-4912-a527-4ddfa975bb91.jpg?1764108148",
+    "is_phenomenon": true
+  },
+  {
+    "id": "d5b01af8-c1b4-41b9-83f6-6d51258dc96d",
+    "name": "Pursued by Something",
+    "type_line": "Plane — Duskmourn",
+    "oracle_text": "At the beginning of your second main phase, if you control a tapped creature, manifest dread. (Look at the top two cards of your library. Put one onto the battlefield face down as a 2/2 creature and the other into your graveyard. Turn it face up any time for its mana cost if it's a creature card.)\nWhenever Chaos ensues, exile target creature. If it's an instant or sorcery, cast it without paying its mana cost. Otherwise put it onto the battlefield under its owner's control.",
+    "image_uri": "https://cards.scryfall.io/normal/front/7/8/7810d18b-32be-485c-95df-8aabf89e57e7.jpg?1760627266",
+    "is_phenomenon": false
+  },
+  {
+    "id": "53517dbf-7b32-423a-af76-afd39b876a1a",
+    "name": "Quicksilver Sea",
+    "type_line": "Plane — Mirrodin",
+    "oracle_text": "When you planeswalk to Quicksilver Sea and at the beginning of your upkeep, scry 4. (Look at the top four cards of your library, then put any number of them on the bottom and the rest on top in any order.)\nWhenever chaos ensues, reveal the top card of your library. You may play it without paying its mana cost.",
+    "image_uri": "https://cards.scryfall.io/normal/front/0/7/072c1a59-dbdc-469c-9743-e083e52b0b6d.jpg?1547432435",
+    "is_phenomenon": false
+  },
+  {
+    "id": "33ed1120-82b1-4936-b210-2f0323a9401c",
+    "name": "Raiders' Allegiance",
+    "type_line": "Plane — Ixalan",
+    "oracle_text": "Raid — At the beginning of your second main phase, for each player dealt combat damage this turn, you get a point counter and create a 2/2 black Pirate creature token with menace.\nWhenever you planeswalk away from here, each player with the most point counters or tied for the most point counters creates three Treasure tokens and draws three cards. Then remove all point counters from each player.\nWhenever Chaos ensues, proliferate for each Pirate you control.",
+    "image_uri": "https://cards.scryfall.io/normal/front/0/7/07252eb1-084c-4ecf-b015-dd00a6ea44ef.jpg?1760627296",
+    "is_phenomenon": false
+  },
+  {
+    "id": "b53e06af-be18-4f75-9dd0-7494ec867b13",
+    "name": "Raven's Run",
+    "type_line": "Plane — Shadowmoor",
+    "oracle_text": "All creatures have wither. (They deal damage to creatures in the form of -1/-1 counters.)\nWhenever chaos ensues, put a -1/-1 counter on target creature, two -1/-1 counters on another target creature, and three -1/-1 counters on a third target creature.",
+    "image_uri": "https://cards.scryfall.io/normal/front/d/e/de770524-9afc-4971-842a-6ee0b81176fb.jpg?1547432477",
+    "is_phenomenon": false
+  },
+  {
+    "id": "3fc15821-1add-4321-aecd-33f8a8c5f9a7",
+    "name": "Reality Shaping",
+    "type_line": "Phenomenon",
+    "oracle_text": "When you encounter Reality Shaping, starting with you, each player may put a permanent card from their hand onto the battlefield. (Then planeswalk away from this phenomenon.)",
+    "image_uri": "https://cards.scryfall.io/normal/front/2/0/203c69fe-2ca5-45b2-9be8-e0443733c821.jpg?1680815559",
+    "is_phenomenon": true
+  },
+  {
+    "id": "91fe554b-13db-451d-ab25-717ab2b70649",
+    "name": "Riptide Island",
+    "type_line": "Plane — Dominaria",
+    "oracle_text": "When you planeswalk to Riptide Island and at the beginning of your upkeep, create two 1/1 colorless Sliver creature tokens.\nWhenever chaos ensues, Slivers you control gain haste and get +X/+X until end of turn, where X is the number of Slivers you control.",
+    "image_uri": "https://cards.scryfall.io/normal/front/6/1/618dbae8-7e3f-47ba-8f02-292047e86a05.jpg?1680815489",
+    "is_phenomenon": false
+  },
+  {
+    "id": "0c77d974-a9fe-4c70-b47a-3a957180bd92",
+    "name": "Royal Booster",
+    "type_line": "Phenomenon",
+    "oracle_text": "When you encounter this phenomenon, open a Magic: The Gathering booster pack and shuffle it without looking at its contents. Those cards become the booster deck. You become the monarch. For the rest of the game, at the beginning of the monarch's end step, that player draws a card from the booster deck. They may spend mana of any type to cast those cards. (Then Planeswalk away from this phenomenon.)",
+    "image_uri": "https://cards.scryfall.io/normal/front/2/d/2d65e2d8-bab3-4e4f-9cd7-f11ff3aa87a5.jpg?1760633328",
+    "is_phenomenon": true
+  },
+  {
+    "id": "f0c8ce35-b627-485c-bd64-d7eae47b8efa",
+    "name": "Sanctum of Serra",
+    "type_line": "Plane — Serra's Realm",
+    "oracle_text": "When you planeswalk away from Sanctum of Serra, destroy all nonland permanents.\nWhenever chaos ensues, you may have your life total become 20.",
+    "image_uri": "https://cards.scryfall.io/normal/front/4/c/4c20e1cd-c541-4b44-8e20-adaa45a989a2.jpg?1768672911",
+    "is_phenomenon": false
+  },
+  {
+    "id": "acda5786-0a30-4fc4-accb-dd3485d11336",
+    "name": "sAnS mERcY",
+    "type_line": "pLAnE — sECreT LaIR",
+    "oracle_text": "wHeN YoU pLAnESWalK tO tHIs pLAnE, eACh pLAyER cHoOSeS a nOnBlACk cREaTuRE tHEy cONtrOl. dEsTRoy tHOsE cREatUReS.\nwHeNEveR cHoAS EnSUEs, pERfoRm tHe foLLowiNG pROceSs X tiMEs, wHErE X iS tHe nUmBEr oF tImeS yOU'vE roLLeD tHe PlaNAr diE tHIs tuRN. eAcH oPPonENt LOseS 3 LiFE uNLeSs tHAt pLAyEr sAcRiFicEs A nOnLaND pErManENt OR diSCaRds a cArD.",
+    "image_uri": "https://cards.scryfall.io/normal/front/6/9/690ee95a-39b9-4e8e-af43-b7a133249a45.jpg?1751869270",
+    "is_phenomenon": false
+  },
+  {
+    "id": "edd21d18-98d2-4e3f-8da1-1ba645b8f69c",
+    "name": "Sea of Sand",
+    "type_line": "Plane — Rabiah",
+    "oracle_text": "Players reveal each card they draw.\nWhenever a player draws a land card, that player gains 3 life.\nWhenever a player draws a nonland card, that player loses 3 life.\nWhenever chaos ensues, put target permanent on top of its owner's library.",
+    "image_uri": "https://cards.scryfall.io/normal/front/0/6/0693024b-7eed-4aa5-a890-66c947db6b73.jpg?1547432420",
+    "is_phenomenon": false
+  },
+  {
+    "id": "0a4bf88d-106a-413b-9d80-8775c1ff5ded",
+    "name": "Selesnya Loft Gardens",
+    "type_line": "Plane — Ravnica",
+    "oracle_text": "If an effect would create one or more tokens, it creates twice that many of those tokens instead.\nIf an effect would put one or more counters on a permanent, it puts twice that many of those counters on that permanent instead.\nWhenever chaos ensues, until end of turn, whenever you tap a land for mana, add one mana of any type that land produced.",
+    "image_uri": "https://cards.scryfall.io/normal/front/e/a/ea1537e5-b1a8-4735-acd4-9df627a8946c.jpg?1680815564",
+    "is_phenomenon": false
+  },
+  {
+    "id": "70edae19-e278-401d-9772-508bd66320a6",
+    "name": "Shiv",
+    "type_line": "Plane — Dominaria",
+    "oracle_text": "All creatures have \"{R}: This creature gets +1/+0 until end of turn.\"\nWhenever chaos ensues, create a 5/5 red Dragon creature token with flying.",
+    "image_uri": "https://cards.scryfall.io/normal/front/8/c/8ce18193-76d6-4357-80e3-67ab453f47ac.jpg?1547432547",
+    "is_phenomenon": false
+  },
+  {
+    "id": "19d28483-5d14-4205-a817-c66083a4d049",
+    "name": "Shrinking Plane",
+    "type_line": "Plane — Foldaria",
+    "oracle_text": "When you planeswalk here and at the beginning of your upkeep, fold this plane in half. Draw cards equal to the number of times it's been folded. If you can't fold it, planeswalk.\nChaos: Completely unfold this plane. Each opponent discards two cards.",
+    "image_uri": "https://cards.scryfall.io/normal/front/3/1/31a2845c-9fc8-4d77-9ce0-a402eac46533.jpg?1764108153",
+    "is_phenomenon": false
+  },
+  {
+    "id": "05226c5f-1f56-4608-b09a-614d0198ad1b",
+    "name": "Shy Town",
+    "type_line": "Plane — Chicago",
+    "oracle_text": "Whenever you planeswalk here and whenever chaos ensues, for each opponent, put a shy counter on up to one target creature they control. That creature becomes a Coward in addition to its other types.\nAt the beginning of your upkeep, create a 2/2 red Warrior creature token with haste and \"Cowards can't block Warriors.\"",
+    "image_uri": "https://cards.scryfall.io/normal/front/f/1/f167ffc1-8957-4c3d-ba7a-7ad86360a51e.jpg?1760626946",
+    "is_phenomenon": false
+  },
+  {
+    "id": "99fb2128-61fc-45a6-a3f8-b116c3eb2c3d",
+    "name": "Singing Towers of Darillium",
+    "type_line": "Plane — Darillium",
+    "oracle_text": "Each nonland card in your hand without foretell has foretell. Its foretell cost is equal to its mana cost reduced by {2}. (During your turn, you may pay {2} and exile it from your hand face down. Cast it on a later turn for its foretell cost.)\nWhenever chaos ensues, you may cast a foretold card you own from exile without paying its mana cost this turn.",
+    "image_uri": "https://cards.scryfall.io/normal/front/b/3/b30f88bd-426a-48fb-a921-c7c5831120bd.jpg?1696637800",
+    "is_phenomenon": false
+  },
+  {
+    "id": "8baa42cf-32bc-4d1f-b4bd-02a4fce376c4",
+    "name": "Sky Deck",
+    "type_line": "Plane — Chicago",
+    "oracle_text": "Whenever you planeswalk here, at the beginning of your upkeep, or whenever chaos ensues, put a glass counter on up to one target nonland permanent.\nWhen you planeswalk away from here, destroy all permanents with glass counters on them.",
+    "image_uri": "https://cards.scryfall.io/normal/front/a/8/a8e8faaf-a266-47f9-8c64-40feb3524820.jpg?1760626949",
+    "is_phenomenon": false
+  },
+  {
+    "id": "61006acf-de38-420b-ab7a-685fbd64141c",
+    "name": "Skybreen",
+    "type_line": "Plane — Kaldheim",
+    "oracle_text": "Players play with the top card of their libraries revealed.\nSpells that share a card type with the top card of a library can't be cast.\nWhenever chaos ensues, target player loses life equal to the number of cards in their hand.",
+    "image_uri": "https://cards.scryfall.io/normal/front/2/4/24ad1b98-17ef-4c58-a947-384ef39f1193.jpg?1547432246",
+    "is_phenomenon": false
+  },
+  {
+    "id": "c09d304a-87d0-4a2a-bcb2-e81341b2dbf2",
+    "name": "Sokenzan",
+    "type_line": "Plane — Kamigawa",
+    "oracle_text": "All creatures get +1/+1 and have haste.\nWhenever chaos ensues, untap all creatures that attacked this turn. If it's a main phase, there is an additional combat phase after this phase, followed by an additional main phase.",
+    "image_uri": "https://cards.scryfall.io/normal/front/a/7/a70f7633-0851-4205-a736-3b11d4823f10.jpg?1680815565",
+    "is_phenomenon": false
+  },
+  {
+    "id": "bfb3a244-ff5c-4ed0-8b19-e96394a97284",
+    "name": "Sorin's Remastered Manor",
+    "type_line": "Plane — Innistrad",
+    "oracle_text": "When you planeswalk here and at the beginning your upkeep, put a spooky counter on target creature you control.\nSpooky creatures you control have +1/+1 and menace. (A creature is spooky if it has a spooky counter or it could be a horror movie monster.)\nA Murder at Markov Manor - Whenever chaos ensues, target spooky creature you control bites target opponent or creature an opponent controls. (The creature deals damage equal to its power to the creature your opponent controls. You gain that much life.)",
+    "image_uri": "https://cards.scryfall.io/normal/front/6/8/68762271-fffe-4a7f-9c8f-c8add913617e.jpg?1760627320",
+    "is_phenomenon": false
+  },
+  {
+    "id": "aa166578-b13b-4adb-a78e-d5183e987112",
+    "name": "Spatial Merging",
+    "type_line": "Phenomenon",
+    "oracle_text": "When you encounter Spatial Merging, reveal cards from the top of your planar deck until you reveal two plane cards. Simultaneously planeswalk to both of them. Put all other cards revealed this way on the bottom of your planar deck in any order.",
+    "image_uri": "https://cards.scryfall.io/normal/front/a/c/ac3d5e6a-64e6-4888-915f-874109e7830a.jpg?1680815571",
+    "is_phenomenon": true
+  },
+  {
+    "id": "4f387b4c-3e4a-419d-9dbe-95c5f797747e",
+    "name": "Spectrox Mines",
+    "type_line": "Plane — Androzani Minor",
+    "oracle_text": "When you planeswalk to Spectrox Mines and at the beginning of your upkeep, you lose 3 life and create a Treasure token.\nWhenever chaos ensues, create a Food token and a 2/2 black Human Rogue creature token.",
+    "image_uri": "https://cards.scryfall.io/normal/front/8/4/84933e48-8b10-4ccf-a7e8-140fbb9c0c9b.jpg?1696637804",
+    "is_phenomenon": false
+  },
+  {
+    "id": "7a425df4-7010-462e-9cb5-20389bac721c",
+    "name": "Stairs to Infinity",
+    "type_line": "Plane — Xerex",
+    "oracle_text": "Players have no maximum hand size.\nWhenever you roll the planar die, draw a card.\nWhenever chaos ensues, reveal the top card of your planar deck. You may put it on the bottom of your planar deck.",
+    "image_uri": "https://cards.scryfall.io/normal/front/e/c/eceba6df-8821-499b-b3c2-4d54c6eab257.jpg?1547432680",
+    "is_phenomenon": false
+  },
+  {
+    "id": "38bdd034-0375-403c-97ca-6f93a5e12e54",
+    "name": "Stensia",
+    "type_line": "Plane — Innistrad",
+    "oracle_text": "Whenever a creature deals damage to one or more players for the first time each turn, put a +1/+1 counter on it.\nWhenever chaos ensues, each creature you control gains \"{T}: This creature deals 1 damage to target player or planeswalker\" until end of turn.",
+    "image_uri": "https://cards.scryfall.io/normal/front/c/3/c31b0240-38c7-4f0b-a851-cbfdfee9d193.jpg?1680815571",
+    "is_phenomenon": false
+  },
+  {
+    "id": "204ee01c-74ca-4c4c-92db-aebeebb89406",
+    "name": "Stormcage Containment Facility",
+    "type_line": "Plane — Unknown Planet",
+    "oracle_text": "Each creature card in your graveyard has escape. The escape cost is equal to the card's mana cost plus exile three other cards from your graveyard. (You may cast cards from your graveyard for their escape cost.)\nWhenever chaos ensues, detain target creature an opponent controls. (Until your next turn, that creature can't attack or block and its activated abilities can't be activated.)",
+    "image_uri": "https://cards.scryfall.io/normal/front/5/6/5665c85f-f564-47fe-a123-4e5a70e179d9.jpg?1696637806",
+    "is_phenomenon": false
+  },
+  {
+    "id": "022e38c3-fcea-428f-a0d0-a6cca057faa3",
+    "name": "Strixhaven",
+    "type_line": "Plane — Arcavios",
+    "oracle_text": "Instant and sorcery spells players cast have demonstrate. (Whenever a player casts an instant or sorcery spell, they may copy it. If they do, they choose an opponent to also copy it. Players may choose new targets for their copies.)\nWhenever chaos ensues, return up to one target instant or sorcery card from a graveyard to its owner's hand.",
+    "image_uri": "https://cards.scryfall.io/normal/front/6/a/6a8a8752-6849-4abc-9acb-bafffe685e94.jpg?1680815492",
+    "is_phenomenon": false
+  },
+  {
+    "id": "ff76b576-8ad3-44f9-8043-80003a078e84",
+    "name": "Stronghold Furnace",
+    "type_line": "Plane — Rath",
+    "oracle_text": "If a source would deal damage to a permanent or player, it deals double that damage instead.\nWhenever chaos ensues, Stronghold Furnace deals 1 damage to any target.",
+    "image_uri": "https://cards.scryfall.io/normal/front/0/f/0ff946f3-a536-4b35-b953-e66667314afa.jpg?1680815573",
+    "is_phenomenon": false
+  },
+  {
+    "id": "152e7c62-e18b-40a8-b224-9e45732e029b",
+    "name": "Stroopwafel Cafe",
+    "type_line": "Plane — Amsterdam",
+    "oracle_text": "Players may look at the top card of their library at any time and may play cards from the top of their library.\nThe top card of each player's library is a Food artifact. (It's an artifact with \"{2}, {T}, Sacrifice this artifact: You gain 3 life.\" Activate this ability from the top of the library.)\nChaos: You may sacrifice a Food. If you do, draw a card, gain three life and each opponent loses 3 life.",
+    "image_uri": "https://cards.scryfall.io/normal/front/c/8/c84ebff2-2040-4e6b-a4e1-a604d773ab0b.jpg?1764108168",
+    "is_phenomenon": false
+  },
+  {
+    "id": "de53c948-b371-4f79-a965-33c44d0b44de",
+    "name": "Takenuma",
+    "type_line": "Plane — Kamigawa",
+    "oracle_text": "Whenever a creature leaves the battlefield, its controller draws a card.\nWhenever chaos ensues, return target creature you control to its owner's hand.",
+    "image_uri": "https://cards.scryfall.io/normal/front/0/d/0dadba2e-1d9a-4f04-b9d5-a3edff017662.jpg?1547432652",
+    "is_phenomenon": false
+  },
+  {
+    "id": "c85d3740-8c8d-4fef-ad33-a6f446b883ac",
+    "name": "Talon Gates",
+    "type_line": "Plane — Dominaria",
+    "oracle_text": "Any time you could cast a sorcery, you may exile a nonland card from your hand with X time counters on it, where X is its mana value. If the exiled card doesn't have suspend, it gains suspend. (At the beginning of its owner's upkeep, they remove a time counter. When the last is removed, the player may cast it without paying its mana cost. If it's a creature, it has haste.)\nWhenever chaos ensues, remove two time counters from each suspended card you own.",
+    "image_uri": "https://cards.scryfall.io/normal/front/0/9/09feed09-96de-4208-b6b9-cac0ec150e70.jpg?1547432225",
+    "is_phenomenon": false
+  },
+  {
+    "id": "424b2702-e7c6-4056-8466-a43782d7df2b",
+    "name": "TARDIS Bay",
+    "type_line": "Plane — Gallifrey",
+    "oracle_text": "The first spell you cast during each of your turns with mana value 2 or greater has cascade. (When you cast that spell, exile cards from the top of your library until you exile a nonland card that costs less. You may cast it without paying its mana cost. Put the exiled cards on the bottom in a random order.)\nWhen chaos ensues, gain control of target artifact. Then planeswalk.",
+    "image_uri": "https://cards.scryfall.io/normal/front/0/e/0e2d8456-6e3c-42ee-8bd4-215db5fbda98.jpg?1696637809",
+    "is_phenomenon": false
+  },
+  {
+    "id": "08081904-4115-4afd-ac82-f00421e54038",
+    "name": "Tarnation",
+    "type_line": "Plane — Thunder Junction",
+    "oracle_text": "Whenever a player commits a crime, they may draw a card. (Targeting opponents, anything they control, and/or cards in their graveyards is a crime.)\nWhenever chaos ensues, Tarnation deals 1 damage to any target.",
+    "image_uri": "https://cards.scryfall.io/normal/front/6/9/6955d29c-0891-44ab-9c6f-2e2abc5729ff.jpg?1764108163",
+    "is_phenomenon": false
+  },
+  {
+    "id": "97f708de-9271-4137-a9fe-dda25b922900",
+    "name": "Tazeem",
+    "type_line": "Plane — Zendikar",
+    "oracle_text": "Creatures can't block.\nWhenever chaos ensues, draw a card for each land you control.",
+    "image_uri": "https://cards.scryfall.io/normal/front/1/8/18c94ada-d864-4e94-9d95-e796ab0d0cff.jpg?1547432498",
+    "is_phenomenon": false
+  },
+  {
+    "id": "7a7fbcc2-b139-44c7-a524-6d69651067d3",
+    "name": "Team-Up!",
+    "type_line": "Phenomenon",
+    "oracle_text": "Whenever you encounter this Phenomenon, for the rest of the game, each player wins the game if the players to their left and right are eliminated. (Multiple players can win the game this way.)",
+    "image_uri": "https://cards.scryfall.io/normal/front/e/9/e9e3a5b4-0ffb-42b1-9ba0-2e959577afd7.jpg?1760633356",
+    "is_phenomenon": true
+  },
+  {
+    "id": "bbb1d13c-a3ce-4151-883a-cce9bbd584d0",
+    "name": "Tember City",
+    "type_line": "Plane — Kinshala",
+    "oracle_text": "Whenever a player taps a land for mana, Tember City deals 1 damage to that player.\nWhenever chaos ensues, each other player sacrifices a nonland permanent of their choice.",
+    "image_uri": "https://cards.scryfall.io/normal/front/e/c/ec65904f-c0dd-45ab-a85a-af4a6a631e11.jpg?1547432749",
+    "is_phenomenon": false
+  },
+  {
+    "id": "9c925057-ac3d-461e-b505-f80e2fd38c8c",
+    "name": "Temple of Atropos",
+    "type_line": "Plane — Time",
+    "oracle_text": "At the beginning of each of your postcombat main phases, there is an additional beginning phase after this phase. (The beginning phase includes the untap, upkeep, and draw steps.)\nWhen chaos ensues, reverse the game's turn order. Then planeswalk. (For example, if play had proceeded clockwise around the table, it now goes counterclockwise.)",
+    "image_uri": "https://cards.scryfall.io/normal/front/7/5/75481e04-ab27-4fdd-b789-4a53ffc92430.jpg?1696637811",
+    "is_phenomenon": false
+  },
+  {
+    "id": "a0cb118e-6af1-41d2-847f-d685ced2165d",
+    "name": "Ten Wizards Mountain",
+    "type_line": "Plane — Shenmeng",
+    "oracle_text": "Whenever you roll the planar die, put a +1/+1 counter on up to one target creature.\nWhenever chaos ensues, creatures you control gain flying until end of turn.",
+    "image_uri": "https://cards.scryfall.io/normal/front/d/2/d2603e7a-1b1b-4f71-81d9-7e84c766312d.jpg?1680815497",
+    "is_phenomenon": false
+  },
+  {
+    "id": "8eb442a9-5e61-4e2e-983d-b49b04be2575",
+    "name": "The Aether Flues",
+    "type_line": "Plane — Iquatana",
+    "oracle_text": "When you planeswalk to The Aether Flues and at the beginning of your upkeep, you may sacrifice a creature. If you do, reveal cards from the top of your library until you reveal a creature card, put that card onto the battlefield, then shuffle all other cards revealed this way into your library.\nWhenever chaos ensues, you may put a creature card from your hand onto the battlefield.",
+    "image_uri": "https://cards.scryfall.io/normal/front/a/2/a22dfe5f-82cc-4d99-b454-82157ffd6a59.jpg?1680815515",
+    "is_phenomenon": false
+  },
+  {
+    "id": "b977ff66-6c52-4f33-8f25-e310d835be8b",
+    "name": "The Bean",
+    "type_line": "Plane — Chicago",
+    "oracle_text": "When you planeswalk here, each player chooses a creature they control and creates a token that's a copy of it, except it's a Reflection in addition to its other types.\nAll Reflections have shadow. (They can block or be blocked only by creatures with shadow.)\nWhenever chaos ensues, create a token that's a copy of a creature you control, except it's a Reflection in addition to its other types.",
+    "image_uri": "https://cards.scryfall.io/normal/front/6/1/61aa1c16-3491-4549-983d-448aecaebb8a.jpg?1760627303",
+    "is_phenomenon": false
+  },
+  {
+    "id": "86534917-5d51-4eba-9bf5-f9fc93c83c80",
+    "name": "The Caldaia",
+    "type_line": "Plane — Capenna",
+    "oracle_text": "Creature spells you cast from your hand have blitz {3}. (If you cast a spell for its blitz cost, it gains haste and \"When this creature dies, draw a card.\" Sacrifice it at the beginning of the next end step.)\nWhenever chaos ensues, return target creature card from your graveyard to your hand.",
+    "image_uri": "https://cards.scryfall.io/normal/front/d/e/de4c566d-85ef-49af-a5cb-bcfa4aaba245.jpg?1680815444",
+    "is_phenomenon": false
+  },
+  {
+    "id": "6ad7027a-5f13-4833-bb88-879ba8830720",
+    "name": "The Cave of Skulls",
+    "type_line": "Plane — Earth",
+    "oracle_text": "Each creature card in your graveyard has scavenge. The scavenge cost is equal to its mana cost. (Exile a creature card from your graveyard and pay its mana cost: Put a number of +1/+1 counters equal to that card's power on target creature. Scavenge only as a sorcery.)\nWhenever chaos ensues, create two 1/1 white Warrior creature tokens.",
+    "image_uri": "https://cards.scryfall.io/normal/front/7/4/74560139-0870-4184-887b-72d67c57b6ed.jpg?1696637728",
+    "is_phenomenon": false
+  },
+  {
+    "id": "0c4679a1-f92f-44a9-9a44-066a137c8cd7",
+    "name": "The Cheetah Planet",
+    "type_line": "Plane — Outside Mutter's Spiral",
+    "oracle_text": "When you planeswalk to The Cheetah Planet and at the beginning of your upkeep, put two +1/+1 counters on target non-Cat creature you control. It becomes a Cat in addition to its other types.\nWhenever chaos ensues, all Cats gain provoke until end of turn. (Whenever a Cat attacks, its controller may have target creature defending player controls untap and block it if able.)",
+    "image_uri": "https://cards.scryfall.io/normal/front/4/b/4b6bd680-18c6-46d9-b747-825fb0fee6dd.jpg?1696637732",
+    "is_phenomenon": false
+  },
+  {
+    "id": "eaa5979c-86d3-4647-9a45-fd80ba4bf192",
+    "name": "The Command Zone",
+    "type_line": "Plane — MagicCon",
+    "oracle_text": "When you planeswalk here, each player who controls their commander draws a card. Other players may put their commander from the command zone onto the battlefield.\nIf an ability of your commander would trigger during your turn, that ability triggers an additional time.\nWhenever chaos ensues, the number of times each commander has been cast from the command zone becomes 0. (This resets commander tax.)",
+    "image_uri": "https://cards.scryfall.io/normal/front/8/e/8ea684de-c544-444c-ab5c-5b86b0b0fc71.jpg?1760627323",
+    "is_phenomenon": false
+  },
+  {
+    "id": "5503c308-560d-4d5f-a86a-4b06d9947ddc",
+    "name": "The Dark Barony",
+    "type_line": "Plane — Ulgrotha",
+    "oracle_text": "Whenever a nonblack card is put into a player's graveyard from anywhere, that player loses 1 life.\nWhenever chaos ensues, each opponent discards a card.",
+    "image_uri": "https://cards.scryfall.io/normal/front/0/b/0b8a0cad-92df-45a1-a3cc-561be2f06778.jpg?1547432232",
+    "is_phenomenon": false
+  },
+  {
+    "id": "7099883d-0a4b-47ae-bff8-a96efa7a3a9a",
+    "name": "The Dining Car",
+    "type_line": "Plane — Spacecraft",
+    "oracle_text": "When you planeswalk to The Dining Car, each player creates a Food token.\nSixty-Six Seconds — At the beginning of your upkeep, sacrifice a creature with the least toughness among creatures you control. Then investigate.\nWhenever chaos ensues, activated abilities of artifact tokens you control cost {2} less to activate this turn.",
+    "image_uri": "https://cards.scryfall.io/normal/front/b/f/bf6193ea-4906-4097-8e30-431220f9e35c.jpg?1696637747",
+    "is_phenomenon": false
+  },
+  {
+    "id": "2a21b90a-7ea7-4090-82ec-359ba8ba1aad",
+    "name": "The Doctor's Childhood Barn",
+    "type_line": "Plane — Gallifrey",
+    "oracle_text": "Creatures enter tapped.\nWhenever chaos ensues, for each opponent, choose up to one target nonland permanent that opponent controls. Untap those permanents. They phase out. They can't phase in for as long as The Doctor's Childhood Barn remains face up. When a player planeswalks, those permanents phase in.",
+    "image_uri": "https://cards.scryfall.io/normal/front/f/4/f4c583ab-ad15-436b-9151-8b4d212cbeda.jpg?1696637747",
+    "is_phenomenon": false
+  },
+  {
+    "id": "fc621e94-e7c7-49ea-9547-4ab041ea39f3",
+    "name": "The Doctor's Tomb",
+    "type_line": "Plane — Trenzalore",
+    "oracle_text": "If a creature would die, instead exile it and that creature's controller loses 2 life.\nWhenever chaos ensues, redistribute any number of players' life totals. (Each of those players gets one life total back.)",
+    "image_uri": "https://cards.scryfall.io/normal/front/2/4/2456bb33-6380-4b4d-bf23-7b071fc22be2.jpg?1696637752",
+    "is_phenomenon": false
+  },
+  {
+    "id": "9f7e1607-34b5-4332-81e3-391fb49cd6ad",
+    "name": "The Drum, Mining Facility",
+    "type_line": "Plane — Earth",
+    "oracle_text": "Whenever you roll the planar die, creatures you control get +1/+1 and gain haste until end of turn.\nWhenever chaos ensues, end the turn. (Exile all spells and abilities from the stack. The player whose turn it is discards down to their maximum hand size. Damage wears off, and \"this turn\" and \"until end of turn\" effects end.)",
+    "image_uri": "https://cards.scryfall.io/normal/front/9/f/9fdb7dca-017a-49a7-b8de-4a8ccf7ac679.jpg?1696637755",
+    "is_phenomenon": false
+  },
+  {
+    "id": "a04d05ed-1b9b-4407-8780-c75c102a94dd",
+    "name": "The Eon Fog",
+    "type_line": "Plane — Equilor",
+    "oracle_text": "Players skip their untap steps.\nWhenever chaos ensues, untap all permanents you control.",
+    "image_uri": "https://cards.scryfall.io/normal/front/5/0/501268b6-878b-4725-be1f-a64c90f79b87.jpg?1547432575",
+    "is_phenomenon": false
+  },
+  {
+    "id": "2f3e71b6-0fd6-4ac5-a265-faaabe21177b",
+    "name": "The Fertile Lands of Saulvinia",
+    "type_line": "Plane — Antausia",
+    "oracle_text": "Whenever a player taps a land for mana, that player adds one mana of any type that land produced.\nWhenever chaos ensues, reveal cards from the top of your planar deck until you reveal a plane card. Chaos ensues on that plane. Then put all cards revealed this way on the bottom of your planar deck in any order.",
+    "image_uri": "https://cards.scryfall.io/normal/front/f/e/fe2e52fb-4633-46c1-a48a-cde89d709e07.jpg?1680815445",
+    "is_phenomenon": false
+  },
+  {
+    "id": "5c28d927-7c8b-4a31-8767-ce053159dfdc",
+    "name": "The Food Court",
+    "type_line": "Plane — Eldraine",
+    "oracle_text": "Artifacts are Foods in addition to their other types (They have \"{2}, {T}, Sacrifice this artifact: You gain 3 life.\")\nSacrifice three Foods: Add {W}{U}{B}{R}{G}. Activate only once each turn and only during your turn.\nChaos: You become the Monarch. If you are already the Monarch, draw a card.",
+    "image_uri": "https://cards.scryfall.io/normal/front/5/9/598d7f8d-fd60-40ff-8d56-2e38ca446b82.jpg?1760626969",
+    "is_phenomenon": false
+  },
+  {
+    "id": "13e801cd-e537-4ea6-8c3d-21b142bdc026",
+    "name": "The Fourth Sphere",
+    "type_line": "Plane — Phyrexia",
+    "oracle_text": "At the beginning of your upkeep, sacrifice a nonblack creature.\nWhenever chaos ensues, create a 2/2 black Zombie creature token.",
+    "image_uri": "https://cards.scryfall.io/normal/front/d/e/decef464-d1d3-4459-a1c4-fbad684d5d02.jpg?1547432413",
+    "is_phenomenon": false
+  },
+  {
+    "id": "3c200cc0-02b1-4a32-a910-5cd3c4d716b7",
+    "name": "The Golden City of Orazca",
+    "type_line": "Plane — Ixalan",
+    "oracle_text": "Ascend (If you control ten or more permanents, you get the city's blessing for the rest of the game.)\nWhenever one or more creatures you control deal combat damage to a player, create a Treasure token. Then draw a card if you have the city's blessing.\nWhenever chaos ensues, you may put a permanent card from your hand onto the battlefield tapped.",
+    "image_uri": "https://cards.scryfall.io/normal/front/0/3/03a2c40d-6adb-4ad7-ba8e-3954d33f0e09.jpg?1680815457",
+    "is_phenomenon": false
+  },
+  {
+    "id": "00f00001-bd84-4dbf-a707-f4b1549100d4",
+    "name": "The Great Aerie",
+    "type_line": "Plane — Tarkir",
+    "oracle_text": "When you planeswalk to The Great Aerie and at the beginning of your upkeep, bolster 3. (Choose a creature with the least toughness among creatures you control and put three +1/+1 counters on it.)\nWhenever chaos ensues, choose up to one target creature you control and up to one target creature an opponent controls. Each of those creatures deals damage equal to its toughness to the other.",
+    "image_uri": "https://cards.scryfall.io/normal/front/4/a/4afe8c95-efeb-4f7d-834d-fa5b095c9a06.jpg?1680815458",
+    "is_phenomenon": false
+  },
+  {
+    "id": "8c56bb41-a8d8-4b0f-bbb7-be8466dc9ed1",
+    "name": "The Great Forest",
+    "type_line": "Plane — Lorwyn",
+    "oracle_text": "Each creature assigns combat damage equal to its toughness rather than its power.\nWhenever chaos ensues, creatures you control get +0/+2 and gain trample until end of turn.",
+    "image_uri": "https://cards.scryfall.io/normal/front/0/4/04075c37-1c1c-439c-9c54-770185fc0af1.jpg?1680815530",
+    "is_phenomenon": false
+  },
+  {
+    "id": "cde8d8c4-5e2b-452f-b3e9-bb9f2e745ec9",
+    "name": "The Hippodrome",
+    "type_line": "Plane — Segovia",
+    "oracle_text": "All creatures get -5/-0.\nWhenever chaos ensues, you may destroy target creature if its power is 0 or less.",
+    "image_uri": "https://cards.scryfall.io/normal/front/4/b/4ba7ce8f-e11d-4e06-8cb6-668de2a43a4e.jpg?1547432288",
+    "is_phenomenon": false
+  },
+  {
+    "id": "68750b81-1309-4362-84b3-8835b3d71d28",
+    "name": "The Lux Foundation Library",
+    "type_line": "Plane — The Library",
+    "oracle_text": "Players have no maximum hand size.\nWhenever a creature you control deals combat damage to a player, you may draw a card.\nWhenever chaos ensues, put a shadow counter on target creature. (A creature with shadow can block or be blocked by only creatures with shadow.)",
+    "image_uri": "https://cards.scryfall.io/normal/front/c/3/c3cd9db0-b417-42e8-b3be-00fdc9330014.jpg?1696637772",
+    "is_phenomenon": false
+  },
+  {
+    "id": "e28deac5-d3c4-48e9-974c-093e3122f317",
+    "name": "The Maelstrom",
+    "type_line": "Plane — Alara",
+    "oracle_text": "When you planeswalk to The Maelstrom and at the beginning of your upkeep, you may reveal the top card of your library. If it's a permanent card, you may put it onto the battlefield. If you revealed a card but didn't put it onto the battlefield, put it on the bottom of your library.\nWhenever chaos ensues, return target permanent card from your graveyard to the battlefield.",
+    "image_uri": "https://cards.scryfall.io/normal/front/6/2/6223caca-e993-4834-a673-3eee65b8afe1.jpg?1547432561",
+    "is_phenomenon": false
+  },
+  {
+    "id": "ed44d47b-2eea-4cb2-a091-07583bdf390f",
+    "name": "The Matrix of Time",
+    "type_line": "Plane — Gallifrey",
+    "oracle_text": "When you planeswalk to The Matrix of Time, each player exiles the top card of their library.\nDuring your turn, you may play lands and cast spells from among cards exiled with The Matrix of Time.\nWhenever you play a land or cast a spell from among cards exiled with The Matrix of Time, that card's owner loses 3 life and exiles the top card of their library.\nWhenever chaos ensues, create two Treasure tokens.",
+    "image_uri": "https://cards.scryfall.io/normal/front/c/3/c343b9dd-edce-46ee-bdd6-f240cf061d59.jpg?1696637776",
+    "is_phenomenon": false
+  },
+  {
+    "id": "381f510b-8696-4af1-a6c9-d1175e9f36d0",
+    "name": "The Moonbase",
+    "type_line": "Plane — Moon",
+    "oracle_text": "Low Gravity — All creatures have \"{2}: This creature gains flying until end of turn. Activate only as a sorcery.\"\nWhenever chaos ensues, for each opponent, choose up to one target creature card in that player's graveyard. Put those cards onto the battlefield face down under your control. They're 2/2 Cyberman artifact creatures.",
+    "image_uri": "https://cards.scryfall.io/normal/front/b/7/b715df92-e504-4844-9d74-6f4965fd32ee.jpg?1696637783",
+    "is_phenomenon": false
+  },
+  {
+    "id": "b60e8617-fc35-4c8a-beb0-4688b88484c4",
+    "name": "The Pit",
+    "type_line": "Plane — The Abyss",
+    "oracle_text": "When you planeswalk to The Pit, each player creates their choice of a 3/3 white Angel creature token with flying or a 6/6 black Demon creature token with flying, trample, and \"At the beginning of your upkeep, sacrifice another creature. If you can't, this token deals 6 damage to you.\"\nWhenever chaos ensues, each player sacrifices a nonartifact creature of their choice.",
+    "image_uri": "https://cards.scryfall.io/normal/front/f/d/fd571dc7-b0b0-49a2-938a-d4336efe5e76.jpg?1680815488",
+    "is_phenomenon": false
+  },
+  {
+    "id": "05540922-3bd4-4853-a55a-720524042621",
+    "name": "The Pro Tour",
+    "type_line": "Plane — MagicCon",
+    "oracle_text": "Draft—When you planeswalk here, each player opens a booster pack, drafts a card, and exiles it face down. Each player may play the card they drafted for as long as it remains exiled. Players may spend any type of mana to cast spells this way.\nStandard—Whenever chaos ensues, each player draws cards equal to the number of differently named Standard-legal cards they control. (Basic lands count. Tokens don't.)",
+    "image_uri": "https://cards.scryfall.io/normal/front/8/f/8f3d801a-d021-40bf-8c88-adb0cc431756.jpg?1760627323",
+    "is_phenomenon": false
+  },
+  {
+    "id": "5910ae7e-7a74-4296-9ae1-7fa093b4e640",
+    "name": "The Pyramid of Mars",
+    "type_line": "Plane — Mars",
+    "oracle_text": "When you planeswalk to The Pyramid of Mars and at the beginning of your upkeep, surveil 2. (Look at the top two cards of your library, then put any number of them into your graveyard and the rest on top of your library in any order.)\nWhenever chaos ensues, return target creature card from your graveyard to the battlefield.",
+    "image_uri": "https://cards.scryfall.io/normal/front/8/a/8aec22c6-4986-45aa-9b6b-8517bbbaed4e.jpg?1696637798",
+    "is_phenomenon": false
+  },
+  {
+    "id": "bc7a3c30-79af-4c60-83b7-8b1984a12e61",
+    "name": "The Sphere",
+    "type_line": "Plane — Las Vegas",
+    "oracle_text": "Whenever a creature you control becomes blocked, round both its power and toughness up to the nearest 5. (A creature with 5 power would round up to 5.)\nWhenever Chaos ensues, Amass Fans 5. (Put five +1/+1 counters on an Army you control. It's also a Fan. If you don't control an army, create a 0/0 red Fan Army creature token first.)",
+    "image_uri": "https://cards.scryfall.io/normal/front/0/3/0381e7be-c75f-4ac9-ad21-1f10a904c771.jpg?1760627298",
+    "is_phenomenon": false
+  },
+  {
+    "id": "4abae901-eb47-4318-bf64-322a893c2833",
+    "name": "The Western Cloud",
+    "type_line": "Plane — Gobakhan",
+    "oracle_text": "Prevent all damage that would be dealt to creatures and planeswalkers you control.\nWhenever chaos ensues, create three tapped Treasure tokens. They each deal 1 damage to each creature and each planeswalker.",
+    "image_uri": "https://cards.scryfall.io/normal/front/4/a/4a0e558d-cfd7-4ecf-b951-50016e8cc569.jpg?1680815506",
+    "is_phenomenon": false
+  },
+  {
+    "id": "cb7ae16a-9982-4782-9e20-07bb771d0601",
+    "name": "The Wilds",
+    "type_line": "Plane — Eldraine",
+    "oracle_text": "When you planeswalk to The Wilds and at the beginning of your upkeep, create a Food token.\nWhenever chaos ensues, target player sacrifices a creature of their choice. If they do, you create a Food token. You create two Food tokens instead if the sacrificed creature's toughness was 4 or greater.",
+    "image_uri": "https://cards.scryfall.io/normal/front/1/f/1fccd76c-cce9-4ae3-84c1-000e54ca4734.jpg?1680815512",
+    "is_phenomenon": false
+  },
+  {
+    "id": "04491781-0e6a-4a30-a69f-db226702adfc",
+    "name": "The Windy City",
+    "type_line": "Plane — Chicago",
+    "oracle_text": "When you planeswalk here and at the beginning of your upkeep, put a flying counter on target nontoken creature you control without flying.\nWhenever chaos ensues, exile target creature with flying. For as long as it remains exiled, its owner may cast it by paying {2} rather than paying its mana cost.\nWhen you planeswalk away from The Windy City, remove all flying counters from all creatures.",
+    "image_uri": "https://cards.scryfall.io/normal/front/6/a/6a88e7e7-a6f9-4ef2-b817-710546d3e8be.jpg?1760627309",
+    "is_phenomenon": false
+  },
+  {
+    "id": "2d84be6d-49a5-4200-8cd3-d8653dfd0899",
+    "name": "The Zephyr Maze",
+    "type_line": "Plane — Kyneth",
+    "oracle_text": "Creatures with flying get +2/+0.\nCreatures without flying get -2/-0.\nWhenever chaos ensues, target creature gains flying until end of turn.",
+    "image_uri": "https://cards.scryfall.io/normal/front/4/c/4c9dc306-92e9-46e1-a67c-d4f2a65ce339.jpg?1547432715",
+    "is_phenomenon": false
+  },
+  {
+    "id": "e19e8895-f8a4-4995-8dd4-2821c6469126",
+    "name": "Time Distortion",
+    "type_line": "Phenomenon",
+    "oracle_text": "When you encounter Time Distortion, reverse the game's turn order. (For example, if play had proceeded clockwise around the table, it now goes counterclockwise. Then planeswalk away from this phenomenon.)",
+    "image_uri": "https://cards.scryfall.io/normal/front/b/a/ba38fb01-ea16-4a2d-964a-41f7b4d74024.jpg?1547432189",
+    "is_phenomenon": true
+  },
+  {
+    "id": "0c1cb8e2-8ed4-4a0e-926b-4df5466c607c",
+    "name": "Towashi",
+    "type_line": "Plane — Kamigawa",
+    "oracle_text": "Modified creatures you control have trample and \"Whenever this creature deals combat damage to a player or planeswalker, draw a card.\" (Equipment, Auras you control, and counters are modifications.)\nWhenever chaos ensues, distribute three +1/+1 counters among one, two, or three target creatures you control.",
+    "image_uri": "https://cards.scryfall.io/normal/front/6/d/6d37cf73-e128-4367-b030-313d987fda7a.jpg?1681345506",
+    "is_phenomenon": false
+  },
+  {
+    "id": "b2c95c7a-a04c-46ef-a879-6eb08e444093",
+    "name": "Trail of the Mage-Rings",
+    "type_line": "Plane — Vryn",
+    "oracle_text": "Instant and sorcery spells have rebound. (The spell's controller exiles the spell as it resolves if they cast it from their hand. At the beginning of that player's next upkeep, they may cast that card from exile without paying its mana cost.)\nWhenever chaos ensues, you may search your library for an instant or sorcery card, reveal it, put it into your hand, then shuffle.",
+    "image_uri": "https://cards.scryfall.io/normal/front/f/5/f5f307bf-80ac-46cb-9003-3e70a0703e71.jpg?1547432442",
+    "is_phenomenon": false
+  },
+  {
+    "id": "d858e6db-9842-41d1-8006-574c8dcd98ed",
+    "name": "Truga Jungle",
+    "type_line": "Plane — Ergamon",
+    "oracle_text": "All lands have \"{T}: Add one mana of any color.\"\nWhenever chaos ensues, reveal the top three cards of your library. Put all land cards revealed this way into your hand and the rest on the bottom of your library in any order.",
+    "image_uri": "https://cards.scryfall.io/normal/front/b/d/bd6aa726-9979-42a5-a9ad-5c3f40b599ae.jpg?1680815578",
+    "is_phenomenon": false
+  },
+  {
+    "id": "1300b5e7-d741-4723-bb15-dabd04cb0c11",
+    "name": "Turri Island",
+    "type_line": "Plane — Ir",
+    "oracle_text": "Creature spells cost {2} less to cast.\nWhenever chaos ensues, reveal the top three cards of your library. Put all creature cards revealed this way into your hand and the rest into your graveyard.",
+    "image_uri": "https://cards.scryfall.io/normal/front/7/0/70d12cff-ba93-4673-832c-f9261c1501cd.jpg?1680815582",
+    "is_phenomenon": false
+  },
+  {
+    "id": "d8aa7f2d-2280-42d4-b082-1b5d45df77c5",
+    "name": "Two Streams Facility",
+    "type_line": "Plane — Apalapucia",
+    "oracle_text": "Whenever you planeswalk to Two Streams Facility and at the beginning of the first upkeep of the game, each player chooses green anchor or red waterfall.\nEach player who last chose green anchor may play an additional land during each of their turns.\nCreatures controlled by players who last chose red waterfall get +2/+0 and have haste.\nWhenever chaos ensues, each player who last chose green anchor chooses red waterfall, and vice versa.",
+    "image_uri": "https://cards.scryfall.io/normal/front/4/0/40732207-291c-4cea-be87-dd4dbb8b6259.jpg?1697544810",
+    "is_phenomenon": false
+  },
+  {
+    "id": "f3f5a033-d063-4250-9cfe-4c3c1a2725f1",
+    "name": "Undercity Reaches",
+    "type_line": "Plane — Ravnica",
+    "oracle_text": "Whenever a creature deals combat damage to a player, its controller may draw a card.\nWhenever chaos ensues, you have no maximum hand size for the rest of the game.",
+    "image_uri": "https://cards.scryfall.io/normal/front/8/7/87a6b20d-93f8-4af4-936c-11606e9efd87.jpg?1680815584",
+    "is_phenomenon": false
+  },
+  {
+    "id": "a7641877-1a61-467c-9365-487cf5a5656d",
+    "name": "UNIT Headquarters",
+    "type_line": "Plane — Earth",
+    "oracle_text": "When you planeswalk to UNIT Headquarters and at the beginning of your upkeep, create a tapped 1/1 white Soldier creature token.\nWhenever chaos ensues, put a +1/+1 counter on each creature you control.",
+    "image_uri": "https://cards.scryfall.io/normal/front/9/f/9f7ec46f-1499-4c75-8568-d9266a3d1e69.jpg?1696637819",
+    "is_phenomenon": false
+  },
+  {
+    "id": "87ff5801-1f16-463a-af2c-3223cef0a532",
+    "name": "Unknown Event",
+    "type_line": "Phenomenon",
+    "oracle_text": "When you encounter this, Each player opens a Magic the Gathering booster pack. They may select up to two cards from that pack and exile them face down. For the rest of the game, players may look at and play cards exiled this way without paying their mana costs. (Then Planeswalk away from this phenomenon.)",
+    "image_uri": "https://cards.scryfall.io/normal/front/6/e/6ef1a378-0aa6-474c-ad92-26f62efd04fe.jpg?1760633359",
+    "is_phenomenon": true
+  },
+  {
+    "id": "14066888-66f6-4903-8de2-cc961aa45d8d",
+    "name": "Unleash the Flux",
+    "type_line": "Phenomenon",
+    "oracle_text": "When you encounter Unleash the Flux, each player sacrifices a nonland permanent of their choice, then you flip a coin. If you lose the flip, repeat this process. (Then planeswalk away from this phenomenon.)",
+    "image_uri": "https://cards.scryfall.io/normal/front/8/e/8e3c04ad-a8b5-453a-aff4-dce743b1c693.jpg?1696637822",
+    "is_phenomenon": true
+  },
+  {
+    "id": "503fcc43-dafd-484b-a97f-bbd11eed66de",
+    "name": "Unyaro",
+    "type_line": "Plane — Zhalfir",
+    "oracle_text": "At the beginning of your end step, if you planeswalked to Unyaro this turn, untap all creatures. They phase out until a player planeswalks. (Treat them and anything attached to them as though they didn't exist.)\nWhenever chaos ensues, create two 2/2 white and blue Knight creature tokens with vigilance.",
+    "image_uri": "https://cards.scryfall.io/normal/front/6/e/6ef8454d-1aac-4907-91cf-535ea679042c.jpg?1680815503",
+    "is_phenomenon": false
+  },
+  {
+    "id": "61b5984a-de6a-4d5a-8b20-e2fb3b553a34",
+    "name": "Valor's Reach",
+    "type_line": "Plane — Kylem",
+    "oracle_text": "Whenever your team attacks with exactly two creatures, those creatures gain double strike until end of turn.\nWhenever chaos ensues, untap up to two target creatures your team controls. If it's a main phase, there is an additional combat phase after this phase, followed by an additional main phase.",
+    "image_uri": "https://cards.scryfall.io/normal/front/4/5/450ed99e-7fb6-45d3-b043-27ff58fe8dbb.jpg?1681017547",
+    "is_phenomenon": false
+  },
+  {
+    "id": "1c4e174e-19fb-4c0a-b762-ef6d927392c9",
+    "name": "Velis Vel",
+    "type_line": "Plane — Lorwyn",
+    "oracle_text": "Each creature gets +1/+1 for each other creature on the battlefield that shares at least one creature type with it. (For example, if two Elemental Shamans and an Elemental Spirit are on the battlefield, each gets +2/+2.)\nWhenever chaos ensues, target creature gains all creature types until end of turn.",
+    "image_uri": "https://cards.scryfall.io/normal/front/6/2/621a8224-7ea2-4ca4-be74-e460d05ad12b.jpg?1547432533",
+    "is_phenomenon": false
+  },
+  {
+    "id": "7aac9628-f112-4840-91b4-7bb5cd896685",
+    "name": "We Hope You Like Squirrels",
+    "type_line": "Plane — Secret Lair",
+    "oracle_text": "At the beginning of each player's upkeep and whenever a player casts a spell, that player creates a 1/1 green Squirrel creature token.\nWhenever chaos ensues, put a +1/+1 counter on each Squirrel you control.",
+    "image_uri": "https://cards.scryfall.io/normal/front/7/5/7514322e-a277-43db-80b4-7ee189040d32.jpg?1751873366",
+    "is_phenomenon": false
+  },
+  {
+    "id": "870ca595-9887-48f9-9ea8-60c0d511726e",
+    "name": "Welcome to Valley",
+    "type_line": "Plane — Bloomburrow",
+    "oracle_text": "Whenever you cast an animal spell, draw a card. (Animals are any non-human creature types that are animals in real life.)\nWhenever Chaos ensues, create a token that's a copy of target creature you control, except it's a 1/1.",
+    "image_uri": "https://cards.scryfall.io/normal/front/3/c/3c94c2c8-46fc-49da-a37b-460e7464aa08.jpg?1760627300",
+    "is_phenomenon": false
+  },
+  {
+    "id": "5b76612b-b2d3-457d-8049-1bf01b8ec28b",
+    "name": "Windmill Farm",
+    "type_line": "Plane — Amsterdam",
+    "oracle_text": "When you planeswalk here and at the beginning of your upkeep, create a Tulip Petal artifact token that has \"{T}, Sacrifice this artifact: Add one mana of any color.\"\nChaos: Spin this plane until the arrow lands on a permanent. If the plane rotated at least 360 degrees during the spin, create a token that's a copy of that permanent.",
+    "image_uri": "https://cards.scryfall.io/normal/front/e/8/e88001d1-339d-4143-8ff5-ff09ef4adfb5.jpg?1764108171",
+    "is_phenomenon": false
+  },
+  {
+    "id": "e4b941d1-60cb-4e14-89a4-62a9785f6eda",
+    "name": "Windriddle Palaces",
+    "type_line": "Plane — Belenon",
+    "oracle_text": "Players play with the top card of their libraries revealed.\nYou may play lands and cast spells from the top of any player's library.\nWhenever chaos ensues, each player mills a card.",
+    "image_uri": "https://cards.scryfall.io/normal/front/2/7/27f3c16a-34f9-497d-835c-5942e395ded8.jpg?1591196076",
+    "is_phenomenon": false
+  },
+  {
+    "id": "370e2b01-5d06-4c9e-9a78-85082afb71d4",
+    "name": "Year-End Review",
+    "type_line": "Phenomenon",
+    "oracle_text": "Each player may choose a nontoken creature they own on the battlefield, reveal a creature card from their hand, or choose a creature card in their graveyard. Those cards become promoted to commander. Each player may put their new commander into the com- mand zone. Then planeswalk away from this phenom- enon. (All original commanders are still commanders.)",
+    "image_uri": "https://cards.scryfall.io/normal/front/c/0/c0cf1c34-0e8f-4a1f-90aa-f827b48b81d3.jpg?1760633360",
+    "is_phenomenon": true
+  }
+]

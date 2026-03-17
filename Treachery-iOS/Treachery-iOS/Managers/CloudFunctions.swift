@@ -44,4 +44,31 @@ struct CloudFunctions {
         let callable = functions.httpsCallable("registerFcmToken")
         _ = try await callable.call(["token": token])
     }
+
+    // MARK: - Planechase
+
+    /// Roll the planar die for the given game. Returns the result string
+    /// ("blank", "chaos", or "planeswalk") from the Cloud Function.
+    func rollPlanarDie(gameId: String) async throws -> String {
+        let callable = functions.httpsCallable("rollPlanarDie")
+        let result = try await callable.call(["gameId": gameId])
+        guard let data = result.data as? [String: Any],
+              let dieResult = data["result"] as? String else {
+            throw NSError(domain: "CloudFunctions", code: -1,
+                          userInfo: [NSLocalizedDescriptionKey: "Invalid rollPlanarDie response"])
+        }
+        return dieResult
+    }
+
+    /// Resolve the current phenomenon, advancing to the next plane.
+    func resolvePhenomenon(gameId: String) async throws {
+        let callable = functions.httpsCallable("resolvePhenomenon")
+        _ = try await callable.call(["gameId": gameId])
+    }
+
+    /// End a non-treachery game (host only).
+    func endGame(gameId: String) async throws {
+        let callable = functions.httpsCallable("endGame")
+        _ = try await callable.call(["gameId": gameId])
+    }
 }

@@ -13,11 +13,14 @@ export default function GameOverScreen() {
   const router = useRouter();
   const { currentUserId } = useAuth();
 
-  const { players, winningTeam, identityCard } = useGameBoard(gameId!, currentUserId);
+  const { game, players, winningTeam, identityCard } = useGameBoard(gameId!, currentUserId);
 
   if (players.length === 0) {
     return <LoadingScreen message="Loading results..." />;
   }
+
+  const isTreacheryMode =
+    game?.game_mode === 'treachery' || game?.game_mode === 'treachery_planechase';
 
   const trophyColor = winningTeam ? ROLE_COLORS[winningTeam] : colors.text;
 
@@ -25,8 +28,8 @@ export default function GameOverScreen() {
     <View style={styles.container}>
       <View style={styles.spacer} />
 
-      {/* Winner announcement */}
-      {winningTeam && (
+      {/* Winner announcement — treachery modes with a winning team */}
+      {isTreacheryMode && winningTeam ? (
         <View style={styles.announcement}>
           <Ionicons name="trophy" size={56} color={trophyColor} />
           <Text style={styles.gameOverText}>Game Over</Text>
@@ -45,32 +48,60 @@ export default function GameOverScreen() {
             </Text>
           </View>
         </View>
+      ) : (
+        <View style={styles.announcement}>
+          <Ionicons name="flag" size={56} color={colors.primary} />
+          <Text style={styles.gameOverText}>Game Over</Text>
+
+          <View style={styles.ornateDivider}>
+            <View style={styles.ornateLine} />
+            <Text style={[styles.ornateDiamond, { color: colors.primary }]}>&#9670;</Text>
+            <View style={styles.ornateLine} />
+          </View>
+
+          <Text style={styles.sessionSummaryText}>
+            Session ended with {players.length} player{players.length !== 1 ? 's' : ''}
+          </Text>
+        </View>
       )}
 
-      {/* All players revealed */}
+      {/* All players — show roles/cards only for treachery modes */}
       <View style={styles.playerList}>
         {players.map((player, index) => {
-          const card = identityCard(player);
-          const roleColor = player.role ? ROLE_COLORS[player.role] : colors.textSecondary;
+          if (isTreacheryMode) {
+            const card = identityCard(player);
+            const roleColor = player.role ? ROLE_COLORS[player.role] : colors.textSecondary;
 
+            return (
+              <View key={player.id}>
+                <View style={styles.playerRow}>
+                  <View style={[styles.accentBar, { backgroundColor: roleColor }]} />
+                  <View style={[styles.roleDot, { backgroundColor: roleColor }]} />
+                  <Text style={styles.playerName}>{player.display_name}</Text>
+                  <View style={styles.playerRight}>
+                    <Text style={[styles.roleText, { color: roleColor }]}>
+                      {player.role ? ROLE_DISPLAY_NAMES[player.role] : 'Unknown'}
+                    </Text>
+                    {card && (
+                      <Text style={styles.cardName}>{card.name}</Text>
+                    )}
+                  </View>
+                  {player.is_eliminated && (
+                    <Ionicons name="close-circle" size={14} color={colors.error} style={{ marginLeft: 4 }} />
+                  )}
+                </View>
+                {index < players.length - 1 && <View style={styles.rowDivider} />}
+              </View>
+            );
+          }
+
+          // Non-treachery: simple player row with final life total
           return (
             <View key={player.id}>
               <View style={styles.playerRow}>
-                {/* Left accent bar */}
-                <View style={[styles.accentBar, { backgroundColor: roleColor }]} />
-                <View style={[styles.roleDot, { backgroundColor: roleColor }]} />
+                <View style={[styles.accentBar, { backgroundColor: colors.primary }]} />
                 <Text style={styles.playerName}>{player.display_name}</Text>
-                <View style={styles.playerRight}>
-                  <Text style={[styles.roleText, { color: roleColor }]}>
-                    {player.role ? ROLE_DISPLAY_NAMES[player.role] : 'Unknown'}
-                  </Text>
-                  {card && (
-                    <Text style={styles.cardName}>{card.name}</Text>
-                  )}
-                </View>
-                {player.is_eliminated && (
-                  <Ionicons name="close-circle" size={14} color={colors.error} style={{ marginLeft: 4 }} />
-                )}
+                <Text style={styles.lifeTotalText}>{player.life_total} life</Text>
               </View>
               {index < players.length - 1 && <View style={styles.rowDivider} />}
             </View>
@@ -188,6 +219,17 @@ const styles = StyleSheet.create({
     height: 1,
     backgroundColor: colors.divider,
     marginHorizontal: 12,
+  },
+  sessionSummaryText: {
+    color: colors.textSecondary,
+    fontSize: 16,
+    fontFamily: fonts.serif,
+    fontStyle: 'italic',
+  },
+  lifeTotalText: {
+    color: colors.textSecondary,
+    fontSize: 14,
+    fontWeight: '500',
   },
   homeButton: {
     backgroundColor: colors.primary,

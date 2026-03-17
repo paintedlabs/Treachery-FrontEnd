@@ -11,12 +11,22 @@ struct CreateGameView: View {
     @EnvironmentObject var authViewModel: AuthViewModel
     @Binding var navigationPath: NavigationPath
 
+    @State private var gameMode: GameMode = .treachery
+    @State private var useOwnDeck = false
     @State private var maxPlayers = Role.minimumPlayerCount
     @State private var startingLife = 40
     @State private var isCreating = false
     @State private var errorMessage: String?
 
     private let firestoreManager = FirestoreManager()
+
+    private var playerRange: ClosedRange<Int> {
+        if gameMode.includesTreachery {
+            return Role.minimumPlayerCount...8
+        } else {
+            return 1...12
+        }
+    }
 
     var body: some View {
         ZStack {
@@ -41,13 +51,34 @@ struct CreateGameView: View {
                     }
                     #endif
 
+                    // Game Mode selector
+                    VStack(spacing: 8) {
+                        MtgSectionHeader(title: "Game Mode")
+                            .frame(maxWidth: .infinity, alignment: .leading)
+
+                        Picker("Game Mode", selection: $gameMode) {
+                            ForEach(GameMode.allCases, id: \.self) { mode in
+                                Text(mode.displayName).tag(mode)
+                            }
+                        }
+                        .pickerStyle(.segmented)
+                    }
+                    .padding(.horizontal)
+
+                    if gameMode.includesPlanechase {
+                        Toggle("I have my own planar deck", isOn: $useOwnDeck)
+                            .foregroundStyle(Color.mtgTextPrimary)
+                            .tint(Color.mtgGold)
+                            .padding(.horizontal)
+                    }
+
                     // Game settings card
                     VStack(spacing: 20) {
                         MtgSectionHeader(title: "Game Settings")
 
                         OrnateDivider()
 
-                        Stepper("Players: \(maxPlayers)", value: $maxPlayers, in: Role.minimumPlayerCount...8)
+                        Stepper("Players: \(maxPlayers)", value: $maxPlayers, in: playerRange)
                             .foregroundStyle(Color.mtgTextPrimary)
                             .accessibilityValue("\(maxPlayers) players")
 
@@ -58,24 +89,26 @@ struct CreateGameView: View {
                     .padding(16)
                     .mtgCardFrame()
 
-                    // Role distribution preview
-                    VStack(spacing: 16) {
-                        MtgSectionHeader(title: "Role Distribution")
+                    // Role distribution preview (only for treachery modes)
+                    if gameMode.includesTreachery {
+                        VStack(spacing: 16) {
+                            MtgSectionHeader(title: "Role Distribution")
 
-                        OrnateDivider()
+                            OrnateDivider()
 
-                        let dist = Role.distribution(forPlayerCount: maxPlayers)
-                        HStack(spacing: 12) {
-                            RoleBadge(count: dist.leaders, role: .leader)
-                            RoleBadge(count: dist.guardians, role: .guardian)
-                            RoleBadge(count: dist.assassins, role: .assassin)
-                            RoleBadge(count: dist.traitors, role: .traitor)
+                            let dist = Role.distribution(forPlayerCount: maxPlayers)
+                            HStack(spacing: 12) {
+                                RoleBadge(count: dist.leaders, role: .leader)
+                                RoleBadge(count: dist.guardians, role: .guardian)
+                                RoleBadge(count: dist.assassins, role: .assassin)
+                                RoleBadge(count: dist.traitors, role: .traitor)
+                            }
+                            .accessibilityElement(children: .combine)
+                            .accessibilityLabel("Role distribution: \(dist.leaders) leaders, \(dist.guardians) guardians, \(dist.assassins) assassins, \(dist.traitors) traitors")
                         }
-                        .accessibilityElement(children: .combine)
-                        .accessibilityLabel("Role distribution: \(dist.leaders) leaders, \(dist.guardians) guardians, \(dist.assassins) assassins, \(dist.traitors) traitors")
+                        .padding(16)
+                        .mtgCardFrame()
                     }
-                    .padding(16)
-                    .mtgCardFrame()
 
                     if let error = errorMessage {
                         MtgErrorBanner(message: error)
@@ -104,6 +137,18 @@ struct CreateGameView: View {
         }
         .navigationTitle("Create Game")
         .toolbarColorScheme(.dark, for: .navigationBar)
+        .onChange(of: gameMode) { _, _ in
+            // Clamp maxPlayers to valid range when switching modes
+            if maxPlayers < playerRange.lowerBound {
+                maxPlayers = playerRange.lowerBound
+            } else if maxPlayers > playerRange.upperBound {
+                maxPlayers = playerRange.upperBound
+            }
+            // Reset own deck toggle when planechase is disabled
+            if !gameMode.includesPlanechase {
+                useOwnDeck = false
+            }
+        }
     }
 
     private func createGame() async {
@@ -118,12 +163,20 @@ struct CreateGameView: View {
                 code: code,
                 hostId: userId,
                 state: .waiting,
+                gameMode: gameMode,
                 maxPlayers: maxPlayers,
                 startingLife: startingLife,
                 winningTeam: nil,
                 playerIds: [userId],
                 createdAt: Date(),
-                lastActivityAt: Date()
+                lastActivityAt: Date(),
+                planechase: gameMode.includesPlanechase ? PlanechaseState(
+                    useOwnDeck: useOwnDeck,
+                    currentPlaneId: nil,
+                    usedPlaneIds: [],
+                    lastDieRollerId: nil,
+                    dieRollCount: 0
+                ) : nil
             )
             try await firestoreManager.createGame(game)
 

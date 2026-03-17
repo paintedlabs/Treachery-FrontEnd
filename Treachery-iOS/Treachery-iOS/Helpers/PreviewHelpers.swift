@@ -268,6 +268,48 @@ extension FriendRequest {
     )
 }
 
+// MARK: - Sample Plane Cards
+
+extension PlaneCard {
+    static let samplePlane = PlaneCard(
+        id: "plane01",
+        name: "Naya",
+        typeLine: "Plane — Alara",
+        oracleText: "You may play any number of lands on each of your turns.\n\nWhenever you roll {CHAOS}, target creature gets +5/+5 until end of turn.",
+        imageUri: nil,
+        isPhenomenon: false
+    )
+
+    static let samplePhenomenon = PlaneCard(
+        id: "phenom01",
+        name: "Chaotic Aether",
+        typeLine: "Phenomenon",
+        oracleText: "When you encounter Chaotic Aether, each blank roll of the planar die is a {CHAOS} roll until a player planeswalks away from a plane.",
+        imageUri: nil,
+        isPhenomenon: true
+    )
+}
+
+// MARK: - Sample Planechase State
+
+extension PlanechaseState {
+    static let sampleActive = PlanechaseState(
+        useOwnDeck: false,
+        currentPlaneId: "plane01",
+        usedPlaneIds: ["plane01"],
+        lastDieRollerId: "user1",
+        dieRollCount: 3
+    )
+
+    static let sampleInitial = PlanechaseState(
+        useOwnDeck: false,
+        currentPlaneId: nil,
+        usedPlaneIds: [],
+        lastDieRollerId: nil,
+        dieRollCount: 0
+    )
+}
+
 // MARK: - Preview NavigationPath
 
 extension Binding where Value == NavigationPath {

@@ -20,6 +20,10 @@ final class GameBoardViewModel: ObservableObject {
     @Published var isGameUnavailable = false
     @Published var isPending = false
 
+    // Planechase transient state
+    @Published var dieRollResult: String?
+    @Published var isRollingDie = false
+
     // MARK: - Optimistic Life Tracking
 
     private var lifeDeltas: [String: Int] = [:]
@@ -61,12 +65,62 @@ final class GameBoardViewModel: ObservableObject {
         players.filter { !$0.isEliminated }
     }
 
+    // MARK: - Game Mode Booleans
+
+    var isPlanechaseActive: Bool {
+        game?.gameMode.includesPlanechase ?? false
+    }
+
+    var isTreacheryActive: Bool {
+        game?.gameMode.includesTreachery ?? false
+    }
+
+    var isOwnDeckMode: Bool {
+        game?.planechase?.useOwnDeck ?? false
+    }
+
+    var isHost: Bool {
+        guard let userId = currentUserId else { return false }
+        return game?.hostId == userId
+    }
+
+    // MARK: - Planechase Computed Properties
+
+    var currentPlane: PlaneCard? {
+        guard let planeId = game?.planechase?.currentPlaneId else { return nil }
+        return PlaneDatabase.shared.plane(withId: planeId)
+    }
+
+    /// The mana cost for the next planar die roll.
+    /// First roll each turn is free, each subsequent costs 1 more.
+    var dieRollCost: Int {
+        let count = game?.planechase?.dieRollCount ?? 0
+        return max(0, count - 1)
+    }
+
+    var lastDieRollerName: String? {
+        guard let rollerId = game?.planechase?.lastDieRollerId else { return nil }
+        return players.first { $0.userId == rollerId }?.displayName
+    }
+
     // MARK: - Init / Deinit
 
     init(gameId: String) {
         self.gameId = gameId
         startListening()
     }
+
+    #if DEBUG
+    /// Preview-only initializer that populates with sample data and skips Firestore.
+    init(gameId: String, previewPlayers: [Player], previewGame: Game?, currentUserId: String?) {
+        self.gameId = gameId
+        self.currentUserId = currentUserId
+        self.serverPlayers = previewPlayers
+        self.players = previewPlayers
+        self.game = previewGame
+        self.hasReceivedFirstGameSnapshot = true
+    }
+    #endif
 
     deinit {
         gameListener?.remove()
@@ -177,6 +231,55 @@ final class GameBoardViewModel: ObservableObject {
 
         do {
             try await cloudFunctions.eliminatePlayer(gameId: gameId)
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+        isPending = false
+    }
+
+    // MARK: - Planechase Actions
+
+    func rollDie() async {
+        guard !isRollingDie else { return }
+        errorMessage = nil
+        isRollingDie = true
+        dieRollResult = nil
+
+        do {
+            let result = try await cloudFunctions.rollPlanarDie(gameId: gameId)
+            dieRollResult = result
+
+            // Auto-clear the die result after a delay so the animation resets
+            Task {
+                try? await Task.sleep(nanoseconds: 3_000_000_000)
+                dieRollResult = nil
+            }
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+        isRollingDie = false
+    }
+
+    func resolvePhenomenon() async {
+        guard !isPending else { return }
+        errorMessage = nil
+        isPending = true
+
+        do {
+            try await cloudFunctions.resolvePhenomenon(gameId: gameId)
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+        isPending = false
+    }
+
+    func endGame() async {
+        guard !isPending else { return }
+        errorMessage = nil
+        isPending = true
+
+        do {
+            try await cloudFunctions.endGame(gameId: gameId)
         } catch {
             errorMessage = error.localizedDescription
         }

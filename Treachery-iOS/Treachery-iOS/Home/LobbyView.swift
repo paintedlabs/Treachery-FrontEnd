@@ -70,6 +70,17 @@ struct LobbyView: View {
                                 .kerning(8)
                                 .accessibilityLabel("Game code: \(game.code.map(String.init).joined(separator: " "))")
 
+                            // Game mode badge
+                            Text(game.gameMode.displayName)
+                                .font(.caption)
+                                .fontWeight(.semibold)
+                                .foregroundStyle(Color.mtgBackground)
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 4)
+                                .background(Color.mtgGold)
+                                .clipShape(Capsule())
+                                .accessibilityLabel("Game mode: \(game.gameMode.displayName)")
+
                             Button {
                                 showShareSheet = true
                             } label: {
@@ -182,8 +193,8 @@ struct LobbyView: View {
                             .buttonStyle(MtgPrimaryButtonStyle(isDisabled: !viewModel.canStartGame || viewModel.isStartingGame))
                             .disabled(!viewModel.canStartGame || viewModel.isStartingGame)
 
-                            if !viewModel.canStartGame && viewModel.players.count < Role.minimumPlayerCount {
-                                Text("Need at least \(Role.minimumPlayerCount) player\(Role.minimumPlayerCount == 1 ? "" : "s") to start")
+                            if !viewModel.canStartGame && viewModel.players.count < viewModel.minimumPlayerCount {
+                                Text("Need at least \(viewModel.minimumPlayerCount) player\(viewModel.minimumPlayerCount == 1 ? "" : "s") to start")
                                     .font(.caption)
                                     .foregroundStyle(Color.mtgTextSecondary)
                             }

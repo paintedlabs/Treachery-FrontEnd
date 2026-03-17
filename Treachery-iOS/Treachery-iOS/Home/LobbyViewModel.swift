@@ -27,7 +27,13 @@ final class LobbyViewModel: ObservableObject {
 
     var canStartGame: Bool {
         guard let game = game else { return false }
-        return isHost && players.count >= Role.minimumPlayerCount && players.count <= game.maxPlayers
+        let minPlayers = game.gameMode.includesTreachery ? Role.minimumPlayerCount : 1
+        return isHost && players.count >= minPlayers && players.count <= game.maxPlayers
+    }
+
+    var minimumPlayerCount: Int {
+        guard let game = game else { return Role.minimumPlayerCount }
+        return game.gameMode.includesTreachery ? Role.minimumPlayerCount : 1
     }
 
     var isGameStarted: Bool {

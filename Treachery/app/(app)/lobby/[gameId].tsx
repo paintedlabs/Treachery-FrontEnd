@@ -19,7 +19,13 @@ import { ErrorBanner } from '@/components/ErrorBanner';
 import { LoadingScreen } from '@/components/LoadingScreen';
 import { ConnectionBanner } from '@/components/ConnectionBanner';
 import { colors, spacing, fonts } from '@/constants/theme';
-import { MINIMUM_PLAYER_COUNT } from '@/constants/roles';
+
+const MODE_DISPLAY: Record<string, string> = {
+  treachery: 'Treachery',
+  planechase: 'Planechase',
+  treachery_planechase: 'Treachery + Planechase',
+  none: 'Life Tracker',
+};
 
 export default function LobbyScreen() {
   const { gameId, isHost: isHostParam } = useLocalSearchParams<{
@@ -38,6 +44,7 @@ export default function LobbyScreen() {
     isGameDisbanded,
     isGameStarted,
     canStartGame,
+    minPlayers,
     startGame,
     leaveGame,
   } = useLobby(gameId!, isHost);
@@ -156,6 +163,13 @@ export default function LobbyScreen() {
               <Ionicons name="share-outline" size={14} color={colors.primary} />
               <Text style={styles.shareText}>Share Code</Text>
             </TouchableOpacity>
+            {game.game_mode && (
+              <View style={styles.modeBadge}>
+                <Text style={styles.modeBadgeText}>
+                  {MODE_DISPLAY[game.game_mode] ?? game.game_mode}
+                </Text>
+              </View>
+            )}
           </View>
         </View>
       )}
@@ -229,9 +243,9 @@ export default function LobbyScreen() {
               )}
             </TouchableOpacity>
 
-            {!canStartGame && players.length < MINIMUM_PLAYER_COUNT && (
+            {!canStartGame && players.length < minPlayers && (
               <Text style={styles.minPlayersText}>
-                Need at least {MINIMUM_PLAYER_COUNT} players to start
+                Need at least {minPlayers} players to start
               </Text>
             )}
           </>
@@ -313,6 +327,20 @@ const styles = StyleSheet.create({
   shareText: {
     color: colors.primary,
     fontSize: 12,
+  },
+  modeBadge: {
+    backgroundColor: 'rgba(201, 168, 76, 0.15)',
+    borderWidth: 1,
+    borderColor: 'rgba(201, 168, 76, 0.3)',
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+    borderRadius: 10,
+    marginTop: 8,
+  },
+  modeBadgeText: {
+    color: colors.primary,
+    fontSize: 12,
+    fontWeight: '600',
   },
   ornateDividerRow: {
     flexDirection: 'row',

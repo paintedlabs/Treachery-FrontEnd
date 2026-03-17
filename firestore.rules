@@ -80,10 +80,11 @@ service cloud.firestore {
         allow read: if request.auth != null;
 
         // Players can add themselves to a game
+        // Note: Swift Codable skips nil fields, so we check for absence OR null
         allow create: if request.auth != null
           && request.resource.data.user_id == request.auth.uid
-          && request.resource.data.role == null
-          && request.resource.data.identity_card_id == null;
+          && (!('role' in request.resource.data) || request.resource.data.role == null)
+          && (!('identity_card_id' in request.resource.data) || request.resource.data.identity_card_id == null);
 
         // Players can ONLY update their own unveil status (true only).
         // Life, elimination, role assignment, and card assignment are

@@ -14,6 +14,9 @@ import { useAuth } from '@/hooks/useAuth';
 import { useGameBoard } from '@/hooks/useGameBoard';
 import { IdentityCardHeader } from '@/components/IdentityCardHeader';
 import { IdentityCardDetail } from '@/components/IdentityCardDetail';
+import { PlaneCardBanner } from '@/components/PlaneCardBanner';
+import { PlaneCardDetail } from '@/components/PlaneCardDetail';
+import { PlanarDieBar } from '@/components/PlanarDieBar';
 import { PlayerRow } from '@/components/PlayerRow';
 import { ErrorBanner } from '@/components/ErrorBanner';
 import { LoadingScreen } from '@/components/LoadingScreen';
@@ -41,11 +44,33 @@ export default function GameBoardScreen() {
     eliminateAndLeave,
     canSeeRole,
     identityCard,
+    // Planechase
+    isPlanechaseActive,
+    isTreacheryActive,
+    isOwnDeckMode,
+    currentPlane,
+    dieRollCost,
+    dieRollResult,
+    isRollingDie,
+    rollDie,
+    resolvePhenomenon,
+    endGame,
   } = useGameBoard(gameId!, currentUserId);
 
   const [showCardDetail, setShowCardDetail] = useState(false);
+  const [showPlaneDetail, setShowPlaneDetail] = useState(false);
   const [inspectedPlayer, setInspectedPlayer] = useState<Player | null>(null);
   const [showUnveilConfirm, setShowUnveilConfirm] = useState(false);
+
+  const isHost = game?.host_id === currentUserId;
+
+  // Derive last roller name from players
+  const lastRollerName = (() => {
+    const rollerId = game?.planechase?.last_die_roller_id;
+    if (!rollerId) return null;
+    const roller = players.find((p) => p.user_id === rollerId);
+    return roller?.display_name ?? null;
+  })();
 
   // On web, intercept browser back button — push user back into the game
   useEffect(() => {
@@ -134,6 +159,22 @@ export default function GameBoardScreen() {
     }
   };
 
+  const handleEndGame = () => {
+    if (Platform.OS === 'web') {
+      const confirmed = window.confirm('End Game?\n\nThis will end the game for all players.');
+      if (confirmed) endGame();
+    } else {
+      Alert.alert(
+        'End Game?',
+        'This will end the game for all players.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'End Game', style: 'destructive', onPress: () => endGame() },
+        ]
+      );
+    }
+  };
+
   if (isGameUnavailable) {
     return (
       <View style={styles.centerContainer}>
@@ -164,12 +205,20 @@ export default function GameBoardScreen() {
     <View style={styles.container}>
       <ConnectionBanner />
 
-      {/* Identity card header */}
-      {currentIdentityCard && currentPlayer && (
+      {/* Identity card header — only when treachery active */}
+      {isTreacheryActive && currentIdentityCard && currentPlayer && (
         <IdentityCardHeader
           card={currentIdentityCard}
           player={currentPlayer}
           onPress={() => setShowCardDetail(true)}
+        />
+      )}
+
+      {/* Plane card banner — only when planechase active and not own-deck */}
+      {isPlanechaseActive && !isOwnDeckMode && currentPlane && (
+        <PlaneCardBanner
+          planeCard={currentPlane}
+          onPress={() => setShowPlaneDetail(true)}
         />
       )}
 
@@ -180,7 +229,7 @@ export default function GameBoardScreen() {
         <View style={styles.ornateLine} />
       </View>
 
-      {/* Player list */}
+      {/* Player list — always shown */}
       <FlatList
         data={players}
         keyExtractor={(p) => p.id}
@@ -188,7 +237,7 @@ export default function GameBoardScreen() {
           <PlayerRow
             player={item}
             isCurrentUser={item.user_id === currentUserId}
-            canSeeRole={canSeeRole(item)}
+            canSeeRole={isTreacheryActive ? canSeeRole(item) : false}
             isUnveiledOrLeader={item.is_unveiled || item.role === 'leader'}
             onAdjustLife={(amount) => adjustLife(item.id, amount)}
             onViewCard={() => setInspectedPlayer(item)}
@@ -221,8 +270,19 @@ export default function GameBoardScreen() {
         </View>
       )}
 
-      {/* Action bar (only for non-eliminated players) */}
-      {currentPlayer && !currentPlayer.is_eliminated && (
+      {/* Planar die bar — only when planechase active */}
+      {isPlanechaseActive && currentPlayer && !currentPlayer.is_eliminated && (
+        <PlanarDieBar
+          cost={dieRollCost}
+          isRolling={isRollingDie}
+          lastResult={dieRollResult}
+          lastRollerName={lastRollerName}
+          onRoll={rollDie}
+        />
+      )}
+
+      {/* Action bar (unveil/win) — only when treachery active */}
+      {isTreacheryActive && currentPlayer && !currentPlayer.is_eliminated && (
         <View style={styles.actionBar}>
           {!currentPlayer.is_unveiled &&
             currentPlayer.role !== 'leader' && (
@@ -257,8 +317,8 @@ export default function GameBoardScreen() {
         </View>
       )}
 
-      {/* Forfeit button (only for non-eliminated players) */}
-      {currentPlayer && !currentPlayer.is_eliminated && (
+      {/* Forfeit button — only when treachery active */}
+      {isTreacheryActive && currentPlayer && !currentPlayer.is_eliminated && (
         <TouchableOpacity
           style={[styles.forfeitButton, isPending && { opacity: 0.5 }]}
           onPress={handleForfeit}
@@ -272,13 +332,37 @@ export default function GameBoardScreen() {
         </TouchableOpacity>
       )}
 
-      {/* Card detail modal */}
-      {currentIdentityCard && currentPlayer && (
+      {/* End Game button — only when NOT treachery (host only) */}
+      {!isTreacheryActive && isHost && currentPlayer && !currentPlayer.is_eliminated && (
+        <TouchableOpacity
+          style={[styles.endGameButton, isPending && { opacity: 0.5 }]}
+          onPress={handleEndGame}
+          disabled={isPending}
+          accessibilityLabel="End game"
+          accessibilityRole="button"
+          accessibilityHint="Ends the game for all players"
+        >
+          <Ionicons name="stop-circle" size={16} color={colors.error} />
+          <Text style={styles.endGameText}>End Game</Text>
+        </TouchableOpacity>
+      )}
+
+      {/* Identity card detail modal */}
+      {isTreacheryActive && currentIdentityCard && currentPlayer && (
         <IdentityCardDetail
           card={currentIdentityCard}
           player={currentPlayer}
           visible={showCardDetail}
           onClose={() => setShowCardDetail(false)}
+        />
+      )}
+
+      {/* Plane card detail modal */}
+      {isPlanechaseActive && currentPlane && (
+        <PlaneCardDetail
+          planeCard={currentPlane}
+          visible={showPlaneDetail}
+          onClose={() => setShowPlaneDetail(false)}
         />
       )}
 
@@ -426,6 +510,18 @@ const styles = StyleSheet.create({
   forfeitText: {
     color: colors.warning,
     fontSize: 14,
+  },
+  endGameButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingBottom: spacing.lg,
+  },
+  endGameText: {
+    color: colors.error,
+    fontSize: 14,
+    fontWeight: '600',
   },
   unavailableTitle: {
     color: colors.text,

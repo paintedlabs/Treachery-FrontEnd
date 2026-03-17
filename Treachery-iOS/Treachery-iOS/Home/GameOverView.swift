@@ -29,14 +29,93 @@ struct GameOverView: View {
                         .foregroundStyle(Color.mtgTextSecondary)
                     Spacer()
                 } else {
+                    let isTreacheryMode = viewModel.game?.gameMode.includesTreachery ?? true
+
                     Spacer()
 
-                    // Winner announcement
-                    if let winningTeam = viewModel.winningTeam {
+                    if isTreacheryMode {
+                        // Winner announcement (treachery modes only)
+                        if let winningTeam = viewModel.winningTeam {
+                            VStack(spacing: 12) {
+                                Image(systemName: "trophy.fill")
+                                    .font(.system(size: 48))
+                                    .foregroundStyle(winningTeam.color)
+
+                                Text("Game Over")
+                                    .font(.system(size: 36, weight: .bold, design: .serif))
+                                    .foregroundStyle(Color.mtgTextPrimary)
+
+                                OrnateDivider()
+                                    .padding(.horizontal, 40)
+
+                                HStack(spacing: 8) {
+                                    Circle()
+                                        .fill(winningTeam.color)
+                                        .frame(width: 16, height: 16)
+                                    Text("\(winningTeam.displayName) Wins!")
+                                        .font(.system(.title, design: .serif))
+                                        .fontWeight(.semibold)
+                                        .foregroundStyle(winningTeam.color)
+                                }
+                                .accessibilityElement(children: .combine)
+                                .accessibilityLabel("\(winningTeam.displayName) team wins")
+                            }
+                        }
+
+                        // All players revealed (treachery modes only)
+                        VStack(spacing: 0) {
+                            ForEach(viewModel.players) { player in
+                                HStack {
+                                    Circle()
+                                        .fill(player.role?.color ?? .gray)
+                                        .frame(width: 12, height: 12)
+
+                                    Text(player.displayName)
+                                        .fontWeight(.medium)
+                                        .foregroundStyle(Color.mtgTextPrimary)
+
+                                    Spacer()
+
+                                    VStack(alignment: .trailing, spacing: 2) {
+                                        Text(player.role?.displayName ?? "Unknown")
+                                            .font(.subheadline)
+                                            .foregroundStyle(player.role?.color ?? Color.mtgTextSecondary)
+
+                                        if let card = viewModel.identityCard(for: player) {
+                                            Text(card.name)
+                                                .font(.caption)
+                                                .foregroundStyle(Color.mtgTextSecondary)
+                                        }
+                                    }
+
+                                    if player.isEliminated {
+                                        Image(systemName: "xmark.circle.fill")
+                                            .foregroundStyle(Color.mtgError)
+                                            .font(.caption)
+                                            .padding(.leading, 4)
+                                    }
+                                }
+                                .padding(.vertical, 10)
+                                .padding(.horizontal, 16)
+                                .accessibilityElement(children: .combine)
+                                .accessibilityLabel("\(player.displayName), \(player.role?.displayName ?? "Unknown")\(player.isEliminated ? ", eliminated" : "")")
+
+                                if player.id != viewModel.players.last?.id {
+                                    Rectangle()
+                                        .fill(Color.mtgDivider)
+                                        .frame(height: 1)
+                                        .padding(.horizontal, 16)
+                                }
+                            }
+                        }
+                        .mtgCardFrame()
+                        .padding(.horizontal)
+                    } else {
+                        // Non-treachery game over: simple summary
                         VStack(spacing: 12) {
-                            Image(systemName: "trophy.fill")
+                            Image(systemName: "flag.checkered")
                                 .font(.system(size: 48))
-                                .foregroundStyle(winningTeam.color)
+                                .foregroundStyle(Color.mtgGold)
 
                             Text("Game Over")
                                 .font(.system(size: 36, weight: .bold, design: .serif))
@@ -45,68 +124,54 @@ struct GameOverView: View {
                             OrnateDivider()
                                 .padding(.horizontal, 40)
 
-                            HStack(spacing: 8) {
-                                Circle()
-                                    .fill(winningTeam.color)
-                                    .frame(width: 16, height: 16)
-                                Text("\(winningTeam.displayName) Wins!")
-                                    .font(.system(.title, design: .serif))
+                            if let mode = viewModel.game?.gameMode {
+                                Text(mode.displayName)
+                                    .font(.caption)
                                     .fontWeight(.semibold)
-                                    .foregroundStyle(winningTeam.color)
+                                    .foregroundStyle(Color.mtgBackground)
+                                    .padding(.horizontal, 12)
+                                    .padding(.vertical, 4)
+                                    .background(Color.mtgGold)
+                                    .clipShape(Capsule())
                             }
-                            .accessibilityElement(children: .combine)
-                            .accessibilityLabel("\(winningTeam.displayName) team wins")
+
+                            Text("\(viewModel.players.count) player\(viewModel.players.count == 1 ? "" : "s")")
+                                .font(.subheadline)
+                                .foregroundStyle(Color.mtgTextSecondary)
                         }
-                    }
 
-                    // All players revealed
-                    VStack(spacing: 0) {
-                        ForEach(viewModel.players) { player in
-                            HStack {
-                                Circle()
-                                    .fill(player.role?.color ?? .gray)
-                                    .frame(width: 12, height: 12)
+                        // Player list without roles
+                        VStack(spacing: 0) {
+                            ForEach(viewModel.players) { player in
+                                HStack {
+                                    Text(player.displayName)
+                                        .fontWeight(.medium)
+                                        .foregroundStyle(Color.mtgTextPrimary)
 
-                                Text(player.displayName)
-                                    .fontWeight(.medium)
-                                    .foregroundStyle(Color.mtgTextPrimary)
+                                    Spacer()
 
-                                Spacer()
-
-                                VStack(alignment: .trailing, spacing: 2) {
-                                    Text(player.role?.displayName ?? "Unknown")
-                                        .font(.subheadline)
-                                        .foregroundStyle(player.role?.color ?? Color.mtgTextSecondary)
-
-                                    if let card = viewModel.identityCard(for: player) {
-                                        Text(card.name)
+                                    if player.isEliminated {
+                                        Image(systemName: "xmark.circle.fill")
+                                            .foregroundStyle(Color.mtgError)
                                             .font(.caption)
-                                            .foregroundStyle(Color.mtgTextSecondary)
                                     }
                                 }
+                                .padding(.vertical, 10)
+                                .padding(.horizontal, 16)
+                                .accessibilityElement(children: .combine)
+                                .accessibilityLabel("\(player.displayName)\(player.isEliminated ? ", eliminated" : "")")
 
-                                if player.isEliminated {
-                                    Image(systemName: "xmark.circle.fill")
-                                        .foregroundStyle(Color.mtgError)
-                                        .font(.caption)
-                                        .padding(.leading, 4)
+                                if player.id != viewModel.players.last?.id {
+                                    Rectangle()
+                                        .fill(Color.mtgDivider)
+                                        .frame(height: 1)
+                                        .padding(.horizontal, 16)
                                 }
                             }
-                            .padding(.vertical, 10)
-                            .padding(.horizontal, 16)
-                            .accessibilityElement(children: .combine)
-                            .accessibilityLabel("\(player.displayName), \(player.role?.displayName ?? "Unknown")\(player.isEliminated ? ", eliminated" : "")")
-
-                            if player.id != viewModel.players.last?.id {
-                                Rectangle()
-                                    .fill(Color.mtgDivider)
-                                    .frame(height: 1)
-                                    .padding(.horizontal, 16)
-                            }
                         }
+                        .mtgCardFrame()
+                        .padding(.horizontal)
                     }
-                    .mtgCardFrame()
-                    .padding(.horizontal)
 
                     Spacer()
 

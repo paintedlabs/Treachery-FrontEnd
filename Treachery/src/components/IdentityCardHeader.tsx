@@ -13,20 +13,77 @@ interface IdentityCardHeaderProps {
 
 export function IdentityCardHeader({ card, player, onPress }: IdentityCardHeaderProps) {
   const roleColor = player.role ? ROLE_COLORS[player.role] : colors.textSecondary;
+  const isAlwaysVisible = player.is_unveiled || player.role === 'leader';
+
+  if (isAlwaysVisible) {
+    return (
+      <TouchableOpacity
+        style={[styles.container, { borderColor: roleColor + '60' }]}
+        onPress={onPress}
+        activeOpacity={0.7}
+        accessibilityLabel={`Your identity card: ${card.name}, ${player.role ? ROLE_DISPLAY_NAMES[player.role] : 'Unknown'} role, ${player.life_total} life`}
+        accessibilityRole="button"
+        accessibilityHint="Opens full identity card view"
+      >
+        <View style={[styles.topTrim, { backgroundColor: roleColor }]} />
+        <RevealedContent card={card} player={player} roleColor={roleColor} />
+      </TouchableOpacity>
+    );
+  }
 
   return (
     <TouchableOpacity
-      style={[styles.container, { borderColor: roleColor + '60' }]}
+      style={[styles.container, { borderColor: colors.border }]}
       onPress={onPress}
       activeOpacity={0.7}
-      accessibilityLabel={`Your identity card: ${card.name}, ${player.role ? ROLE_DISPLAY_NAMES[player.role] : 'Unknown'} role, ${player.life_total} life`}
+      accessibilityLabel="Your secret identity. Tap to peek."
       accessibilityRole="button"
       accessibilityHint="Opens full identity card view"
     >
-      {/* Top gold trim */}
-      <View style={[styles.topTrim, { backgroundColor: roleColor }]} />
+      <View style={[styles.topTrim, { backgroundColor: colors.primary }]} />
+      <ConcealedContent player={player} />
+    </TouchableOpacity>
+  );
+}
 
-      {/* Role and life */}
+// ── Concealed (tap to open sheet) ─────────────────────────────────────
+
+function ConcealedContent({
+  player,
+}: {
+  player: Player;
+}) {
+  return (
+    <>
+      <View style={styles.topRow}>
+        <Ionicons
+          name="eye-off"
+          size={22}
+          color={colors.primary}
+        />
+        <View style={styles.lifeBox}>
+          <Text style={styles.lifeText}>{player.life_total}</Text>
+        </View>
+      </View>
+
+      <Text style={styles.tapHintConcealed}>Tap to peek at your identity</Text>
+    </>
+  );
+}
+
+// ── Revealed content (unveiled or leader) ─────────────────────────────
+
+function RevealedContent({
+  card,
+  player,
+  roleColor,
+}: {
+  card: IdentityCard;
+  player: Player;
+  roleColor: string;
+}) {
+  return (
+    <>
       <View style={styles.topRow}>
         <View style={styles.roleRow}>
           <View style={[styles.roleDot, { backgroundColor: roleColor }]} />
@@ -39,38 +96,34 @@ export function IdentityCardHeader({ card, player, onPress }: IdentityCardHeader
         </View>
       </View>
 
-      {/* Card name */}
       <View style={styles.nameRow}>
         <Text style={styles.cardName}>{card.name}</Text>
         <Ionicons name="chevron-forward" size={12} color={colors.textTertiary} />
       </View>
 
-      {/* Ornate divider */}
       <View style={styles.ornateDivider}>
         <View style={styles.ornateLine} />
         <Text style={styles.ornateDiamond}>&#9670;</Text>
         <View style={styles.ornateLine} />
       </View>
 
-      {/* Ability text */}
       <Text style={styles.abilityText} numberOfLines={3}>
         {card.ability_text}
       </Text>
 
-      {/* Unveil status */}
       <View style={styles.bottomRow}>
-        {!player.is_unveiled ? (
-          <View style={styles.unveilBadge}>
-            <Text style={styles.unveilText}>Unveil: {card.unveil_cost}</Text>
-          </View>
-        ) : (
+        {player.is_unveiled ? (
           <View style={[styles.unveiledBadge, { backgroundColor: roleColor }]}>
             <Text style={styles.unveiledText}>UNVEILED</Text>
           </View>
-        )}
+        ) : player.role === 'leader' ? (
+          <View style={styles.leaderBadge}>
+            <Text style={styles.leaderBadgeText}>LEADER — ALWAYS VISIBLE</Text>
+          </View>
+        ) : null}
         <Text style={styles.tapHint}>Tap for details</Text>
       </View>
-    </TouchableOpacity>
+    </>
   );
 }
 
@@ -166,6 +219,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 2,
     borderRadius: 10,
+    alignSelf: 'flex-start',
+    marginTop: 4,
   },
   unveilText: {
     color: colors.primary,
@@ -183,9 +238,26 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     letterSpacing: 1,
   },
+  leaderBadge: {
+    backgroundColor: 'rgba(201, 168, 76, 0.15)',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 10,
+  },
+  leaderBadgeText: {
+    color: colors.primary,
+    fontSize: 10,
+    fontWeight: 'bold',
+    letterSpacing: 0.5,
+  },
   tapHint: {
     color: colors.textTertiary,
     fontSize: 10,
     fontStyle: 'italic',
+  },
+  // Concealed-specific styles
+  tapHintConcealed: {
+    color: colors.textSecondary,
+    fontSize: 14,
   },
 });

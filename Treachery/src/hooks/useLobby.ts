@@ -13,6 +13,7 @@ interface UseLobbyReturn {
   isGameDisbanded: boolean;
   isGameStarted: boolean;
   canStartGame: boolean;
+  minPlayers: number;
   startGame: () => Promise<void>;
   leaveGame: (userId: string) => Promise<void>;
 }
@@ -48,9 +49,13 @@ export function useLobby(gameId: string, isHost: boolean): UseLobbyReturn {
 
   const isGameStarted = game?.state === 'in_progress';
 
+  const isTreacheryMode =
+    game?.game_mode === 'treachery' || game?.game_mode === 'treachery_planechase';
+  const minPlayers = isTreacheryMode ? MINIMUM_PLAYER_COUNT : 1;
+
   const canStartGame =
     isHost &&
-    players.length >= MINIMUM_PLAYER_COUNT &&
+    players.length >= minPlayers &&
     players.length <= (game?.max_players ?? 0);
 
   const startGame = useCallback(async () => {
@@ -92,6 +97,7 @@ export function useLobby(gameId: string, isHost: boolean): UseLobbyReturn {
     isGameDisbanded,
     isGameStarted,
     canStartGame,
+    minPlayers,
     startGame,
     leaveGame,
   };
