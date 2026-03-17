@@ -108,7 +108,3 @@ firebase deploy --only hosting
 4. **Play** — Track life totals, strategize, and figure out who's who
 5. **Unveil** — Reveal your identity at the right moment to activate your card's ability
 6. **Win** — Eliminate your enemies before they eliminate you
-
-## License
-
-Private — not open source.
