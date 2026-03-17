@@ -298,7 +298,9 @@ extension PlanechaseState {
         currentPlaneId: "plane01",
         usedPlaneIds: ["plane01"],
         lastDieRollerId: "user1",
-        dieRollCount: 3
+        dieRollCount: 3,
+        chaoticAetherActive: false,
+        secondaryPlaneId: nil
     )
 
     static let sampleInitial = PlanechaseState(
@@ -306,7 +308,9 @@ extension PlanechaseState {
         currentPlaneId: nil,
         usedPlaneIds: [],
         lastDieRollerId: nil,
-        dieRollCount: 0
+        dieRollCount: 0,
+        chaoticAetherActive: false,
+        secondaryPlaneId: nil
     )
 }
 

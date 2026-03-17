@@ -8,6 +8,14 @@
 import Foundation
 import FirebaseFunctions
 
+struct PhenomenonResult {
+    let type: String // "resolved" or "choose"
+    let newPlaneId: String?
+    let isPhenomenon: Bool?
+    let options: [[String: Any]]? // For Interplanar Tunnel
+    let secondaryPlaneId: String? // For Spatial Merging
+}
+
 struct CloudFunctions {
     private let functions = Functions.functions()
 
@@ -61,9 +69,25 @@ struct CloudFunctions {
     }
 
     /// Resolve the current phenomenon, advancing to the next plane.
-    func resolvePhenomenon(gameId: String) async throws {
+    /// Returns a `PhenomenonResult` so the caller can handle Interplanar Tunnel
+    /// (choose from options) and Spatial Merging (secondary plane).
+    func resolvePhenomenon(gameId: String) async throws -> PhenomenonResult {
         let callable = functions.httpsCallable("resolvePhenomenon")
-        _ = try await callable.call(["gameId": gameId])
+        let result = try await callable.call(["gameId": gameId])
+        let data = result.data as? [String: Any] ?? [:]
+        return PhenomenonResult(
+            type: data["type"] as? String ?? "resolved",
+            newPlaneId: data["newPlaneId"] as? String,
+            isPhenomenon: data["isPhenomenon"] as? Bool,
+            options: data["options"] as? [[String: Any]],
+            secondaryPlaneId: data["secondaryPlaneId"] as? String
+        )
+    }
+
+    /// Select a specific plane (e.g., from Interplanar Tunnel options).
+    func selectPlane(gameId: String, planeId: String) async throws {
+        let callable = functions.httpsCallable("selectPlane")
+        _ = try await callable.call(["gameId": gameId, "planeId": planeId])
     }
 
     /// End a non-treachery game (host only).

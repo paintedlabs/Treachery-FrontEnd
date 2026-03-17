@@ -17,6 +17,8 @@ import { IdentityCardDetail } from '@/components/IdentityCardDetail';
 import { PlaneCardBanner } from '@/components/PlaneCardBanner';
 import { PlaneCardDetail } from '@/components/PlaneCardDetail';
 import { PlanarDieBar } from '@/components/PlanarDieBar';
+import { ChaoticAetherBanner } from '@/components/ChaoticAetherBanner';
+import { InterplanarTunnelPicker } from '@/components/InterplanarTunnelPicker';
 import { PlayerRow } from '@/components/PlayerRow';
 import { ErrorBanner } from '@/components/ErrorBanner';
 import { LoadingScreen } from '@/components/LoadingScreen';
@@ -49,6 +51,10 @@ export default function GameBoardScreen() {
     isTreacheryActive,
     isOwnDeckMode,
     currentPlane,
+    secondaryPlane,
+    isChaoticAetherActive,
+    tunnelOptions,
+    selectTunnelPlane,
     dieRollCost,
     dieRollResult,
     isRollingDie,
@@ -218,8 +224,14 @@ export default function GameBoardScreen() {
       {isPlanechaseActive && !isOwnDeckMode && currentPlane && (
         <PlaneCardBanner
           planeCard={currentPlane}
+          secondaryPlaneCard={secondaryPlane}
           onPress={() => setShowPlaneDetail(true)}
         />
+      )}
+
+      {/* Chaotic Aether warning banner */}
+      {isPlanechaseActive && isChaoticAetherActive && (
+        <ChaoticAetherBanner />
       )}
 
       {/* Ornate divider */}
@@ -373,6 +385,16 @@ export default function GameBoardScreen() {
           player={inspectedPlayer}
           visible={!!inspectedPlayer}
           onClose={() => setInspectedPlayer(null)}
+        />
+      )}
+
+      {/* Interplanar Tunnel picker modal */}
+      {tunnelOptions && (
+        <InterplanarTunnelPicker
+          options={tunnelOptions}
+          visible={tunnelOptions !== null}
+          onSelect={selectTunnelPlane}
+          isSelecting={isPending}
         />
       )}
     </View>

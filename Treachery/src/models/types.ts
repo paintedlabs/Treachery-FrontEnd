@@ -17,6 +17,8 @@ export interface PlanechaseState {
   used_plane_ids: string[];
   last_die_roller_id: string | null;
   die_roll_count: number;
+  chaotic_aether_active?: boolean;
+  secondary_plane_id?: string;
 }
 
 // Plane card from bundled PlaneCards.json

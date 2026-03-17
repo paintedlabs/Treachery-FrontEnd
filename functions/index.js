@@ -18,6 +18,11 @@ const CARDS = require("./identityCards.json");
 
 const PLANE_CARDS = require("./planeCards.json");
 
+// Phenomenon IDs with custom resolution behavior
+const CHAOTIC_AETHER_ID = "6dc67a65-31bf-4535-9e02-8f6d6ecefde5";
+const INTERPLANAR_TUNNEL_ID = "7812174b-2dc1-43e8-b98f-639905e20ab7";
+const SPATIAL_MERGING_ID = "aa166578-b13b-4adb-a78e-d5183e987112";
+
 function getCardsForRole(role) {
   return CARDS.filter((c) => c.role === role);
 }
@@ -290,6 +295,8 @@ exports.startGame = onCall(callableOptions, async (request) => {
       const startingPlane = startablePlanes[Math.floor(Math.random() * startablePlanes.length)];
       gameUpdate["planechase.current_plane_id"] = startingPlane.id;
       gameUpdate["planechase.used_plane_ids"] = [startingPlane.id];
+      gameUpdate["planechase.chaotic_aether_active"] = false;
+      gameUpdate["planechase.secondary_plane_id"] = null;
     }
 
     // Transition game state + update activity timestamp
@@ -673,13 +680,26 @@ exports.rollPlanarDie = onCall(callableOptions, async (request) => {
       }
     }
 
-    tx.update(gameRef, {
+    // Chaotic Aether: while active, blank rolls become chaos
+    if (planechase.chaotic_aether_active && result === "blank") {
+      result = "chaos";
+    }
+
+    const updateData = {
       "planechase.last_die_roller_id": uid,
       "planechase.die_roll_count": rollCount,
       "planechase.current_plane_id": newPlaneId,
       "planechase.used_plane_ids": usedPlaneIds,
       last_activity_at: FieldValue.serverTimestamp(),
-    });
+    };
+
+    // Planeswalking resets Chaotic Aether and clears Spatial Merging
+    if (result === "planeswalk") {
+      updateData["planechase.chaotic_aether_active"] = false;
+      updateData["planechase.secondary_plane_id"] = null;
+    }
+
+    tx.update(gameRef, updateData);
 
     return { result, manaCost, newPlaneId };
   });
@@ -717,22 +737,138 @@ exports.resolvePhenomenon = onCall(callableOptions, async (request) => {
       throw new HttpsError("failed-precondition", "Current plane is not a phenomenon.");
 
     let usedPlaneIds = planechase.used_plane_ids || [];
-    let available = PLANE_CARDS.filter((p) => !usedPlaneIds.includes(p.id));
-    if (available.length === 0) {
-      usedPlaneIds = planechase.current_plane_id ? [planechase.current_plane_id] : [];
-      available = PLANE_CARDS.filter((p) => !usedPlaneIds.includes(p.id));
+
+    // Helper: get available non-phenomenon planes
+    function getAvailablePlanes() {
+      let pool = PLANE_CARDS.filter(
+        (p) => !p.is_phenomenon && !usedPlaneIds.includes(p.id)
+      );
+      if (pool.length === 0) {
+        usedPlaneIds = planechase.current_plane_id ? [planechase.current_plane_id] : [];
+        pool = PLANE_CARDS.filter(
+          (p) => !p.is_phenomenon && !usedPlaneIds.includes(p.id)
+        );
+      }
+      return pool;
     }
 
-    const next = available[Math.floor(Math.random() * available.length)];
-    usedPlaneIds = [...usedPlaneIds, next.id];
+    // Helper: get available cards (including phenomena) for default behavior
+    function getAvailableAll() {
+      let pool = PLANE_CARDS.filter((p) => !usedPlaneIds.includes(p.id));
+      if (pool.length === 0) {
+        usedPlaneIds = planechase.current_plane_id ? [planechase.current_plane_id] : [];
+        pool = PLANE_CARDS.filter((p) => !usedPlaneIds.includes(p.id));
+      }
+      return pool;
+    }
+
+    // Branch based on phenomenon type
+    if (currentPlane.id === CHAOTIC_AETHER_ID) {
+      // Chaotic Aether: activate the effect, then resolve to next random plane
+      const available = getAvailableAll();
+      const next = available[Math.floor(Math.random() * available.length)];
+      usedPlaneIds = [...usedPlaneIds, next.id];
+
+      tx.update(gameRef, {
+        "planechase.chaotic_aether_active": true,
+        "planechase.current_plane_id": next.id,
+        "planechase.used_plane_ids": usedPlaneIds,
+        last_activity_at: FieldValue.serverTimestamp(),
+      });
+
+      return { newPlaneId: next.id, isPhenomenon: next.is_phenomenon };
+    } else if (currentPlane.id === INTERPLANAR_TUNNEL_ID) {
+      // Interplanar Tunnel: present 5 random non-phenomenon planes for the player to choose
+      const available = getAvailablePlanes();
+      const shuffled = shuffle(available);
+      const options = shuffled.slice(0, Math.min(5, shuffled.length)).map((p) => ({
+        id: p.id,
+        name: p.name,
+      }));
+
+      // Do NOT update game state — wait for selectPlane call
+      return { type: "choose", options };
+    } else if (currentPlane.id === SPATIAL_MERGING_ID) {
+      // Spatial Merging: pick 2 random non-phenomenon planes
+      const available = getAvailablePlanes();
+      const shuffled = shuffle(available);
+
+      if (shuffled.length < 2) {
+        throw new HttpsError("internal", "Not enough planes available for Spatial Merging.");
+      }
+
+      const first = shuffled[0];
+      const second = shuffled[1];
+      usedPlaneIds = [...usedPlaneIds, first.id, second.id];
+
+      tx.update(gameRef, {
+        "planechase.current_plane_id": first.id,
+        "planechase.secondary_plane_id": second.id,
+        "planechase.used_plane_ids": usedPlaneIds,
+        last_activity_at: FieldValue.serverTimestamp(),
+      });
+
+      return { newPlaneId: first.id, secondaryPlaneId: second.id, isPhenomenon: false };
+    } else {
+      // Default: pick next random card (same as original behavior)
+      const available = getAvailableAll();
+      const next = available[Math.floor(Math.random() * available.length)];
+      usedPlaneIds = [...usedPlaneIds, next.id];
+
+      tx.update(gameRef, {
+        "planechase.current_plane_id": next.id,
+        "planechase.used_plane_ids": usedPlaneIds,
+        last_activity_at: FieldValue.serverTimestamp(),
+      });
+
+      return { newPlaneId: next.id, isPhenomenon: next.is_phenomenon };
+    }
+  });
+});
+
+// ════════════════════════════════════════════════════════════════
+// CLOUD FUNCTION: selectPlane
+// Resolves Interplanar Tunnel after the player chooses one of
+// the presented planes.
+// ════════════════════════════════════════════════════════════════
+
+exports.selectPlane = onCall(callableOptions, async (request) => {
+  const uid = request.auth?.uid;
+  if (!uid) throw new HttpsError("unauthenticated", "Must be signed in.");
+
+  const { gameId, planeId } = request.data;
+  if (!gameId) throw new HttpsError("invalid-argument", "gameId is required.");
+  if (!planeId) throw new HttpsError("invalid-argument", "planeId is required.");
+
+  return db.runTransaction(async (tx) => {
+    const gameRef = db.doc(`games/${gameId}`);
+    const gameSnap = await tx.get(gameRef);
+    if (!gameSnap.exists) throw new HttpsError("not-found", "Game not found.");
+    const game = gameSnap.data();
+
+    if (game.state !== "in_progress")
+      throw new HttpsError("failed-precondition", "Game is not in progress.");
+    if (!(game.player_ids || []).includes(uid))
+      throw new HttpsError("permission-denied", "You are not in this game.");
+
+    // Validate the chosen plane exists and is not a phenomenon
+    const chosenPlane = PLANE_CARDS.find((p) => p.id === planeId);
+    if (!chosenPlane)
+      throw new HttpsError("invalid-argument", "Invalid plane ID.");
+    if (chosenPlane.is_phenomenon)
+      throw new HttpsError("invalid-argument", "Cannot select a phenomenon.");
+
+    const planechase = game.planechase || {};
+    let usedPlaneIds = planechase.used_plane_ids || [];
+    usedPlaneIds = [...usedPlaneIds, planeId];
 
     tx.update(gameRef, {
-      "planechase.current_plane_id": next.id,
+      "planechase.current_plane_id": planeId,
       "planechase.used_plane_ids": usedPlaneIds,
       last_activity_at: FieldValue.serverTimestamp(),
     });
 
-    return { newPlaneId: next.id, isPhenomenon: next.is_phenomenon };
+    return { newPlaneId: planeId };
   });
 });
 

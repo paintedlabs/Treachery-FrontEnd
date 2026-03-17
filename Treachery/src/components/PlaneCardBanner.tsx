@@ -6,10 +6,11 @@ import { colors, fonts } from '@/constants/theme';
 
 interface PlaneCardBannerProps {
   planeCard: PlaneCard;
+  secondaryPlaneCard?: PlaneCard;
   onPress: () => void;
 }
 
-export function PlaneCardBanner({ planeCard, onPress }: PlaneCardBannerProps) {
+export function PlaneCardBanner({ planeCard, secondaryPlaneCard, onPress }: PlaneCardBannerProps) {
   const accentColor = planeCard.is_phenomenon ? colors.warning : colors.primary;
 
   return (
@@ -17,7 +18,11 @@ export function PlaneCardBanner({ planeCard, onPress }: PlaneCardBannerProps) {
       style={[styles.container, { borderColor: accentColor + '40' }]}
       onPress={onPress}
       activeOpacity={0.7}
-      accessibilityLabel={`Current plane: ${planeCard.name}. Tap for details.`}
+      accessibilityLabel={
+        secondaryPlaneCard
+          ? `Current planes: ${planeCard.name} and ${secondaryPlaneCard.name}. Tap for details.`
+          : `Current plane: ${planeCard.name}. Tap for details.`
+      }
       accessibilityRole="button"
     >
       <View style={[styles.topTrim, { backgroundColor: accentColor }]} />
@@ -36,6 +41,21 @@ export function PlaneCardBanner({ planeCard, onPress }: PlaneCardBannerProps) {
           <Text style={[styles.typeLine, { color: accentColor }]} numberOfLines={1}>
             {planeCard.type_line}
           </Text>
+          {secondaryPlaneCard && (
+            <>
+              <View style={styles.dualDivider}>
+                <View style={styles.dualDividerLine} />
+                <Text style={styles.dualDividerPlus}>+</Text>
+                <View style={styles.dualDividerLine} />
+              </View>
+              <Text style={styles.name} numberOfLines={1}>
+                {secondaryPlaneCard.name}
+              </Text>
+              <Text style={[styles.typeLine, { color: colors.primary }]} numberOfLines={1}>
+                {secondaryPlaneCard.type_line}
+              </Text>
+            </>
+          )}
         </View>
         <Ionicons name="chevron-forward" size={14} color={colors.textTertiary} />
       </View>
@@ -85,5 +105,21 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '500',
     letterSpacing: 0.5,
+  },
+  dualDivider: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginVertical: 4,
+  },
+  dualDividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: colors.border,
+  },
+  dualDividerPlus: {
+    color: colors.textTertiary,
+    fontSize: 12,
+    fontWeight: '600',
   },
 });

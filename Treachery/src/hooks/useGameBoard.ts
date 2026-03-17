@@ -27,6 +27,10 @@ interface UseGameBoardReturn {
   isTreacheryActive: boolean;
   isOwnDeckMode: boolean;
   currentPlane: PlaneCard | undefined;
+  secondaryPlane: PlaneCard | undefined;
+  isChaoticAetherActive: boolean;
+  tunnelOptions: PlaneCard[] | null;
+  selectTunnelPlane: (planeId: string) => Promise<void>;
   dieRollCost: number;
   dieRollResult: string | null;
   isRollingDie: boolean;
@@ -46,6 +50,7 @@ export function useGameBoard(gameId: string, currentUserId: string | null): UseG
   // Planechase transient state
   const [dieRollResult, setDieRollResult] = useState<string | null>(null);
   const [isRollingDie, setIsRollingDie] = useState(false);
+  const [tunnelOptions, setTunnelOptions] = useState<PlaneCard[] | null>(null);
 
   // Optimistic life deltas: playerId -> pending delta
   const lifeDeltasRef = useRef<Record<string, number>>({});
@@ -133,6 +138,16 @@ export function useGameBoard(gameId: string, currentUserId: string | null): UseG
     if (!planeId) return undefined;
     return getPlane(planeId);
   }, [game?.planechase?.current_plane_id]);
+
+  const secondaryPlane = useMemo(() => {
+    const planeId = game?.planechase?.secondary_plane_id;
+    if (!planeId) return undefined;
+    return getPlane(planeId);
+  }, [game?.planechase?.secondary_plane_id]);
+
+  const isChaoticAetherActive = useMemo(() => {
+    return game?.planechase?.chaotic_aether_active === true;
+  }, [game?.planechase?.chaotic_aether_active]);
 
   const dieRollCost = useMemo(() => {
     // Cost starts at 0 for the first roll each turn, then increases by 1 each subsequent roll
@@ -260,10 +275,33 @@ export function useGameBoard(gameId: string, currentUserId: string | null): UseG
     setIsPending(true);
 
     try {
-      const resolveFn = httpsCallable(functions, 'resolvePhenomenon');
-      await resolveFn({ gameId });
+      const resolveFn = httpsCallable<{ gameId: string }, { type?: string; options?: string[] }>(functions, 'resolvePhenomenon');
+      const response = await resolveFn({ gameId });
+
+      if (response.data.type === 'choose' && response.data.options) {
+        const planes = response.data.options
+          .map((id) => getPlane(id))
+          .filter((p): p is PlaneCard => p !== undefined);
+        setTunnelOptions(planes);
+      }
     } catch (error: any) {
       setErrorMessage(error.message || 'Failed to resolve phenomenon.');
+    } finally {
+      setIsPending(false);
+    }
+  }, [gameId, isPending]);
+
+  const selectTunnelPlane = useCallback(async (planeId: string) => {
+    if (isPending) return;
+    setErrorMessage(null);
+    setIsPending(true);
+
+    try {
+      const selectFn = httpsCallable(functions, 'selectPlane');
+      await selectFn({ gameId, planeId });
+      setTunnelOptions(null);
+    } catch (error: any) {
+      setErrorMessage(error.message || 'Failed to select plane.');
     } finally {
       setIsPending(false);
     }
@@ -305,6 +343,10 @@ export function useGameBoard(gameId: string, currentUserId: string | null): UseG
     isTreacheryActive,
     isOwnDeckMode,
     currentPlane,
+    secondaryPlane,
+    isChaoticAetherActive,
+    tunnelOptions,
+    selectTunnelPlane,
     dieRollCost,
     dieRollResult,
     isRollingDie,

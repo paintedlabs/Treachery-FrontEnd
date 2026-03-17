@@ -23,6 +23,7 @@ final class GameBoardViewModel: ObservableObject {
     // Planechase transient state
     @Published var dieRollResult: String?
     @Published var isRollingDie = false
+    @Published var tunnelOptions: [PlaneCard]?
 
     // MARK: - Optimistic Life Tracking
 
@@ -89,6 +90,15 @@ final class GameBoardViewModel: ObservableObject {
     var currentPlane: PlaneCard? {
         guard let planeId = game?.planechase?.currentPlaneId else { return nil }
         return PlaneDatabase.shared.plane(withId: planeId)
+    }
+
+    var secondaryPlane: PlaneCard? {
+        guard let planeId = game?.planechase?.secondaryPlaneId else { return nil }
+        return PlaneDatabase.shared.plane(withId: planeId)
+    }
+
+    var isChaoticAetherActive: Bool {
+        game?.planechase?.chaoticAetherActive ?? false
     }
 
     /// The mana cost for the next planar die roll.
@@ -266,7 +276,29 @@ final class GameBoardViewModel: ObservableObject {
         isPending = true
 
         do {
-            try await cloudFunctions.resolvePhenomenon(gameId: gameId)
+            let result = try await cloudFunctions.resolvePhenomenon(gameId: gameId)
+            if result.type == "choose", let options = result.options {
+                // Interplanar Tunnel — show picker
+                tunnelOptions = options.compactMap { dict in
+                    guard let id = dict["id"] as? String else { return nil }
+                    return PlaneDatabase.shared.plane(withId: id)
+                }
+            }
+            // For other types, Firestore listener will update the state
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+        isPending = false
+    }
+
+    func selectTunnelPlane(_ plane: PlaneCard) async {
+        guard !isPending else { return }
+        errorMessage = nil
+        isPending = true
+        tunnelOptions = nil
+
+        do {
+            try await cloudFunctions.selectPlane(gameId: gameId, planeId: plane.id)
         } catch {
             errorMessage = error.localizedDescription
         }

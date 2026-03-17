@@ -127,8 +127,13 @@ struct GameBoardView: View {
 
                     // Plane card banner — only when planechase active (and not own-deck)
                     if viewModel.isPlanechaseActive && !viewModel.isOwnDeckMode {
+                        // Chaotic Aether indicator
+                        if viewModel.isChaoticAetherActive {
+                            ChaoticAetherIndicator()
+                        }
+
                         if let plane = viewModel.currentPlane {
-                            PlaneCardBanner(plane: plane)
+                            PlaneCardBanner(plane: plane, secondaryPlane: viewModel.secondaryPlane)
 
                             // Phenomenon overlay when current plane is a phenomenon
                             if plane.isPhenomenon {
@@ -310,6 +315,14 @@ struct GameBoardView: View {
             if let card = viewModel.currentIdentityCard,
                let player = viewModel.currentPlayer {
                 IdentityCardView(card: card, player: player)
+            }
+        }
+        .sheet(isPresented: Binding(
+            get: { viewModel.tunnelOptions != nil },
+            set: { if !$0 { viewModel.tunnelOptions = nil } }
+        )) {
+            if let options = viewModel.tunnelOptions {
+                InterplanarTunnelPicker(options: options, viewModel: viewModel)
             }
         }
     }
