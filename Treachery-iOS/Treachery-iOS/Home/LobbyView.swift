@@ -13,6 +13,7 @@ struct LobbyView: View {
     @Binding var navigationPath: NavigationPath
     @State private var showHostLeftAlert = false
     @State private var showShareSheet = false
+    @State private var isLeaving = false
 
     init(gameId: String, isHost: Bool, navigationPath: Binding<NavigationPath>) {
         _viewModel = StateObject(wrappedValue: LobbyViewModel(gameId: gameId, isHost: isHost))
@@ -188,15 +189,28 @@ struct LobbyView: View {
                             }
                         }
 
-                        Button("Leave Game") {
+                        Button {
+                            isLeaving = true
                             Task {
                                 if let userId = authViewModel.currentUserId {
                                     await viewModel.leaveGame(userId: userId)
-                                    navigationPath.removeLast(navigationPath.count)
                                 }
+                                navigationPath.removeLast(navigationPath.count)
+                            }
+                        } label: {
+                            if isLeaving {
+                                HStack(spacing: 8) {
+                                    ProgressView()
+                                        .controlSize(.small)
+                                        .tint(Color.mtgError)
+                                    Text("Leaving...")
+                                }
+                            } else {
+                                Text("Leave Game")
                             }
                         }
                         .foregroundStyle(Color.mtgError)
+                        .disabled(isLeaving)
                         .accessibilityLabel("Leave game")
                     }
                     .padding()

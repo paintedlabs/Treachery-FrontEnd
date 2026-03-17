@@ -89,6 +89,9 @@ final class LobbyViewModel: ObservableObject {
 
     func leaveGame(userId: String) async {
         errorMessage = nil
+        // Stop listeners before leaving to prevent race conditions
+        // where the snapshot update re-renders the view mid-navigation
+        stopListening()
         do {
             try await cloudFunctions.leaveGame(gameId: gameId)
         } catch {

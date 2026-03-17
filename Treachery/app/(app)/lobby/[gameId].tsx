@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -85,20 +85,31 @@ export default function LobbyScreen() {
     }
   };
 
+  const [isLeaving, setIsLeaving] = useState(false);
+
+  const doLeave = async () => {
+    setIsLeaving(true);
+    if (currentUserId) {
+      await leaveGame(currentUserId);
+    }
+    router.replace('/(app)');
+  };
+
   const handleLeave = () => {
-    Alert.alert('Leave Game', 'Are you sure you want to leave?', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Leave',
-        style: 'destructive',
-        onPress: async () => {
-          if (currentUserId) {
-            await leaveGame(currentUserId);
-            router.replace('/(app)');
-          }
+    if (Platform.OS === 'web') {
+      if (window.confirm('Are you sure you want to leave?')) {
+        doLeave();
+      }
+    } else {
+      Alert.alert('Leave Game', 'Are you sure you want to leave?', [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Leave',
+          style: 'destructive',
+          onPress: doLeave,
         },
-      },
-    ]);
+      ]);
+    }
   };
 
   if (!game && !errorMessage && !isGameDisbanded) {
@@ -229,10 +240,18 @@ export default function LobbyScreen() {
         <TouchableOpacity
           style={styles.leaveButton}
           onPress={handleLeave}
+          disabled={isLeaving}
           accessibilityLabel="Leave game"
           accessibilityRole="button"
         >
-          <Text style={styles.leaveText}>Leave Game</Text>
+          {isLeaving ? (
+            <View style={styles.buttonRow}>
+              <ActivityIndicator size="small" color={colors.destructive} />
+              <Text style={styles.leaveText}>Leaving...</Text>
+            </View>
+          ) : (
+            <Text style={styles.leaveText}>Leave Game</Text>
+          )}
         </TouchableOpacity>
       </View>
     </View>

@@ -24,9 +24,11 @@ export function useLobby(gameId: string, isHost: boolean): UseLobbyReturn {
   const [isStartingGame, setIsStartingGame] = useState(false);
   const [isGameDisbanded, setIsGameDisbanded] = useState(false);
   const hasReceivedFirstSnapshot = useRef(false);
+  const unsubGameRef = useRef<(() => void) | null>(null);
+  const unsubPlayersRef = useRef<(() => void) | null>(null);
 
   useEffect(() => {
-    const unsubGame = firestoreService.listenToGame(gameId, (g) => {
+    unsubGameRef.current = firestoreService.listenToGame(gameId, (g) => {
       if (g === null && hasReceivedFirstSnapshot.current) {
         setIsGameDisbanded(true);
       }
@@ -34,13 +36,13 @@ export function useLobby(gameId: string, isHost: boolean): UseLobbyReturn {
       hasReceivedFirstSnapshot.current = true;
     });
 
-    const unsubPlayers = firestoreService.listenToPlayers(gameId, (p) => {
+    unsubPlayersRef.current = firestoreService.listenToPlayers(gameId, (p) => {
       setPlayers(p);
     });
 
     return () => {
-      unsubGame();
-      unsubPlayers();
+      unsubGameRef.current?.();
+      unsubPlayersRef.current?.();
     };
   }, [gameId]);
 
@@ -68,6 +70,10 @@ export function useLobby(gameId: string, isHost: boolean): UseLobbyReturn {
   const leaveGame = useCallback(
     async (_userId: string) => {
       setErrorMessage(null);
+      // Stop listeners before leaving to prevent race conditions
+      // where snapshot updates re-render the view mid-navigation
+      unsubGameRef.current?.();
+      unsubPlayersRef.current?.();
       try {
         const leaveGameFn = httpsCallable(functions, 'leaveGame');
         await leaveGameFn({ gameId });
