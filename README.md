@@ -2,6 +2,8 @@
 
 A companion app for the [MTG Treachery](https://mtgtreachery.net) format — a multiplayer Magic: The Gathering variant built around hidden roles, secret allegiances, and dramatic reveals.
 
+Currently running live at https://treachery-71922.web.app/ - check it out! No signup required.
+
 Available as a **native iOS app** and a **web app** hosted on Firebase.
 
 ## What is Treachery?
