@@ -1,9 +1,10 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { httpsCallable } from 'firebase/functions';
-import { Game, Player, Role, IdentityCard } from '@/models/types';
+import { Game, Player, Role, IdentityCard, PlaneCard } from '@/models/types';
 import * as firestoreService from '@/services/firestore';
 import { functions } from '@/config/firebase';
 import { getCard } from '@/services/cardDatabase';
+import { getPlane } from '@/services/planeDatabase';
 
 interface UseGameBoardReturn {
   game: Game | null;
@@ -21,6 +22,21 @@ interface UseGameBoardReturn {
   eliminateAndLeave: () => Promise<void>;
   canSeeRole: (player: Player) => boolean;
   identityCard: (player: Player) => IdentityCard | undefined;
+  // Planechase
+  isPlanechaseActive: boolean;
+  isTreacheryActive: boolean;
+  isOwnDeckMode: boolean;
+  currentPlane: PlaneCard | undefined;
+  secondaryPlane: PlaneCard | undefined;
+  isChaoticAetherActive: boolean;
+  tunnelOptions: PlaneCard[] | null;
+  selectTunnelPlane: (planeId: string) => Promise<void>;
+  dieRollCost: number;
+  dieRollResult: string | null;
+  isRollingDie: boolean;
+  rollDie: () => Promise<void>;
+  resolvePhenomenon: () => Promise<void>;
+  endGame: () => Promise<void>;
 }
 
 export function useGameBoard(gameId: string, currentUserId: string | null): UseGameBoardReturn {
@@ -30,6 +46,11 @@ export function useGameBoard(gameId: string, currentUserId: string | null): UseG
   const [isGameUnavailable, setIsGameUnavailable] = useState(false);
   const [isPending, setIsPending] = useState(false);
   const hasReceivedFirstSnapshot = useRef(false);
+
+  // Planechase transient state
+  const [dieRollResult, setDieRollResult] = useState<string | null>(null);
+  const [isRollingDie, setIsRollingDie] = useState(false);
+  const [tunnelOptions, setTunnelOptions] = useState<PlaneCard[] | null>(null);
 
   // Optimistic life deltas: playerId -> pending delta
   const lifeDeltasRef = useRef<Record<string, number>>({});
@@ -94,7 +115,46 @@ export function useGameBoard(gameId: string, currentUserId: string | null): UseG
 
   const alivePlayers = players.filter((p) => !p.is_eliminated);
 
-  // All game actions now go through Cloud Functions.
+  // ── Game mode computed booleans ──────────────────────────────────────
+
+  const isPlanechaseActive = useMemo(() => {
+    const mode = game?.game_mode;
+    return mode === 'planechase' || mode === 'treachery_planechase';
+  }, [game?.game_mode]);
+
+  const isTreacheryActive = useMemo(() => {
+    const mode = game?.game_mode;
+    return mode === 'treachery' || mode === 'treachery_planechase';
+  }, [game?.game_mode]);
+
+  const isOwnDeckMode = useMemo(() => {
+    return game?.planechase?.use_own_deck === true;
+  }, [game?.planechase?.use_own_deck]);
+
+  // ── Planechase derived state ─────────────────────────────────────────
+
+  const currentPlane = useMemo(() => {
+    const planeId = game?.planechase?.current_plane_id;
+    if (!planeId) return undefined;
+    return getPlane(planeId);
+  }, [game?.planechase?.current_plane_id]);
+
+  const secondaryPlane = useMemo(() => {
+    const planeId = game?.planechase?.secondary_plane_id;
+    if (!planeId) return undefined;
+    return getPlane(planeId);
+  }, [game?.planechase?.secondary_plane_id]);
+
+  const isChaoticAetherActive = useMemo(() => {
+    return game?.planechase?.chaotic_aether_active === true;
+  }, [game?.planechase?.chaotic_aether_active]);
+
+  const dieRollCost = useMemo(() => {
+    // Cost starts at 0 for the first roll each turn, then increases by 1 each subsequent roll
+    return game?.planechase?.die_roll_count ?? 0;
+  }, [game?.planechase?.die_roll_count]);
+
+  // ── All game actions now go through Cloud Functions ───────────────────
   // Win condition checking happens server-side automatically.
 
   const flushLifeDelta = useCallback(
@@ -190,6 +250,78 @@ export function useGameBoard(gameId: string, currentUserId: string | null): UseG
     return getCard(player.identity_card_id);
   }, []);
 
+  // ── Planechase actions ───────────────────────────────────────────────
+
+  const rollDie = useCallback(async () => {
+    if (isRollingDie || isPending) return;
+    setErrorMessage(null);
+    setIsRollingDie(true);
+    setDieRollResult(null);
+
+    try {
+      const rollDieFn = httpsCallable<{ gameId: string }, { result: string }>(functions, 'rollPlanarDie');
+      const response = await rollDieFn({ gameId });
+      setDieRollResult(response.data.result);
+    } catch (error: any) {
+      setErrorMessage(error.message || 'Failed to roll die.');
+    } finally {
+      setIsRollingDie(false);
+    }
+  }, [gameId, isRollingDie, isPending]);
+
+  const resolvePhenomenon = useCallback(async () => {
+    if (isPending) return;
+    setErrorMessage(null);
+    setIsPending(true);
+
+    try {
+      const resolveFn = httpsCallable<{ gameId: string }, { type?: string; options?: string[] }>(functions, 'resolvePhenomenon');
+      const response = await resolveFn({ gameId });
+
+      if (response.data.type === 'choose' && response.data.options) {
+        const planes = response.data.options
+          .map((id) => getPlane(id))
+          .filter((p): p is PlaneCard => p !== undefined);
+        setTunnelOptions(planes);
+      }
+    } catch (error: any) {
+      setErrorMessage(error.message || 'Failed to resolve phenomenon.');
+    } finally {
+      setIsPending(false);
+    }
+  }, [gameId, isPending]);
+
+  const selectTunnelPlane = useCallback(async (planeId: string) => {
+    if (isPending) return;
+    setErrorMessage(null);
+    setIsPending(true);
+
+    try {
+      const selectFn = httpsCallable(functions, 'selectPlane');
+      await selectFn({ gameId, planeId });
+      setTunnelOptions(null);
+    } catch (error: any) {
+      setErrorMessage(error.message || 'Failed to select plane.');
+    } finally {
+      setIsPending(false);
+    }
+  }, [gameId, isPending]);
+
+  const endGame = useCallback(async () => {
+    if (isPending) return;
+    setErrorMessage(null);
+    setIsPending(true);
+
+    try {
+      const endGameFn = httpsCallable(functions, 'endGame');
+      await endGameFn({ gameId });
+    } catch (error: any) {
+      setErrorMessage(error.message || 'Failed to end game.');
+    } finally {
+      setIsPending(false);
+    }
+  }, [gameId, isPending]);
+
   return {
     game,
     players,
@@ -206,5 +338,20 @@ export function useGameBoard(gameId: string, currentUserId: string | null): UseG
     eliminateAndLeave,
     canSeeRole,
     identityCard: identityCardFn,
+    // Planechase
+    isPlanechaseActive,
+    isTreacheryActive,
+    isOwnDeckMode,
+    currentPlane,
+    secondaryPlane,
+    isChaoticAetherActive,
+    tunnelOptions,
+    selectTunnelPlane,
+    dieRollCost,
+    dieRollResult,
+    isRollingDie,
+    rollDie,
+    resolvePhenomenon,
+    endGame,
   };
 }

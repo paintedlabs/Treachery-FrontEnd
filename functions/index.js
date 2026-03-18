@@ -14,6 +14,15 @@ const db = getFirestore();
 
 const CARDS = require("./identityCards.json");
 
+// ── Plane Cards (for Planechase game mode) ──
+
+const PLANE_CARDS = require("./planeCards.json");
+
+// Phenomenon IDs with custom resolution behavior
+const CHAOTIC_AETHER_ID = "6dc67a65-31bf-4535-9e02-8f6d6ecefde5";
+const INTERPLANAR_TUNNEL_ID = "7812174b-2dc1-43e8-b98f-639905e20ab7";
+const SPATIAL_MERGING_ID = "aa166578-b13b-4adb-a78e-d5183e987112";
+
 function getCardsForRole(role) {
   return CARDS.filter((c) => c.role === role);
 }
@@ -201,6 +210,11 @@ exports.startGame = onCall(callableOptions, async (request) => {
 
     const game = gameSnap.data();
 
+    // Determine game mode
+    const gameMode = game.game_mode || "treachery";
+    const includesTreachery = gameMode === "treachery" || gameMode === "treachery_planechase";
+    const includesPlanechase = gameMode === "planechase" || gameMode === "treachery_planechase";
+
     // Validate caller is the host
     if (game.host_id !== uid) {
       throw new HttpsError("permission-denied", "Only the host can start the game.");
@@ -217,48 +231,76 @@ exports.startGame = onCall(callableOptions, async (request) => {
     );
     const players = playersSnap.docs.map((d) => ({ ref: d.ref, ...d.data() }));
 
-    if (players.length < 1) {
-      throw new HttpsError("failed-precondition", "Not enough players.");
-    }
-
-    // Build and shuffle roles
-    const dist = getRoleDistribution(players.length);
-    const roles = [];
-    for (let i = 0; i < dist.leaders; i++) roles.push("leader");
-    for (let i = 0; i < dist.guardians; i++) roles.push("guardian");
-    for (let i = 0; i < dist.assassins; i++) roles.push("assassin");
-    for (let i = 0; i < dist.traitors; i++) roles.push("traitor");
-
-    const shuffledRoles = shuffle(roles);
-
-    // Assign roles and cards
-    const usedCardIds = new Set();
-
-    for (let i = 0; i < players.length; i++) {
-      const role = shuffledRoles[i];
-      const availableCards = getCardsForRole(role).filter(
-        (c) => !usedCardIds.has(c.id)
-      );
-
-      if (availableCards.length === 0) {
-        throw new HttpsError("internal", "Not enough identity cards for role: " + role);
+    if (includesTreachery) {
+      // Validate minimum player count against role distribution
+      if (players.length < 1) {
+        throw new HttpsError("failed-precondition", "Not enough players.");
       }
 
-      const card = availableCards[Math.floor(Math.random() * availableCards.length)];
-      usedCardIds.add(card.id);
+      // Build and shuffle roles
+      const dist = getRoleDistribution(players.length);
+      const roles = [];
+      for (let i = 0; i < dist.leaders; i++) roles.push("leader");
+      for (let i = 0; i < dist.guardians; i++) roles.push("guardian");
+      for (let i = 0; i < dist.assassins; i++) roles.push("assassin");
+      for (let i = 0; i < dist.traitors; i++) roles.push("traitor");
 
-      tx.update(players[i].ref, {
-        role: role,
-        identity_card_id: card.id,
-        life_total: game.starting_life + (card.life_modifier || 0),
-      });
+      const shuffledRoles = shuffle(roles);
+
+      // Assign roles and cards
+      const usedCardIds = new Set();
+
+      for (let i = 0; i < players.length; i++) {
+        const role = shuffledRoles[i];
+        const availableCards = getCardsForRole(role).filter(
+          (c) => !usedCardIds.has(c.id)
+        );
+
+        if (availableCards.length === 0) {
+          throw new HttpsError("internal", "Not enough identity cards for role: " + role);
+        }
+
+        const card = availableCards[Math.floor(Math.random() * availableCards.length)];
+        usedCardIds.add(card.id);
+
+        tx.update(players[i].ref, {
+          role: role,
+          identity_card_id: card.id,
+          life_total: game.starting_life + (card.life_modifier || 0),
+        });
+      }
+    } else {
+      // Non-treachery modes: just require at least 1 player
+      if (players.length < 1) {
+        throw new HttpsError("failed-precondition", "Not enough players.");
+      }
+
+      // Set life totals (no card life modifiers since there are no identity cards)
+      for (let i = 0; i < players.length; i++) {
+        tx.update(players[i].ref, {
+          life_total: game.starting_life,
+        });
+      }
+    }
+
+    // Planechase setup: pick a random starting plane
+    const gameUpdate = {
+      state: "in_progress",
+      last_activity_at: FieldValue.serverTimestamp(),
+    };
+
+    if (includesPlanechase && !(game.planechase?.use_own_deck)) {
+      // Filter out phenomena for the starting plane
+      const startablePlanes = PLANE_CARDS.filter((p) => !p.is_phenomenon);
+      const startingPlane = startablePlanes[Math.floor(Math.random() * startablePlanes.length)];
+      gameUpdate["planechase.current_plane_id"] = startingPlane.id;
+      gameUpdate["planechase.used_plane_ids"] = [startingPlane.id];
+      gameUpdate["planechase.chaotic_aether_active"] = false;
+      gameUpdate["planechase.secondary_plane_id"] = null;
     }
 
     // Transition game state + update activity timestamp
-    tx.update(gameRef, {
-      state: "in_progress",
-      last_activity_at: FieldValue.serverTimestamp(),
-    });
+    tx.update(gameRef, gameUpdate);
 
     return { success: true };
   });
@@ -575,6 +617,292 @@ exports.unveilPlayer = onCall(callableOptions, async (request) => {
   await gameRef.update({ last_activity_at: FieldValue.serverTimestamp() });
 
   return { success: true };
+});
+
+// ════════════════════════════════════════════════════════════════
+// CLOUD FUNCTION: rollPlanarDie
+// Rolls the planar die for a Planechase game.
+// ════════════════════════════════════════════════════════════════
+
+exports.rollPlanarDie = onCall(callableOptions, async (request) => {
+  const uid = request.auth?.uid;
+  if (!uid) throw new HttpsError("unauthenticated", "Must be signed in.");
+
+  const { gameId } = request.data;
+  if (!gameId) throw new HttpsError("invalid-argument", "gameId is required.");
+
+  return db.runTransaction(async (tx) => {
+    const gameRef = db.doc(`games/${gameId}`);
+    const gameSnap = await tx.get(gameRef);
+    if (!gameSnap.exists) throw new HttpsError("not-found", "Game not found.");
+    const game = gameSnap.data();
+
+    if (game.state !== "in_progress")
+      throw new HttpsError("failed-precondition", "Game is not in progress.");
+    if (!(game.player_ids || []).includes(uid))
+      throw new HttpsError("permission-denied", "You are not in this game.");
+
+    const planechase = game.planechase || {};
+
+    // Roll cost tracking
+    let rollCount;
+    if (planechase.last_die_roller_id === uid) {
+      rollCount = (planechase.die_roll_count || 0) + 1;
+    } else {
+      rollCount = 1;
+    }
+    const manaCost = Math.max(0, rollCount - 1);
+
+    // Roll: 0-3 blank, 4 chaos, 5 planeswalk
+    const roll = Math.floor(Math.random() * 6);
+    let result;
+    let newPlaneId = planechase.current_plane_id || null;
+    let usedPlaneIds = planechase.used_plane_ids || [];
+
+    if (roll < 4) {
+      result = "blank";
+    } else if (roll === 4) {
+      result = "chaos";
+    } else {
+      result = "planeswalk";
+
+      if (!planechase.use_own_deck) {
+        // Pick next plane (including phenomena this time - they get encountered)
+        let available = PLANE_CARDS.filter((p) => !usedPlaneIds.includes(p.id));
+        if (available.length === 0) {
+          // Reset pool, keep current as used
+          usedPlaneIds = newPlaneId ? [newPlaneId] : [];
+          available = PLANE_CARDS.filter((p) => !usedPlaneIds.includes(p.id));
+        }
+        const next = available[Math.floor(Math.random() * available.length)];
+        newPlaneId = next.id;
+        usedPlaneIds = [...usedPlaneIds, next.id];
+      }
+    }
+
+    // Chaotic Aether: while active, blank rolls become chaos
+    if (planechase.chaotic_aether_active && result === "blank") {
+      result = "chaos";
+    }
+
+    const updateData = {
+      "planechase.last_die_roller_id": uid,
+      "planechase.die_roll_count": rollCount,
+      "planechase.current_plane_id": newPlaneId,
+      "planechase.used_plane_ids": usedPlaneIds,
+      last_activity_at: FieldValue.serverTimestamp(),
+    };
+
+    // Planeswalking resets Chaotic Aether and clears Spatial Merging
+    if (result === "planeswalk") {
+      updateData["planechase.chaotic_aether_active"] = false;
+      updateData["planechase.secondary_plane_id"] = null;
+    }
+
+    tx.update(gameRef, updateData);
+
+    return { result, manaCost, newPlaneId };
+  });
+});
+
+// ════════════════════════════════════════════════════════════════
+// CLOUD FUNCTION: resolvePhenomenon
+// When the current plane is a phenomenon, resolves it and moves
+// to the next card.
+// ════════════════════════════════════════════════════════════════
+
+exports.resolvePhenomenon = onCall(callableOptions, async (request) => {
+  const uid = request.auth?.uid;
+  if (!uid) throw new HttpsError("unauthenticated", "Must be signed in.");
+
+  const { gameId } = request.data;
+  if (!gameId) throw new HttpsError("invalid-argument", "gameId is required.");
+
+  return db.runTransaction(async (tx) => {
+    const gameRef = db.doc(`games/${gameId}`);
+    const gameSnap = await tx.get(gameRef);
+    if (!gameSnap.exists) throw new HttpsError("not-found", "Game not found.");
+    const game = gameSnap.data();
+
+    if (game.state !== "in_progress")
+      throw new HttpsError("failed-precondition", "Game is not in progress.");
+
+    const planechase = game.planechase || {};
+    if (planechase.use_own_deck)
+      throw new HttpsError("failed-precondition", "Using own deck.");
+
+    // Verify current plane is a phenomenon
+    const currentPlane = PLANE_CARDS.find((p) => p.id === planechase.current_plane_id);
+    if (!currentPlane || !currentPlane.is_phenomenon)
+      throw new HttpsError("failed-precondition", "Current plane is not a phenomenon.");
+
+    let usedPlaneIds = planechase.used_plane_ids || [];
+
+    // Helper: get available non-phenomenon planes
+    function getAvailablePlanes() {
+      let pool = PLANE_CARDS.filter(
+        (p) => !p.is_phenomenon && !usedPlaneIds.includes(p.id)
+      );
+      if (pool.length === 0) {
+        usedPlaneIds = planechase.current_plane_id ? [planechase.current_plane_id] : [];
+        pool = PLANE_CARDS.filter(
+          (p) => !p.is_phenomenon && !usedPlaneIds.includes(p.id)
+        );
+      }
+      return pool;
+    }
+
+    // Helper: get available cards (including phenomena) for default behavior
+    function getAvailableAll() {
+      let pool = PLANE_CARDS.filter((p) => !usedPlaneIds.includes(p.id));
+      if (pool.length === 0) {
+        usedPlaneIds = planechase.current_plane_id ? [planechase.current_plane_id] : [];
+        pool = PLANE_CARDS.filter((p) => !usedPlaneIds.includes(p.id));
+      }
+      return pool;
+    }
+
+    // Branch based on phenomenon type
+    if (currentPlane.id === CHAOTIC_AETHER_ID) {
+      // Chaotic Aether: activate the effect, then resolve to next random plane
+      const available = getAvailableAll();
+      const next = available[Math.floor(Math.random() * available.length)];
+      usedPlaneIds = [...usedPlaneIds, next.id];
+
+      tx.update(gameRef, {
+        "planechase.chaotic_aether_active": true,
+        "planechase.current_plane_id": next.id,
+        "planechase.used_plane_ids": usedPlaneIds,
+        last_activity_at: FieldValue.serverTimestamp(),
+      });
+
+      return { newPlaneId: next.id, isPhenomenon: next.is_phenomenon };
+    } else if (currentPlane.id === INTERPLANAR_TUNNEL_ID) {
+      // Interplanar Tunnel: present 5 random non-phenomenon planes for the player to choose
+      const available = getAvailablePlanes();
+      const shuffled = shuffle(available);
+      const options = shuffled.slice(0, Math.min(5, shuffled.length)).map((p) => ({
+        id: p.id,
+        name: p.name,
+      }));
+
+      // Do NOT update game state — wait for selectPlane call
+      return { type: "choose", options };
+    } else if (currentPlane.id === SPATIAL_MERGING_ID) {
+      // Spatial Merging: pick 2 random non-phenomenon planes
+      const available = getAvailablePlanes();
+      const shuffled = shuffle(available);
+
+      if (shuffled.length < 2) {
+        throw new HttpsError("internal", "Not enough planes available for Spatial Merging.");
+      }
+
+      const first = shuffled[0];
+      const second = shuffled[1];
+      usedPlaneIds = [...usedPlaneIds, first.id, second.id];
+
+      tx.update(gameRef, {
+        "planechase.current_plane_id": first.id,
+        "planechase.secondary_plane_id": second.id,
+        "planechase.used_plane_ids": usedPlaneIds,
+        last_activity_at: FieldValue.serverTimestamp(),
+      });
+
+      return { newPlaneId: first.id, secondaryPlaneId: second.id, isPhenomenon: false };
+    } else {
+      // Default: pick next random card (same as original behavior)
+      const available = getAvailableAll();
+      const next = available[Math.floor(Math.random() * available.length)];
+      usedPlaneIds = [...usedPlaneIds, next.id];
+
+      tx.update(gameRef, {
+        "planechase.current_plane_id": next.id,
+        "planechase.used_plane_ids": usedPlaneIds,
+        last_activity_at: FieldValue.serverTimestamp(),
+      });
+
+      return { newPlaneId: next.id, isPhenomenon: next.is_phenomenon };
+    }
+  });
+});
+
+// ════════════════════════════════════════════════════════════════
+// CLOUD FUNCTION: selectPlane
+// Resolves Interplanar Tunnel after the player chooses one of
+// the presented planes.
+// ════════════════════════════════════════════════════════════════
+
+exports.selectPlane = onCall(callableOptions, async (request) => {
+  const uid = request.auth?.uid;
+  if (!uid) throw new HttpsError("unauthenticated", "Must be signed in.");
+
+  const { gameId, planeId } = request.data;
+  if (!gameId) throw new HttpsError("invalid-argument", "gameId is required.");
+  if (!planeId) throw new HttpsError("invalid-argument", "planeId is required.");
+
+  return db.runTransaction(async (tx) => {
+    const gameRef = db.doc(`games/${gameId}`);
+    const gameSnap = await tx.get(gameRef);
+    if (!gameSnap.exists) throw new HttpsError("not-found", "Game not found.");
+    const game = gameSnap.data();
+
+    if (game.state !== "in_progress")
+      throw new HttpsError("failed-precondition", "Game is not in progress.");
+    if (!(game.player_ids || []).includes(uid))
+      throw new HttpsError("permission-denied", "You are not in this game.");
+
+    // Validate the chosen plane exists and is not a phenomenon
+    const chosenPlane = PLANE_CARDS.find((p) => p.id === planeId);
+    if (!chosenPlane)
+      throw new HttpsError("invalid-argument", "Invalid plane ID.");
+    if (chosenPlane.is_phenomenon)
+      throw new HttpsError("invalid-argument", "Cannot select a phenomenon.");
+
+    const planechase = game.planechase || {};
+    let usedPlaneIds = planechase.used_plane_ids || [];
+    usedPlaneIds = [...usedPlaneIds, planeId];
+
+    tx.update(gameRef, {
+      "planechase.current_plane_id": planeId,
+      "planechase.used_plane_ids": usedPlaneIds,
+      last_activity_at: FieldValue.serverTimestamp(),
+    });
+
+    return { newPlaneId: planeId };
+  });
+});
+
+// ════════════════════════════════════════════════════════════════
+// CLOUD FUNCTION: endGame
+// Ends a game in progress. For non-treachery modes where there
+// are no automatic win conditions.
+// ════════════════════════════════════════════════════════════════
+
+exports.endGame = onCall(callableOptions, async (request) => {
+  const uid = request.auth?.uid;
+  if (!uid) throw new HttpsError("unauthenticated", "Must be signed in.");
+
+  const { gameId } = request.data;
+  if (!gameId) throw new HttpsError("invalid-argument", "gameId is required.");
+
+  return db.runTransaction(async (tx) => {
+    const gameRef = db.doc(`games/${gameId}`);
+    const gameSnap = await tx.get(gameRef);
+    if (!gameSnap.exists) throw new HttpsError("not-found", "Game not found.");
+    const game = gameSnap.data();
+
+    if (game.host_id !== uid)
+      throw new HttpsError("permission-denied", "Only the host can end the game.");
+    if (game.state !== "in_progress")
+      throw new HttpsError("failed-precondition", "Game is not in progress.");
+
+    tx.update(gameRef, {
+      state: "finished",
+      last_activity_at: FieldValue.serverTimestamp(),
+    });
+
+    return { action: "ended" };
+  });
 });
 
 // ════════════════════════════════════════════════════════════════

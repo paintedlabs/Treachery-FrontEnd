@@ -16,12 +16,21 @@ struct GameBoardView: View {
     @State private var showUnveiledBanner = false
     @State private var showForfeitConfirmation = false
     @State private var showGameUnavailableAlert = false
+    @State private var showEndGameConfirmation = false
     @State private var inspectedPlayer: Player?
 
     init(gameId: String, navigationPath: Binding<NavigationPath>) {
         _viewModel = StateObject(wrappedValue: GameBoardViewModel(gameId: gameId))
         _navigationPath = navigationPath
     }
+
+    #if DEBUG
+    /// Preview-only initializer with pre-populated view model.
+    init(viewModel: GameBoardViewModel, navigationPath: Binding<NavigationPath>) {
+        _viewModel = StateObject(wrappedValue: viewModel)
+        _navigationPath = navigationPath
+    }
+    #endif
 
     var body: some View {
         ZStack {
@@ -66,61 +75,78 @@ struct GameBoardView: View {
                     }
                     Spacer()
                 } else {
-                    // Current player's identity card (tappable)
-                    if let card = viewModel.currentIdentityCard,
-                       let player = viewModel.currentPlayer {
-                        ZStack {
-                            Button {
-                                showCardDetail = true
-                            } label: {
-                                IdentityCardHeader(card: card, player: player)
-                            }
-                            .buttonStyle(.plain)
-                            .rotation3DEffect(
-                                .degrees(cardFlipDegrees),
-                                axis: (x: 0, y: 1, z: 0),
-                                perspective: 0.5
-                            )
-                            .accessibilityLabel("Your identity card: \(card.name), \(player.role?.displayName ?? "Unknown") role, \(player.lifeTotal) life. Tap for details.")
-                            .accessibilityHint("Opens full identity card view")
-
-                            // Unveiled banner overlay
-                            if showUnveiledBanner {
-                                VStack {
-                                    Text("IDENTITY REVEALED")
-                                        .font(.headline)
-                                        .fontWeight(.black)
-                                        .foregroundStyle(Color.mtgBackground)
-                                        .padding(.horizontal, 20)
-                                        .padding(.vertical, 10)
-                                        .background(
-                                            RoundedRectangle(cornerRadius: 8)
-                                                .fill(player.role?.color ?? Color.mtgGuardian)
-                                                .shadow(color: (player.role?.color ?? Color.mtgGuardian).opacity(0.6), radius: 12)
-                                        )
+                    // Identity card header — only when treachery active
+                    if viewModel.isTreacheryActive {
+                        if let card = viewModel.currentIdentityCard,
+                           let player = viewModel.currentPlayer {
+                            ZStack {
+                                Button {
+                                    showCardDetail = true
+                                } label: {
+                                    IdentityCardHeader(card: card, player: player)
                                 }
-                                .transition(.scale.combined(with: .opacity))
-                                .zIndex(1)
+                                .buttonStyle(.plain)
+                                .rotation3DEffect(
+                                    .degrees(cardFlipDegrees),
+                                    axis: (x: 0, y: 1, z: 0),
+                                    perspective: 0.5
+                                )
+
+                                // Unveiled banner overlay
+                                if showUnveiledBanner {
+                                    VStack {
+                                        Text("IDENTITY REVEALED")
+                                            .font(.headline)
+                                            .fontWeight(.black)
+                                            .foregroundStyle(Color.mtgBackground)
+                                            .padding(.horizontal, 20)
+                                            .padding(.vertical, 10)
+                                            .background(
+                                                RoundedRectangle(cornerRadius: 8)
+                                                    .fill(player.role?.color ?? Color.mtgGuardian)
+                                                    .shadow(color: (player.role?.color ?? Color.mtgGuardian).opacity(0.6), radius: 12)
+                                            )
+                                    }
+                                    .transition(.scale.combined(with: .opacity))
+                                    .zIndex(1)
+                                }
+                            }
+                        } else {
+                            // Current player not found (reconnection case)
+                            VStack(spacing: 8) {
+                                Image(systemName: "exclamationmark.triangle.fill")
+                                    .font(.title)
+                                    .foregroundStyle(Color.mtgGold)
+                                Text("Unable to find your player data")
+                                    .font(.subheadline)
+                                    .foregroundStyle(Color.mtgTextSecondary)
+                            }
+                            .padding()
+                        }
+                    }
+
+                    // Plane card banner — only when planechase active (and not own-deck)
+                    if viewModel.isPlanechaseActive && !viewModel.isOwnDeckMode {
+                        // Chaotic Aether indicator
+                        if viewModel.isChaoticAetherActive {
+                            ChaoticAetherIndicator()
+                        }
+
+                        if let plane = viewModel.currentPlane {
+                            PlaneCardBanner(plane: plane, secondaryPlane: viewModel.secondaryPlane)
+
+                            // Phenomenon overlay when current plane is a phenomenon
+                            if plane.isPhenomenon {
+                                PhenomenonOverlay(plane: plane, viewModel: viewModel)
                             }
                         }
-                    } else {
-                        // Current player not found (reconnection case)
-                        VStack(spacing: 8) {
-                            Image(systemName: "exclamationmark.triangle.fill")
-                                .font(.title)
-                                .foregroundStyle(Color.mtgGold)
-                            Text("Unable to find your player data")
-                                .font(.subheadline)
-                                .foregroundStyle(Color.mtgTextSecondary)
-                        }
-                        .padding()
                     }
 
                     OrnateDivider()
                         .padding(.horizontal)
                         .padding(.vertical, 4)
 
-                    // Player list with life controls
+                    // Player list with life controls — always shown
                     ScrollView {
                         VStack(spacing: 0) {
                             MtgSectionHeader(title: "Players")
@@ -161,8 +187,9 @@ struct GameBoardView: View {
                             .padding(.vertical, 4)
                     }
 
-                    // Spectator overlay for eliminated players
-                    if let player = viewModel.currentPlayer, player.isEliminated {
+                    // Spectator overlay for eliminated players (treachery only)
+                    if viewModel.isTreacheryActive,
+                       let player = viewModel.currentPlayer, player.isEliminated {
                         VStack(spacing: 8) {
                             HStack(spacing: 8) {
                                 Image(systemName: "person.slash.fill")
@@ -197,9 +224,43 @@ struct GameBoardView: View {
                         )
                     }
 
-                    // Action bar (only for non-eliminated players)
-                    if !(viewModel.currentPlayer?.isEliminated ?? true) {
+                    // Planar die bar — only when planechase active
+                    if viewModel.isPlanechaseActive {
+                        PlanarDieBar(viewModel: viewModel)
+                    }
+
+                    // Action bar (unveil/win) — only when treachery active
+                    if viewModel.isTreacheryActive,
+                       !(viewModel.currentPlayer?.isEliminated ?? true) {
                         ActionBar(viewModel: viewModel, onUnveil: playUnveilAnimation)
+                    }
+
+                    // End Game button — only when NOT treachery (host only)
+                    if !viewModel.isTreacheryActive && viewModel.isHost {
+                        Button {
+                            showEndGameConfirmation = true
+                        } label: {
+                            HStack(spacing: 8) {
+                                Image(systemName: "flag.checkered")
+                                Text("End Game")
+                                    .fontWeight(.semibold)
+                            }
+                        }
+                        .buttonStyle(MtgSecondaryButtonStyle())
+                        .padding(.horizontal)
+                        .padding(.vertical, 8)
+                        .confirmationDialog(
+                            "End Game?",
+                            isPresented: $showEndGameConfirmation,
+                            titleVisibility: .visible
+                        ) {
+                            Button("End Game", role: .destructive) {
+                                Task { await viewModel.endGame() }
+                            }
+                            Button("Cancel", role: .cancel) {}
+                        } message: {
+                            Text("This will end the game for all players.")
+                        }
                     }
                 }
             }
@@ -208,7 +269,8 @@ struct GameBoardView: View {
         .toolbarColorScheme(.dark, for: .navigationBar)
         .navigationBarBackButtonHidden(true)
         .toolbar {
-            if !viewModel.isGameUnavailable && !(viewModel.currentPlayer?.isEliminated ?? true) {
+            // Forfeit button — only when treachery active
+            if viewModel.isTreacheryActive && !viewModel.isGameUnavailable && !(viewModel.currentPlayer?.isEliminated ?? true) {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {
                         showForfeitConfirmation = true
@@ -255,6 +317,14 @@ struct GameBoardView: View {
                 IdentityCardView(card: card, player: player)
             }
         }
+        .sheet(isPresented: Binding(
+            get: { viewModel.tunnelOptions != nil },
+            set: { if !$0 { viewModel.tunnelOptions = nil } }
+        )) {
+            if let options = viewModel.tunnelOptions {
+                InterplanarTunnelPicker(options: options, viewModel: viewModel)
+            }
+        }
     }
 
     // MARK: - Unveil Animation
@@ -294,9 +364,58 @@ private struct IdentityCardHeader: View {
     let card: IdentityCard
     let player: Player
 
+    /// Leaders are always face-up; unveiled players show openly; everyone else is hidden.
+    private var isAlwaysVisible: Bool {
+        player.isUnveiled || player.role == .leader
+    }
+
     var body: some View {
+        if isAlwaysVisible {
+            revealedContent
+        } else {
+            concealedContent
+        }
+    }
+
+    // MARK: - Concealed (tap to open sheet)
+
+    private var concealedContent: some View {
         VStack(spacing: 8) {
-            // Role and life
+            HStack {
+                Image(systemName: "eye.slash.fill")
+                    .font(.title3)
+                    .foregroundStyle(Color.mtgGold)
+
+                Spacer()
+
+                HStack(spacing: 4) {
+                    Image(systemName: "heart.fill")
+                        .font(.caption)
+                        .foregroundStyle(Color.mtgError)
+                    Text("\(player.lifeTotal)")
+                        .font(.system(size: 28, weight: .bold, design: .serif))
+                        .foregroundStyle(Color.mtgTextPrimary)
+                        .contentTransition(.numericText())
+                }
+            }
+
+            Text("Tap to peek at your identity")
+                .font(.subheadline)
+                .foregroundStyle(Color.mtgTextSecondary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .padding()
+        .background(Color.mtgSurface)
+        .overlay(
+            RoundedRectangle(cornerRadius: 0)
+                .stroke(Color.mtgBorderAccent, lineWidth: 1)
+        )
+    }
+
+    // MARK: - Revealed (unveiled)
+
+    private var revealedContent: some View {
+        VStack(spacing: 8) {
             HStack {
                 HStack(spacing: 6) {
                     Circle()
@@ -309,7 +428,6 @@ private struct IdentityCardHeader: View {
 
                 Spacer()
 
-                // Life total - large and prominent
                 HStack(spacing: 4) {
                     Image(systemName: "heart.fill")
                         .font(.caption)
@@ -321,7 +439,6 @@ private struct IdentityCardHeader: View {
                 }
             }
 
-            // Card name
             HStack {
                 Text(card.name)
                     .font(.system(.title3, design: .serif))
@@ -333,28 +450,14 @@ private struct IdentityCardHeader: View {
                     .foregroundStyle(Color.mtgTextSecondary)
             }
 
-            // Ability text
             Text(card.abilityText)
                 .font(.caption)
                 .foregroundStyle(Color.mtgTextSecondary)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .lineLimit(3)
 
-            // Unveil status
             HStack {
-                if !player.isUnveiled {
-                    Text("Unveil: \(card.unveilCost)")
-                        .font(.caption2)
-                        .foregroundStyle(Color.mtgTextSecondary)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 2)
-                        .background(Color.mtgCardElevated)
-                        .clipShape(Capsule())
-                        .overlay(
-                            Capsule()
-                                .stroke(Color.mtgDivider, lineWidth: 1)
-                        )
-                } else {
+                if player.isUnveiled {
                     Text("UNVEILED")
                         .font(.caption2)
                         .fontWeight(.bold)
@@ -362,6 +465,15 @@ private struct IdentityCardHeader: View {
                         .padding(.horizontal, 8)
                         .padding(.vertical, 2)
                         .background(player.role?.color ?? .gray)
+                        .clipShape(Capsule())
+                } else if player.role == .leader {
+                    Text("LEADER — ALWAYS VISIBLE")
+                        .font(.caption2)
+                        .fontWeight(.bold)
+                        .foregroundStyle(Color.mtgGold)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 2)
+                        .background(Color.mtgGold.opacity(0.15))
                         .clipShape(Capsule())
                 }
                 Spacer()
@@ -573,15 +685,30 @@ private struct ActionBar: View {
 #if DEBUG
 #Preview("Game Board") {
     NavigationStack {
-        GameBoardView(gameId: "preview-game", navigationPath: .preview)
+        GameBoardView(
+            viewModel: GameBoardViewModel(
+                gameId: "preview-game",
+                previewPlayers: Player.sampleGamePlayers,
+                previewGame: .sampleInProgress,
+                currentUserId: "user2"  // Sarah (Guardian)
+            ),
+            navigationPath: .preview
+        )
     }
     .environmentObject(AuthViewModel())
 }
 
-#Preview("Identity Card Header") {
+#Preview("Identity Card Header - Leader (always visible)") {
     IdentityCardHeader(
         card: .sampleLeaderCard,
         player: .sampleLeader
+    )
+}
+
+#Preview("Identity Card Header - Hidden (tap to peek)") {
+    IdentityCardHeader(
+        card: .sampleGuardianCard,
+        player: .sampleGuardian
     )
 }
 
@@ -593,20 +720,26 @@ private struct ActionBar: View {
 }
 
 #Preview("Player Row - Active") {
+    let vm = GameBoardViewModel(
+        gameId: "preview",
+        previewPlayers: Player.sampleGamePlayers,
+        previewGame: .sampleInProgress,
+        currentUserId: "user2"
+    )
     ZStack {
         Color.mtgBackground.ignoresSafeArea()
         VStack(spacing: 0) {
             PlayerRow(
                 player: .sampleGuardian,
-                viewModel: GameBoardViewModel(gameId: "preview")
+                viewModel: vm
             )
             PlayerRow(
                 player: .sampleAssassin,
-                viewModel: GameBoardViewModel(gameId: "preview")
+                viewModel: vm
             )
             PlayerRow(
                 player: .sampleEliminated,
-                viewModel: GameBoardViewModel(gameId: "preview")
+                viewModel: vm
             )
         }
         .mtgCardFrame()

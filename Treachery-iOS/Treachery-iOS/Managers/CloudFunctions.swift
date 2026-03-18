@@ -8,6 +8,14 @@
 import Foundation
 import FirebaseFunctions
 
+struct PhenomenonResult {
+    let type: String // "resolved" or "choose"
+    let newPlaneId: String?
+    let isPhenomenon: Bool?
+    let options: [[String: Any]]? // For Interplanar Tunnel
+    let secondaryPlaneId: String? // For Spatial Merging
+}
+
 struct CloudFunctions {
     private let functions = Functions.functions()
 
@@ -43,5 +51,48 @@ struct CloudFunctions {
     func registerFcmToken(_ token: String) async throws {
         let callable = functions.httpsCallable("registerFcmToken")
         _ = try await callable.call(["token": token])
+    }
+
+    // MARK: - Planechase
+
+    /// Roll the planar die for the given game. Returns the result string
+    /// ("blank", "chaos", or "planeswalk") from the Cloud Function.
+    func rollPlanarDie(gameId: String) async throws -> String {
+        let callable = functions.httpsCallable("rollPlanarDie")
+        let result = try await callable.call(["gameId": gameId])
+        guard let data = result.data as? [String: Any],
+              let dieResult = data["result"] as? String else {
+            throw NSError(domain: "CloudFunctions", code: -1,
+                          userInfo: [NSLocalizedDescriptionKey: "Invalid rollPlanarDie response"])
+        }
+        return dieResult
+    }
+
+    /// Resolve the current phenomenon, advancing to the next plane.
+    /// Returns a `PhenomenonResult` so the caller can handle Interplanar Tunnel
+    /// (choose from options) and Spatial Merging (secondary plane).
+    func resolvePhenomenon(gameId: String) async throws -> PhenomenonResult {
+        let callable = functions.httpsCallable("resolvePhenomenon")
+        let result = try await callable.call(["gameId": gameId])
+        let data = result.data as? [String: Any] ?? [:]
+        return PhenomenonResult(
+            type: data["type"] as? String ?? "resolved",
+            newPlaneId: data["newPlaneId"] as? String,
+            isPhenomenon: data["isPhenomenon"] as? Bool,
+            options: data["options"] as? [[String: Any]],
+            secondaryPlaneId: data["secondaryPlaneId"] as? String
+        )
+    }
+
+    /// Select a specific plane (e.g., from Interplanar Tunnel options).
+    func selectPlane(gameId: String, planeId: String) async throws {
+        let callable = functions.httpsCallable("selectPlane")
+        _ = try await callable.call(["gameId": gameId, "planeId": planeId])
+    }
+
+    /// End a non-treachery game (host only).
+    func endGame(gameId: String) async throws {
+        let callable = functions.httpsCallable("endGame")
+        _ = try await callable.call(["gameId": gameId])
     }
 }

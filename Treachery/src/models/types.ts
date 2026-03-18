@@ -7,6 +7,30 @@ export type GameState = 'waiting' | 'in_progress' | 'finished';
 export type Rarity = 'uncommon' | 'rare' | 'mythic' | 'special';
 export type FriendRequestStatus = 'pending' | 'accepted' | 'declined';
 
+// Game modes
+export type GameMode = 'treachery' | 'planechase' | 'treachery_planechase' | 'none';
+
+// Planechase state (subdocument on Game)
+export interface PlanechaseState {
+  use_own_deck: boolean;
+  current_plane_id: string | null;
+  used_plane_ids: string[];
+  last_die_roller_id: string | null;
+  die_roll_count: number;
+  chaotic_aether_active?: boolean;
+  secondary_plane_id?: string;
+}
+
+// Plane card from bundled PlaneCards.json
+export interface PlaneCard {
+  id: string;
+  name: string;
+  type_line: string;
+  oracle_text: string;
+  image_uri: string | null;
+  is_phenomenon: boolean;
+}
+
 // Firestore document interfaces — field names use snake_case to match existing iOS data
 
 export interface TreacheryUser {
@@ -30,6 +54,8 @@ export interface Game {
   player_ids: string[];
   created_at: Timestamp;
   last_activity_at?: Timestamp;
+  game_mode?: GameMode;
+  planechase?: PlanechaseState;
 }
 
 export interface Player {
