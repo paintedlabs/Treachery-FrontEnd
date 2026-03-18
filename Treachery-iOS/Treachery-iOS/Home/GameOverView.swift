@@ -70,9 +70,16 @@ struct GameOverView: View {
                                         .fill(player.role?.color ?? .gray)
                                         .frame(width: 12, height: 12)
 
-                                    Text(player.displayName)
-                                        .fontWeight(.medium)
-                                        .foregroundStyle(Color.mtgTextPrimary)
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text(player.displayName)
+                                            .fontWeight(.medium)
+                                            .foregroundStyle(Color.mtgTextPrimary)
+                                        if let commander = player.commanderName, !commander.isEmpty {
+                                            Text(commander)
+                                                .font(.caption2)
+                                                .foregroundStyle(Color.mtgGold)
+                                        }
+                                    }
 
                                     Spacer()
 
@@ -144,9 +151,16 @@ struct GameOverView: View {
                         VStack(spacing: 0) {
                             ForEach(viewModel.players) { player in
                                 HStack {
-                                    Text(player.displayName)
-                                        .fontWeight(.medium)
-                                        .foregroundStyle(Color.mtgTextPrimary)
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text(player.displayName)
+                                            .fontWeight(.medium)
+                                            .foregroundStyle(Color.mtgTextPrimary)
+                                        if let commander = player.commanderName, !commander.isEmpty {
+                                            Text(commander)
+                                                .font(.caption2)
+                                                .foregroundStyle(Color.mtgGold)
+                                        }
+                                    }
 
                                     Spacer()
 
@@ -191,6 +205,25 @@ struct GameOverView: View {
         .navigationBarBackButtonHidden(true)
         .onAppear {
             viewModel.currentUserId = authViewModel.currentUserId
+        }
+        .task {
+            await updateDeckLastPlayed()
+        }
+    }
+
+    private func updateDeckLastPlayed() async {
+        guard let userId = authViewModel.currentUserId else { return }
+        // Wait for players to load
+        while viewModel.players.isEmpty {
+            try? await Task.sleep(nanoseconds: 200_000_000)
+        }
+        guard let myPlayer = viewModel.players.first(where: { $0.userId == userId }),
+              let deckId = myPlayer.deckId else { return }
+
+        let firestoreManager = FirestoreManager()
+        if var deck = try? await firestoreManager.getDeck(id: deckId, userId: userId) {
+            deck.lastPlayedAt = Date()
+            try? await firestoreManager.updateDeck(deck)
         }
     }
 }

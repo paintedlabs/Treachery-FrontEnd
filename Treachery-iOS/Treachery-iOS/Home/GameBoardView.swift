@@ -17,6 +17,7 @@ struct GameBoardView: View {
     @State private var showForfeitConfirmation = false
     @State private var showGameUnavailableAlert = false
     @State private var showEndGameConfirmation = false
+    @State private var showDeckPicker = false
     @State private var inspectedPlayer: Player?
 
     init(gameId: String, navigationPath: Binding<NavigationPath>) {
@@ -156,9 +157,11 @@ struct GameBoardView: View {
 
                             VStack(spacing: 0) {
                                 ForEach(viewModel.players) { player in
-                                    PlayerRow(player: player, viewModel: viewModel) { tappedPlayer in
+                                    PlayerRow(player: player, viewModel: viewModel, onViewCard: { tappedPlayer in
                                         inspectedPlayer = tappedPlayer
-                                    }
+                                    }, onChangeDeck: player.userId == viewModel.currentUserId ? {
+                                        showDeckPicker = true
+                                    } : nil)
                                     .padding(.horizontal, 16)
                                     .padding(.vertical, 8)
 
@@ -323,6 +326,13 @@ struct GameBoardView: View {
         )) {
             if let options = viewModel.tunnelOptions {
                 InterplanarTunnelPicker(options: options, viewModel: viewModel)
+            }
+        }
+        .sheet(isPresented: $showDeckPicker) {
+            DeckPickerView { deck in
+                Task {
+                    await viewModel.selectDeck(deck)
+                }
             }
         }
     }
@@ -497,6 +507,7 @@ private struct PlayerRow: View {
     let player: Player
     @ObservedObject var viewModel: GameBoardViewModel
     var onViewCard: ((Player) -> Void)?
+    var onChangeDeck: (() -> Void)?
 
     private var isCurrentUser: Bool {
         player.userId == viewModel.currentUserId
@@ -535,6 +546,42 @@ private struct PlayerRow: View {
                             .foregroundStyle(Color.mtgError)
                             .font(.caption)
                     }
+                }
+
+                // Commander name
+                if let commander = player.commanderName, !commander.isEmpty {
+                    if isCurrentUser {
+                        Button {
+                            onChangeDeck?()
+                        } label: {
+                            HStack(spacing: 4) {
+                                Text(commander)
+                                    .font(.caption2)
+                                    .foregroundStyle(Color.mtgGold)
+                                Image(systemName: "pencil")
+                                    .font(.system(size: 8))
+                                    .foregroundStyle(Color.mtgGold)
+                            }
+                        }
+                        .buttonStyle(.plain)
+                    } else {
+                        Text(commander)
+                            .font(.caption2)
+                            .foregroundStyle(Color.mtgTextSecondary)
+                    }
+                } else if isCurrentUser {
+                    Button {
+                        onChangeDeck?()
+                    } label: {
+                        HStack(spacing: 4) {
+                            Image(systemName: "rectangle.stack")
+                                .font(.system(size: 8))
+                            Text("Select Deck")
+                                .font(.caption2)
+                        }
+                        .foregroundStyle(Color.mtgGold.opacity(0.7))
+                    }
+                    .buttonStyle(.plain)
                 }
 
                 // Role visibility

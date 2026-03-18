@@ -189,6 +189,54 @@ final class FirestoreManager {
         }
     }
 
+    // MARK: - Decks
+
+    private func decksCollection(userId: String) -> CollectionReference {
+        usersCollection.document(userId).collection("decks")
+    }
+
+    func createDeck(_ deck: Deck) async throws {
+        try decksCollection(userId: deck.userId).document(deck.id).setData(from: deck)
+    }
+
+    func getDecks(forUserId userId: String) async throws -> [Deck] {
+        let snapshot = try await decksCollection(userId: userId)
+            .order(by: "created_at", descending: true)
+            .getDocuments()
+        return snapshot.documents.compactMap { try? $0.data(as: Deck.self) }
+    }
+
+    func getDeck(id: String, userId: String) async throws -> Deck? {
+        let snapshot = try await decksCollection(userId: userId).document(id).getDocument()
+        guard snapshot.exists else { return nil }
+        return try snapshot.data(as: Deck.self)
+    }
+
+    func updateDeck(_ deck: Deck) async throws {
+        try decksCollection(userId: deck.userId).document(deck.id).setData(from: deck, merge: true)
+    }
+
+    func deleteDeck(id: String, userId: String) async throws {
+        try await decksCollection(userId: userId).document(id).delete()
+    }
+
+    // MARK: - Player Deck Selection
+
+    func updatePlayerDeck(playerId: String, gameId: String, deckId: String?, commanderName: String?) async throws {
+        var data: [String: Any] = [:]
+        if let deckId = deckId {
+            data["deck_id"] = deckId
+        } else {
+            data["deck_id"] = FieldValue.delete()
+        }
+        if let commanderName = commanderName {
+            data["commander_name"] = commanderName
+        } else {
+            data["commander_name"] = FieldValue.delete()
+        }
+        try await playersCollection(gameId: gameId).document(playerId).updateData(data)
+    }
+
     // MARK: - Players
 
     func addPlayer(_ player: Player, toGame gameId: String) async throws {

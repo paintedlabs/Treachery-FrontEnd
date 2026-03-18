@@ -20,6 +20,8 @@ enum AppDestination: Hashable {
     case profile
     case friends
     case gameHistory
+    case decks
+    case addEditDeck(Deck?)
 }
 
 struct HomeView: View {
@@ -144,6 +146,17 @@ struct HomeView: View {
                         }
                         .accessibilityLabel("Game history")
 
+                        NavigationLink(value: AppDestination.decks) {
+                            VStack(spacing: 4) {
+                                Image(systemName: "rectangle.stack.fill")
+                                    .font(.title3)
+                                Text("Decks")
+                                    .font(.caption)
+                            }
+                            .foregroundStyle(Color.mtgTextSecondary)
+                        }
+                        .accessibilityLabel("My decks")
+
                         NavigationLink(value: AppDestination.friends) {
                             VStack(spacing: 4) {
                                 Image(systemName: "person.2.fill")
@@ -217,6 +230,10 @@ struct HomeView: View {
                     FriendsListView()
                 case .gameHistory:
                     GameHistoryView()
+                case .decks:
+                    DeckListView()
+                case .addEditDeck(let deck):
+                    AddEditDeckView(deck: deck)
                 }
             }
         }

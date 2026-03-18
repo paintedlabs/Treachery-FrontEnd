@@ -314,6 +314,32 @@ extension PlanechaseState {
     )
 }
 
+// MARK: - Sample Decks
+
+extension Deck {
+    static let sampleDeck1 = Deck(
+        id: "deck1",
+        userId: "user1",
+        name: "Eldrazi Ramp",
+        commanderName: "Kozilek, the Great Distortion",
+        partnerCommanderName: nil,
+        colorIdentity: [.colorless],
+        createdAt: Date().addingTimeInterval(-604800),
+        lastPlayedAt: Date().addingTimeInterval(-86400)
+    )
+
+    static let sampleDeck2 = Deck(
+        id: "deck2",
+        userId: "user1",
+        name: "Simic Value",
+        commanderName: "Thrasios, Triton Hero",
+        partnerCommanderName: "Kydele, Chosen of Kruphix",
+        colorIdentity: [.blue, .green],
+        createdAt: Date().addingTimeInterval(-302400),
+        lastPlayedAt: nil
+    )
+}
+
 // MARK: - Preview NavigationPath
 
 extension Binding where Value == NavigationPath {
