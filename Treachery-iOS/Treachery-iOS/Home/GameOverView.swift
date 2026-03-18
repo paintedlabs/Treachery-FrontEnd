@@ -66,13 +66,31 @@ struct GameOverView: View {
                         VStack(spacing: 0) {
                             ForEach(viewModel.players) { player in
                                 HStack {
+                                    // Left accent bar for player color
+                                    if let hex = player.playerColor {
+                                        RoundedRectangle(cornerRadius: 1.5)
+                                            .fill(Color(hex: hex))
+                                            .frame(width: 3)
+                                            .padding(.vertical, 2)
+                                            .padding(.trailing, 4)
+                                    }
+
                                     Circle()
                                         .fill(player.role?.color ?? .gray)
                                         .frame(width: 12, height: 12)
 
-                                    Text(player.displayName)
-                                        .fontWeight(.medium)
-                                        .foregroundStyle(Color.mtgTextPrimary)
+                                    VStack(alignment: .leading, spacing: 1) {
+                                        Text(player.displayName)
+                                            .fontWeight(.medium)
+                                            .foregroundStyle(Color.mtgTextPrimary)
+
+                                        if let commanderName = player.commanderName, !commanderName.isEmpty {
+                                            Text(commanderName)
+                                                .font(.system(.caption, design: .serif))
+                                                .italic()
+                                                .foregroundStyle(Color.mtgTextSecondary)
+                                        }
+                                    }
 
                                     Spacer()
 
@@ -144,9 +162,27 @@ struct GameOverView: View {
                         VStack(spacing: 0) {
                             ForEach(viewModel.players) { player in
                                 HStack {
-                                    Text(player.displayName)
-                                        .fontWeight(.medium)
-                                        .foregroundStyle(Color.mtgTextPrimary)
+                                    // Left accent bar for player color
+                                    if let hex = player.playerColor {
+                                        RoundedRectangle(cornerRadius: 1.5)
+                                            .fill(Color(hex: hex))
+                                            .frame(width: 3)
+                                            .padding(.vertical, 2)
+                                            .padding(.trailing, 4)
+                                    }
+
+                                    VStack(alignment: .leading, spacing: 1) {
+                                        Text(player.displayName)
+                                            .fontWeight(.medium)
+                                            .foregroundStyle(Color.mtgTextPrimary)
+
+                                        if let commanderName = player.commanderName, !commanderName.isEmpty {
+                                            Text(commanderName)
+                                                .font(.system(.caption, design: .serif))
+                                                .italic()
+                                                .foregroundStyle(Color.mtgTextSecondary)
+                                        }
+                                    }
 
                                     Spacer()
 

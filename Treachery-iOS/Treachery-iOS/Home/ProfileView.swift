@@ -82,6 +82,12 @@ struct ProfileView: View {
                                 MtgStatBox(value: stats.winRateText, label: "Win %", color: Color.mtgGuardian)
                             }
                             .padding(.horizontal, 16)
+                            .padding(.bottom, 8)
+
+                            HStack(spacing: 8) {
+                                MtgStatBox(value: "\(user?.elo ?? 1500)", label: "ELO", color: Color.mtgGoldBright)
+                            }
+                            .padding(.horizontal, 16)
                             .padding(.bottom, 12)
 
                             // Role breakdown
@@ -135,6 +141,64 @@ struct ProfileView: View {
                         }
                     }
                     .mtgCardFrame()
+
+                    // Deck Performance card
+                    if let deckStats = user?.deckStats, !deckStats.isEmpty {
+                        VStack(spacing: 0) {
+                            MtgSectionHeader(title: "Deck Performance")
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(.horizontal, 16)
+                                .padding(.top, 16)
+                                .padding(.bottom, 8)
+
+                            OrnateDivider()
+                                .padding(.horizontal, 16)
+                                .padding(.bottom, 12)
+
+                            ForEach(deckStats.sorted(by: { $0.value.games > $1.value.games }), id: \.key) { deckName, stat in
+                                VStack(alignment: .leading, spacing: 6) {
+                                    Text(deckName)
+                                        .font(.system(.subheadline, design: .serif))
+                                        .italic()
+                                        .foregroundStyle(Color.mtgGoldBright)
+
+                                    HStack(spacing: 16) {
+                                        HStack(spacing: 4) {
+                                            Text("ELO")
+                                                .font(.caption)
+                                                .foregroundStyle(Color.mtgTextSecondary)
+                                            Text("\(stat.elo)")
+                                                .font(.subheadline.weight(.semibold))
+                                                .foregroundStyle(Color.mtgGoldBright)
+                                        }
+
+                                        HStack(spacing: 4) {
+                                            Text("Record")
+                                                .font(.caption)
+                                                .foregroundStyle(Color.mtgTextSecondary)
+                                            Text("\(stat.wins)W - \(stat.losses)L")
+                                                .font(.subheadline.weight(.semibold))
+                                                .foregroundStyle(Color.mtgTextPrimary)
+                                        }
+
+                                        HStack(spacing: 4) {
+                                            Text("Games")
+                                                .font(.caption)
+                                                .foregroundStyle(Color.mtgTextSecondary)
+                                            Text("\(stat.games)")
+                                                .font(.subheadline.weight(.semibold))
+                                                .foregroundStyle(Color.mtgTextPrimary)
+                                        }
+
+                                        Spacer()
+                                    }
+                                }
+                                .padding(.horizontal, 16)
+                                .padding(.vertical, 8)
+                            }
+                        }
+                        .mtgCardFrame()
+                    }
 
                     // Friends card
                     if let user = user {

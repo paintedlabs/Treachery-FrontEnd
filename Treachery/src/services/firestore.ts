@@ -6,6 +6,7 @@ import {
   setDoc,
   updateDoc,
   deleteDoc,
+  deleteField,
   query,
   where,
   orderBy,
@@ -229,4 +230,22 @@ export function listenToPlayers(
     const players = snap.docs.map((d) => d.data() as Player);
     onChange(players);
   });
+}
+
+export async function updatePlayerColor(gameId: string, playerId: string, color: string | null): Promise<void> {
+  const ref = doc(db, 'games', gameId, 'players', playerId);
+  if (color) {
+    await updateDoc(ref, { player_color: color });
+  } else {
+    await updateDoc(ref, { player_color: deleteField() });
+  }
+}
+
+export async function updateCommanderName(gameId: string, playerId: string, name: string | null): Promise<void> {
+  const ref = doc(db, 'games', gameId, 'players', playerId);
+  if (name && name.trim()) {
+    await updateDoc(ref, { commander_name: name.trim() });
+  } else {
+    await updateDoc(ref, { commander_name: deleteField() });
+  }
 }

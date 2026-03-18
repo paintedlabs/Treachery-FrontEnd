@@ -882,7 +882,7 @@ exports.endGame = onCall(callableOptions, async (request) => {
   const uid = request.auth?.uid;
   if (!uid) throw new HttpsError("unauthenticated", "Must be signed in.");
 
-  const { gameId } = request.data;
+  const { gameId, winnerUserIds } = request.data;
   if (!gameId) throw new HttpsError("invalid-argument", "gameId is required.");
 
   return db.runTransaction(async (tx) => {
@@ -896,10 +896,14 @@ exports.endGame = onCall(callableOptions, async (request) => {
     if (game.state !== "in_progress")
       throw new HttpsError("failed-precondition", "Game is not in progress.");
 
-    tx.update(gameRef, {
+    const update = {
       state: "finished",
       last_activity_at: FieldValue.serverTimestamp(),
-    });
+    };
+    if (winnerUserIds && Array.isArray(winnerUserIds) && winnerUserIds.length > 0) {
+      update.winner_user_ids = winnerUserIds;
+    }
+    tx.update(gameRef, update);
 
     return { action: "ended" };
   });
@@ -973,7 +977,7 @@ exports.cleanupStaleGames = onSchedule("every 1 hours", async () => {
 // Sends a push notification when a new player joins a lobby.
 // ════════════════════════════════════════════════════════════════
 
-const { onDocumentCreated } = require("firebase-functions/v2/firestore");
+const { onDocumentCreated, onDocumentUpdated } = require("firebase-functions/v2/firestore");
 
 exports.onPlayerJoined = onDocumentCreated(
   "games/{gameId}/players/{playerId}",
@@ -998,3 +1002,138 @@ exports.onPlayerJoined = onDocumentCreated(
     );
   }
 );
+
+// ════════════════════════════════════════════════════════════════
+// FIRESTORE TRIGGER: onGameFinished
+// Fires when a game's state transitions to "finished".
+// Updates ELO ratings for all players (and per-deck stats).
+// ════════════════════════════════════════════════════════════════
+
+exports.onGameFinished = onDocumentUpdated("games/{gameId}", async (event) => {
+  const before = event.data.before.data();
+  const after = event.data.after.data();
+
+  // Only fire on state transition to finished
+  if (before.state === "finished" || after.state !== "finished") return;
+
+  const gameId = event.params.gameId;
+  const game = after;
+
+  // Fetch all players
+  const playersSnap = await db.collection(`games/${gameId}/players`).get();
+  const players = playersSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
+
+  if (players.length < 2) return; // Need at least 2 players for ELO
+
+  // Determine winners and losers
+  let winnerUserIds = [];
+  let loserUserIds = [];
+
+  if (game.game_mode === "treachery" || game.game_mode === "treachery_planechase") {
+    // Treachery: use winning_team
+    const winningTeam = game.winning_team;
+    if (!winningTeam) return;
+
+    for (const player of players) {
+      if (!player.role) continue;
+      const isWinner =
+        (winningTeam === "leader" && (player.role === "leader" || player.role === "guardian")) ||
+        (winningTeam === "assassin" && player.role === "assassin") ||
+        (winningTeam === "traitor" && player.role === "traitor");
+      if (isWinner) {
+        winnerUserIds.push(player.user_id);
+      } else {
+        loserUserIds.push(player.user_id);
+      }
+    }
+  } else {
+    // Non-treachery: use winner_user_ids from game doc
+    winnerUserIds = game.winner_user_ids || [];
+    if (winnerUserIds.length === 0) return; // No winners declared, skip ELO
+
+    loserUserIds = players
+      .map((p) => p.user_id)
+      .filter((uid) => !winnerUserIds.includes(uid));
+  }
+
+  if (winnerUserIds.length === 0 || loserUserIds.length === 0) return;
+
+  // Build a map of userId -> commanderName for deck stats
+  const playerCommanders = {};
+  for (const p of players) {
+    if (p.commander_name) {
+      playerCommanders[p.user_id] = p.commander_name;
+    }
+  }
+
+  // Fetch all user docs
+  const allUserIds = [...new Set([...winnerUserIds, ...loserUserIds])];
+  const userDocs = {};
+  for (const uid of allUserIds) {
+    const snap = await db.doc(`users/${uid}`).get();
+    if (snap.exists) userDocs[uid] = snap.data();
+  }
+
+  // ELO calculation (K=32)
+  const K = 32;
+  const eloChanges = {};
+
+  for (const uid of allUserIds) {
+    eloChanges[uid] = 0;
+  }
+
+  // Each winner vs each loser
+  for (const winnerId of winnerUserIds) {
+    const winnerElo = (userDocs[winnerId]?.elo) || 1500;
+    for (const loserId of loserUserIds) {
+      const loserElo = (userDocs[loserId]?.elo) || 1500;
+
+      const expectedWinner = 1.0 / (1.0 + Math.pow(10, (loserElo - winnerElo) / 400));
+      const expectedLoser = 1.0 / (1.0 + Math.pow(10, (winnerElo - loserElo) / 400));
+
+      eloChanges[winnerId] += K * (1 - expectedWinner);
+      eloChanges[loserId] += K * (0 - expectedLoser);
+    }
+  }
+
+  // Average changes (divide by number of opponents)
+  for (const winnerId of winnerUserIds) {
+    eloChanges[winnerId] = Math.round(eloChanges[winnerId] / loserUserIds.length);
+  }
+  for (const loserId of loserUserIds) {
+    eloChanges[loserId] = Math.round(eloChanges[loserId] / winnerUserIds.length);
+  }
+
+  // Update user docs atomically
+  const batch = db.batch();
+
+  for (const uid of allUserIds) {
+    const userRef = db.doc(`users/${uid}`);
+    const currentElo = (userDocs[uid]?.elo) || 1500;
+    const newElo = Math.max(0, currentElo + eloChanges[uid]);
+    const isWinner = winnerUserIds.includes(uid);
+    const commanderName = playerCommanders[uid];
+
+    const updates = { elo: newElo };
+
+    if (commanderName) {
+      const deckStats = userDocs[uid]?.deck_stats || {};
+      const currentDeck = deckStats[commanderName] || { elo: 1500, wins: 0, losses: 0, games: 0 };
+
+      // Deck ELO uses same change as player ELO
+      const newDeckElo = Math.max(0, currentDeck.elo + eloChanges[uid]);
+
+      updates[`deck_stats.${commanderName}`] = {
+        elo: newDeckElo,
+        wins: currentDeck.wins + (isWinner ? 1 : 0),
+        losses: currentDeck.losses + (isWinner ? 0 : 1),
+        games: currentDeck.games + 1,
+      };
+    }
+
+    batch.update(userRef, updates);
+  }
+
+  await batch.commit();
+  console.log(`onGameFinished: Updated ELO for ${allUserIds.length} players in game ${gameId}`);
+});

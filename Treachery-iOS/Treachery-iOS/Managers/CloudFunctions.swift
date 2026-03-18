@@ -90,9 +90,13 @@ struct CloudFunctions {
         _ = try await callable.call(["gameId": gameId, "planeId": planeId])
     }
 
-    /// End a non-treachery game (host only).
-    func endGame(gameId: String) async throws {
+    /// End a non-treachery game (host only). Optionally pass winner user IDs for ELO tracking.
+    func endGame(gameId: String, winnerUserIds: [String]? = nil) async throws {
         let callable = functions.httpsCallable("endGame")
-        _ = try await callable.call(["gameId": gameId])
+        var data: [String: Any] = ["gameId": gameId]
+        if let winners = winnerUserIds, !winners.isEmpty {
+            data["winnerUserIds"] = winners
+        }
+        _ = try await callable.call(data)
     }
 }

@@ -19,11 +19,17 @@ final class LobbyViewModel: ObservableObject {
 
     let gameId: String
     let isHost: Bool
+    var currentUserId: String?
     private let firestoreManager = FirestoreManager()
     private let cloudFunctions = CloudFunctions()
     private var gameListener: ListenerRegistration?
     private var playersListener: ListenerRegistration?
     private var hasReceivedFirstSnapshot = false
+
+    var currentPlayer: Player? {
+        guard let userId = currentUserId else { return nil }
+        return players.first { $0.userId == userId }
+    }
 
     var canStartGame: Bool {
         guard let game = game else { return false }
@@ -100,6 +106,26 @@ final class LobbyViewModel: ObservableObject {
         stopListening()
         do {
             try await cloudFunctions.leaveGame(gameId: gameId)
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    // MARK: - Player Customization
+
+    func updatePlayerColor(_ hex: String?) async {
+        guard let player = currentPlayer else { return }
+        do {
+            try await firestoreManager.updatePlayerColor(gameId: gameId, playerId: player.id, color: hex)
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    func updateCommanderName(_ name: String?) async {
+        guard let player = currentPlayer else { return }
+        do {
+            try await firestoreManager.updateCommanderName(gameId: gameId, playerId: player.id, name: name)
         } catch {
             errorMessage = error.localizedDescription
         }

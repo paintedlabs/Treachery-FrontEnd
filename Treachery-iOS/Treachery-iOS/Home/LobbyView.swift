@@ -14,6 +14,9 @@ struct LobbyView: View {
     @State private var showHostLeftAlert = false
     @State private var showShareSheet = false
     @State private var isLeaving = false
+    @State private var showColorPicker = false
+    @State private var commanderNameInput = ""
+    @State private var commanderNameDebounce: Task<Void, Never>?
 
     init(gameId: String, isHost: Bool, navigationPath: Binding<NavigationPath>) {
         _viewModel = StateObject(wrappedValue: LobbyViewModel(gameId: gameId, isHost: isHost))
@@ -121,19 +124,110 @@ struct LobbyView: View {
                             } else {
                                 VStack(spacing: 0) {
                                     ForEach(viewModel.players) { player in
-                                        HStack {
-                                            Text(player.displayName)
-                                                .fontWeight(player.userId == viewModel.game?.hostId ? .semibold : .regular)
-                                                .foregroundStyle(Color.mtgTextPrimary)
-                                            Spacer()
-                                            if player.userId == viewModel.game?.hostId {
-                                                Text("Host")
-                                                    .font(.caption)
-                                                    .foregroundStyle(Color.mtgGold)
-                                                    .padding(.horizontal, 8)
-                                                    .padding(.vertical, 2)
-                                                    .background(Color.mtgGold.opacity(0.15))
-                                                    .clipShape(Capsule())
+                                        let isMe = player.userId == viewModel.currentUserId
+
+                                        VStack(spacing: 0) {
+                                            HStack(spacing: 0) {
+                                                // Left accent bar for player color
+                                                if let hex = player.playerColor {
+                                                    RoundedRectangle(cornerRadius: 1.5)
+                                                        .fill(Color(hex: hex))
+                                                        .frame(width: 3)
+                                                        .padding(.vertical, 2)
+                                                        .padding(.trailing, 8)
+                                                }
+
+                                                // Color picker toggle for current user
+                                                if isMe {
+                                                    Button {
+                                                        withAnimation(.easeInOut(duration: 0.2)) {
+                                                            showColorPicker.toggle()
+                                                        }
+                                                    } label: {
+                                                        if let hex = player.playerColor {
+                                                            Circle()
+                                                                .fill(Color(hex: hex))
+                                                                .frame(width: 16, height: 16)
+                                                                .overlay(
+                                                                    Circle().stroke(Color.mtgTextSecondary.opacity(0.3), lineWidth: 1)
+                                                                )
+                                                        } else {
+                                                            Circle()
+                                                                .stroke(Color.mtgTextSecondary, lineWidth: 1.5)
+                                                                .frame(width: 16, height: 16)
+                                                        }
+                                                    }
+                                                    .buttonStyle(.plain)
+                                                    .padding(.trailing, 6)
+                                                    .accessibilityLabel("Choose player color")
+                                                }
+
+                                                VStack(alignment: .leading, spacing: 2) {
+                                                    Text(player.displayName)
+                                                        .fontWeight(player.userId == viewModel.game?.hostId ? .semibold : .regular)
+                                                        .foregroundStyle(Color.mtgTextPrimary)
+
+                                                    // Commander name display for other players
+                                                    if !isMe, let commanderName = player.commanderName, !commanderName.isEmpty {
+                                                        Text(commanderName)
+                                                            .font(.system(.caption, design: .serif))
+                                                            .italic()
+                                                            .foregroundStyle(Color.mtgTextSecondary)
+                                                    }
+                                                }
+
+                                                Spacer()
+
+                                                if player.userId == viewModel.game?.hostId {
+                                                    Text("Host")
+                                                        .font(.caption)
+                                                        .foregroundStyle(Color.mtgGold)
+                                                        .padding(.horizontal, 8)
+                                                        .padding(.vertical, 2)
+                                                        .background(Color.mtgGold.opacity(0.15))
+                                                        .clipShape(Capsule())
+                                                }
+                                            }
+
+                                            // Commander name input for current user
+                                            if isMe {
+                                                TextField("Commander name...", text: $commanderNameInput)
+                                                    .font(.system(.caption, design: .serif))
+                                                    .italic()
+                                                    .foregroundStyle(Color.mtgTextPrimary)
+                                                    .padding(.horizontal, 10)
+                                                    .padding(.vertical, 6)
+                                                    .background(Color.mtgCardElevated)
+                                                    .clipShape(RoundedRectangle(cornerRadius: 6))
+                                                    .overlay(
+                                                        RoundedRectangle(cornerRadius: 6)
+                                                            .stroke(Color.mtgDivider, lineWidth: 1)
+                                                    )
+                                                    .padding(.top, 6)
+                                                    .onSubmit {
+                                                        commanderNameDebounce?.cancel()
+                                                        Task { await viewModel.updateCommanderName(commanderNameInput.isEmpty ? nil : commanderNameInput) }
+                                                    }
+                                                    .onChange(of: commanderNameInput) { _, newValue in
+                                                        commanderNameDebounce?.cancel()
+                                                        commanderNameDebounce = Task {
+                                                            try? await Task.sleep(nanoseconds: 500_000_000)
+                                                            guard !Task.isCancelled else { return }
+                                                            await viewModel.updateCommanderName(newValue.isEmpty ? nil : newValue)
+                                                        }
+                                                    }
+                                            }
+
+                                            // Color picker row (current user only)
+                                            if isMe && showColorPicker {
+                                                LobbyColorPickerRow(selectedHex: player.playerColor) { hex in
+                                                    Task { await viewModel.updatePlayerColor(hex) }
+                                                }
+                                                .padding(.top, 8)
+                                                .transition(.asymmetric(
+                                                    insertion: .move(edge: .top).combined(with: .opacity),
+                                                    removal: .opacity
+                                                ))
                                             }
                                         }
                                         .padding(.horizontal, 16)
@@ -231,6 +325,18 @@ struct LobbyView: View {
         .navigationTitle("Lobby")
         .toolbarColorScheme(.dark, for: .navigationBar)
         .navigationBarBackButtonHidden(true)
+        .onAppear {
+            viewModel.currentUserId = authViewModel.currentUserId
+            if let player = viewModel.currentPlayer {
+                commanderNameInput = player.commanderName ?? ""
+            }
+        }
+        .onChange(of: viewModel.players) { _, _ in
+            // Sync commander name input when player data first arrives
+            if commanderNameInput.isEmpty, let player = viewModel.currentPlayer, let name = player.commanderName {
+                commanderNameInput = name
+            }
+        }
         .onChange(of: viewModel.isGameStarted) { _, started in
             if started {
                 navigationPath.append(AppDestination.gameBoard(gameId: viewModel.gameId))
@@ -253,6 +359,55 @@ struct LobbyView: View {
                 ShareSheet(items: ["Join my Treachery game! Code: \(code)"])
             }
         }
+    }
+}
+
+// MARK: - Lobby Color Picker Row
+
+private struct LobbyColorPickerRow: View {
+    let selectedHex: String?
+    let onSelect: (String?) -> Void
+
+    var body: some View {
+        HStack(spacing: 8) {
+            ForEach(PlayerColors.palette, id: \.hex) { playerColor in
+                Button {
+                    if selectedHex == playerColor.hex {
+                        onSelect(nil)
+                    } else {
+                        onSelect(playerColor.hex)
+                    }
+                } label: {
+                    Circle()
+                        .fill(playerColor.color)
+                        .frame(width: 24, height: 24)
+                        .overlay(
+                            Circle()
+                                .stroke(Color.mtgTextPrimary, lineWidth: selectedHex == playerColor.hex ? 2 : 0)
+                                .padding(selectedHex == playerColor.hex ? -2 : 0)
+                        )
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(playerColor.name)
+            }
+
+            // Clear button
+            Button {
+                onSelect(nil)
+            } label: {
+                ZStack {
+                    Circle()
+                        .stroke(Color.mtgTextSecondary, lineWidth: 1)
+                        .frame(width: 24, height: 24)
+                    Image(systemName: "xmark")
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundStyle(Color.mtgTextSecondary)
+                }
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Clear color")
+        }
+        .padding(.vertical, 4)
     }
 }
 

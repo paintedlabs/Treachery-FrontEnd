@@ -33,6 +33,13 @@ export interface PlaneCard {
 
 // Firestore document interfaces — field names use snake_case to match existing iOS data
 
+export interface DeckStat {
+  elo: number;
+  wins: number;
+  losses: number;
+  games: number;
+}
+
 export interface TreacheryUser {
   id: string;
   display_name: string;
@@ -41,6 +48,8 @@ export interface TreacheryUser {
   friend_ids: string[];
   fcm_token?: string | null;
   created_at: Timestamp;
+  elo?: number;
+  deck_stats?: Record<string, DeckStat>;
 }
 
 export interface Game {
@@ -56,6 +65,7 @@ export interface Game {
   last_activity_at?: Timestamp;
   game_mode?: GameMode;
   planechase?: PlanechaseState;
+  winner_user_ids?: string[];
 }
 
 export interface Player {
@@ -69,6 +79,8 @@ export interface Player {
   is_eliminated: boolean;
   is_unveiled: boolean;
   joined_at: Timestamp;
+  player_color: string | null;
+  commander_name: string | null;
 }
 
 export interface IdentityCard {

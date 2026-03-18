@@ -1,9 +1,9 @@
-import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import React, { useState, useRef, useEffect } from 'react';
+import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Animated } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Player, Role } from '@/models/types';
 import { ROLE_COLORS, ROLE_DISPLAY_NAMES } from '@/constants/roles';
-import { colors, fonts } from '@/constants/theme';
+import { colors, fonts, PLAYER_COLORS } from '@/constants/theme';
 
 interface PlayerRowProps {
   player: Player;
@@ -13,6 +13,8 @@ interface PlayerRowProps {
   onAdjustLife: (amount: number) => void;
   onViewCard?: () => void;
   isDisabled?: boolean;
+  onColorChange?: (color: string | null) => void;
+  playerColor?: string | null;
 }
 
 export function PlayerRow({
@@ -23,85 +25,172 @@ export function PlayerRow({
   onAdjustLife,
   onViewCard,
   isDisabled,
+  onColorChange,
+  playerColor,
 }: PlayerRowProps) {
   const roleColor = player.role ? ROLE_COLORS[player.role] : colors.textSecondary;
+  const effectiveColor = player.player_color || playerColor;
+  const accentColor = effectiveColor || (canSeeRole && player.role ? roleColor : null);
+
+  const [showColorPicker, setShowColorPicker] = useState(false);
+  const pickerHeight = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.timing(pickerHeight, {
+      toValue: showColorPicker ? 48 : 0,
+      duration: 200,
+      useNativeDriver: false,
+    }).start();
+  }, [showColorPicker]);
+
+  const handleColorSelect = (hex: string) => {
+    onColorChange?.(hex);
+    setShowColorPicker(false);
+  };
+
+  const handleClearColor = () => {
+    onColorChange?.(null);
+    setShowColorPicker(false);
+  };
 
   return (
-    <View style={[styles.container, isCurrentUser && styles.containerHighlight]}>
-      {/* Left role accent bar */}
-      {canSeeRole && player.role && (
-        <View style={[styles.accentBar, { backgroundColor: roleColor }]} />
-      )}
+    <View>
+      <View style={[styles.container, isCurrentUser && styles.containerHighlight]}>
+        {/* Left accent bar — player color preferred over role color */}
+        {accentColor && (
+          <View style={[styles.accentBar, { backgroundColor: accentColor }]} />
+        )}
 
-      <View style={styles.info}>
-        <View style={styles.nameRow}>
-          <Text
-            style={[
-              styles.name,
-              isCurrentUser && styles.nameBold,
-              player.is_eliminated && styles.nameEliminated,
-            ]}
-          >
-            {player.display_name}
-          </Text>
-          {isCurrentUser && (
-            <View style={styles.youBadge}>
-              <Text style={styles.youText}>You</Text>
-            </View>
-          )}
-          {player.is_eliminated && (
-            <Ionicons name="close-circle" size={14} color={colors.error} />
+        <View style={styles.info}>
+          <View style={styles.nameRow}>
+            {/* Color indicator circle for current user */}
+            {isCurrentUser && onColorChange && (
+              <TouchableOpacity
+                onPress={() => setShowColorPicker(!showColorPicker)}
+                accessibilityLabel="Choose player color"
+                accessibilityRole="button"
+                hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+              >
+                <View
+                  style={[
+                    styles.colorCircle,
+                    effectiveColor
+                      ? { backgroundColor: effectiveColor }
+                      : styles.colorCircleEmpty,
+                  ]}
+                />
+              </TouchableOpacity>
+            )}
+            <Text
+              style={[
+                styles.name,
+                isCurrentUser && styles.nameBold,
+                player.is_eliminated && styles.nameEliminated,
+              ]}
+            >
+              {player.display_name}
+            </Text>
+            {isCurrentUser && (
+              <View style={styles.youBadge}>
+                <Text style={styles.youText}>You</Text>
+              </View>
+            )}
+            {player.is_eliminated && (
+              <Ionicons name="close-circle" size={14} color={colors.error} />
+            )}
+          </View>
+
+          {/* Commander name */}
+          {player.commander_name ? (
+            <Text style={styles.commanderName}>{player.commander_name}</Text>
+          ) : null}
+
+          {canSeeRole && player.role ? (
+            <TouchableOpacity
+              onPress={isUnveiledOrLeader && !isCurrentUser ? onViewCard : undefined}
+              style={styles.roleRow}
+              disabled={!isUnveiledOrLeader || isCurrentUser}
+              accessibilityLabel={`${player.role ? ROLE_DISPLAY_NAMES[player.role] : 'Unknown'} role${isUnveiledOrLeader && !isCurrentUser ? ', view card' : ''}`}
+              accessibilityRole="button"
+            >
+              <View style={[styles.roleDot, { backgroundColor: roleColor }]} />
+              <Text style={[styles.roleText, { color: roleColor }]}>
+                {ROLE_DISPLAY_NAMES[player.role]}
+              </Text>
+              {player.is_unveiled && player.role !== 'leader' && !isCurrentUser && (
+                <Text style={styles.unveiledText}>(Unveiled)</Text>
+              )}
+              {isUnveiledOrLeader && !isCurrentUser && (
+                <Ionicons name="information-circle-outline" size={12} color={roleColor} />
+              )}
+            </TouchableOpacity>
+          ) : (
+            <Text style={styles.hiddenText}>Role Hidden</Text>
           )}
         </View>
 
-        {canSeeRole && player.role ? (
-          <TouchableOpacity
-            onPress={isUnveiledOrLeader && !isCurrentUser ? onViewCard : undefined}
-            style={styles.roleRow}
-            disabled={!isUnveiledOrLeader || isCurrentUser}
-            accessibilityLabel={`${player.role ? ROLE_DISPLAY_NAMES[player.role] : 'Unknown'} role${isUnveiledOrLeader && !isCurrentUser ? ', view card' : ''}`}
-            accessibilityRole="button"
-          >
-            <View style={[styles.roleDot, { backgroundColor: roleColor }]} />
-            <Text style={[styles.roleText, { color: roleColor }]}>
-              {ROLE_DISPLAY_NAMES[player.role]}
-            </Text>
-            {player.is_unveiled && player.role !== 'leader' && !isCurrentUser && (
-              <Text style={styles.unveiledText}>(Unveiled)</Text>
-            )}
-            {isUnveiledOrLeader && !isCurrentUser && (
-              <Ionicons name="information-circle-outline" size={12} color={roleColor} />
-            )}
-          </TouchableOpacity>
+        {!player.is_eliminated ? (
+          <View style={[styles.lifeControls, isDisabled && { opacity: 0.5 }]}>
+            <TouchableOpacity
+              onPress={() => onAdjustLife(-1)}
+              disabled={isDisabled}
+              accessibilityLabel={`Decrease ${player.display_name} life`}
+              accessibilityRole="button"
+            >
+              <Ionicons name="remove-circle" size={34} color={colors.error} />
+            </TouchableOpacity>
+            <View style={styles.lifeBox}>
+              <Text style={styles.lifeText}>{player.life_total}</Text>
+            </View>
+            <TouchableOpacity
+              onPress={() => onAdjustLife(1)}
+              disabled={isDisabled}
+              accessibilityLabel={`Increase ${player.display_name} life`}
+              accessibilityRole="button"
+            >
+              <Ionicons name="add-circle" size={34} color={colors.success} />
+            </TouchableOpacity>
+          </View>
         ) : (
-          <Text style={styles.hiddenText}>Role Hidden</Text>
+          <Text style={styles.eliminatedText}>Eliminated</Text>
         )}
       </View>
 
-      {!player.is_eliminated ? (
-        <View style={[styles.lifeControls, isDisabled && { opacity: 0.5 }]}>
-          <TouchableOpacity
-            onPress={() => onAdjustLife(-1)}
-            disabled={isDisabled}
-            accessibilityLabel={`Decrease ${player.display_name} life`}
-            accessibilityRole="button"
+      {/* Color picker strip — animated below the row */}
+      {isCurrentUser && onColorChange && (
+        <Animated.View style={[styles.colorPickerContainer, { height: pickerHeight }]}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.colorPickerContent}
           >
-            <Ionicons name="remove-circle" size={28} color={colors.error} />
-          </TouchableOpacity>
-          <View style={styles.lifeBox}>
-            <Text style={styles.lifeText}>{player.life_total}</Text>
-          </View>
-          <TouchableOpacity
-            onPress={() => onAdjustLife(1)}
-            disabled={isDisabled}
-            accessibilityLabel={`Increase ${player.display_name} life`}
-            accessibilityRole="button"
-          >
-            <Ionicons name="add-circle" size={28} color={colors.success} />
-          </TouchableOpacity>
-        </View>
-      ) : (
-        <Text style={styles.eliminatedText}>Eliminated</Text>
+            {PLAYER_COLORS.map((c) => (
+              <TouchableOpacity
+                key={c.hex}
+                onPress={() => handleColorSelect(c.hex)}
+                accessibilityLabel={`Select ${c.name} color`}
+                accessibilityRole="button"
+              >
+                <View
+                  style={[
+                    styles.colorOption,
+                    { backgroundColor: c.hex },
+                    effectiveColor === c.hex && styles.colorOptionSelected,
+                  ]}
+                />
+              </TouchableOpacity>
+            ))}
+            <TouchableOpacity
+              onPress={handleClearColor}
+              accessibilityLabel="Clear color"
+              accessibilityRole="button"
+            >
+              <View style={styles.colorClear}>
+                <Ionicons name="close" size={14} color={colors.textSecondary} />
+              </View>
+            </TouchableOpacity>
+          </ScrollView>
+        </Animated.View>
       )}
     </View>
   );
@@ -135,6 +224,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 6,
   },
+  colorCircle: {
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+  },
+  colorCircleEmpty: {
+    backgroundColor: colors.surfaceLight,
+    borderWidth: 1.5,
+    borderColor: colors.border,
+    borderStyle: 'dashed',
+  },
   name: {
     color: colors.text,
     fontSize: 16,
@@ -158,6 +258,11 @@ const styles = StyleSheet.create({
     color: colors.primary,
     fontSize: 10,
     fontWeight: '600',
+  },
+  commanderName: {
+    fontSize: 12,
+    color: colors.textSecondary,
+    fontStyle: 'italic',
   },
   roleRow: {
     flexDirection: 'row',
@@ -194,13 +299,13 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     borderRadius: 6,
     paddingVertical: 4,
-    paddingHorizontal: 8,
-    minWidth: 44,
+    paddingHorizontal: 10,
+    minWidth: 54,
     alignItems: 'center',
   },
   lifeText: {
     color: colors.text,
-    fontSize: 20,
+    fontSize: 28,
     fontWeight: '700',
     fontFamily: fonts.serif,
     textAlign: 'center',
@@ -209,5 +314,37 @@ const styles = StyleSheet.create({
     color: colors.error,
     fontSize: 12,
     fontStyle: 'italic',
+  },
+  colorPickerContainer: {
+    overflow: 'hidden',
+    backgroundColor: colors.background,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.divider,
+  },
+  colorPickerContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+  },
+  colorOption: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+  },
+  colorOptionSelected: {
+    borderWidth: 2.5,
+    borderColor: colors.text,
+  },
+  colorClear: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: colors.surfaceLight,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });

@@ -305,17 +305,28 @@ final class GameBoardViewModel: ObservableObject {
         isPending = false
     }
 
-    func endGame() async {
+    func endGame(winnerUserIds: [String]? = nil) async {
         guard !isPending else { return }
         errorMessage = nil
         isPending = true
 
         do {
-            try await cloudFunctions.endGame(gameId: gameId)
+            try await cloudFunctions.endGame(gameId: gameId, winnerUserIds: winnerUserIds)
         } catch {
             errorMessage = error.localizedDescription
         }
         isPending = false
+    }
+
+    // MARK: - Player Customization
+
+    func updatePlayerColor(_ hex: String?) async {
+        guard let player = currentPlayer else { return }
+        do {
+            try await firestoreManager.updatePlayerColor(gameId: gameId, playerId: player.id, color: hex)
+        } catch {
+            errorMessage = error.localizedDescription
+        }
     }
 
     // MARK: - Helpers

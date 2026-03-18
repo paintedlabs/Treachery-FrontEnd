@@ -14,7 +14,7 @@ import { useProfile } from '@/hooks/useProfile';
 import { StatBox } from '@/components/StatBox';
 import { ErrorBanner } from '@/components/ErrorBanner';
 import { ROLE_COLORS, ROLE_DISPLAY_NAMES } from '@/constants/roles';
-import { Role } from '@/models/types';
+import { Role, DeckStat } from '@/models/types';
 import { colors, spacing, fonts } from '@/constants/theme';
 
 export default function ProfileScreen() {
@@ -155,6 +155,47 @@ export default function ProfileScreen() {
           </View>
         )}
       </View>
+
+      {/* ELO Rating */}
+      {user && (
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>ELO Rating</Text>
+          <View style={styles.card}>
+            <View style={styles.statsRow}>
+              <StatBox
+                value={`${user.elo ?? 1500}`}
+                label="ELO"
+                color={colors.primary}
+              />
+            </View>
+          </View>
+        </View>
+      )}
+
+      {/* Deck Performance */}
+      {user?.deck_stats && Object.keys(user.deck_stats).length > 0 && (
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Deck Performance</Text>
+          <View style={styles.card}>
+            {(Object.entries(user.deck_stats) as [string, DeckStat][])
+              .sort(([, a], [, b]) => b.games - a.games)
+              .map(([deckName, stats]) => (
+                <View key={deckName} style={styles.deckRow}>
+                  <Text style={styles.deckName}>{deckName}</Text>
+                  <View style={styles.deckStats}>
+                    <Text style={styles.deckElo}>{stats.elo} ELO</Text>
+                    <Text style={styles.deckRecord}>
+                      {stats.wins}W - {stats.losses}L
+                    </Text>
+                    <Text style={styles.deckGames}>
+                      {stats.games} {stats.games === 1 ? 'game' : 'games'}
+                    </Text>
+                  </View>
+                </View>
+              ))}
+          </View>
+        </View>
+      )}
 
       {/* Friends */}
       {user && user.friend_ids && (
@@ -312,6 +353,36 @@ const styles = StyleSheet.create({
   linkText: {
     color: colors.primary,
     fontSize: 16,
+  },
+  deckRow: {
+    padding: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.divider,
+    gap: 4,
+  },
+  deckName: {
+    color: colors.text,
+    fontSize: 15,
+    fontWeight: '600',
+    fontFamily: fonts.serif,
+  },
+  deckStats: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  deckElo: {
+    color: colors.primary,
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  deckRecord: {
+    color: colors.textSecondary,
+    fontSize: 13,
+  },
+  deckGames: {
+    color: colors.textTertiary,
+    fontSize: 13,
   },
   signOutButton: {
     backgroundColor: colors.surface,

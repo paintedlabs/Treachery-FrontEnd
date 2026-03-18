@@ -16,9 +16,11 @@ interface UseLobbyReturn {
   minPlayers: number;
   startGame: () => Promise<void>;
   leaveGame: (userId: string) => Promise<void>;
+  updatePlayerColor: (color: string | null) => Promise<void>;
+  updateCommanderName: (name: string | null) => Promise<void>;
 }
 
-export function useLobby(gameId: string, isHost: boolean): UseLobbyReturn {
+export function useLobby(gameId: string, isHost: boolean, currentUserId?: string | null): UseLobbyReturn {
   const [game, setGame] = useState<Game | null>(null);
   const [players, setPlayers] = useState<Player[]>([]);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -89,6 +91,26 @@ export function useLobby(gameId: string, isHost: boolean): UseLobbyReturn {
     [gameId]
   );
 
+  const currentPlayer = players.find((p) => p.user_id === currentUserId) ?? null;
+
+  const updatePlayerColor = useCallback(async (color: string | null) => {
+    if (!currentPlayer) return;
+    try {
+      await firestoreService.updatePlayerColor(gameId, currentPlayer.id, color);
+    } catch (error: any) {
+      setErrorMessage(error.message || 'Failed to update color.');
+    }
+  }, [gameId, currentPlayer]);
+
+  const updateCommanderName = useCallback(async (name: string | null) => {
+    if (!currentPlayer) return;
+    try {
+      await firestoreService.updateCommanderName(gameId, currentPlayer.id, name);
+    } catch (error: any) {
+      setErrorMessage(error.message || 'Failed to update commander name.');
+    }
+  }, [gameId, currentPlayer]);
+
   return {
     game,
     players,
@@ -100,5 +122,7 @@ export function useLobby(gameId: string, isHost: boolean): UseLobbyReturn {
     minPlayers,
     startGame,
     leaveGame,
+    updatePlayerColor,
+    updateCommanderName,
   };
 }

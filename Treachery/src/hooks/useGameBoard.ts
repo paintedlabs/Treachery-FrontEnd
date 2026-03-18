@@ -22,6 +22,7 @@ interface UseGameBoardReturn {
   eliminateAndLeave: () => Promise<void>;
   canSeeRole: (player: Player) => boolean;
   identityCard: (player: Player) => IdentityCard | undefined;
+  updatePlayerColor: (color: string | null) => Promise<void>;
   // Planechase
   isPlanechaseActive: boolean;
   isTreacheryActive: boolean;
@@ -36,7 +37,7 @@ interface UseGameBoardReturn {
   isRollingDie: boolean;
   rollDie: () => Promise<void>;
   resolvePhenomenon: () => Promise<void>;
-  endGame: () => Promise<void>;
+  endGame: (winnerUserIds?: string[]) => Promise<void>;
 }
 
 export function useGameBoard(gameId: string, currentUserId: string | null): UseGameBoardReturn {
@@ -66,19 +67,26 @@ export function useGameBoard(gameId: string, currentUserId: string | null): UseG
       hasReceivedFirstSnapshot.current = true;
     });
 
-    const unsubPlayers = firestoreService.listenToPlayers(gameId, (p) => {
-      setServerPlayers(p);
-      // Clear optimistic deltas for players whose server state has caught up
-      setLifeDeltas((prev) => {
-        const next = { ...prev };
-        let changed = false;
-        for (const id of Object.keys(next)) {
-          if (next[id] === 0) {
-            delete next[id];
-            changed = true;
+    const unsubPlayers = firestoreService.listenToPlayers(gameId, (newPlayers) => {
+      // Clear optimistic deltas for players whose server life has changed
+      // (meaning the server has processed our update)
+      setServerPlayers((prevServer) => {
+        setLifeDeltas((prev) => {
+          if (Object.keys(prev).length === 0) return prev;
+          const next = { ...prev };
+          let changed = false;
+          for (const id of Object.keys(next)) {
+            const oldLife = prevServer.find((s) => s.id === id)?.life_total;
+            const newLife = newPlayers.find((s) => s.id === id)?.life_total;
+            if (oldLife !== undefined && newLife !== undefined && oldLife !== newLife) {
+              delete next[id];
+              lifeDeltasRef.current[id] = 0;
+              changed = true;
+            }
           }
-        }
-        return changed ? next : prev;
+          return changed ? next : prev;
+        });
+        return newPlayers;
       });
     });
 
@@ -162,18 +170,16 @@ export function useGameBoard(gameId: string, currentUserId: string | null): UseG
       const delta = lifeDeltasRef.current[playerId];
       if (!delta) return;
 
-      // Clear the delta before sending so new taps start fresh
+      // Clear ref so new taps accumulate fresh, but keep lifeDeltas STATE
+      // intact — the optimistic display persists until the Firestore
+      // snapshot arrives with the updated server value.
       lifeDeltasRef.current[playerId] = 0;
-      setLifeDeltas((prev) => ({ ...prev, [playerId]: 0 }));
 
       const adjustLifeFn = httpsCallable(functions, 'adjustLife');
       adjustLifeFn({ gameId, playerId, amount: delta }).catch((error: any) => {
-        // Revert: re-apply the delta that failed
+        // Revert: re-apply the delta to the ref
         lifeDeltasRef.current[playerId] = (lifeDeltasRef.current[playerId] || 0) + delta;
-        setLifeDeltas((prev) => ({
-          ...prev,
-          [playerId]: (prev[playerId] || 0) + delta,
-        }));
+        // State delta is still there, so display is correct — no action needed
         setErrorMessage(error.message || 'Failed to adjust life.');
       });
     },
@@ -234,6 +240,15 @@ export function useGameBoard(gameId: string, currentUserId: string | null): UseG
       setIsPending(false);
     }
   }, [currentPlayer, gameId, isPending]);
+
+  const updatePlayerColor = useCallback(async (color: string | null) => {
+    if (!currentPlayer) return;
+    try {
+      await firestoreService.updatePlayerColor(gameId, currentPlayer.id, color);
+    } catch (error: any) {
+      setErrorMessage(error.message || 'Failed to update color.');
+    }
+  }, [gameId, currentPlayer]);
 
   const canSeeRole = useCallback(
     (player: Player): boolean => {
@@ -307,14 +322,18 @@ export function useGameBoard(gameId: string, currentUserId: string | null): UseG
     }
   }, [gameId, isPending]);
 
-  const endGame = useCallback(async () => {
+  const endGame = useCallback(async (winnerUserIds?: string[]) => {
     if (isPending) return;
     setErrorMessage(null);
     setIsPending(true);
 
     try {
       const endGameFn = httpsCallable(functions, 'endGame');
-      await endGameFn({ gameId });
+      const payload: { gameId: string; winnerUserIds?: string[] } = { gameId };
+      if (winnerUserIds) {
+        payload.winnerUserIds = winnerUserIds;
+      }
+      await endGameFn(payload);
     } catch (error: any) {
       setErrorMessage(error.message || 'Failed to end game.');
     } finally {
@@ -338,6 +357,7 @@ export function useGameBoard(gameId: string, currentUserId: string | null): UseG
     eliminateAndLeave,
     canSeeRole,
     identityCard: identityCardFn,
+    updatePlayerColor,
     // Planechase
     isPlanechaseActive,
     isTreacheryActive,

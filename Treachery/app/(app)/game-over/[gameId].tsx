@@ -72,12 +72,19 @@ export default function GameOverScreen() {
             const card = identityCard(player);
             const roleColor = player.role ? ROLE_COLORS[player.role] : colors.textSecondary;
 
+            const playerAccentColor = player.player_color || roleColor;
+
             return (
               <View key={player.id}>
                 <View style={styles.playerRow}>
-                  <View style={[styles.accentBar, { backgroundColor: roleColor }]} />
+                  <View style={[styles.accentBar, { backgroundColor: playerAccentColor }]} />
                   <View style={[styles.roleDot, { backgroundColor: roleColor }]} />
-                  <Text style={styles.playerName}>{player.display_name}</Text>
+                  <View style={styles.playerNameCol}>
+                    <Text style={styles.playerName}>{player.display_name}</Text>
+                    {player.commander_name ? (
+                      <Text style={styles.commanderName}>{player.commander_name}</Text>
+                    ) : null}
+                  </View>
                   <View style={styles.playerRight}>
                     <Text style={[styles.roleText, { color: roleColor }]}>
                       {player.role ? ROLE_DISPLAY_NAMES[player.role] : 'Unknown'}
@@ -96,11 +103,17 @@ export default function GameOverScreen() {
           }
 
           // Non-treachery: simple player row with final life total
+          const nonTreacheryAccent = player.player_color || colors.primary;
           return (
             <View key={player.id}>
               <View style={styles.playerRow}>
-                <View style={[styles.accentBar, { backgroundColor: colors.primary }]} />
-                <Text style={styles.playerName}>{player.display_name}</Text>
+                <View style={[styles.accentBar, { backgroundColor: nonTreacheryAccent }]} />
+                <View style={styles.playerNameCol}>
+                  <Text style={styles.playerName}>{player.display_name}</Text>
+                  {player.commander_name ? (
+                    <Text style={styles.commanderName}>{player.commander_name}</Text>
+                  ) : null}
+                </View>
                 <Text style={styles.lifeTotalText}>{player.life_total} life</Text>
               </View>
               {index < players.length - 1 && <View style={styles.rowDivider} />}
@@ -195,11 +208,19 @@ const styles = StyleSheet.create({
     height: 12,
     borderRadius: 6,
   },
+  playerNameCol: {
+    flex: 1,
+    gap: 1,
+  },
   playerName: {
     color: colors.text,
     fontSize: 16,
     fontWeight: '500',
-    flex: 1,
+  },
+  commanderName: {
+    fontSize: 12,
+    color: colors.textSecondary,
+    fontStyle: 'italic',
   },
   playerRight: {
     alignItems: 'flex-end',

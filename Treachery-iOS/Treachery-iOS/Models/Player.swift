@@ -18,6 +18,8 @@ struct Player: Codable, Identifiable {
     var isEliminated: Bool
     var isUnveiled: Bool
     let joinedAt: Date
+    var playerColor: String?
+    var commanderName: String?
 
     enum CodingKeys: String, CodingKey {
         case id
@@ -30,5 +32,7 @@ struct Player: Codable, Identifiable {
         case isEliminated = "is_eliminated"
         case isUnveiled = "is_unveiled"
         case joinedAt = "joined_at"
+        case playerColor = "player_color"
+        case commanderName = "commander_name"
     }
 }

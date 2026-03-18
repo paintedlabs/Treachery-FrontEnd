@@ -1,14 +1,17 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import {
   View,
   Text,
+  TextInput,
   TouchableOpacity,
+  ScrollView,
   StyleSheet,
   FlatList,
   ActivityIndicator,
   Alert,
   Share,
   Platform,
+  Animated,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -18,7 +21,8 @@ import { useLobby } from '@/hooks/useLobby';
 import { ErrorBanner } from '@/components/ErrorBanner';
 import { LoadingScreen } from '@/components/LoadingScreen';
 import { ConnectionBanner } from '@/components/ConnectionBanner';
-import { colors, spacing, fonts } from '@/constants/theme';
+import { Player } from '@/models/types';
+import { colors, spacing, fonts, PLAYER_COLORS } from '@/constants/theme';
 
 const MODE_DISPLAY: Record<string, string> = {
   treachery: 'Treachery',
@@ -26,6 +30,166 @@ const MODE_DISPLAY: Record<string, string> = {
   treachery_planechase: 'Treachery + Planechase',
   none: 'Life Tracker',
 };
+
+function LobbyPlayerRow({
+  item,
+  isCurrentUser,
+  isHostPlayer,
+  onColorChange,
+  onCommanderNameSubmit,
+}: {
+  item: Player;
+  isCurrentUser: boolean;
+  isHostPlayer: boolean;
+  onColorChange?: (color: string | null) => void;
+  onCommanderNameSubmit?: (name: string | null) => void;
+}) {
+  const [showColorPicker, setShowColorPicker] = useState(false);
+  const [commanderDraft, setCommanderDraft] = useState(item.commander_name ?? '');
+  const pickerHeight = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.timing(pickerHeight, {
+      toValue: showColorPicker ? 48 : 0,
+      duration: 200,
+      useNativeDriver: false,
+    }).start();
+  }, [showColorPicker]);
+
+  const handleColorSelect = (hex: string) => {
+    onColorChange?.(hex);
+    setShowColorPicker(false);
+  };
+
+  const handleClearColor = () => {
+    onColorChange?.(null);
+    setShowColorPicker(false);
+  };
+
+  const handleCommanderBlur = () => {
+    const trimmed = commanderDraft.trim();
+    if (trimmed !== (item.commander_name ?? '')) {
+      onCommanderNameSubmit?.(trimmed || null);
+    }
+  };
+
+  return (
+    <View>
+      <View style={styles.playerRow}>
+        {/* Left accent bar for player color */}
+        {item.player_color && (
+          <View style={[styles.accentBar, { backgroundColor: item.player_color }]} />
+        )}
+
+        {/* Color circle for current user, or player icon for others */}
+        {isCurrentUser && onColorChange ? (
+          <TouchableOpacity
+            onPress={() => setShowColorPicker(!showColorPicker)}
+            accessibilityLabel="Choose player color"
+            accessibilityRole="button"
+          >
+            <View
+              style={[
+                styles.playerIcon,
+                item.player_color
+                  ? { backgroundColor: item.player_color, borderColor: item.player_color }
+                  : {},
+              ]}
+            >
+              <Ionicons
+                name="color-palette"
+                size={14}
+                color={item.player_color ? '#fff' : colors.textSecondary}
+              />
+            </View>
+          </TouchableOpacity>
+        ) : (
+          <View
+            style={[
+              styles.playerIcon,
+              item.player_color
+                ? { backgroundColor: item.player_color, borderColor: item.player_color }
+                : {},
+            ]}
+          >
+            <Ionicons
+              name="person"
+              size={14}
+              color={item.player_color ? '#fff' : colors.textSecondary}
+            />
+          </View>
+        )}
+
+        <View style={styles.playerInfo}>
+          <Text style={[styles.playerName, isHostPlayer && styles.bold]}>
+            {item.display_name}
+          </Text>
+          {/* Commander name display for non-current users */}
+          {!isCurrentUser && item.commander_name ? (
+            <Text style={styles.commanderNameDisplay}>{item.commander_name}</Text>
+          ) : null}
+          {/* Commander name input for current user */}
+          {isCurrentUser && onCommanderNameSubmit && (
+            <TextInput
+              style={styles.commanderInput}
+              placeholder="Commander name..."
+              placeholderTextColor={colors.textTertiary}
+              value={commanderDraft}
+              onChangeText={setCommanderDraft}
+              onBlur={handleCommanderBlur}
+              onSubmitEditing={handleCommanderBlur}
+              returnKeyType="done"
+              maxLength={40}
+            />
+          )}
+        </View>
+
+        {isHostPlayer && (
+          <View style={styles.hostBadge}>
+            <Text style={styles.hostBadgeText}>Host</Text>
+          </View>
+        )}
+      </View>
+
+      {/* Color picker strip — animated */}
+      {isCurrentUser && onColorChange && (
+        <Animated.View style={[styles.colorPickerContainer, { height: pickerHeight }]}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.colorPickerContent}
+          >
+            {PLAYER_COLORS.map((c) => (
+              <TouchableOpacity
+                key={c.hex}
+                onPress={() => handleColorSelect(c.hex)}
+                accessibilityLabel={`Select ${c.name} color`}
+                accessibilityRole="button"
+              >
+                <View
+                  style={[
+                    styles.colorOption,
+                    { backgroundColor: c.hex },
+                    item.player_color === c.hex && styles.colorOptionSelected,
+                  ]}
+                />
+              </TouchableOpacity>
+            ))}
+            <TouchableOpacity
+              onPress={handleClearColor}
+              accessibilityLabel="Clear color"
+              accessibilityRole="button"
+            >
+              <View style={styles.colorClear}>
+                <Ionicons name="close" size={14} color={colors.textSecondary} />
+              </View>
+            </TouchableOpacity>
+          </ScrollView>
+        </Animated.View>
+      )}
+    </View>
+  );
+}
 
 export default function LobbyScreen() {
   const { gameId, isHost: isHostParam } = useLocalSearchParams<{
@@ -47,7 +211,9 @@ export default function LobbyScreen() {
     minPlayers,
     startGame,
     leaveGame,
-  } = useLobby(gameId!, isHost);
+    updatePlayerColor,
+    updateCommanderName,
+  } = useLobby(gameId!, isHost, currentUserId);
 
   // On web, intercept browser back button — prevent accidental lobby exit
   useEffect(() => {
@@ -192,22 +358,20 @@ export default function LobbyScreen() {
         <FlatList
           data={players}
           keyExtractor={(p) => p.id}
-          renderItem={({ item }) => (
-            <View style={styles.playerRow}>
-              <View style={styles.playerIcon}>
-                <Ionicons name="person" size={14} color={colors.textSecondary} />
-              </View>
-              <Text style={[styles.playerName, item.user_id === game?.host_id && styles.bold]}>
-                {item.display_name}
-              </Text>
-              {item.user_id === game?.host_id && (
-                <View style={styles.hostBadge}>
-                  <Text style={styles.hostBadgeText}>Host</Text>
-                </View>
-              )}
-            </View>
-          )}
+          renderItem={({ item }) => {
+            const isCurrent = item.user_id === currentUserId;
+            return (
+              <LobbyPlayerRow
+                item={item}
+                isCurrentUser={isCurrent}
+                isHostPlayer={item.user_id === game?.host_id}
+                onColorChange={isCurrent ? updatePlayerColor : undefined}
+                onCommanderNameSubmit={isCurrent ? updateCommanderName : undefined}
+              />
+            );
+          }}
           style={styles.list}
+          keyboardShouldPersistTaps="handled"
         />
       )}
 
@@ -385,6 +549,12 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: colors.divider,
   },
+  accentBar: {
+    width: 3,
+    alignSelf: 'stretch',
+    borderRadius: 2,
+    marginRight: 10,
+  },
   playerIcon: {
     width: 28,
     height: 28,
@@ -396,13 +566,29 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginRight: 10,
   },
+  playerInfo: {
+    flex: 1,
+    gap: 2,
+  },
   playerName: {
     color: colors.text,
     fontSize: 16,
-    flex: 1,
   },
   bold: {
     fontWeight: '600',
+  },
+  commanderNameDisplay: {
+    fontSize: 12,
+    color: colors.textSecondary,
+    fontStyle: 'italic',
+  },
+  commanderInput: {
+    fontSize: 12,
+    color: colors.textSecondary,
+    fontStyle: 'italic',
+    paddingVertical: 2,
+    paddingHorizontal: 0,
+    margin: 0,
   },
   hostBadge: {
     backgroundColor: 'rgba(201, 168, 76, 0.15)',
@@ -416,6 +602,38 @@ const styles = StyleSheet.create({
     color: colors.primary,
     fontSize: 12,
     fontWeight: '500',
+  },
+  colorPickerContainer: {
+    overflow: 'hidden',
+    backgroundColor: colors.background,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.divider,
+  },
+  colorPickerContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+  },
+  colorOption: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+  },
+  colorOptionSelected: {
+    borderWidth: 2.5,
+    borderColor: colors.text,
+  },
+  colorClear: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: colors.surfaceLight,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   waitingRow: {
     flexDirection: 'row',

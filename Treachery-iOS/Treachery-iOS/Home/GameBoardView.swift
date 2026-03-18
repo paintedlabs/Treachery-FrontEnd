@@ -17,7 +17,10 @@ struct GameBoardView: View {
     @State private var showForfeitConfirmation = false
     @State private var showGameUnavailableAlert = false
     @State private var showEndGameConfirmation = false
+    @State private var showWinnerSelection = false
+    @State private var selectedWinners: Set<String> = []
     @State private var inspectedPlayer: Player?
+    @State private var showColorPicker = false
 
     init(gameId: String, navigationPath: Binding<NavigationPath>) {
         _viewModel = StateObject(wrappedValue: GameBoardViewModel(gameId: gameId))
@@ -35,6 +38,10 @@ struct GameBoardView: View {
     var body: some View {
         ZStack {
             Color.mtgBackground.ignoresSafeArea()
+
+            if let hex = viewModel.currentPlayer?.playerColor {
+                Color(hex: hex).opacity(0.08).ignoresSafeArea()
+            }
 
             VStack(spacing: 0) {
                 ConnectionBanner()
@@ -156,7 +163,11 @@ struct GameBoardView: View {
 
                             VStack(spacing: 0) {
                                 ForEach(viewModel.players) { player in
-                                    PlayerRow(player: player, viewModel: viewModel) { tappedPlayer in
+                                    PlayerRow(
+                                        player: player,
+                                        viewModel: viewModel,
+                                        showColorPicker: player.userId == viewModel.currentUserId ? $showColorPicker : .constant(false)
+                                    ) { tappedPlayer in
                                         inspectedPlayer = tappedPlayer
                                     }
                                     .padding(.horizontal, 16)
@@ -238,7 +249,8 @@ struct GameBoardView: View {
                     // End Game button — only when NOT treachery (host only)
                     if !viewModel.isTreacheryActive && viewModel.isHost {
                         Button {
-                            showEndGameConfirmation = true
+                            selectedWinners = []
+                            showWinnerSelection = true
                         } label: {
                             HStack(spacing: 8) {
                                 Image(systemName: "flag.checkered")
@@ -249,18 +261,6 @@ struct GameBoardView: View {
                         .buttonStyle(MtgSecondaryButtonStyle())
                         .padding(.horizontal)
                         .padding(.vertical, 8)
-                        .confirmationDialog(
-                            "End Game?",
-                            isPresented: $showEndGameConfirmation,
-                            titleVisibility: .visible
-                        ) {
-                            Button("End Game", role: .destructive) {
-                                Task { await viewModel.endGame() }
-                            }
-                            Button("Cancel", role: .cancel) {}
-                        } message: {
-                            Text("This will end the game for all players.")
-                        }
                     }
                 }
             }
@@ -323,6 +323,20 @@ struct GameBoardView: View {
         )) {
             if let options = viewModel.tunnelOptions {
                 InterplanarTunnelPicker(options: options, viewModel: viewModel)
+            }
+        }
+        .sheet(isPresented: $showWinnerSelection) {
+            WinnerSelectionSheet(
+                players: viewModel.alivePlayers,
+                selectedWinners: $selectedWinners,
+                isPending: viewModel.isPending
+            ) {
+                Task {
+                    await viewModel.endGame(winnerUserIds: Array(selectedWinners))
+                    showWinnerSelection = false
+                }
+            } onCancel: {
+                showWinnerSelection = false
             }
         }
     }
@@ -496,6 +510,7 @@ private struct IdentityCardHeader: View {
 private struct PlayerRow: View {
     let player: Player
     @ObservedObject var viewModel: GameBoardViewModel
+    @Binding var showColorPicker: Bool
     var onViewCard: ((Player) -> Void)?
 
     private var isCurrentUser: Bool {
@@ -511,38 +526,102 @@ private struct PlayerRow: View {
     }
 
     var body: some View {
-        HStack {
-            // Player info
-            VStack(alignment: .leading, spacing: 2) {
-                HStack(spacing: 6) {
-                    Text(player.displayName)
-                        .fontWeight(isCurrentUser ? .bold : .regular)
-                        .strikethrough(player.isEliminated)
-                        .foregroundStyle(player.isEliminated ? Color.mtgTextSecondary : Color.mtgTextPrimary)
-
-                    if isCurrentUser {
-                        Text("You")
-                            .font(.caption2)
-                            .foregroundStyle(Color.mtgGold)
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 1)
-                            .background(Color.mtgGold.opacity(0.15))
-                            .clipShape(Capsule())
-                    }
-
-                    if player.isEliminated {
-                        Image(systemName: "xmark.circle.fill")
-                            .foregroundStyle(Color.mtgError)
-                            .font(.caption)
-                    }
+        VStack(spacing: 0) {
+            HStack(spacing: 0) {
+                // Left accent bar for player color
+                if let hex = player.playerColor {
+                    RoundedRectangle(cornerRadius: 1.5)
+                        .fill(Color(hex: hex))
+                        .frame(width: 3)
+                        .padding(.vertical, 2)
+                        .padding(.trailing, 8)
                 }
 
-                // Role visibility
-                if viewModel.canSeeRole(of: player) {
-                    if canInspectCard {
-                        Button {
-                            onViewCard?(player)
-                        } label: {
+                // Color picker toggle for current user
+                if isCurrentUser {
+                    Button {
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            showColorPicker.toggle()
+                        }
+                    } label: {
+                        if let hex = player.playerColor {
+                            Circle()
+                                .fill(Color(hex: hex))
+                                .frame(width: 16, height: 16)
+                                .overlay(
+                                    Circle().stroke(Color.mtgTextSecondary.opacity(0.3), lineWidth: 1)
+                                )
+                        } else {
+                            Circle()
+                                .stroke(Color.mtgTextSecondary, lineWidth: 1.5)
+                                .frame(width: 16, height: 16)
+                        }
+                    }
+                    .buttonStyle(.plain)
+                    .padding(.trailing, 6)
+                    .accessibilityLabel("Choose player color")
+                }
+
+                // Player info
+                VStack(alignment: .leading, spacing: 2) {
+                    HStack(spacing: 6) {
+                        Text(player.displayName)
+                            .fontWeight(isCurrentUser ? .bold : .regular)
+                            .strikethrough(player.isEliminated)
+                            .foregroundStyle(player.isEliminated ? Color.mtgTextSecondary : Color.mtgTextPrimary)
+
+                        if isCurrentUser {
+                            Text("You")
+                                .font(.caption2)
+                                .foregroundStyle(Color.mtgGold)
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 1)
+                                .background(Color.mtgGold.opacity(0.15))
+                                .clipShape(Capsule())
+                        }
+
+                        if player.isEliminated {
+                            Image(systemName: "xmark.circle.fill")
+                                .foregroundStyle(Color.mtgError)
+                                .font(.caption)
+                        }
+                    }
+
+                    // Commander name
+                    if let commanderName = player.commanderName, !commanderName.isEmpty {
+                        Text(commanderName)
+                            .font(.system(.caption, design: .serif))
+                            .italic()
+                            .foregroundStyle(Color.mtgTextSecondary)
+                    }
+
+                    // Role visibility
+                    if viewModel.canSeeRole(of: player) {
+                        if canInspectCard {
+                            Button {
+                                onViewCard?(player)
+                            } label: {
+                                HStack(spacing: 4) {
+                                    Circle()
+                                        .fill(player.role?.color ?? .gray)
+                                        .frame(width: 8, height: 8)
+                                    Text(player.role?.displayName ?? "")
+                                        .font(.caption)
+                                        .foregroundStyle(player.role?.color ?? Color.mtgTextSecondary)
+                                    if player.isUnveiled && player.role != .leader {
+                                        Text("(Unveiled)")
+                                            .font(.caption2)
+                                            .foregroundStyle(Color.mtgTextSecondary)
+                                    }
+                                    Image(systemName: "info.circle")
+                                        .font(.caption2)
+                                        .foregroundStyle(player.role?.color ?? Color.mtgTextSecondary)
+                                }
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityLabel("View \(player.displayName)'s identity card")
+                            .accessibilityHint("Shows their role ability and card details")
+                        } else {
                             HStack(spacing: 4) {
                                 Circle()
                                     .fill(player.role?.color ?? .gray)
@@ -550,83 +629,123 @@ private struct PlayerRow: View {
                                 Text(player.role?.displayName ?? "")
                                     .font(.caption)
                                     .foregroundStyle(player.role?.color ?? Color.mtgTextSecondary)
-                                if player.isUnveiled && player.role != .leader {
+                                if player.isUnveiled && !isCurrentUser && player.role != .leader {
                                     Text("(Unveiled)")
                                         .font(.caption2)
                                         .foregroundStyle(Color.mtgTextSecondary)
                                 }
-                                Image(systemName: "info.circle")
-                                    .font(.caption2)
-                                    .foregroundStyle(player.role?.color ?? Color.mtgTextSecondary)
                             }
+                        }
+                    } else {
+                        Text("Role Hidden")
+                            .font(.caption)
+                            .foregroundStyle(Color.mtgTextSecondary)
+                    }
+                }
+
+                Spacer()
+
+                // Life controls
+                if !player.isEliminated {
+                    HStack(spacing: 14) {
+                        Button {
+                            viewModel.adjustLife(for: player.id, by: -1)
+                        } label: {
+                            Image(systemName: "minus.circle.fill")
+                                .font(.system(size: 30))
+                                .foregroundStyle(Color.mtgAssassin)
                         }
                         .buttonStyle(.plain)
-                        .accessibilityLabel("View \(player.displayName)'s identity card")
-                        .accessibilityHint("Shows their role ability and card details")
-                    } else {
-                        HStack(spacing: 4) {
-                            Circle()
-                                .fill(player.role?.color ?? .gray)
-                                .frame(width: 8, height: 8)
-                            Text(player.role?.displayName ?? "")
-                                .font(.caption)
-                                .foregroundStyle(player.role?.color ?? Color.mtgTextSecondary)
-                            if player.isUnveiled && !isCurrentUser && player.role != .leader {
-                                Text("(Unveiled)")
-                                    .font(.caption2)
-                                    .foregroundStyle(Color.mtgTextSecondary)
-                            }
+                        .accessibilityLabel("Decrease \(player.displayName)'s life")
+
+                        Text("\(player.lifeTotal)")
+                            .font(.system(size: 32, weight: .bold, design: .serif))
+                            .foregroundStyle(Color.mtgTextPrimary)
+                            .frame(minWidth: 48)
+                            .multilineTextAlignment(.center)
+                            .contentTransition(.numericText())
+                            .accessibilityLabel("\(player.lifeTotal) life")
+
+                        Button {
+                            viewModel.adjustLife(for: player.id, by: 1)
+                        } label: {
+                            Image(systemName: "plus.circle.fill")
+                                .font(.system(size: 30))
+                                .foregroundStyle(Color.mtgSuccess)
                         }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Increase \(player.displayName)'s life")
                     }
                 } else {
-                    Text("Role Hidden")
+                    Text("Eliminated")
                         .font(.caption)
+                        .foregroundStyle(Color.mtgError)
+                }
+            }
+            .padding(.vertical, 4)
+
+            // Color picker row (current user only)
+            if isCurrentUser && showColorPicker {
+                ColorPickerRow(selectedHex: player.playerColor) { hex in
+                    Task { await viewModel.updatePlayerColor(hex) }
+                }
+                .padding(.top, 8)
+                .transition(.asymmetric(
+                    insertion: .move(edge: .top).combined(with: .opacity),
+                    removal: .opacity
+                ))
+            }
+        }
+        .accessibilityElement(children: .combine)
+    }
+}
+
+// MARK: - Color Picker Row
+
+private struct ColorPickerRow: View {
+    let selectedHex: String?
+    let onSelect: (String?) -> Void
+
+    var body: some View {
+        HStack(spacing: 8) {
+            ForEach(PlayerColors.palette, id: \.hex) { playerColor in
+                Button {
+                    if selectedHex == playerColor.hex {
+                        onSelect(nil)
+                    } else {
+                        onSelect(playerColor.hex)
+                    }
+                } label: {
+                    Circle()
+                        .fill(playerColor.color)
+                        .frame(width: 24, height: 24)
+                        .overlay(
+                            Circle()
+                                .stroke(Color.mtgTextPrimary, lineWidth: selectedHex == playerColor.hex ? 2 : 0)
+                                .padding(selectedHex == playerColor.hex ? -2 : 0)
+                        )
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(playerColor.name)
+            }
+
+            // Clear button
+            Button {
+                onSelect(nil)
+            } label: {
+                ZStack {
+                    Circle()
+                        .stroke(Color.mtgTextSecondary, lineWidth: 1)
+                        .frame(width: 24, height: 24)
+                    Image(systemName: "xmark")
+                        .font(.system(size: 10, weight: .bold))
                         .foregroundStyle(Color.mtgTextSecondary)
                 }
             }
-
-            Spacer()
-
-            // Life controls
-            if !player.isEliminated {
-                HStack(spacing: 12) {
-                    Button {
-                        viewModel.adjustLife(for: player.id, by: -1)
-                    } label: {
-                        Image(systemName: "minus.circle.fill")
-                            .font(.title2)
-                            .foregroundStyle(Color.mtgAssassin)
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel("Decrease \(player.displayName)'s life")
-
-                    Text("\(player.lifeTotal)")
-                        .font(.system(.title3, design: .serif))
-                        .fontWeight(.bold)
-                        .foregroundStyle(Color.mtgTextPrimary)
-                        .frame(minWidth: 36)
-                        .multilineTextAlignment(.center)
-                        .contentTransition(.numericText())
-                        .accessibilityLabel("\(player.lifeTotal) life")
-
-                    Button {
-                        viewModel.adjustLife(for: player.id, by: 1)
-                    } label: {
-                        Image(systemName: "plus.circle.fill")
-                            .font(.title2)
-                            .foregroundStyle(Color.mtgSuccess)
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel("Increase \(player.displayName)'s life")
-                }
-            } else {
-                Text("Eliminated")
-                    .font(.caption)
-                    .foregroundStyle(Color.mtgError)
-            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Clear color")
         }
         .padding(.vertical, 4)
-        .accessibilityElement(children: .combine)
     }
 }
 
@@ -677,6 +796,115 @@ private struct ActionBar: View {
             }
         }
         .padding()
+    }
+}
+
+// MARK: - Winner Selection Sheet
+
+private struct WinnerSelectionSheet: View {
+    let players: [Player]
+    @Binding var selectedWinners: Set<String>
+    let isPending: Bool
+    let onConfirm: () -> Void
+    let onCancel: () -> Void
+
+    var body: some View {
+        NavigationStack {
+            ZStack {
+                Color.mtgBackground.ignoresSafeArea()
+
+                VStack(spacing: 16) {
+                    Text("Select the winner(s) of this game for ELO tracking.")
+                        .font(.subheadline)
+                        .foregroundStyle(Color.mtgTextSecondary)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal)
+
+                    ScrollView {
+                        VStack(spacing: 0) {
+                            ForEach(players) { player in
+                                Button {
+                                    if selectedWinners.contains(player.userId) {
+                                        selectedWinners.remove(player.userId)
+                                    } else {
+                                        selectedWinners.insert(player.userId)
+                                    }
+                                } label: {
+                                    HStack(spacing: 12) {
+                                        Image(systemName: selectedWinners.contains(player.userId) ? "checkmark.circle.fill" : "circle")
+                                            .foregroundStyle(selectedWinners.contains(player.userId) ? Color.mtgSuccess : Color.mtgTextSecondary)
+                                            .font(.title3)
+
+                                        VStack(alignment: .leading, spacing: 2) {
+                                            Text(player.displayName)
+                                                .foregroundStyle(Color.mtgTextPrimary)
+                                            if let commanderName = player.commanderName, !commanderName.isEmpty {
+                                                Text(commanderName)
+                                                    .font(.system(.caption, design: .serif))
+                                                    .italic()
+                                                    .foregroundStyle(Color.mtgTextSecondary)
+                                            }
+                                        }
+
+                                        Spacer()
+
+                                        if let hex = player.playerColor {
+                                            Circle()
+                                                .fill(Color(hex: hex))
+                                                .frame(width: 12, height: 12)
+                                        }
+                                    }
+                                    .padding(.horizontal, 16)
+                                    .padding(.vertical, 12)
+                                }
+                                .buttonStyle(.plain)
+
+                                if player.id != players.last?.id {
+                                    Rectangle()
+                                        .fill(Color.mtgDivider)
+                                        .frame(height: 1)
+                                        .padding(.horizontal, 16)
+                                }
+                            }
+                        }
+                        .mtgCardFrame()
+                        .padding(.horizontal)
+                    }
+
+                    VStack(spacing: 8) {
+                        Button {
+                            onConfirm()
+                        } label: {
+                            if isPending {
+                                HStack(spacing: 8) {
+                                    ProgressView().controlSize(.small).tint(Color.mtgBackground)
+                                    Text("Ending Game...")
+                                }
+                            } else {
+                                Text("End Game")
+                            }
+                        }
+                        .buttonStyle(MtgPrimaryButtonStyle(isDisabled: isPending))
+                        .disabled(isPending)
+                        .padding(.horizontal)
+
+                        Text("You can skip winner selection — ELO won't be updated.")
+                            .font(.caption2)
+                            .foregroundStyle(Color.mtgTextSecondary)
+                    }
+                    .padding(.bottom)
+                }
+            }
+            .navigationTitle("End Game")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbarColorScheme(.dark, for: .navigationBar)
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button("Cancel") { onCancel() }
+                        .foregroundStyle(Color.mtgGold)
+                }
+            }
+        }
     }
 }
 
@@ -731,15 +959,18 @@ private struct ActionBar: View {
         VStack(spacing: 0) {
             PlayerRow(
                 player: .sampleGuardian,
-                viewModel: vm
+                viewModel: vm,
+                showColorPicker: .constant(false)
             )
             PlayerRow(
                 player: .sampleAssassin,
-                viewModel: vm
+                viewModel: vm,
+                showColorPicker: .constant(false)
             )
             PlayerRow(
                 player: .sampleEliminated,
-                viewModel: vm
+                viewModel: vm,
+                showColorPicker: .constant(false)
             )
         }
         .mtgCardFrame()

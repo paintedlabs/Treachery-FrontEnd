@@ -228,4 +228,22 @@ final class FirestoreManager {
                 onChange(players)
             }
     }
+
+    // MARK: - Player Customization
+
+    func updatePlayerColor(gameId: String, playerId: String, color: String?) async throws {
+        if let color = color {
+            try await playersCollection(gameId: gameId).document(playerId).updateData(["player_color": color])
+        } else {
+            try await playersCollection(gameId: gameId).document(playerId).updateData(["player_color": FieldValue.delete()])
+        }
+    }
+
+    func updateCommanderName(gameId: String, playerId: String, name: String?) async throws {
+        if let name = name, !name.isEmpty {
+            try await playersCollection(gameId: gameId).document(playerId).updateData(["commander_name": name])
+        } else {
+            try await playersCollection(gameId: gameId).document(playerId).updateData(["commander_name": FieldValue.delete()])
+        }
+    }
 }

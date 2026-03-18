@@ -95,6 +95,16 @@ service cloud.firestore {
           && resource.data.user_id == request.auth.uid
           && onlyUnveilChanged();
 
+        // Players can update their own player_color
+        allow update: if request.auth != null
+          && resource.data.user_id == request.auth.uid
+          && onlyPlayerColorChanged();
+
+        // Players can update their own commander_name
+        allow update: if request.auth != null
+          && resource.data.user_id == request.auth.uid
+          && onlyCommanderNameChanged();
+
         // Players can remove themselves, or the host can remove anyone (lobby only)
         allow delete: if request.auth != null
           && (resource.data.user_id == request.auth.uid
@@ -131,6 +141,16 @@ service cloud.firestore {
       let affectedKeys = request.resource.data.diff(resource.data).affectedKeys();
       return affectedKeys.hasOnly(['is_unveiled'])
         && request.resource.data.is_unveiled == true;
+    }
+
+    function onlyPlayerColorChanged() {
+      let affectedKeys = request.resource.data.diff(resource.data).affectedKeys();
+      return affectedKeys.hasOnly(['player_color']);
+    }
+
+    function onlyCommanderNameChanged() {
+      let affectedKeys = request.resource.data.diff(resource.data).affectedKeys();
+      return affectedKeys.hasOnly(['commander_name']);
     }
   }
 }

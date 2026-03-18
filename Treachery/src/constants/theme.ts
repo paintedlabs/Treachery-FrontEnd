@@ -42,3 +42,16 @@ export const fonts = {
   serifItalic: 'Georgia',
   body: undefined, // system default sans-serif
 };
+
+export const PLAYER_COLORS = [
+  { name: 'Crimson', hex: '#e74c3c' },
+  { name: 'Sunset', hex: '#e67e22' },
+  { name: 'Amber', hex: '#f1c40f' },
+  { name: 'Emerald', hex: '#2ecc71' },
+  { name: 'Teal', hex: '#1abc9c' },
+  { name: 'Sky', hex: '#3498db' },
+  { name: 'Indigo', hex: '#6c5ce7' },
+  { name: 'Orchid', hex: '#a855f7' },
+  { name: 'Rose', hex: '#ec4899' },
+  { name: 'Silver', hex: '#95a5a6' },
+];
