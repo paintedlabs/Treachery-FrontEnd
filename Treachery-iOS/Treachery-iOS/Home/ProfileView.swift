@@ -136,6 +136,23 @@ struct ProfileView: View {
                     }
                     .mtgCardFrame()
 
+                    // Decks card
+                    NavigationLink(value: AppDestination.decks) {
+                        HStack {
+                            Text("My Decks")
+                                .foregroundStyle(Color.mtgTextPrimary)
+                            Spacer()
+                            Image(systemName: "rectangle.stack.fill")
+                                .font(.caption)
+                                .foregroundStyle(Color.mtgTextSecondary)
+                            Image(systemName: "chevron.right")
+                                .font(.caption)
+                                .foregroundStyle(Color.mtgTextSecondary)
+                        }
+                        .padding(16)
+                    }
+                    .mtgCardFrame()
+
                     // Friends card
                     if let user = user {
                         NavigationLink {

@@ -93,6 +93,21 @@ final class LobbyViewModel: ObservableObject {
         isStartingGame = false
     }
 
+    func selectDeck(_ deck: Deck?, forUserId userId: String) async {
+        guard let player = players.first(where: { $0.userId == userId }) else { return }
+        errorMessage = nil
+        do {
+            try await firestoreManager.updatePlayerDeck(
+                playerId: player.id,
+                gameId: gameId,
+                deckId: deck?.id,
+                commanderName: deck?.commanderDisplayName
+            )
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
     func leaveGame(userId: String) async {
         errorMessage = nil
         // Stop listeners before leaving to prevent race conditions

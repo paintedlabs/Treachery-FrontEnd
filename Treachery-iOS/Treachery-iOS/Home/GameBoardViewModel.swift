@@ -318,6 +318,23 @@ final class GameBoardViewModel: ObservableObject {
         isPending = false
     }
 
+    // MARK: - Deck Selection
+
+    func selectDeck(_ deck: Deck?) async {
+        guard let player = currentPlayer else { return }
+        errorMessage = nil
+        do {
+            try await firestoreManager.updatePlayerDeck(
+                playerId: player.id,
+                gameId: gameId,
+                deckId: deck?.id,
+                commanderName: deck?.commanderDisplayName
+            )
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
     // MARK: - Helpers
 
     func identityCard(for player: Player) -> IdentityCard? {

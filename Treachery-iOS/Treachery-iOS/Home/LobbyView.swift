@@ -13,6 +13,7 @@ struct LobbyView: View {
     @Binding var navigationPath: NavigationPath
     @State private var showHostLeftAlert = false
     @State private var showShareSheet = false
+    @State private var showDeckPicker = false
     @State private var isLeaving = false
 
     init(gameId: String, isHost: Bool, navigationPath: Binding<NavigationPath>) {
@@ -122,10 +123,35 @@ struct LobbyView: View {
                                 VStack(spacing: 0) {
                                     ForEach(viewModel.players) { player in
                                         HStack {
-                                            Text(player.displayName)
-                                                .fontWeight(player.userId == viewModel.game?.hostId ? .semibold : .regular)
-                                                .foregroundStyle(Color.mtgTextPrimary)
+                                            VStack(alignment: .leading, spacing: 2) {
+                                                Text(player.displayName)
+                                                    .fontWeight(player.userId == viewModel.game?.hostId ? .semibold : .regular)
+                                                    .foregroundStyle(Color.mtgTextPrimary)
+                                                if let commander = player.commanderName, !commander.isEmpty {
+                                                    Text(commander)
+                                                        .font(.caption)
+                                                        .foregroundStyle(Color.mtgGold)
+                                                }
+                                            }
                                             Spacer()
+                                            if player.userId == authViewModel.currentUserId {
+                                                Button {
+                                                    showDeckPicker = true
+                                                } label: {
+                                                    HStack(spacing: 4) {
+                                                        Image(systemName: "rectangle.stack")
+                                                            .font(.caption)
+                                                        Text(player.commanderName != nil ? "Change" : "Deck")
+                                                            .font(.caption)
+                                                    }
+                                                    .foregroundStyle(Color.mtgGold)
+                                                    .padding(.horizontal, 8)
+                                                    .padding(.vertical, 4)
+                                                    .background(Color.mtgGold.opacity(0.15))
+                                                    .clipShape(Capsule())
+                                                }
+                                                .buttonStyle(.plain)
+                                            }
                                             if player.userId == viewModel.game?.hostId {
                                                 Text("Host")
                                                     .font(.caption)
@@ -251,6 +277,15 @@ struct LobbyView: View {
         .sheet(isPresented: $showShareSheet) {
             if let code = viewModel.game?.code {
                 ShareSheet(items: ["Join my Treachery game! Code: \(code)"])
+            }
+        }
+        .sheet(isPresented: $showDeckPicker) {
+            DeckPickerView { deck in
+                if let userId = authViewModel.currentUserId {
+                    Task {
+                        await viewModel.selectDeck(deck, forUserId: userId)
+                    }
+                }
             }
         }
     }
