@@ -1,6 +1,4 @@
 import { useState, useEffect } from 'react';
-import { onSnapshot, doc } from 'firebase/firestore';
-import { db } from '@/config/firebase';
 
 /**
  * Monitors Firestore connection status by listening to a lightweight doc.

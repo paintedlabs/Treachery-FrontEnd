@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
-import { colors, spacing, fonts } from '@/constants/theme';
+import { colors, spacing } from '@/constants/theme';
 import { useConnectionStatus } from '@/hooks/useConnectionStatus';
 
 export function ConnectionBanner() {
@@ -9,7 +9,11 @@ export function ConnectionBanner() {
   if (!isOffline) return null;
 
   return (
-    <View style={styles.banner} accessibilityRole="alert" accessibilityLabel="Reconnecting to server">
+    <View
+      style={styles.banner}
+      accessibilityRole="alert"
+      accessibilityLabel="Reconnecting to server"
+    >
       <ActivityIndicator size="small" color={colors.warning} />
       <Text style={styles.text}>Reconnecting...</Text>
     </View>

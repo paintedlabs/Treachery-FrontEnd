@@ -27,7 +27,7 @@ function getCardsForRole(role) {
   return CARDS.filter((c) => c.role === role);
 }
 
-function getCard(id) {
+function _getCard(id) {
   return CARDS.find((c) => c.id === id);
 }
 

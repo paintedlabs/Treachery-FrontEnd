@@ -1,12 +1,5 @@
 import React from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  FlatList,
-  ActivityIndicator,
-  RefreshControl,
-} from 'react-native';
+import { View, Text, StyleSheet, FlatList, ActivityIndicator, RefreshControl } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '@/hooks/useAuth';
 import { useGameHistory } from '@/hooks/useGameHistory';
@@ -18,8 +11,7 @@ import { colors, spacing, fonts } from '@/constants/theme';
 
 export default function HistoryScreen() {
   const { currentUserId } = useAuth();
-  const { games, gamePlayers, isLoading, errorMessage, refresh } =
-    useGameHistory(currentUserId);
+  const { games, gamePlayers, isLoading, errorMessage, refresh } = useGameHistory(currentUserId);
 
   if (isLoading) {
     return (
@@ -53,11 +45,7 @@ export default function HistoryScreen() {
           />
         )}
         refreshControl={
-          <RefreshControl
-            refreshing={isLoading}
-            onRefresh={refresh}
-            tintColor={colors.primary}
-          />
+          <RefreshControl refreshing={isLoading} onRefresh={refresh} tintColor={colors.primary} />
         }
         contentContainerStyle={styles.listContent}
       />
@@ -85,12 +73,14 @@ function GameHistoryRow({
     return myPlayer.role === winningRole;
   })();
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const formatDate = (timestamp: any) => {
     if (!timestamp) return '';
     const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
     return date.toLocaleDateString();
   };
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const formatTime = (timestamp: any) => {
     if (!timestamp) return '';
     const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
@@ -98,9 +88,7 @@ function GameHistoryRow({
   };
 
   // Use role color for the card border accent
-  const borderColor = myPlayer?.role
-    ? ROLE_COLORS[myPlayer.role] + '60'
-    : colors.border;
+  const borderColor = myPlayer?.role ? ROLE_COLORS[myPlayer.role] + '60' : colors.border;
 
   return (
     <View style={[styles.gameCard, { borderColor }]}>
@@ -113,15 +101,11 @@ function GameHistoryRow({
 
         {winningRole && (
           <View style={styles.resultColumn}>
-            <Text
-              style={[styles.resultText, { color: didWin ? colors.success : colors.error }]}
-            >
+            <Text style={[styles.resultText, { color: didWin ? colors.success : colors.error }]}>
               {didWin ? 'Victory' : 'Defeat'}
             </Text>
             <View style={styles.winnerRow}>
-              <View
-                style={[styles.winnerDot, { backgroundColor: ROLE_COLORS[winningRole] }]}
-              />
+              <View style={[styles.winnerDot, { backgroundColor: ROLE_COLORS[winningRole] }]} />
               <Text style={[styles.winnerText, { color: ROLE_COLORS[winningRole] }]}>
                 {ROLE_DISPLAY_NAMES[winningRole]} Won
               </Text>
@@ -136,9 +120,7 @@ function GameHistoryRow({
           <View style={styles.gameDivider} />
           <View style={styles.playerGrid}>
             {players.map((player) => {
-              const roleColor = player.role
-                ? ROLE_COLORS[player.role]
-                : colors.textSecondary;
+              const roleColor = player.role ? ROLE_COLORS[player.role] : colors.textSecondary;
               return (
                 <View key={player.id} style={styles.gridPlayer}>
                   <View style={[styles.gridDot, { backgroundColor: roleColor }]} />
@@ -165,12 +147,7 @@ function GameHistoryRow({
       {myPlayer?.role && (
         <View style={styles.myRoleRow}>
           <Text style={styles.myRoleLabel}>Your role:</Text>
-          <Text
-            style={[
-              styles.myRoleValue,
-              { color: ROLE_COLORS[myPlayer.role] },
-            ]}
-          >
+          <Text style={[styles.myRoleValue, { color: ROLE_COLORS[myPlayer.role] }]}>
             {ROLE_DISPLAY_NAMES[myPlayer.role]}
           </Text>
           {myPlayer.identity_card_id && (

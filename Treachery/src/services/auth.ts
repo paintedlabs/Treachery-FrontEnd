@@ -47,7 +47,7 @@ export function createRecaptchaVerifier(containerId: string): RecaptchaVerifier 
 
 export function sendPhoneCode(
   phoneNumber: string,
-  recaptchaVerifier: RecaptchaVerifier
+  recaptchaVerifier: RecaptchaVerifier,
 ): Promise<ConfirmationResult> {
   return signInWithPhoneNumber(auth, phoneNumber, recaptchaVerifier);
 }

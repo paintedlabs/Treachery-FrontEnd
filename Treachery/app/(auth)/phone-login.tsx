@@ -64,10 +64,14 @@ export default function PhoneLoginScreen() {
       }
       confirmationRef.current = await authService.sendPhoneCode(formatted, recaptchaRef.current);
       setStep('code');
-    } catch (error: any) {
-      setErrorMessage(error.message || 'Failed to send verification code.');
+    } catch (error: unknown) {
+      setErrorMessage(error instanceof Error ? error.message : 'Failed to send verification code.');
       // Recreate recaptcha on failure
-      try { recaptchaRef.current?.clear(); } catch {}
+      try {
+        recaptchaRef.current?.clear();
+      } catch {
+        // Ignore recaptcha clear errors
+      }
       recaptchaRef.current = authService.createRecaptchaVerifier('recaptcha-container');
     } finally {
       setIsLoading(false);
@@ -83,8 +87,8 @@ export default function PhoneLoginScreen() {
     try {
       await confirmationRef.current.confirm(code.trim());
       // Auth state listener in useAuth will handle the rest
-    } catch (error: any) {
-      setErrorMessage(error.message || 'Invalid verification code.');
+    } catch (error: unknown) {
+      setErrorMessage(error instanceof Error ? error.message : 'Invalid verification code.');
     } finally {
       setIsLoading(false);
     }
@@ -181,11 +185,7 @@ export default function PhoneLoginScreen() {
         </>
       )}
 
-      <TouchableOpacity
-        style={styles.backLink}
-        onPress={() => router.back()}
-        disabled={isLoading}
-      >
+      <TouchableOpacity style={styles.backLink} onPress={() => router.back()} disabled={isLoading}>
         <Text style={styles.linkText}>Back to Sign In</Text>
       </TouchableOpacity>
 

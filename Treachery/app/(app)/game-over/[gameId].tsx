@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, FlatList } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '@/hooks/useAuth';
@@ -89,12 +89,15 @@ export default function GameOverScreen() {
                     <Text style={[styles.roleText, { color: roleColor }]}>
                       {player.role ? ROLE_DISPLAY_NAMES[player.role] : 'Unknown'}
                     </Text>
-                    {card && (
-                      <Text style={styles.cardName}>{card.name}</Text>
-                    )}
+                    {card && <Text style={styles.cardName}>{card.name}</Text>}
                   </View>
                   {player.is_eliminated && (
-                    <Ionicons name="close-circle" size={14} color={colors.error} style={{ marginLeft: 4 }} />
+                    <Ionicons
+                      name="close-circle"
+                      size={14}
+                      color={colors.error}
+                      style={{ marginLeft: 4 }}
+                    />
                   )}
                 </View>
                 {index < players.length - 1 && <View style={styles.rowDivider} />}

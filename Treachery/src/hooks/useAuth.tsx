@@ -65,8 +65,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       const result = await authService.signInAsGuest();
       await createUserDocumentIfNeeded(result.user);
-    } catch (error: any) {
-      setErrorMessage(error.message || 'Failed to sign in.');
+    } catch (error: unknown) {
+      setErrorMessage(error instanceof Error ? error.message : 'Failed to sign in.');
     }
   }, []);
 
@@ -75,8 +75,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       const result = await authService.signIn(email, password);
       await createUserDocumentIfNeeded(result.user);
-    } catch (error: any) {
-      setErrorMessage(error.message || 'Failed to sign in.');
+    } catch (error: unknown) {
+      setErrorMessage(error instanceof Error ? error.message : 'Failed to sign in.');
     }
   }, []);
 
@@ -85,8 +85,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       const result = await authService.signUp(email, password);
       await createUserDocumentIfNeeded(result.user);
-    } catch (error: any) {
-      setErrorMessage(error.message || 'Failed to create account.');
+    } catch (error: unknown) {
+      setErrorMessage(error instanceof Error ? error.message : 'Failed to create account.');
     }
   }, []);
 
@@ -94,8 +94,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setErrorMessage(null);
     try {
       await authService.resetPassword(email);
-    } catch (error: any) {
-      setErrorMessage(error.message || 'Failed to send reset email.');
+    } catch (error: unknown) {
+      setErrorMessage(error instanceof Error ? error.message : 'Failed to send reset email.');
     }
   }, []);
 
@@ -103,8 +103,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setErrorMessage(null);
     try {
       await authService.signOut();
-    } catch (error: any) {
-      setErrorMessage(error.message || 'Sign out failed.');
+    } catch (error: unknown) {
+      setErrorMessage(error instanceof Error ? error.message : 'Sign out failed.');
     }
   }, []);
 

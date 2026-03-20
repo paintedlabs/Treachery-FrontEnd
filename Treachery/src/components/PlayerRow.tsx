@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Animated } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { Player, Role } from '@/models/types';
+import { Player } from '@/models/types';
 import { ROLE_COLORS, ROLE_DISPLAY_NAMES } from '@/constants/roles';
 import { colors, fonts, PLAYER_COLORS } from '@/constants/theme';
 
@@ -20,7 +20,7 @@ interface PlayerRowProps {
 export function PlayerRow({
   player,
   isCurrentUser,
-  canSeeRole,
+  canSeeRole: _canSeeRole,
   isUnveiledOrLeader,
   onAdjustLife,
   onViewCard,
@@ -30,7 +30,8 @@ export function PlayerRow({
 }: PlayerRowProps) {
   const roleColor = player.role ? ROLE_COLORS[player.role] : colors.textSecondary;
   const effectiveColor = player.player_color || playerColor;
-  const accentColor = effectiveColor || (canSeeRole && player.role ? roleColor : null);
+  const isPublicRole = player.role && (player.is_unveiled || player.role === 'leader');
+  const accentColor = effectiveColor || (isPublicRole ? roleColor : null);
 
   const [showColorPicker, setShowColorPicker] = useState(false);
   const pickerHeight = useRef(new Animated.Value(0)).current;
@@ -41,7 +42,7 @@ export function PlayerRow({
       duration: 200,
       useNativeDriver: false,
     }).start();
-  }, [showColorPicker]);
+  }, [showColorPicker, pickerHeight]);
 
   const handleColorSelect = (hex: string) => {
     onColorChange?.(hex);
@@ -57,9 +58,7 @@ export function PlayerRow({
     <View>
       <View style={[styles.container, isCurrentUser && styles.containerHighlight]}>
         {/* Left accent bar — player color preferred over role color */}
-        {accentColor && (
-          <View style={[styles.accentBar, { backgroundColor: accentColor }]} />
-        )}
+        {accentColor && <View style={[styles.accentBar, { backgroundColor: accentColor }]} />}
 
         <View style={styles.info}>
           <View style={styles.nameRow}>
@@ -74,9 +73,7 @@ export function PlayerRow({
                 <View
                   style={[
                     styles.colorCircle,
-                    effectiveColor
-                      ? { backgroundColor: effectiveColor }
-                      : styles.colorCircleEmpty,
+                    effectiveColor ? { backgroundColor: effectiveColor } : styles.colorCircleEmpty,
                   ]}
                 />
               </TouchableOpacity>
@@ -105,7 +102,7 @@ export function PlayerRow({
             <Text style={styles.commanderName}>{player.commander_name}</Text>
           ) : null}
 
-          {canSeeRole && player.role ? (
+          {isPublicRole ? (
             <TouchableOpacity
               onPress={isUnveiledOrLeader && !isCurrentUser ? onViewCard : undefined}
               style={styles.roleRow}
@@ -115,7 +112,7 @@ export function PlayerRow({
             >
               <View style={[styles.roleDot, { backgroundColor: roleColor }]} />
               <Text style={[styles.roleText, { color: roleColor }]}>
-                {ROLE_DISPLAY_NAMES[player.role]}
+                {ROLE_DISPLAY_NAMES[player.role!]}
               </Text>
               {player.is_unveiled && player.role !== 'leader' && !isCurrentUser && (
                 <Text style={styles.unveiledText}>(Unveiled)</Text>

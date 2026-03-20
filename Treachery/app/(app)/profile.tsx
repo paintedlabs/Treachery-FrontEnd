@@ -41,6 +41,7 @@ export default function ProfileScreen() {
     // AuthRedirect in _layout.tsx handles navigation to login
   };
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const formatDate = (timestamp: any) => {
     if (!timestamp) return '';
     const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
@@ -89,9 +90,7 @@ export default function ProfileScreen() {
             accessibilityLabel={isSaving ? 'Saving display name' : 'Save display name'}
             accessibilityRole="button"
           >
-            <Text style={styles.editButtonText}>
-              {isSaving ? 'Saving...' : 'Save'}
-            </Text>
+            <Text style={styles.editButtonText}>{isSaving ? 'Saving...' : 'Save'}</Text>
           </TouchableOpacity>
         ) : (
           <TouchableOpacity
@@ -162,11 +161,7 @@ export default function ProfileScreen() {
           <Text style={styles.sectionTitle}>ELO Rating</Text>
           <View style={styles.card}>
             <View style={styles.statsRow}>
-              <StatBox
-                value={`${user.elo ?? 1500}`}
-                label="ELO"
-                color={colors.primary}
-              />
+              <StatBox value={`${user.elo ?? 1500}`} label="ELO" color={colors.primary} />
             </View>
           </View>
         </View>

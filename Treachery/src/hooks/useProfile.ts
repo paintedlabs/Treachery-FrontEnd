@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { TreacheryUser, Game, Role } from '@/models/types';
+import { TreacheryUser, Role } from '@/models/types';
 import * as firestoreService from '@/services/firestore';
 
 export interface GameStats {
@@ -36,8 +36,8 @@ export function useProfile(userId: string | null): UseProfileReturn {
     try {
       const fetchedUser = await firestoreService.getUser(userId);
       setUser(fetchedUser);
-    } catch (error: any) {
-      setErrorMessage(error.message || 'Failed to load profile.');
+    } catch (error: unknown) {
+      setErrorMessage(error instanceof Error ? error.message : 'Failed to load profile.');
       setIsLoading(false);
       return;
     }
@@ -70,12 +70,11 @@ export function useProfile(userId: string | null): UseProfileReturn {
       }
 
       const totalGames = games.length;
-      const winRateText =
-        totalGames > 0 ? `${Math.round((wins / totalGames) * 100)}%` : '—';
+      const winRateText = totalGames > 0 ? `${Math.round((wins / totalGames) * 100)}%` : '—';
 
       setGameStats({ totalGames, wins, losses, roleBreakdown, winRateText });
-    } catch (error: any) {
-      console.warn('Failed to load game stats:', error.message);
+    } catch (error: unknown) {
+      console.warn('Failed to load game stats:', error instanceof Error ? error.message : error);
       // Still show the profile even if stats fail — set empty stats
       setGameStats({ totalGames: 0, wins: 0, losses: 0, roleBreakdown: {}, winRateText: '—' });
     }
@@ -99,12 +98,12 @@ export function useProfile(userId: string | null): UseProfileReturn {
         const updatedUser: TreacheryUser = { ...user, display_name: trimmed };
         await firestoreService.updateUser(updatedUser);
         setUser(updatedUser);
-      } catch (error: any) {
-        setErrorMessage(error.message || 'Failed to save name.');
+      } catch (error: unknown) {
+        setErrorMessage(error instanceof Error ? error.message : 'Failed to save name.');
       }
       setIsSaving(false);
     },
-    [user]
+    [user],
   );
 
   return {

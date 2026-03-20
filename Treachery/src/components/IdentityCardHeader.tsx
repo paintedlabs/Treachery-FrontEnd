@@ -48,19 +48,11 @@ export function IdentityCardHeader({ card, player, onPress }: IdentityCardHeader
 
 // ── Concealed (tap to open sheet) ─────────────────────────────────────
 
-function ConcealedContent({
-  player,
-}: {
-  player: Player;
-}) {
+function ConcealedContent({ player }: { player: Player }) {
   return (
     <>
       <View style={styles.topRow}>
-        <Ionicons
-          name="eye-off"
-          size={22}
-          color={colors.primary}
-        />
+        <Ionicons name="eye-off" size={22} color={colors.primary} />
         <View style={styles.lifeBox}>
           <Text style={styles.lifeText}>{player.life_total}</Text>
         </View>

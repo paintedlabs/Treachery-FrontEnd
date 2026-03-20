@@ -1,13 +1,5 @@
 import React, { useState } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-  Modal,
-  Image,
-} from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Modal, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { PlaneCard } from '@/models/types';
 import { colors, fonts } from '@/constants/theme';
@@ -32,9 +24,7 @@ export function PlaneCardDetail({ planeCard, visible, onClose }: PlaneCardDetail
       <View style={styles.modalContainer}>
         {/* Header bar */}
         <View style={styles.header}>
-          <Text style={styles.headerTitle}>
-            {planeCard.is_phenomenon ? 'Phenomenon' : 'Plane'}
-          </Text>
+          <Text style={styles.headerTitle}>{planeCard.is_phenomenon ? 'Phenomenon' : 'Plane'}</Text>
           <TouchableOpacity
             onPress={onClose}
             accessibilityLabel="Close plane card"
@@ -50,10 +40,7 @@ export function PlaneCardDetail({ planeCard, visible, onClose }: PlaneCardDetail
             <View style={styles.imageContainer}>
               <Image
                 source={{ uri: planeCard.image_uri }}
-                style={[
-                  styles.cardImage,
-                  rotated && styles.cardImageRotated,
-                ]}
+                style={[styles.cardImage, rotated && styles.cardImageRotated]}
                 resizeMode="contain"
               />
               <TouchableOpacity

@@ -22,6 +22,7 @@ function AuthRedirect({ children }: { children: React.ReactNode }) {
       // Not signed in but on app screen — go to login
       router.replace('/(auth)/login');
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authState, segments]);
 
   return <>{children}</>;

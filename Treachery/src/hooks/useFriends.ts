@@ -40,8 +40,8 @@ export function useFriends(userId: string | null): UseFriendsReturn {
       ]);
       setFriends(fetchedFriends);
       setPendingRequests(fetchedRequests);
-    } catch (error: any) {
-      setErrorMessage(error.message || 'Failed to load friends.');
+    } catch (error: unknown) {
+      setErrorMessage(error instanceof Error ? error.message : 'Failed to load friends.');
     }
     setIsLoading(false);
   }, [userId]);
@@ -59,8 +59,8 @@ export function useFriends(userId: string | null): UseFriendsReturn {
     try {
       const results = await firestoreService.searchUsers(trimmed);
       setSearchResults(results);
-    } catch (error: any) {
-      setErrorMessage(error.message || 'Search failed.');
+    } catch (error: unknown) {
+      setErrorMessage(error instanceof Error ? error.message : 'Search failed.');
     }
     setIsSearching(false);
   }, []);
@@ -82,11 +82,11 @@ export function useFriends(userId: string | null): UseFriendsReturn {
         };
         await firestoreService.sendFriendRequest(request);
         setSentRequestUserIds((prev) => new Set(prev).add(toUser.id));
-      } catch (error: any) {
-        setErrorMessage(error.message || 'Failed to send request.');
+      } catch (error: unknown) {
+        setErrorMessage(error instanceof Error ? error.message : 'Failed to send request.');
       }
     },
-    [userId]
+    [userId],
   );
 
   const acceptRequest = useCallback(
@@ -99,30 +99,27 @@ export function useFriends(userId: string | null): UseFriendsReturn {
         await firestoreService.updateFriendRequest(updated);
         await firestoreService.addFriend(userId, request.from_user_id);
         await loadData();
-      } catch (error: any) {
-        setErrorMessage(error.message || 'Failed to accept request.');
+      } catch (error: unknown) {
+        setErrorMessage(error instanceof Error ? error.message : 'Failed to accept request.');
       }
     },
-    [userId, loadData]
+    [userId, loadData],
   );
 
-  const declineRequest = useCallback(
-    async (request: FriendRequest) => {
-      setErrorMessage(null);
-      try {
-        const updated: FriendRequest = { ...request, status: 'declined' };
-        await firestoreService.updateFriendRequest(updated);
-        setPendingRequests((prev) => prev.filter((r) => r.id !== request.id));
-      } catch (error: any) {
-        setErrorMessage(error.message || 'Failed to decline request.');
-      }
-    },
-    []
-  );
+  const declineRequest = useCallback(async (request: FriendRequest) => {
+    setErrorMessage(null);
+    try {
+      const updated: FriendRequest = { ...request, status: 'declined' };
+      await firestoreService.updateFriendRequest(updated);
+      setPendingRequests((prev) => prev.filter((r) => r.id !== request.id));
+    } catch (error: unknown) {
+      setErrorMessage(error instanceof Error ? error.message : 'Failed to decline request.');
+    }
+  }, []);
 
   const isFriend = useCallback(
     (user: TreacheryUser) => friends.some((f) => f.id === user.id),
-    [friends]
+    [friends],
   );
 
   return {

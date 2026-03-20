@@ -1,17 +1,17 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, Platform } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Platform } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '@/hooks/useAuth';
 import { Game } from '@/models/types';
 import * as firestoreService from '@/services/firestore';
-import { colors, spacing, fontSize, fonts } from '@/constants/theme';
+import { colors, spacing, fonts } from '@/constants/theme';
 
 export default function HomeScreen() {
   const router = useRouter();
   const { authState, currentUserId } = useAuth();
   const [activeGame, setActiveGame] = useState<Game | null>(null);
-  const [checkingActiveGame, setCheckingActiveGame] = useState(true);
+  const [, setCheckingActiveGame] = useState(true);
 
   const checkForActiveGame = useCallback(async () => {
     if (!currentUserId) return;
@@ -38,7 +38,7 @@ export default function HomeScreen() {
       if (authState === 'authenticated') {
         checkForActiveGame();
       }
-    }, [authState, checkForActiveGame])
+    }, [authState, checkForActiveGame]),
   );
 
   // On web, also listen for popstate (browser back button) and visibility changes
@@ -97,7 +97,9 @@ export default function HomeScreen() {
         <TouchableOpacity
           style={styles.rejoinBanner}
           onPress={handleRejoin}
-          accessibilityLabel={activeGame?.state === 'in_progress' ? 'Rejoin game in progress' : 'Rejoin waiting game'}
+          accessibilityLabel={
+            activeGame?.state === 'in_progress' ? 'Rejoin game in progress' : 'Rejoin waiting game'
+          }
           accessibilityRole="button"
         >
           <View style={styles.rejoinIcon}>

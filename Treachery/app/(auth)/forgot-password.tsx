@@ -37,9 +37,7 @@ export default function ForgotPasswordScreen() {
       <View style={styles.spacer} />
 
       <Text style={styles.title}>Reset Password</Text>
-      <Text style={styles.subtitle}>
-        Enter your email and we'll send you a reset link.
-      </Text>
+      <Text style={styles.subtitle}>Enter your email and we&apos;ll send you a reset link.</Text>
 
       {errorMessage && <ErrorBanner message={errorMessage} />}
 
@@ -73,11 +71,7 @@ export default function ForgotPasswordScreen() {
         )}
       </TouchableOpacity>
 
-      <TouchableOpacity
-        style={styles.backLink}
-        onPress={() => router.back()}
-        disabled={isLoading}
-      >
+      <TouchableOpacity style={styles.backLink} onPress={() => router.back()} disabled={isLoading}>
         <Text style={styles.linkText}>Back to Sign In</Text>
       </TouchableOpacity>
 

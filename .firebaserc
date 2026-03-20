@@ -1,0 +1,18 @@
+{
+  "projects": {
+    "default": "treachery-71922"
+  },
+  "targets": {
+    "treachery-71922": {
+      "hosting": {
+        "production": [
+          "treachery-71922"
+        ],
+        "staging": [
+          "treachery-staging"
+        ]
+      }
+    }
+  },
+  "etags": {}
+}

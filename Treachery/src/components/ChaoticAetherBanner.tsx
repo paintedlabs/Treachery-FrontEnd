@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { colors, spacing, fonts } from '@/constants/theme';
+import { colors, spacing } from '@/constants/theme';
 
 export function ChaoticAetherBanner() {
   return (

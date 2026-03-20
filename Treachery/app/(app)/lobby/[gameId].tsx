@@ -54,7 +54,7 @@ function LobbyPlayerRow({
       duration: 200,
       useNativeDriver: false,
     }).start();
-  }, [showColorPicker]);
+  }, [showColorPicker, pickerHeight]);
 
   const handleColorSelect = (hex: string) => {
     onColorChange?.(hex);
@@ -121,9 +121,7 @@ function LobbyPlayerRow({
         )}
 
         <View style={styles.playerInfo}>
-          <Text style={[styles.playerName, isHostPlayer && styles.bold]}>
-            {item.display_name}
-          </Text>
+          <Text style={[styles.playerName, isHostPlayer && styles.bold]}>{item.display_name}</Text>
           {/* Commander name display for non-current users */}
           {!isCurrentUser && item.commander_name ? (
             <Text style={styles.commanderNameDisplay}>{item.commander_name}</Text>
@@ -294,9 +292,7 @@ export default function LobbyScreen() {
       <View style={styles.centerContainer}>
         <Ionicons name="close-circle" size={48} color={colors.error} />
         <Text style={styles.disbandedTitle}>Game Disbanded</Text>
-        <Text style={styles.disbandedText}>
-          The host has left and the game was closed.
-        </Text>
+        <Text style={styles.disbandedText}>The host has left and the game was closed.</Text>
         <TouchableOpacity
           style={styles.primaryButton}
           onPress={() => router.replace('/(app)')}
@@ -309,8 +305,18 @@ export default function LobbyScreen() {
     );
   }
 
+  const currentPlayerColor = players.find((p) => p.user_id === currentUserId)?.player_color;
+
   return (
     <View style={styles.container}>
+      {/* Player color background tint */}
+      {currentPlayerColor && (
+        <View
+          style={[StyleSheet.absoluteFill, { backgroundColor: currentPlayerColor, opacity: 0.15 }]}
+          pointerEvents="none"
+        />
+      )}
+
       <ConnectionBanner />
 
       {/* Game code display - ornate card frame */}
@@ -378,9 +384,7 @@ export default function LobbyScreen() {
       {!isHost && (
         <View style={styles.waitingRow}>
           <ActivityIndicator size="small" color={colors.primary} />
-          <Text style={styles.waitingForHost}>
-            Waiting for host to start the game...
-          </Text>
+          <Text style={styles.waitingForHost}>Waiting for host to start the game...</Text>
         </View>
       )}
 
@@ -391,7 +395,10 @@ export default function LobbyScreen() {
         {isHost && (
           <>
             <TouchableOpacity
-              style={[styles.primaryButton, (!canStartGame || isStartingGame) && styles.buttonDisabled]}
+              style={[
+                styles.primaryButton,
+                (!canStartGame || isStartingGame) && styles.buttonDisabled,
+              ]}
               onPress={startGame}
               disabled={!canStartGame || isStartingGame}
               accessibilityLabel={isStartingGame ? 'Starting game' : 'Start game'}
@@ -408,9 +415,7 @@ export default function LobbyScreen() {
             </TouchableOpacity>
 
             {!canStartGame && players.length < minPlayers && (
-              <Text style={styles.minPlayersText}>
-                Need at least {minPlayers} players to start
-              </Text>
+              <Text style={styles.minPlayersText}>Need at least {minPlayers} players to start</Text>
             )}
           </>
         )}

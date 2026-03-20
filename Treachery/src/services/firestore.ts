@@ -6,7 +6,6 @@ import {
   setDoc,
   updateDoc,
   deleteDoc,
-  deleteField,
   query,
   where,
   orderBy,
@@ -14,7 +13,6 @@ import {
   onSnapshot,
   arrayUnion,
   arrayRemove,
-  Timestamp,
   documentId,
   Unsubscribe,
 } from 'firebase/firestore';
@@ -25,8 +23,7 @@ import { TreacheryUser, Game, Player, FriendRequest } from '@/models/types';
 
 const usersCol = () => collection(db, 'users');
 const gamesCol = () => collection(db, 'games');
-const playersCol = (gameId: string) =>
-  collection(db, 'games', gameId, 'players');
+const playersCol = (gameId: string) => collection(db, 'games', gameId, 'players');
 const friendRequestsCol = () => collection(db, 'friend_requests');
 
 // ── Users ──
@@ -51,7 +48,7 @@ export async function searchUsers(name: string): Promise<TreacheryUser[]> {
     usersCol(),
     where('display_name', '>=', name),
     where('display_name', '<', end),
-    limit(20)
+    limit(20),
   );
   const snap = await getDocs(q);
   return snap.docs.map((d) => d.data() as TreacheryUser);
@@ -67,7 +64,7 @@ export async function getPendingFriendRequests(userId: string): Promise<FriendRe
   const q = query(
     friendRequestsCol(),
     where('to_user_id', '==', userId),
-    where('status', '==', 'pending')
+    where('status', '==', 'pending'),
   );
   const snap = await getDocs(q);
   return snap.docs.map((d) => d.data() as FriendRequest);
@@ -106,12 +103,10 @@ export async function getFriends(userId: string): Promise<TreacheryUser[]> {
   }
 
   const results = await Promise.all(
-    chunks.map((chunk) => getDocs(query(usersCol(), where(documentId(), 'in', chunk))))
+    chunks.map((chunk) => getDocs(query(usersCol(), where(documentId(), 'in', chunk)))),
   );
 
-  const friends = results.flatMap((snap) =>
-    snap.docs.map((d) => d.data() as TreacheryUser)
-  );
+  const friends = results.flatMap((snap) => snap.docs.map((d) => d.data() as TreacheryUser));
   return friends.sort((a, b) => a.display_name.localeCompare(b.display_name));
 }
 
@@ -154,7 +149,7 @@ export async function getActiveGame(userId: string): Promise<Game | null> {
     gamesCol(),
     where('player_ids', 'array-contains', userId),
     where('state', '==', 'in_progress'),
-    limit(1)
+    limit(1),
   );
   const inProgressSnap = await getDocs(inProgressQ);
   if (!inProgressSnap.empty) {
@@ -166,7 +161,7 @@ export async function getActiveGame(userId: string): Promise<Game | null> {
     gamesCol(),
     where('player_ids', 'array-contains', userId),
     where('state', '==', 'waiting'),
-    limit(1)
+    limit(1),
   );
   const waitingSnap = await getDocs(waitingQ);
   if (!waitingSnap.empty) {
@@ -182,16 +177,13 @@ export async function getFinishedGames(userId: string): Promise<Game[]> {
     where('player_ids', 'array-contains', userId),
     where('state', '==', 'finished'),
     orderBy('created_at', 'desc'),
-    limit(50)
+    limit(50),
   );
   const snap = await getDocs(q);
   return snap.docs.map((d) => d.data() as Game);
 }
 
-export function listenToGame(
-  id: string,
-  onChange: (game: Game | null) => void
-): Unsubscribe {
+export function listenToGame(id: string, onChange: (game: Game | null) => void): Unsubscribe {
   return onSnapshot(doc(gamesCol(), id), (snap) => {
     if (!snap.exists()) {
       onChange(null);
@@ -223,7 +215,7 @@ export async function removePlayer(id: string, gameId: string): Promise<void> {
 
 export function listenToPlayers(
   gameId: string,
-  onChange: (players: Player[]) => void
+  onChange: (players: Player[]) => void,
 ): Unsubscribe {
   const q = query(playersCol(gameId), orderBy('order_id'));
   return onSnapshot(q, (snap) => {
@@ -232,20 +224,20 @@ export function listenToPlayers(
   });
 }
 
-export async function updatePlayerColor(gameId: string, playerId: string, color: string | null): Promise<void> {
+export async function updatePlayerColor(
+  gameId: string,
+  playerId: string,
+  color: string | null,
+): Promise<void> {
   const ref = doc(db, 'games', gameId, 'players', playerId);
-  if (color) {
-    await updateDoc(ref, { player_color: color });
-  } else {
-    await updateDoc(ref, { player_color: deleteField() });
-  }
+  await updateDoc(ref, { player_color: color });
 }
 
-export async function updateCommanderName(gameId: string, playerId: string, name: string | null): Promise<void> {
+export async function updateCommanderName(
+  gameId: string,
+  playerId: string,
+  name: string | null,
+): Promise<void> {
   const ref = doc(db, 'games', gameId, 'players', playerId);
-  if (name && name.trim()) {
-    await updateDoc(ref, { commander_name: name.trim() });
-  } else {
-    await updateDoc(ref, { commander_name: deleteField() });
-  }
+  await updateDoc(ref, { commander_name: name && name.trim() ? name.trim() : null });
 }
