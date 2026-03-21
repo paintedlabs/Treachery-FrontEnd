@@ -7,7 +7,7 @@
 
 import Foundation
 
-struct Player: Codable, Identifiable {
+struct Player: Codable, Identifiable, Equatable {
     let id: String
     let orderId: Int
     let userId: String
