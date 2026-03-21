@@ -7,7 +7,6 @@ import {
   StyleSheet,
   FlatList,
   ActivityIndicator,
-  SectionList,
 } from 'react-native';
 import { useAuth } from '@/hooks/useAuth';
 import { useFriends } from '@/hooks/useFriends';
@@ -98,9 +97,7 @@ export default function FriendsScreen() {
       {/* Pending requests */}
       {pendingRequests.length > 0 && (
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>
-            Friend Requests ({pendingRequests.length})
-          </Text>
+          <Text style={styles.sectionTitle}>Friend Requests ({pendingRequests.length})</Text>
           {pendingRequests.map((request) => (
             <View key={request.id} style={styles.requestRow}>
               <View style={styles.requestInfo}>
@@ -141,9 +138,7 @@ export default function FriendsScreen() {
         {isLoading ? (
           <ActivityIndicator color={colors.primary} style={{ padding: 16 }} />
         ) : friends.length === 0 ? (
-          <Text style={styles.emptyText}>
-            No friends yet. Search for players above.
-          </Text>
+          <Text style={styles.emptyText}>No friends yet. Search for players above.</Text>
         ) : (
           <FlatList
             data={friends}

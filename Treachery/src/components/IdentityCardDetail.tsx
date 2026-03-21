@@ -1,14 +1,7 @@
 import React from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-  Modal,
-} from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Modal } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { Player, IdentityCard, Rarity } from '@/models/types';
+import { Player, IdentityCard } from '@/models/types';
 import { ROLE_COLORS, ROLE_DISPLAY_NAMES, ROLE_WIN_CONDITIONS } from '@/constants/roles';
 import { RARITY_DISPLAY_NAMES, RARITY_COLORS } from '@/constants/roles';
 import { colors, fonts } from '@/constants/theme';
@@ -178,9 +171,7 @@ export function IdentityCardDetail({ card, player, visible, onClose }: IdentityC
                 <View style={styles.ornateLine} />
               </View>
               <Text style={styles.winConditionLabel}>Win Condition</Text>
-              <Text style={styles.winConditionText}>
-                {ROLE_WIN_CONDITIONS[player.role]}
-              </Text>
+              <Text style={styles.winConditionText}>{ROLE_WIN_CONDITIONS[player.role]}</Text>
             </View>
           )}
         </ScrollView>

@@ -11,13 +11,22 @@ interface PlanarDieBarProps {
   onRoll: () => void;
 }
 
-const DIE_RESULT_CONFIG: Record<string, { icon: keyof typeof Ionicons.glyphMap; label: string; color: string }> = {
+const DIE_RESULT_CONFIG: Record<
+  string,
+  { icon: keyof typeof Ionicons.glyphMap; label: string; color: string }
+> = {
   blank: { icon: 'remove', label: 'Blank', color: colors.textSecondary },
   chaos: { icon: 'flame', label: 'Chaos', color: colors.warning },
   planeswalk: { icon: 'planet', label: 'Planeswalk', color: colors.primary },
 };
 
-export function PlanarDieBar({ cost, isRolling, lastResult, lastRollerName, onRoll }: PlanarDieBarProps) {
+export function PlanarDieBar({
+  cost,
+  isRolling,
+  lastResult,
+  lastRollerName,
+  onRoll,
+}: PlanarDieBarProps) {
   const resultConfig = lastResult ? DIE_RESULT_CONFIG[lastResult] : null;
 
   return (

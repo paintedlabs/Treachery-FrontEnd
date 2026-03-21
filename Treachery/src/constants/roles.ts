@@ -8,10 +8,10 @@ export const ROLE_DISPLAY_NAMES: Record<Role, string> = {
 };
 
 export const ROLE_COLORS: Record<Role, string> = {
-  leader: '#e4c96a',   // Royal gold
-  guardian: '#4c8cc9',  // Arcane blue
-  assassin: '#c94c4c',  // Blood red
-  traitor: '#9c4cc9',   // Shadow purple
+  leader: '#e4c96a', // Royal gold
+  guardian: '#4c8cc9', // Arcane blue
+  assassin: '#c94c4c', // Blood red
+  traitor: '#9c4cc9', // Shadow purple
 };
 
 export const ROLE_WIN_CONDITIONS: Record<Role, string> = {
@@ -44,15 +44,24 @@ export interface RoleDistribution {
 
 export function getRoleDistribution(playerCount: number): RoleDistribution {
   switch (playerCount) {
-    case 1: return { leaders: 1, guardians: 0, assassins: 0, traitors: 0 };
-    case 2: return { leaders: 1, guardians: 0, assassins: 1, traitors: 0 };
-    case 3: return { leaders: 1, guardians: 0, assassins: 1, traitors: 1 };
-    case 4: return { leaders: 1, guardians: 0, assassins: 2, traitors: 1 };
-    case 5: return { leaders: 1, guardians: 1, assassins: 2, traitors: 1 };
-    case 6: return { leaders: 1, guardians: 1, assassins: 3, traitors: 1 };
-    case 7: return { leaders: 1, guardians: 2, assassins: 3, traitors: 1 };
-    case 8: return { leaders: 1, guardians: 2, assassins: 3, traitors: 2 };
-    default: return { leaders: 1, guardians: 0, assassins: 2, traitors: 1 };
+    case 1:
+      return { leaders: 1, guardians: 0, assassins: 0, traitors: 0 };
+    case 2:
+      return { leaders: 1, guardians: 0, assassins: 1, traitors: 0 };
+    case 3:
+      return { leaders: 1, guardians: 0, assassins: 1, traitors: 1 };
+    case 4:
+      return { leaders: 1, guardians: 0, assassins: 2, traitors: 1 };
+    case 5:
+      return { leaders: 1, guardians: 1, assassins: 2, traitors: 1 };
+    case 6:
+      return { leaders: 1, guardians: 1, assassins: 3, traitors: 1 };
+    case 7:
+      return { leaders: 1, guardians: 2, assassins: 3, traitors: 1 };
+    case 8:
+      return { leaders: 1, guardians: 2, assassins: 3, traitors: 2 };
+    default:
+      return { leaders: 1, guardians: 0, assassins: 2, traitors: 1 };
   }
 }
 

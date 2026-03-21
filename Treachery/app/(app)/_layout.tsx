@@ -19,14 +19,8 @@ export default function AppLayout() {
       <Stack.Screen name="index" options={{ title: 'Home', headerShown: false }} />
       <Stack.Screen name="create-game" options={{ title: 'Create Game' }} />
       <Stack.Screen name="join-game" options={{ title: 'Join Game' }} />
-      <Stack.Screen
-        name="lobby/[gameId]"
-        options={{ title: 'Lobby', headerBackVisible: false }}
-      />
-      <Stack.Screen
-        name="game/[gameId]"
-        options={{ title: 'Game', headerBackVisible: false }}
-      />
+      <Stack.Screen name="lobby/[gameId]" options={{ title: 'Lobby', headerBackVisible: false }} />
+      <Stack.Screen name="game/[gameId]" options={{ title: 'Game', headerBackVisible: false }} />
       <Stack.Screen
         name="game-over/[gameId]"
         options={{ title: 'Results', headerBackVisible: false }}

@@ -105,11 +105,7 @@ export default function SignUpScreen() {
         )}
       </TouchableOpacity>
 
-      <TouchableOpacity
-        style={styles.backLink}
-        onPress={() => router.back()}
-        disabled={isLoading}
-      >
+      <TouchableOpacity style={styles.backLink} onPress={() => router.back()} disabled={isLoading}>
         <Text style={styles.linkText}>Already have an account? Sign In</Text>
       </TouchableOpacity>
 

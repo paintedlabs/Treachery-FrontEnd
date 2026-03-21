@@ -20,7 +20,11 @@ interface UseLobbyReturn {
   updateCommanderName: (name: string | null) => Promise<void>;
 }
 
-export function useLobby(gameId: string, isHost: boolean, currentUserId?: string | null): UseLobbyReturn {
+export function useLobby(
+  gameId: string,
+  isHost: boolean,
+  currentUserId?: string | null,
+): UseLobbyReturn {
   const [game, setGame] = useState<Game | null>(null);
   const [players, setPlayers] = useState<Player[]>([]);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -56,9 +60,7 @@ export function useLobby(gameId: string, isHost: boolean, currentUserId?: string
   const minPlayers = isTreacheryMode ? MINIMUM_PLAYER_COUNT : 1;
 
   const canStartGame =
-    isHost &&
-    players.length >= minPlayers &&
-    players.length <= (game?.max_players ?? 0);
+    isHost && players.length >= minPlayers && players.length <= (game?.max_players ?? 0);
 
   const startGame = useCallback(async () => {
     if (!isHost || !game) return;
@@ -68,8 +70,8 @@ export function useLobby(gameId: string, isHost: boolean, currentUserId?: string
     try {
       const startGameFn = httpsCallable(functions, 'startGame');
       await startGameFn({ gameId });
-    } catch (error: any) {
-      setErrorMessage(error.message || 'Failed to start game.');
+    } catch (error: unknown) {
+      setErrorMessage(error instanceof Error ? error.message : 'Failed to start game.');
     }
     setIsStartingGame(false);
   }, [isHost, game, gameId]);
@@ -84,32 +86,40 @@ export function useLobby(gameId: string, isHost: boolean, currentUserId?: string
       try {
         const leaveGameFn = httpsCallable(functions, 'leaveGame');
         await leaveGameFn({ gameId });
-      } catch (error: any) {
-        setErrorMessage(error.message || 'Failed to leave game.');
+      } catch (error: unknown) {
+        setErrorMessage(error instanceof Error ? error.message : 'Failed to leave game.');
       }
     },
-    [gameId]
+    [gameId],
   );
 
   const currentPlayer = players.find((p) => p.user_id === currentUserId) ?? null;
 
-  const updatePlayerColor = useCallback(async (color: string | null) => {
-    if (!currentPlayer) return;
-    try {
-      await firestoreService.updatePlayerColor(gameId, currentPlayer.id, color);
-    } catch (error: any) {
-      setErrorMessage(error.message || 'Failed to update color.');
-    }
-  }, [gameId, currentPlayer]);
+  const updatePlayerColor = useCallback(
+    async (color: string | null) => {
+      if (!currentPlayer) return;
+      try {
+        await firestoreService.updatePlayerColor(gameId, currentPlayer.id, color);
+      } catch (error: unknown) {
+        setErrorMessage(error instanceof Error ? error.message : 'Failed to update color.');
+      }
+    },
+    [gameId, currentPlayer],
+  );
 
-  const updateCommanderName = useCallback(async (name: string | null) => {
-    if (!currentPlayer) return;
-    try {
-      await firestoreService.updateCommanderName(gameId, currentPlayer.id, name);
-    } catch (error: any) {
-      setErrorMessage(error.message || 'Failed to update commander name.');
-    }
-  }, [gameId, currentPlayer]);
+  const updateCommanderName = useCallback(
+    async (name: string | null) => {
+      if (!currentPlayer) return;
+      try {
+        await firestoreService.updateCommanderName(gameId, currentPlayer.id, name);
+      } catch (error: unknown) {
+        setErrorMessage(
+          error instanceof Error ? error.message : 'Failed to update commander name.',
+        );
+      }
+    },
+    [gameId, currentPlayer],
+  );
 
   return {
     game,

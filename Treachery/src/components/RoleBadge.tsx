@@ -14,9 +14,7 @@ export function RoleBadge({ count, role }: RoleBadgeProps) {
   return (
     <View style={[styles.container, { borderColor: roleColor + '40' }]}>
       <Text style={[styles.count, { color: roleColor }]}>{count}</Text>
-      <Text style={[styles.label, { color: roleColor + 'BB' }]}>
-        {ROLE_DISPLAY_NAMES[role]}
-      </Text>
+      <Text style={[styles.label, { color: roleColor + 'BB' }]}>{ROLE_DISPLAY_NAMES[role]}</Text>
     </View>
   );
 }

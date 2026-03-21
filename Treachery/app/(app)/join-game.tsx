@@ -76,8 +76,8 @@ export default function JoinGameScreen() {
         pathname: '/(app)/lobby/[gameId]',
         params: { gameId: game.id, isHost: 'false' },
       });
-    } catch (error: any) {
-      setErrorMessage(error.message || 'Failed to join game.');
+    } catch (error: unknown) {
+      setErrorMessage(error instanceof Error ? error.message : 'Failed to join game.');
     }
     setIsJoining(false);
   };

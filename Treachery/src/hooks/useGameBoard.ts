@@ -90,11 +90,14 @@ export function useGameBoard(gameId: string, currentUserId: string | null): UseG
       });
     });
 
+    // Copy ref to local variable so cleanup captures the current value
+    const timers = debounceTimersRef.current;
+
     return () => {
       unsubGame();
       unsubPlayers();
       // Clean up debounce timers
-      for (const timer of Object.values(debounceTimersRef.current)) {
+      for (const timer of Object.values(timers)) {
         clearTimeout(timer);
       }
     };
@@ -113,8 +116,8 @@ export function useGameBoard(gameId: string, currentUserId: string | null): UseG
   const currentPlayer = players.find((p) => p.user_id === currentUserId) ?? null;
 
   const currentIdentityCard = useMemo(
-    () => currentPlayer?.identity_card_id ? getCard(currentPlayer.identity_card_id) : undefined,
-    [currentPlayer?.identity_card_id]
+    () => (currentPlayer?.identity_card_id ? getCard(currentPlayer.identity_card_id) : undefined),
+    [currentPlayer?.identity_card_id],
   );
 
   const isGameFinished = game?.state === 'finished';
@@ -176,14 +179,14 @@ export function useGameBoard(gameId: string, currentUserId: string | null): UseG
       lifeDeltasRef.current[playerId] = 0;
 
       const adjustLifeFn = httpsCallable(functions, 'adjustLife');
-      adjustLifeFn({ gameId, playerId, amount: delta }).catch((error: any) => {
+      adjustLifeFn({ gameId, playerId, amount: delta }).catch((error: unknown) => {
         // Revert: re-apply the delta to the ref
         lifeDeltasRef.current[playerId] = (lifeDeltasRef.current[playerId] || 0) + delta;
         // State delta is still there, so display is correct — no action needed
-        setErrorMessage(error.message || 'Failed to adjust life.');
+        setErrorMessage(error instanceof Error ? error.message : 'Failed to adjust life.');
       });
     },
-    [gameId]
+    [gameId],
   );
 
   const adjustLife = useCallback(
@@ -208,7 +211,7 @@ export function useGameBoard(gameId: string, currentUserId: string | null): UseG
         delete debounceTimersRef.current[playerId];
       }, 500);
     },
-    [serverPlayers, flushLifeDelta]
+    [serverPlayers, flushLifeDelta],
   );
 
   const unveilCurrentPlayer = useCallback(async () => {
@@ -219,8 +222,8 @@ export function useGameBoard(gameId: string, currentUserId: string | null): UseG
     try {
       const unveilFn = httpsCallable(functions, 'unveilPlayer');
       await unveilFn({ gameId });
-    } catch (error: any) {
-      setErrorMessage(error.message || 'Failed to unveil.');
+    } catch (error: unknown) {
+      setErrorMessage(error instanceof Error ? error.message : 'Failed to unveil.');
     } finally {
       setIsPending(false);
     }
@@ -234,21 +237,24 @@ export function useGameBoard(gameId: string, currentUserId: string | null): UseG
     try {
       const eliminateFn = httpsCallable(functions, 'eliminatePlayer');
       await eliminateFn({ gameId });
-    } catch (error: any) {
-      setErrorMessage(error.message || 'Failed to forfeit.');
+    } catch (error: unknown) {
+      setErrorMessage(error instanceof Error ? error.message : 'Failed to forfeit.');
     } finally {
       setIsPending(false);
     }
   }, [currentPlayer, gameId, isPending]);
 
-  const updatePlayerColor = useCallback(async (color: string | null) => {
-    if (!currentPlayer) return;
-    try {
-      await firestoreService.updatePlayerColor(gameId, currentPlayer.id, color);
-    } catch (error: any) {
-      setErrorMessage(error.message || 'Failed to update color.');
-    }
-  }, [gameId, currentPlayer]);
+  const updatePlayerColor = useCallback(
+    async (color: string | null) => {
+      if (!currentPlayer) return;
+      try {
+        await firestoreService.updatePlayerColor(gameId, currentPlayer.id, color);
+      } catch (error: unknown) {
+        setErrorMessage(error instanceof Error ? error.message : 'Failed to update color.');
+      }
+    },
+    [gameId, currentPlayer],
+  );
 
   const canSeeRole = useCallback(
     (player: Player): boolean => {
@@ -257,7 +263,7 @@ export function useGameBoard(gameId: string, currentUserId: string | null): UseG
       if (player.role === 'leader') return true;
       return false;
     },
-    [currentUserId]
+    [currentUserId],
   );
 
   const identityCardFn = useCallback((player: Player): IdentityCard | undefined => {
@@ -274,11 +280,14 @@ export function useGameBoard(gameId: string, currentUserId: string | null): UseG
     setDieRollResult(null);
 
     try {
-      const rollDieFn = httpsCallable<{ gameId: string }, { result: string }>(functions, 'rollPlanarDie');
+      const rollDieFn = httpsCallable<{ gameId: string }, { result: string }>(
+        functions,
+        'rollPlanarDie',
+      );
       const response = await rollDieFn({ gameId });
       setDieRollResult(response.data.result);
-    } catch (error: any) {
-      setErrorMessage(error.message || 'Failed to roll die.');
+    } catch (error: unknown) {
+      setErrorMessage(error instanceof Error ? error.message : 'Failed to roll die.');
     } finally {
       setIsRollingDie(false);
     }
@@ -290,7 +299,10 @@ export function useGameBoard(gameId: string, currentUserId: string | null): UseG
     setIsPending(true);
 
     try {
-      const resolveFn = httpsCallable<{ gameId: string }, { type?: string; options?: string[] }>(functions, 'resolvePhenomenon');
+      const resolveFn = httpsCallable<{ gameId: string }, { type?: string; options?: string[] }>(
+        functions,
+        'resolvePhenomenon',
+      );
       const response = await resolveFn({ gameId });
 
       if (response.data.type === 'choose' && response.data.options) {
@@ -299,47 +311,53 @@ export function useGameBoard(gameId: string, currentUserId: string | null): UseG
           .filter((p): p is PlaneCard => p !== undefined);
         setTunnelOptions(planes);
       }
-    } catch (error: any) {
-      setErrorMessage(error.message || 'Failed to resolve phenomenon.');
+    } catch (error: unknown) {
+      setErrorMessage(error instanceof Error ? error.message : 'Failed to resolve phenomenon.');
     } finally {
       setIsPending(false);
     }
   }, [gameId, isPending]);
 
-  const selectTunnelPlane = useCallback(async (planeId: string) => {
-    if (isPending) return;
-    setErrorMessage(null);
-    setIsPending(true);
+  const selectTunnelPlane = useCallback(
+    async (planeId: string) => {
+      if (isPending) return;
+      setErrorMessage(null);
+      setIsPending(true);
 
-    try {
-      const selectFn = httpsCallable(functions, 'selectPlane');
-      await selectFn({ gameId, planeId });
-      setTunnelOptions(null);
-    } catch (error: any) {
-      setErrorMessage(error.message || 'Failed to select plane.');
-    } finally {
-      setIsPending(false);
-    }
-  }, [gameId, isPending]);
-
-  const endGame = useCallback(async (winnerUserIds?: string[]) => {
-    if (isPending) return;
-    setErrorMessage(null);
-    setIsPending(true);
-
-    try {
-      const endGameFn = httpsCallable(functions, 'endGame');
-      const payload: { gameId: string; winnerUserIds?: string[] } = { gameId };
-      if (winnerUserIds) {
-        payload.winnerUserIds = winnerUserIds;
+      try {
+        const selectFn = httpsCallable(functions, 'selectPlane');
+        await selectFn({ gameId, planeId });
+        setTunnelOptions(null);
+      } catch (error: unknown) {
+        setErrorMessage(error instanceof Error ? error.message : 'Failed to select plane.');
+      } finally {
+        setIsPending(false);
       }
-      await endGameFn(payload);
-    } catch (error: any) {
-      setErrorMessage(error.message || 'Failed to end game.');
-    } finally {
-      setIsPending(false);
-    }
-  }, [gameId, isPending]);
+    },
+    [gameId, isPending],
+  );
+
+  const endGame = useCallback(
+    async (winnerUserIds?: string[]) => {
+      if (isPending) return;
+      setErrorMessage(null);
+      setIsPending(true);
+
+      try {
+        const endGameFn = httpsCallable(functions, 'endGame');
+        const payload: { gameId: string; winnerUserIds?: string[] } = { gameId };
+        if (winnerUserIds) {
+          payload.winnerUserIds = winnerUserIds;
+        }
+        await endGameFn(payload);
+      } catch (error: unknown) {
+        setErrorMessage(error instanceof Error ? error.message : 'Failed to end game.');
+      } finally {
+        setIsPending(false);
+      }
+    },
+    [gameId, isPending],
+  );
 
   return {
     game,

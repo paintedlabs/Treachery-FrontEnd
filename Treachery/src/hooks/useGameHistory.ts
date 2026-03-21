@@ -30,8 +30,8 @@ export function useGameHistory(userId: string | null): UseGameHistoryReturn {
         playerMap[game.id] = await firestoreService.getPlayers(game.id);
       }
       setGamePlayers(playerMap);
-    } catch (error: any) {
-      setErrorMessage(error.message || 'Failed to load history.');
+    } catch (error: unknown) {
+      setErrorMessage(error instanceof Error ? error.message : 'Failed to load history.');
     }
     setIsLoading(false);
   }, [userId]);

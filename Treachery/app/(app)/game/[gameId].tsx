@@ -18,14 +18,13 @@ import { IdentityCardHeader } from '@/components/IdentityCardHeader';
 import { IdentityCardDetail } from '@/components/IdentityCardDetail';
 import { PlaneCardBanner } from '@/components/PlaneCardBanner';
 import { PlaneCardDetail } from '@/components/PlaneCardDetail';
-import { PlanarDieBar } from '@/components/PlanarDieBar';
 import { ChaoticAetherBanner } from '@/components/ChaoticAetherBanner';
 import { InterplanarTunnelPicker } from '@/components/InterplanarTunnelPicker';
 import { PlayerRow } from '@/components/PlayerRow';
 import { ErrorBanner } from '@/components/ErrorBanner';
 import { LoadingScreen } from '@/components/LoadingScreen';
 import { ConnectionBanner } from '@/components/ConnectionBanner';
-import { ROLE_COLORS, ROLE_DISPLAY_NAMES, ROLE_WIN_CONDITIONS } from '@/constants/roles';
+import { ROLE_DISPLAY_NAMES } from '@/constants/roles';
 import { Player } from '@/models/types';
 import { colors, spacing, fonts } from '@/constants/theme';
 
@@ -63,14 +62,12 @@ export default function GameBoardScreen() {
     dieRollResult,
     isRollingDie,
     rollDie,
-    resolvePhenomenon,
     endGame,
   } = useGameBoard(gameId!, currentUserId);
 
   const [showCardDetail, setShowCardDetail] = useState(false);
   const [showPlaneDetail, setShowPlaneDetail] = useState(false);
   const [inspectedPlayer, setInspectedPlayer] = useState<Player | null>(null);
-  const [showUnveilConfirm, setShowUnveilConfirm] = useState(false);
   const [showWinnerSelection, setShowWinnerSelection] = useState(false);
   const [selectedWinners, setSelectedWinners] = useState<Set<string>>(new Set());
 
@@ -128,26 +125,24 @@ export default function GameBoardScreen() {
 
   const handleForfeit = () => {
     if (Platform.OS === 'web') {
-      const confirmed = window.confirm('Forfeit Game?\n\nYou will be eliminated from the game. This cannot be undone.');
+      const confirmed = window.confirm(
+        'Forfeit Game?\n\nYou will be eliminated from the game. This cannot be undone.',
+      );
       if (confirmed) {
         eliminateAndLeave().then(navigateToGameOver);
       }
     } else {
-      Alert.alert(
-        'Forfeit Game?',
-        'You will be eliminated from the game. This cannot be undone.',
-        [
-          { text: 'Cancel', style: 'cancel' },
-          {
-            text: 'Forfeit',
-            style: 'destructive',
-            onPress: async () => {
-              await eliminateAndLeave();
-              navigateToGameOver();
-            },
+      Alert.alert('Forfeit Game?', 'You will be eliminated from the game. This cannot be undone.', [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Forfeit',
+          style: 'destructive',
+          onPress: async () => {
+            await eliminateAndLeave();
+            navigateToGameOver();
           },
-        ]
-      );
+        },
+      ]);
     }
   };
 
@@ -156,7 +151,7 @@ export default function GameBoardScreen() {
     const cardName = currentIdentityCard?.name ?? '';
     if (Platform.OS === 'web') {
       const confirmed = window.confirm(
-        `Unveil your identity?\n\nThis will reveal your role (${roleName}) and card (${cardName}) to all players. This cannot be undone.`
+        `Unveil your identity?\n\nThis will reveal your role (${roleName}) and card (${cardName}) to all players. This cannot be undone.`,
       );
       if (confirmed) unveilCurrentPlayer();
     } else {
@@ -166,7 +161,7 @@ export default function GameBoardScreen() {
         [
           { text: 'Cancel', style: 'cancel' },
           { text: 'Unveil', onPress: () => unveilCurrentPlayer() },
-        ]
+        ],
       );
     }
   };
@@ -199,9 +194,7 @@ export default function GameBoardScreen() {
       <View style={styles.centerContainer}>
         <Ionicons name="wifi" size={48} color={colors.warning} />
         <Text style={styles.unavailableTitle}>Game Unavailable</Text>
-        <Text style={styles.unavailableText}>
-          This game is no longer available.
-        </Text>
+        <Text style={styles.unavailableText}>This game is no longer available.</Text>
         <TouchableOpacity
           style={styles.primaryButton}
           onPress={() => router.replace('/(app)')}
@@ -222,12 +215,12 @@ export default function GameBoardScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Subtle player color overlay */}
+      {/* Player color background tint */}
       {currentPlayer?.player_color && (
         <View
           style={[
             StyleSheet.absoluteFill,
-            { backgroundColor: currentPlayer.player_color, opacity: 0.08 },
+            { backgroundColor: currentPlayer.player_color, opacity: 0.15 },
           ]}
           pointerEvents="none"
         />
@@ -250,13 +243,16 @@ export default function GameBoardScreen() {
           planeCard={currentPlane}
           secondaryPlaneCard={secondaryPlane}
           onPress={() => setShowPlaneDetail(true)}
+          dieCost={dieRollCost}
+          isRolling={isRollingDie}
+          onRollDie={currentPlayer && !currentPlayer.is_eliminated ? rollDie : undefined}
+          lastDieResult={dieRollResult}
+          lastRollerName={lastRollerName}
         />
       )}
 
       {/* Chaotic Aether warning banner */}
-      {isPlanechaseActive && isChaoticAetherActive && (
-        <ChaoticAetherBanner />
-      )}
+      {isPlanechaseActive && isChaoticAetherActive && <ChaoticAetherBanner />}
 
       {/* Ornate divider */}
       <View style={styles.ornateDividerRow}>
@@ -292,10 +288,10 @@ export default function GameBoardScreen() {
         <View style={styles.spectatorBar}>
           <View style={styles.spectatorBanner}>
             <Ionicons name="skull" size={20} color={colors.error} />
-            <Text style={styles.spectatorTitle}>You've Been Eliminated</Text>
+            <Text style={styles.spectatorTitle}>You&apos;ve Been Eliminated</Text>
           </View>
           <Text style={styles.spectatorSubtitle}>
-            You're now spectating. Watch the game unfold or leave.
+            You&apos;re now spectating. Watch the game unfold or leave.
           </Text>
           <TouchableOpacity
             style={styles.spectatorLeaveButton}
@@ -308,49 +304,20 @@ export default function GameBoardScreen() {
         </View>
       )}
 
-      {/* Planar die bar — only when planechase active */}
-      {isPlanechaseActive && currentPlayer && !currentPlayer.is_eliminated && (
-        <PlanarDieBar
-          cost={dieRollCost}
-          isRolling={isRollingDie}
-          lastResult={dieRollResult}
-          lastRollerName={lastRollerName}
-          onRoll={rollDie}
-        />
-      )}
-
       {/* Action bar (unveil/win) — only when treachery active */}
       {isTreacheryActive && currentPlayer && !currentPlayer.is_eliminated && (
         <View style={styles.actionBar}>
-          {!currentPlayer.is_unveiled &&
-            currentPlayer.role !== 'leader' && (
-              <TouchableOpacity
-                style={[
-                  styles.unveilButton,
-                  {
-                    backgroundColor: currentPlayer.role
-                      ? ROLE_COLORS[currentPlayer.role]
-                      : colors.primary,
-                  },
-                  isPending && styles.buttonDisabled,
-                ]}
-                onPress={handleUnveil}
-                disabled={isPending}
-                accessibilityLabel="Unveil identity"
-                accessibilityRole="button"
-                accessibilityHint="Reveals your role and card to all players"
-              >
-                <Text style={styles.unveilButtonText}>Unveil Identity</Text>
-              </TouchableOpacity>
-            )}
-
-          {currentPlayer.role && (
-            <View style={styles.winConditionBox}>
-              <Text style={styles.winConditionLabel}>Win Condition</Text>
-              <Text style={styles.winConditionText}>
-                {ROLE_WIN_CONDITIONS[currentPlayer.role]}
-              </Text>
-            </View>
+          {!currentPlayer.is_unveiled && currentPlayer.role !== 'leader' && (
+            <TouchableOpacity
+              style={[styles.unveilButton, isPending && styles.buttonDisabled]}
+              onPress={handleUnveil}
+              disabled={isPending}
+              accessibilityLabel="Unveil identity"
+              accessibilityRole="button"
+              accessibilityHint="Reveals your role and card to all players"
+            >
+              <Text style={styles.unveilButtonText}>Unveil Identity</Text>
+            </TouchableOpacity>
           )}
         </View>
       )}
@@ -475,7 +442,7 @@ export default function GameBoardScreen() {
             </ScrollView>
 
             <Text style={styles.modalNote}>
-              You can skip winner selection — ELO won't be updated.
+              You can skip winner selection — ELO won&apos;t be updated.
             </Text>
 
             <TouchableOpacity
@@ -543,6 +510,7 @@ const styles = StyleSheet.create({
     borderTopColor: colors.divider,
   },
   unveilButton: {
+    backgroundColor: colors.primary,
     borderRadius: 8,
     padding: 14,
     alignItems: 'center',
@@ -567,24 +535,6 @@ const styles = StyleSheet.create({
     color: '#0d0b1a',
     fontSize: 16,
     fontWeight: '700',
-  },
-  winConditionBox: {
-    alignItems: 'center',
-    gap: 4,
-  },
-  winConditionLabel: {
-    color: colors.primary,
-    fontSize: 10,
-    fontWeight: '600',
-    textTransform: 'uppercase',
-    letterSpacing: 1,
-  },
-  winConditionText: {
-    color: colors.textSecondary,
-    fontSize: 11,
-    textAlign: 'center',
-    fontFamily: fonts.serif,
-    fontStyle: 'italic',
   },
   spectatorBar: {
     borderTopWidth: 1,

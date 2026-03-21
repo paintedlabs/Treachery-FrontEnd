@@ -9,16 +9,12 @@ import {
   ScrollView,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Timestamp, serverTimestamp } from 'firebase/firestore';
+import { Timestamp } from 'firebase/firestore';
 import { useAuth } from '@/hooks/useAuth';
 import { RoleBadge } from '@/components/RoleBadge';
 import { ErrorBanner } from '@/components/ErrorBanner';
 import * as firestoreService from '@/services/firestore';
-import {
-  getRoleDistribution,
-  MINIMUM_PLAYER_COUNT,
-  CODE_CHARACTERS,
-} from '@/constants/roles';
+import { getRoleDistribution, MINIMUM_PLAYER_COUNT, CODE_CHARACTERS } from '@/constants/roles';
 import { Game, GameMode, Player } from '@/models/types';
 import { colors, spacing, fontSize } from '@/constants/theme';
 
@@ -143,8 +139,8 @@ export default function CreateGameScreen() {
         pathname: '/(app)/lobby/[gameId]',
         params: { gameId, isHost: 'true' },
       });
-    } catch (error: any) {
-      setErrorMessage(error.message || 'Failed to create game.');
+    } catch (error: unknown) {
+      setErrorMessage(error instanceof Error ? error.message : 'Failed to create game.');
     }
     setIsCreating(false);
   };
@@ -158,10 +154,7 @@ export default function CreateGameScreen() {
           {GAME_MODES.map((mode) => (
             <TouchableOpacity
               key={mode.value}
-              style={[
-                styles.modeButton,
-                gameMode === mode.value && styles.modeButtonSelected,
-              ]}
+              style={[styles.modeButton, gameMode === mode.value && styles.modeButtonSelected]}
               onPress={() => handleModeChange(mode.value)}
               accessibilityLabel={`${mode.label} game mode`}
               accessibilityRole="button"
@@ -203,9 +196,7 @@ export default function CreateGameScreen() {
             accessibilityLabel="Decrease player count"
             accessibilityRole="button"
           >
-            <Text style={[styles.stepperBtn, maxPlayers <= minPlayers && styles.disabled]}>
-              −
-            </Text>
+            <Text style={[styles.stepperBtn, maxPlayers <= minPlayers && styles.disabled]}>−</Text>
           </TouchableOpacity>
           <TouchableOpacity
             onPress={() => setMaxPlayers(Math.min(maxPlayerLimit, maxPlayers + 1))}
@@ -213,7 +204,9 @@ export default function CreateGameScreen() {
             accessibilityLabel="Increase player count"
             accessibilityRole="button"
           >
-            <Text style={[styles.stepperBtn, maxPlayers >= maxPlayerLimit && styles.disabled]}>+</Text>
+            <Text style={[styles.stepperBtn, maxPlayers >= maxPlayerLimit && styles.disabled]}>
+              +
+            </Text>
           </TouchableOpacity>
         </View>
       </View>
