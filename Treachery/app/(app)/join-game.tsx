@@ -14,6 +14,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { ErrorBanner } from '@/components/ErrorBanner';
 import * as firestoreService from '@/services/firestore';
 import { Player } from '@/models/types';
+import { trackEvent } from '@/services/analytics';
 import { colors, spacing, fonts } from '@/constants/theme';
 
 function generateId(): string {
@@ -71,6 +72,8 @@ export default function JoinGameScreen() {
       };
       await firestoreService.addPlayer(player, game.id);
       await firestoreService.addPlayerIdToGame(game.id, currentUserId);
+
+      trackEvent('join_game');
 
       router.replace({
         pathname: '/(app)/lobby/[gameId]',

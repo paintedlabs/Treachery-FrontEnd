@@ -16,6 +16,7 @@ import { ErrorBanner } from '@/components/ErrorBanner';
 import * as firestoreService from '@/services/firestore';
 import { getRoleDistribution, MINIMUM_PLAYER_COUNT, CODE_CHARACTERS } from '@/constants/roles';
 import { Game, GameMode, Player } from '@/models/types';
+import { trackEvent } from '@/services/analytics';
 import { colors, spacing, fontSize } from '@/constants/theme';
 
 const GAME_MODES: { value: GameMode; label: string }[] = [
@@ -134,6 +135,8 @@ export default function CreateGameScreen() {
         commander_name: null,
       };
       await firestoreService.addPlayer(player, gameId);
+
+      trackEvent('create_game', { game_mode: gameMode, max_players: maxPlayers });
 
       router.replace({
         pathname: '/(app)/lobby/[gameId]',
