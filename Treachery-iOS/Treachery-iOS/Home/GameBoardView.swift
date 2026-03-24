@@ -40,7 +40,7 @@ struct GameBoardView: View {
             Color.mtgBackground.ignoresSafeArea()
 
             if let hex = viewModel.currentPlayer?.playerColor {
-                Color(hex: hex).opacity(0.08).ignoresSafeArea()
+                Color(hex: hex).opacity(0.15).ignoresSafeArea()
             }
 
             VStack(spacing: 0) {
@@ -595,8 +595,9 @@ private struct PlayerRow: View {
                             .foregroundStyle(Color.mtgTextSecondary)
                     }
 
-                    // Role visibility
-                    if viewModel.canSeeRole(of: player) {
+                    // Role visibility — only show for unveiled players and leaders
+                    // to prevent leaking info when the phone is on the table
+                    if player.isUnveiled || player.role == .leader {
                         if canInspectCard {
                             Button {
                                 onViewCard?(player)
@@ -629,14 +630,14 @@ private struct PlayerRow: View {
                                 Text(player.role?.displayName ?? "")
                                     .font(.caption)
                                     .foregroundStyle(player.role?.color ?? Color.mtgTextSecondary)
-                                if player.isUnveiled && !isCurrentUser && player.role != .leader {
+                                if player.isUnveiled && player.role != .leader {
                                     Text("(Unveiled)")
                                         .font(.caption2)
                                         .foregroundStyle(Color.mtgTextSecondary)
                                 }
                             }
                         }
-                    } else {
+                    } else if viewModel.isTreacheryActive {
                         Text("Role Hidden")
                             .font(.caption)
                             .foregroundStyle(Color.mtgTextSecondary)
@@ -786,14 +787,6 @@ private struct ActionBar: View {
                 }
             }
 
-            // Win condition reminder
-            if let player = viewModel.currentPlayer {
-                Text(player.role?.winConditionText ?? "")
-                    .font(.caption2)
-                    .foregroundStyle(Color.mtgTextSecondary)
-                    .multilineTextAlignment(.center)
-                    .accessibilityLabel("Win condition: \(player.role?.winConditionText ?? "")")
-            }
         }
         .padding()
     }

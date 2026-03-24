@@ -3,6 +3,7 @@ import { User } from 'firebase/auth';
 import { Timestamp } from 'firebase/firestore';
 import * as authService from '@/services/auth';
 import * as firestoreService from '@/services/firestore';
+import { trackEvent, setAnalyticsUserId, setAnalyticsUserProperties } from '@/services/analytics';
 import { TreacheryUser } from '@/models/types';
 
 type AuthState = 'loading' | 'authenticated' | 'unauthenticated';
@@ -32,10 +33,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (firebaseUser) {
         setUser(firebaseUser);
         setAuthState('authenticated');
+        setAnalyticsUserId(firebaseUser.uid);
+        setAnalyticsUserProperties({
+          auth_method: firebaseUser.isAnonymous ? 'guest' : 'email',
+        });
         await createUserDocumentIfNeeded(firebaseUser);
       } else {
         setUser(null);
         setAuthState('unauthenticated');
+        setAnalyticsUserId(null);
       }
     });
     return unsubscribe;
@@ -65,6 +71,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       const result = await authService.signInAsGuest();
       await createUserDocumentIfNeeded(result.user);
+      trackEvent('sign_in', { method: 'guest' });
     } catch (error: unknown) {
       setErrorMessage(error instanceof Error ? error.message : 'Failed to sign in.');
     }
@@ -75,6 +82,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       const result = await authService.signIn(email, password);
       await createUserDocumentIfNeeded(result.user);
+      trackEvent('sign_in', { method: 'email' });
     } catch (error: unknown) {
       setErrorMessage(error instanceof Error ? error.message : 'Failed to sign in.');
     }
@@ -85,6 +93,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       const result = await authService.signUp(email, password);
       await createUserDocumentIfNeeded(result.user);
+      trackEvent('sign_up', { method: 'email' });
     } catch (error: unknown) {
       setErrorMessage(error instanceof Error ? error.message : 'Failed to create account.');
     }
@@ -103,6 +112,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setErrorMessage(null);
     try {
       await authService.signOut();
+      trackEvent('sign_out');
     } catch (error: unknown) {
       setErrorMessage(error instanceof Error ? error.message : 'Sign out failed.');
     }

@@ -4,6 +4,7 @@ import { Game, Player } from '@/models/types';
 import * as firestoreService from '@/services/firestore';
 import { functions } from '@/config/firebase';
 import { MINIMUM_PLAYER_COUNT } from '@/constants/roles';
+import { trackEvent } from '@/services/analytics';
 
 interface UseLobbyReturn {
   game: Game | null;
@@ -70,11 +71,12 @@ export function useLobby(
     try {
       const startGameFn = httpsCallable(functions, 'startGame');
       await startGameFn({ gameId });
+      trackEvent('start_game', { player_count: players.length, game_mode: game.game_mode ?? 'unknown' });
     } catch (error: unknown) {
       setErrorMessage(error instanceof Error ? error.message : 'Failed to start game.');
     }
     setIsStartingGame(false);
-  }, [isHost, game, gameId]);
+  }, [isHost, game, gameId, players.length]);
 
   const leaveGame = useCallback(
     async (_userId: string) => {
@@ -86,6 +88,7 @@ export function useLobby(
       try {
         const leaveGameFn = httpsCallable(functions, 'leaveGame');
         await leaveGameFn({ gameId });
+        trackEvent('leave_lobby');
       } catch (error: unknown) {
         setErrorMessage(error instanceof Error ? error.message : 'Failed to leave game.');
       }

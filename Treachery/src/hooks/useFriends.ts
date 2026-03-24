@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { Timestamp } from 'firebase/firestore';
 import { TreacheryUser, FriendRequest } from '@/models/types';
 import * as firestoreService from '@/services/firestore';
+import { trackEvent } from '@/services/analytics';
 
 interface UseFriendsReturn {
   friends: TreacheryUser[];
@@ -82,6 +83,7 @@ export function useFriends(userId: string | null): UseFriendsReturn {
         };
         await firestoreService.sendFriendRequest(request);
         setSentRequestUserIds((prev) => new Set(prev).add(toUser.id));
+        trackEvent('send_friend_request');
       } catch (error: unknown) {
         setErrorMessage(error instanceof Error ? error.message : 'Failed to send request.');
       }
@@ -98,6 +100,7 @@ export function useFriends(userId: string | null): UseFriendsReturn {
         const updated: FriendRequest = { ...request, status: 'accepted' };
         await firestoreService.updateFriendRequest(updated);
         await firestoreService.addFriend(userId, request.from_user_id);
+        trackEvent('accept_friend_request');
         await loadData();
       } catch (error: unknown) {
         setErrorMessage(error instanceof Error ? error.message : 'Failed to accept request.');

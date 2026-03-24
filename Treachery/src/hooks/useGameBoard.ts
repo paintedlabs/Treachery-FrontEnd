@@ -5,6 +5,7 @@ import * as firestoreService from '@/services/firestore';
 import { functions } from '@/config/firebase';
 import { getCard } from '@/services/cardDatabase';
 import { getPlane } from '@/services/planeDatabase';
+import { trackEvent } from '@/services/analytics';
 
 interface UseGameBoardReturn {
   game: Game | null;
@@ -222,6 +223,7 @@ export function useGameBoard(gameId: string, currentUserId: string | null): UseG
     try {
       const unveilFn = httpsCallable(functions, 'unveilPlayer');
       await unveilFn({ gameId });
+      trackEvent('unveil_identity');
     } catch (error: unknown) {
       setErrorMessage(error instanceof Error ? error.message : 'Failed to unveil.');
     } finally {
@@ -237,6 +239,7 @@ export function useGameBoard(gameId: string, currentUserId: string | null): UseG
     try {
       const eliminateFn = httpsCallable(functions, 'eliminatePlayer');
       await eliminateFn({ gameId });
+      trackEvent('forfeit_game');
     } catch (error: unknown) {
       setErrorMessage(error instanceof Error ? error.message : 'Failed to forfeit.');
     } finally {
@@ -286,6 +289,7 @@ export function useGameBoard(gameId: string, currentUserId: string | null): UseG
       );
       const response = await rollDieFn({ gameId });
       setDieRollResult(response.data.result);
+      trackEvent('roll_planar_die', { result: response.data.result });
     } catch (error: unknown) {
       setErrorMessage(error instanceof Error ? error.message : 'Failed to roll die.');
     } finally {
@@ -350,6 +354,7 @@ export function useGameBoard(gameId: string, currentUserId: string | null): UseG
           payload.winnerUserIds = winnerUserIds;
         }
         await endGameFn(payload);
+        trackEvent('end_game');
       } catch (error: unknown) {
         setErrorMessage(error instanceof Error ? error.message : 'Failed to end game.');
       } finally {
