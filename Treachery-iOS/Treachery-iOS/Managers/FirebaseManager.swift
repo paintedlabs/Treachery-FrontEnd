@@ -40,12 +40,12 @@ struct FirebaseManager {
     // MARK: - Phone Auth
 
     func verifyPhoneNumber(_ phoneNumber: String) async throws -> String {
-        let verificationID = try await PhoneAuthProvider.provider().verifyPhoneNumber(phoneNumber, uiDelegate: nil)
+        let verificationID = try await PhoneAuthProvider.provider(auth: Auth.auth()).verifyPhoneNumber(phoneNumber, uiDelegate: nil)
         return verificationID
     }
 
     func signInWithPhoneCode(verificationID: String, code: String) async throws -> User {
-        let credential = PhoneAuthProvider.provider().credential(
+        let credential = PhoneAuthProvider.provider(auth: Auth.auth()).credential(
             withVerificationID: verificationID,
             verificationCode: code
         )

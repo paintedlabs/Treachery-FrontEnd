@@ -209,6 +209,7 @@ struct FriendsListView: View {
         }
         .navigationTitle("Friends")
         .toolbarColorScheme(.dark, for: .navigationBar)
+        .onAppear { AnalyticsService.trackScreen("Friends") }
         .task {
             await loadData()
         }
@@ -268,7 +269,7 @@ struct FriendsListView: View {
                 createdAt: Date()
             )
             try await firestoreManager.sendFriendRequest(request)
-            // Track sent request for UI feedback
+            AnalyticsService.trackEvent("send_friend_request")
             sentRequestUserIds.insert(user.id)
         } catch {
             errorMessage = error.localizedDescription
@@ -293,6 +294,7 @@ struct FriendsListView: View {
 
             // Add to both friend lists
             try await firestoreManager.addFriend(userId: userId, friendId: request.fromUserId)
+            AnalyticsService.trackEvent("accept_friend_request")
 
             // Refresh data
             await loadData()

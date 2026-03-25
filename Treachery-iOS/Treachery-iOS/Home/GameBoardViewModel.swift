@@ -225,6 +225,7 @@ final class GameBoardViewModel: ObservableObject {
 
         do {
             try await cloudFunctions.unveilPlayer(gameId: gameId)
+            AnalyticsService.trackEvent("unveil_identity")
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -241,6 +242,7 @@ final class GameBoardViewModel: ObservableObject {
 
         do {
             try await cloudFunctions.eliminatePlayer(gameId: gameId)
+            AnalyticsService.trackEvent("forfeit_game")
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -258,6 +260,7 @@ final class GameBoardViewModel: ObservableObject {
         do {
             let result = try await cloudFunctions.rollPlanarDie(gameId: gameId)
             dieRollResult = result
+            AnalyticsService.trackEvent("roll_planar_die", params: ["result": result])
 
             // Auto-clear the die result after a delay so the animation resets
             Task {
@@ -312,6 +315,7 @@ final class GameBoardViewModel: ObservableObject {
 
         do {
             try await cloudFunctions.endGame(gameId: gameId, winnerUserIds: winnerUserIds)
+            AnalyticsService.trackEvent("end_game")
         } catch {
             errorMessage = error.localizedDescription
         }

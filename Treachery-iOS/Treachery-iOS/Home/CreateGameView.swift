@@ -137,6 +137,7 @@ struct CreateGameView: View {
         }
         .navigationTitle("Create Game")
         .toolbarColorScheme(.dark, for: .navigationBar)
+        .onAppear { AnalyticsService.trackScreen("CreateGame") }
         .onChange(of: gameMode) { _, _ in
             // Clamp maxPlayers to valid range when switching modes
             if maxPlayers < playerRange.lowerBound {
@@ -196,6 +197,10 @@ struct CreateGameView: View {
             )
             try await firestoreManager.addPlayer(player, toGame: game.id)
 
+            AnalyticsService.trackEvent("create_game", params: [
+                "game_mode": gameMode.rawValue,
+                "max_players": maxPlayers
+            ])
             navigationPath.append(AppDestination.lobby(gameId: game.id, isHost: true))
         } catch {
             errorMessage = error.localizedDescription

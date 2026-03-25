@@ -86,6 +86,7 @@ struct JoinGameView: View {
         }
         .navigationTitle("Join Game")
         .toolbarColorScheme(.dark, for: .navigationBar)
+        .onAppear { AnalyticsService.trackScreen("JoinGame") }
     }
 
     private func joinGame() async {
@@ -136,6 +137,7 @@ struct JoinGameView: View {
             // Add user to game's playerIds for history queries
             try await firestoreManager.addPlayerIdToGame(gameId: game.id, userId: userId)
 
+            AnalyticsService.trackEvent("join_game")
             navigationPath.append(AppDestination.lobby(gameId: game.id, isHost: false))
         } catch {
             errorMessage = error.localizedDescription

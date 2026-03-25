@@ -469,8 +469,7 @@
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = "Solomon.Treachery-iOS";
-				"PRODUCT_BUNDLE_IDENTIFIER[sdk=iphoneos*]" = "com.Solomon.Treachery-iOS";
+				PRODUCT_BUNDLE_IDENTIFIER = "com.Solomon.Treachery-iOS";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				SDKROOT = auto;
@@ -518,8 +517,7 @@
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = "Solomon.Treachery-iOS";
-				"PRODUCT_BUNDLE_IDENTIFIER[sdk=iphoneos*]" = "com.Solomon.Treachery-iOS";
+				PRODUCT_BUNDLE_IDENTIFIER = "com.Solomon.Treachery-iOS";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				SDKROOT = auto;
