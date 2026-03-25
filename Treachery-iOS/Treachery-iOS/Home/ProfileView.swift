@@ -21,9 +21,19 @@ struct ProfileView: View {
     var body: some View {
         ZStack {
             Color.mtgBackground.ignoresSafeArea()
+            RadialGradient(
+                colors: [
+                    Color(hex: "1e1735").opacity(0.6),
+                    Color.mtgBackground
+                ],
+                center: .top,
+                startRadius: 20,
+                endRadius: UIScreen.main.bounds.height * 0.5
+            )
+            .ignoresSafeArea()
 
             ScrollView {
-                VStack(spacing: 20) {
+                VStack(spacing: 24) {
                     // Profile info card
                     VStack(spacing: 0) {
                         MtgSectionHeader(title: "Profile")
