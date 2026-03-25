@@ -26,6 +26,16 @@ struct LobbyView: View {
     var body: some View {
         ZStack {
             Color.mtgBackground.ignoresSafeArea()
+            RadialGradient(
+                colors: [
+                    Color(hex: "1e1735").opacity(0.6),
+                    Color.mtgBackground
+                ],
+                center: .top,
+                startRadius: 20,
+                endRadius: 420
+            )
+            .ignoresSafeArea()
 
             VStack(spacing: 0) {
                 ConnectionBanner()
@@ -173,7 +183,7 @@ struct LobbyView: View {
                         .padding(.vertical, 20)
                 } else {
                     VStack(spacing: 0) {
-                        ForEach(viewModel.players) { player in
+                        ForEach(Array(viewModel.players.enumerated()), id: \.element.id) { index, player in
                             LobbyPlayerRow(
                                 player: player,
                                 isMe: player.userId == viewModel.currentUserId,
@@ -196,6 +206,10 @@ struct LobbyView: View {
                                     Task { await viewModel.updateCommanderName(name.isEmpty ? nil : name) }
                                 }
                             )
+                            .transition(.asymmetric(
+                                insertion: .move(edge: .trailing).combined(with: .opacity),
+                                removal: .opacity
+                            ))
 
                             if player.id != viewModel.players.last?.id {
                                 Rectangle()
@@ -205,6 +219,7 @@ struct LobbyView: View {
                             }
                         }
                     }
+                    .animation(.easeInOut(duration: 0.3), value: viewModel.players.map(\.id))
                     .mtgCardFrame()
                     .padding(.horizontal)
                 }
@@ -232,13 +247,14 @@ private struct LobbyGameCodeCard: View {
     @Binding var showShareSheet: Bool
 
     var body: some View {
-        VStack(spacing: 8) {
+        VStack(spacing: 10) {
             MtgSectionHeader(title: "Game Code")
 
             Text(game.code)
-                .font(.system(size: 48, weight: .bold, design: .monospaced))
-                .foregroundStyle(Color.mtgGoldBright)
-                .kerning(8)
+                .font(.system(size: 52, weight: .bold, design: .monospaced))
+                .mtgGoldShimmer()
+                .kerning(10)
+                .shadow(color: Color.mtgGold.opacity(0.3), radius: 12, x: 0, y: 0)
                 .accessibilityLabel("Game code: \(game.code.map(String.init).joined(separator: " "))")
 
             Text(game.gameMode.displayName)
@@ -247,26 +263,49 @@ private struct LobbyGameCodeCard: View {
                 .foregroundStyle(Color.mtgBackground)
                 .padding(.horizontal, 12)
                 .padding(.vertical, 4)
-                .background(Color.mtgGold)
+                .background(
+                    LinearGradient(
+                        colors: [Color(hex: "e4c96a"), Color(hex: "c9a84c")],
+                        startPoint: .leading,
+                        endPoint: .trailing
+                    )
+                )
                 .clipShape(Capsule())
                 .accessibilityLabel("Game mode: \(game.gameMode.displayName)")
 
-            Button {
-                showShareSheet = true
-            } label: {
-                HStack(spacing: 4) {
-                    Image(systemName: "square.and.arrow.up")
-                        .font(.caption)
-                    Text("Share Code")
-                        .font(.caption)
+            HStack(spacing: 16) {
+                Button {
+                    UIPasteboard.general.string = game.code
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: "doc.on.doc")
+                            .font(.caption)
+                        Text("Copy")
+                            .font(.caption)
+                    }
+                    .foregroundStyle(Color.mtgGold)
                 }
-                .foregroundStyle(Color.mtgGold)
+                .accessibilityLabel("Copy game code")
+
+                Button {
+                    showShareSheet = true
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: "square.and.arrow.up")
+                            .font(.caption)
+                        Text("Share")
+                            .font(.caption)
+                    }
+                    .foregroundStyle(Color.mtgGold)
+                }
+                .accessibilityLabel("Share game code with friends")
             }
             .padding(.top, 4)
-            .accessibilityLabel("Share game code with friends")
         }
-        .padding(20)
+        .padding(.vertical, 24)
+        .padding(.horizontal, 20)
         .mtgCardFrame()
+        .mtgCardGlow(color: .mtgGold, radius: 12, opacity: 0.12)
         .padding(.horizontal)
         .padding(.top, 12)
     }
@@ -341,7 +380,7 @@ private struct LobbyPlayerRow: View {
             }
         }
         .padding(.horizontal, 16)
-        .padding(.vertical, 12)
+        .padding(.vertical, 14)
         .accessibilityLabel("\(player.displayName)\(isHost ? ", Host" : "")")
     }
 

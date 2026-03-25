@@ -84,7 +84,6 @@ struct JoinGameView: View {
             }
             .padding()
         }
-        .navigationTitle("Join Game")
         .toolbarColorScheme(.dark, for: .navigationBar)
         .onAppear { AnalyticsService.trackScreen("JoinGame") }
     }

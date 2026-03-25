@@ -436,6 +436,7 @@ private struct IdentityCardHeader: View {
                     Circle()
                         .fill(player.role?.color ?? .gray)
                         .frame(width: 12, height: 12)
+                        .shadow(color: (player.role?.color ?? .gray).opacity(0.5), radius: 4)
                     Text(player.role?.displayName ?? "Unknown")
                         .font(.headline)
                         .foregroundStyle(player.role?.color ?? Color.mtgTextPrimary)
@@ -448,9 +449,10 @@ private struct IdentityCardHeader: View {
                         .font(.caption)
                         .foregroundStyle(Color.mtgError)
                     Text("\(player.lifeTotal)")
-                        .font(.system(size: 28, weight: .bold, design: .serif))
+                        .font(.system(size: 30, weight: .bold, design: .serif))
                         .foregroundStyle(Color.mtgTextPrimary)
                         .contentTransition(.numericText())
+                        .animation(.spring(response: 0.3, dampingFraction: 0.6), value: player.lifeTotal)
                 }
             }
 
@@ -498,10 +500,22 @@ private struct IdentityCardHeader: View {
             }
         }
         .padding()
-        .background(Color.mtgSurface)
+        .background(
+            ZStack {
+                Color.mtgSurface
+                LinearGradient(
+                    colors: [
+                        (player.role?.color ?? Color.mtgGold).opacity(0.1),
+                        Color.clear
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+            }
+        )
         .overlay(
             RoundedRectangle(cornerRadius: 0)
-                .stroke(Color.mtgBorderAccent, lineWidth: 1)
+                .stroke(player.role?.color ?? Color.mtgBorderAccent, lineWidth: 1)
         )
     }
 }
@@ -649,31 +663,42 @@ private struct PlayerRow: View {
 
                 // Life controls
                 if !player.isEliminated {
-                    HStack(spacing: 14) {
+                    HStack(spacing: 12) {
                         Button {
                             viewModel.adjustLife(for: player.id, by: -1)
                         } label: {
                             Image(systemName: "minus.circle.fill")
-                                .font(.system(size: 30))
+                                .font(.system(size: 32))
                                 .foregroundStyle(Color.mtgAssassin)
+                                .background(
+                                    Circle()
+                                        .fill(Color.mtgAssassin.opacity(0.1))
+                                        .frame(width: 40, height: 40)
+                                )
                         }
                         .buttonStyle(.plain)
                         .accessibilityLabel("Decrease \(player.displayName)'s life")
 
                         Text("\(player.lifeTotal)")
-                            .font(.system(size: 32, weight: .bold, design: .serif))
+                            .font(.system(size: 36, weight: .bold, design: .serif))
                             .foregroundStyle(Color.mtgTextPrimary)
-                            .frame(minWidth: 48)
+                            .frame(minWidth: 52)
                             .multilineTextAlignment(.center)
                             .contentTransition(.numericText())
+                            .animation(.spring(response: 0.3, dampingFraction: 0.6), value: player.lifeTotal)
                             .accessibilityLabel("\(player.lifeTotal) life")
 
                         Button {
                             viewModel.adjustLife(for: player.id, by: 1)
                         } label: {
                             Image(systemName: "plus.circle.fill")
-                                .font(.system(size: 30))
+                                .font(.system(size: 32))
                                 .foregroundStyle(Color.mtgSuccess)
+                                .background(
+                                    Circle()
+                                        .fill(Color.mtgSuccess.opacity(0.1))
+                                        .frame(width: 40, height: 40)
+                                )
                         }
                         .buttonStyle(.plain)
                         .accessibilityLabel("Increase \(player.displayName)'s life")

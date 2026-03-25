@@ -34,7 +34,20 @@ struct HomeView: View {
     var body: some View {
         NavigationStack(path: $path) {
             ZStack {
-                Color.mtgBackground.ignoresSafeArea()
+                // Radial gradient background
+                ZStack {
+                    Color.mtgBackground
+                    RadialGradient(
+                        colors: [
+                            Color(hex: "1e1735").opacity(0.8),
+                            Color.mtgBackground
+                        ],
+                        center: .center,
+                        startRadius: 20,
+                        endRadius: 500
+                    )
+                }
+                .ignoresSafeArea()
 
                 VStack(spacing: 24) {
                     #if DEBUG
@@ -57,19 +70,26 @@ struct HomeView: View {
 
                     Spacer()
 
-                    // Title treatment
+                    // Title treatment with subtle glow
                     VStack(spacing: 8) {
                         Text("Treachery")
                             .font(.system(size: 42, weight: .bold, design: .serif))
-                            .foregroundStyle(Color.mtgGoldBright)
+                            .mtgGoldShimmer()
+                            .shadow(color: Color.mtgGold.opacity(0.4), radius: 16, x: 0, y: 0)
+                            .shadow(color: Color.mtgGold.opacity(0.2), radius: 32, x: 0, y: 0)
                             .accessibilityAddTraits(.isHeader)
+
+                        Text("A Game of Hidden Allegiance")
+                            .font(.system(.caption, design: .serif))
+                            .foregroundStyle(Color.mtgTextSecondary)
+                            .opacity(0.8)
 
                         OrnateDivider()
                             .padding(.horizontal, 40)
                     }
 
                     Spacer()
-                        .frame(height: 16)
+                        .frame(height: 20)
 
                     // Rejoin active game banner
                     if let game = activeGame {
@@ -130,8 +150,11 @@ struct HomeView: View {
                     .padding(.horizontal)
 
                     Spacer()
+                        .frame(height: 16)
 
-                    // Bottom navigation
+                    Spacer()
+
+                    // Bottom navigation with tab bar surface
                     HStack(spacing: 24) {
                         NavigationLink(value: AppDestination.gameHistory) {
                             VStack(spacing: 4) {
@@ -183,9 +206,20 @@ struct HomeView: View {
                         .accessibilityValue(devSettings.devModeEnabled ? "Enabled" : "Disabled")
                         #endif
                     }
-                    .padding(.bottom)
+                    .padding(.vertical, 12)
+                    .padding(.horizontal, 24)
+                    .frame(maxWidth: .infinity)
+                    .background(
+                        Color.mtgSurface.opacity(0.85)
+                            .overlay(
+                                Rectangle()
+                                    .fill(Color.mtgDivider)
+                                    .frame(height: 1),
+                                alignment: .top
+                            )
+                    )
                 }
-                .padding()
+                .padding(.horizontal)
             }
             .navigationTitle("Home")
             .toolbarColorScheme(.dark, for: .navigationBar)

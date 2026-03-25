@@ -135,7 +135,6 @@ struct CreateGameView: View {
                 .padding()
             }
         }
-        .navigationTitle("Create Game")
         .toolbarColorScheme(.dark, for: .navigationBar)
         .onAppear { AnalyticsService.trackScreen("CreateGame") }
         .onChange(of: gameMode) { _, _ in
