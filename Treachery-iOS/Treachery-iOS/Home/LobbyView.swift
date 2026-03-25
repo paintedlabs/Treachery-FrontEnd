@@ -171,7 +171,7 @@ struct LobbyView: View {
     private var playerListSection: some View {
         ScrollView {
             VStack(spacing: 0) {
-                MtgSectionHeader(title: "Players (\(viewModel.players.count)/\(viewModel.game?.maxPlayers ?? 0))")
+                MtgSectionHeader(title: "Players (\(viewModel.players.count))")
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.horizontal, 16)
                     .padding(.bottom, 8)

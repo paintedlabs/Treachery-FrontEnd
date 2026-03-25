@@ -11,10 +11,9 @@ import {
 import { useRouter } from 'expo-router';
 import { Timestamp } from 'firebase/firestore';
 import { useAuth } from '@/hooks/useAuth';
-import { RoleBadge } from '@/components/RoleBadge';
 import { ErrorBanner } from '@/components/ErrorBanner';
 import * as firestoreService from '@/services/firestore';
-import { getRoleDistribution, MINIMUM_PLAYER_COUNT, CODE_CHARACTERS } from '@/constants/roles';
+import { CODE_CHARACTERS } from '@/constants/roles';
 import { Game, GameMode, Player } from '@/models/types';
 import { trackEvent } from '@/services/analytics';
 import { colors, spacing, fontSize } from '@/constants/theme';
@@ -47,26 +46,18 @@ export default function CreateGameScreen() {
   const { currentUserId } = useAuth();
   const [gameMode, setGameMode] = useState<GameMode>('treachery');
   const [useOwnDeck, setUseOwnDeck] = useState(false);
-  const [maxPlayers, setMaxPlayers] = useState(MINIMUM_PLAYER_COUNT);
   const [startingLife, setStartingLife] = useState(40);
   const [isCreating, setIsCreating] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const hasTreachery = includesTreachery(gameMode);
   const hasPlanechase = includesPlanechase(gameMode);
-  const minPlayers = hasTreachery ? MINIMUM_PLAYER_COUNT : 1;
-  const maxPlayerLimit = hasTreachery ? 8 : 12;
 
-  const dist = getRoleDistribution(maxPlayers);
+  // Max players is determined by game mode — no user input needed.
+  const maxPlayers = hasTreachery ? 8 : 12;
 
   const handleModeChange = (mode: GameMode) => {
     setGameMode(mode);
-    const newHasTreachery = includesTreachery(mode);
-    const newMin = newHasTreachery ? MINIMUM_PLAYER_COUNT : 1;
-    const newMax = newHasTreachery ? 8 : 12;
-    // Clamp player count to new valid range
-    if (maxPlayers < newMin) setMaxPlayers(newMin);
-    if (maxPlayers > newMax) setMaxPlayers(newMax);
     // Reset own deck when planechase is disabled
     if (!includesPlanechase(mode)) setUseOwnDeck(false);
   };
@@ -136,7 +127,7 @@ export default function CreateGameScreen() {
       };
       await firestoreService.addPlayer(player, gameId);
 
-      trackEvent('create_game', { game_mode: gameMode, max_players: maxPlayers });
+      trackEvent('create_game', { game_mode: gameMode });
 
       router.replace({
         pathname: '/(app)/lobby/[gameId]',
@@ -189,31 +180,6 @@ export default function CreateGameScreen() {
         </View>
       )}
 
-      {/* Players stepper */}
-      <View style={styles.stepperRow}>
-        <Text style={styles.stepperLabel}>Players: {maxPlayers}</Text>
-        <View style={styles.stepperButtons}>
-          <TouchableOpacity
-            onPress={() => setMaxPlayers(Math.max(minPlayers, maxPlayers - 1))}
-            disabled={maxPlayers <= minPlayers}
-            accessibilityLabel="Decrease player count"
-            accessibilityRole="button"
-          >
-            <Text style={[styles.stepperBtn, maxPlayers <= minPlayers && styles.disabled]}>−</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            onPress={() => setMaxPlayers(Math.min(maxPlayerLimit, maxPlayers + 1))}
-            disabled={maxPlayers >= maxPlayerLimit}
-            accessibilityLabel="Increase player count"
-            accessibilityRole="button"
-          >
-            <Text style={[styles.stepperBtn, maxPlayers >= maxPlayerLimit && styles.disabled]}>
-              +
-            </Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-
       {/* Starting life stepper */}
       <View style={styles.stepperRow}>
         <Text style={styles.stepperLabel}>Starting Life: {startingLife}</Text>
@@ -236,29 +202,6 @@ export default function CreateGameScreen() {
           </TouchableOpacity>
         </View>
       </View>
-
-      {/* Role distribution (treachery modes only) */}
-      {hasTreachery && (
-        <>
-          {/* Ornate divider */}
-          <View style={styles.ornateDivider}>
-            <View style={styles.ornateLine} />
-            <Text style={styles.ornateDiamond}>&#9670;</Text>
-            <View style={styles.ornateLine} />
-          </View>
-
-          {/* Section header */}
-          <Text style={styles.roleHeader}>Role Distribution</Text>
-
-          {/* Role distribution */}
-          <View style={styles.roleBadges}>
-            <RoleBadge count={dist.leaders} role="leader" />
-            <RoleBadge count={dist.guardians} role="guardian" />
-            <RoleBadge count={dist.assassins} role="assassin" />
-            <RoleBadge count={dist.traitors} role="traitor" />
-          </View>
-        </>
-      )}
 
       {errorMessage && <ErrorBanner message={errorMessage} />}
 
@@ -370,32 +313,6 @@ const styles = StyleSheet.create({
   },
   disabled: {
     opacity: 0.3,
-  },
-  ornateDivider: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  ornateLine: {
-    flex: 1,
-    height: 1,
-    backgroundColor: colors.border,
-  },
-  ornateDiamond: {
-    color: colors.primary,
-    fontSize: 10,
-  },
-  roleHeader: {
-    color: colors.textSecondary,
-    fontSize: 12,
-    fontWeight: '600',
-    textTransform: 'uppercase',
-    letterSpacing: 1.5,
-    textAlign: 'center',
-  },
-  roleBadges: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
   },
   createButton: {
     backgroundColor: colors.primary,

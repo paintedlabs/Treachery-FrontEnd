@@ -13,19 +13,15 @@ struct CreateGameView: View {
 
     @State private var gameMode: GameMode = .treachery
     @State private var useOwnDeck = false
-    @State private var maxPlayers = Role.minimumPlayerCount
     @State private var startingLife = 40
     @State private var isCreating = false
     @State private var errorMessage: String?
 
     private let firestoreManager = FirestoreManager()
 
-    private var playerRange: ClosedRange<Int> {
-        if gameMode.includesTreachery {
-            return Role.minimumPlayerCount...8
-        } else {
-            return 1...12
-        }
+    /// Max players is determined by game mode — no user input needed.
+    private var maxPlayers: Int {
+        gameMode.includesTreachery ? 8 : 12
     }
 
     var body: some View {
@@ -78,37 +74,12 @@ struct CreateGameView: View {
 
                         OrnateDivider()
 
-                        Stepper("Players: \(maxPlayers)", value: $maxPlayers, in: playerRange)
-                            .foregroundStyle(Color.mtgTextPrimary)
-                            .accessibilityValue("\(maxPlayers) players")
-
                         Stepper("Starting Life: \(startingLife)", value: $startingLife, in: 20...60, step: 5)
                             .foregroundStyle(Color.mtgTextPrimary)
                             .accessibilityValue("\(startingLife) life")
                     }
                     .padding(16)
                     .mtgCardFrame()
-
-                    // Role distribution preview (only for treachery modes)
-                    if gameMode.includesTreachery {
-                        VStack(spacing: 16) {
-                            MtgSectionHeader(title: "Role Distribution")
-
-                            OrnateDivider()
-
-                            let dist = Role.distribution(forPlayerCount: maxPlayers)
-                            HStack(spacing: 12) {
-                                RoleBadge(count: dist.leaders, role: .leader)
-                                RoleBadge(count: dist.guardians, role: .guardian)
-                                RoleBadge(count: dist.assassins, role: .assassin)
-                                RoleBadge(count: dist.traitors, role: .traitor)
-                            }
-                            .accessibilityElement(children: .combine)
-                            .accessibilityLabel("Role distribution: \(dist.leaders) leaders, \(dist.guardians) guardians, \(dist.assassins) assassins, \(dist.traitors) traitors")
-                        }
-                        .padding(16)
-                        .mtgCardFrame()
-                    }
 
                     if let error = errorMessage {
                         MtgErrorBanner(message: error)
@@ -138,12 +109,6 @@ struct CreateGameView: View {
         .toolbarColorScheme(.dark, for: .navigationBar)
         .onAppear { AnalyticsService.trackScreen("CreateGame") }
         .onChange(of: gameMode) { _, _ in
-            // Clamp maxPlayers to valid range when switching modes
-            if maxPlayers < playerRange.lowerBound {
-                maxPlayers = playerRange.lowerBound
-            } else if maxPlayers > playerRange.upperBound {
-                maxPlayers = playerRange.upperBound
-            }
             // Reset own deck toggle when planechase is disabled
             if !gameMode.includesPlanechase {
                 useOwnDeck = false
@@ -197,8 +162,7 @@ struct CreateGameView: View {
             try await firestoreManager.addPlayer(player, toGame: game.id)
 
             AnalyticsService.trackEvent("create_game", params: [
-                "game_mode": gameMode.rawValue,
-                "max_players": maxPlayers
+                "game_mode": gameMode.rawValue
             ])
             navigationPath.append(AppDestination.lobby(gameId: game.id, isHost: true))
         } catch {
@@ -218,35 +182,6 @@ struct CreateGameView: View {
             }
         }
         throw GameError.codeGenerationFailed
-    }
-}
-
-// MARK: - Role Badge
-
-private struct RoleBadge: View {
-    let count: Int
-    let role: Role
-
-    var body: some View {
-        VStack(spacing: 4) {
-            Text("\(count)")
-                .font(.title2)
-                .fontWeight(.bold)
-                .foregroundStyle(role.color)
-            Text(role.displayName)
-                .font(.caption2)
-                .foregroundStyle(Color.mtgTextSecondary)
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 10)
-        .background(Color.mtgCardElevated)
-        .clipShape(RoundedRectangle(cornerRadius: 8))
-        .overlay(
-            RoundedRectangle(cornerRadius: 8)
-                .stroke(role.color.opacity(0.3), lineWidth: 1)
-        )
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(count) \(role.displayName)")
     }
 }
 

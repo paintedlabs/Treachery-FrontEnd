@@ -51,8 +51,18 @@ export default function HomeScreen() {
       }
     };
 
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible' && authState === 'authenticated') {
+        checkForActiveGame();
+      }
+    };
+
     window.addEventListener('popstate', handlePopState);
-    return () => window.removeEventListener('popstate', handlePopState);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => {
+      window.removeEventListener('popstate', handlePopState);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
   }, [authState, checkForActiveGame]);
 
   if (authState !== 'authenticated') return null;
