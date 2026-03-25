@@ -43,6 +43,7 @@ struct LobbyView: View {
         .toolbarColorScheme(.dark, for: .navigationBar)
         .navigationBarBackButtonHidden(true)
         .onAppear {
+            AnalyticsService.trackScreen("Lobby")
             viewModel.currentUserId = authViewModel.currentUserId
             if let player = viewModel.currentPlayer {
                 commanderNameInput = player.commanderName ?? ""

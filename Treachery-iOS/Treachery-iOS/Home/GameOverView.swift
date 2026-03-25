@@ -226,6 +226,7 @@ struct GameOverView: View {
         .toolbarColorScheme(.dark, for: .navigationBar)
         .navigationBarBackButtonHidden(true)
         .onAppear {
+            AnalyticsService.trackScreen("GameOver")
             viewModel.currentUserId = authViewModel.currentUserId
         }
     }

@@ -268,6 +268,7 @@ struct GameBoardView: View {
         .navigationTitle("Game")
         .toolbarColorScheme(.dark, for: .navigationBar)
         .navigationBarBackButtonHidden(true)
+        .onAppear { AnalyticsService.trackScreen("GameBoard") }
         .toolbar {
             // Forfeit button — only when treachery active
             if viewModel.isTreacheryActive && !viewModel.isGameUnavailable && !(viewModel.currentPlayer?.isEliminated ?? true) {

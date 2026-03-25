@@ -93,6 +93,10 @@ final class LobbyViewModel: ObservableObject {
         isStartingGame = true
         do {
             try await cloudFunctions.startGame(gameId: gameId)
+            AnalyticsService.trackEvent("start_game", params: [
+                "player_count": players.count,
+                "game_mode": game?.gameMode.rawValue ?? "unknown"
+            ])
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -106,6 +110,7 @@ final class LobbyViewModel: ObservableObject {
         stopListening()
         do {
             try await cloudFunctions.leaveGame(gameId: gameId)
+            AnalyticsService.trackEvent("leave_lobby")
         } catch {
             errorMessage = error.localizedDescription
         }

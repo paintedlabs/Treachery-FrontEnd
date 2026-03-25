@@ -64,6 +64,7 @@ struct GameHistoryView: View {
         }
         .navigationTitle("Game History")
         .toolbarColorScheme(.dark, for: .navigationBar)
+        .onAppear { AnalyticsService.trackScreen("GameHistory") }
         .task {
             await loadHistory()
         }

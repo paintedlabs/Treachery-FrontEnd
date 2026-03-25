@@ -58,9 +58,12 @@ final class AuthViewModel: ObservableObject {
             Task { @MainActor in
                 if let user = user {
                     self?.authState = .authenticated(user)
+                    AnalyticsService.setUserId(user.uid)
+                    AnalyticsService.setUserProperties(["auth_method": user.isAnonymous ? "guest" : "email"])
                     await self?.createUserDocumentIfNeeded(for: user)
                 } else {
                     self?.authState = .unauthenticated
+                    AnalyticsService.setUserId(nil)
                 }
             }
         }
@@ -73,6 +76,7 @@ final class AuthViewModel: ObservableObject {
         do {
             let user = try await firebaseManager.signInAnonymously()
             await createUserDocumentIfNeeded(for: user)
+            AnalyticsService.trackEvent("sign_in", params: ["method": "guest"])
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -85,6 +89,7 @@ final class AuthViewModel: ObservableObject {
         do {
             let user = try await firebaseManager.signIn(email: email, password: password)
             await createUserDocumentIfNeeded(for: user)
+            AnalyticsService.trackEvent("sign_in", params: ["method": "email"])
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -95,6 +100,7 @@ final class AuthViewModel: ObservableObject {
         do {
             let user = try await firebaseManager.signUp(email: email, password: password)
             await createUserDocumentIfNeeded(for: user)
+            AnalyticsService.trackEvent("sign_up", params: ["method": "email"])
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -126,6 +132,7 @@ final class AuthViewModel: ObservableObject {
         do {
             let user = try await firebaseManager.signInWithPhoneCode(verificationID: verificationID, code: code)
             await createUserDocumentIfNeeded(for: user)
+            AnalyticsService.trackEvent("sign_in", params: ["method": "phone"])
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -137,6 +144,7 @@ final class AuthViewModel: ObservableObject {
         errorMessage = nil
         do {
             try firebaseManager.signOut()
+            AnalyticsService.trackEvent("sign_out")
         } catch {
             errorMessage = error.localizedDescription
         }

@@ -248,6 +248,7 @@ struct ProfileView: View {
         }
         .navigationTitle("Profile")
         .toolbarColorScheme(.dark, for: .navigationBar)
+        .onAppear { AnalyticsService.trackScreen("Profile") }
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 if isEditingName {

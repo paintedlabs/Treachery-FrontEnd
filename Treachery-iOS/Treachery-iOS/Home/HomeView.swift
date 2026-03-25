@@ -189,6 +189,7 @@ struct HomeView: View {
             }
             .navigationTitle("Home")
             .toolbarColorScheme(.dark, for: .navigationBar)
+            .onAppear { AnalyticsService.trackScreen("Home") }
             .task(id: path.count) {
                 // Re-check every time we return to the home screen (path becomes empty)
                 guard path.isEmpty,
