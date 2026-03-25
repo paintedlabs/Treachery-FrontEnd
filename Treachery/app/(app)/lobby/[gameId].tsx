@@ -355,7 +355,7 @@ export default function LobbyScreen() {
 
       {/* Player list */}
       <Text style={styles.sectionTitle}>
-        Players ({players.length}/{game?.max_players ?? 0})
+        Players ({players.length})
       </Text>
 
       {players.length === 0 ? (

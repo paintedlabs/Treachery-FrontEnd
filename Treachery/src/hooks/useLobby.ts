@@ -60,8 +60,7 @@ export function useLobby(
     game?.game_mode === 'treachery' || game?.game_mode === 'treachery_planechase';
   const minPlayers = isTreacheryMode ? MINIMUM_PLAYER_COUNT : 1;
 
-  const canStartGame =
-    isHost && players.length >= minPlayers && players.length <= (game?.max_players ?? 0);
+  const canStartGame = isHost && players.length >= minPlayers;
 
   const startGame = useCallback(async () => {
     if (!isHost || !game) return;
