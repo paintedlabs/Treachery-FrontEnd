@@ -65,3 +65,6 @@ Treachery-iOS/Treachery-iOS/Support Files/GoogleService-Info.plist
 
 # Firebase
 .firebase/
+
+# APNs auth keys
+*.p8

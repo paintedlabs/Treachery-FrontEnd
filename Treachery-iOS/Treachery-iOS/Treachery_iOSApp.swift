@@ -32,7 +32,7 @@ class AppDelegate: NSObject, UIApplicationDelegate, MessagingDelegate, UNUserNot
     ) -> Bool {
         FirebaseApp.configure()
 
-        #if DEBUG
+        #if targetEnvironment(simulator)
         Auth.auth().settings?.isAppVerificationDisabledForTesting = true
         #endif
 
