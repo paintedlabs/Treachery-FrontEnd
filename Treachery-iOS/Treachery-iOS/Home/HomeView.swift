@@ -44,7 +44,7 @@ struct HomeView: View {
                         ],
                         center: .center,
                         startRadius: 20,
-                        endRadius: UIScreen.main.bounds.height * 0.6
+                        endRadius: 500
                     )
                 }
                 .ignoresSafeArea()

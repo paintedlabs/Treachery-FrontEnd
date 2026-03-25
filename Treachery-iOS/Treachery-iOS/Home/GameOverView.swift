@@ -33,7 +33,7 @@ struct GameOverView: View {
                     ],
                     center: .top,
                     startRadius: 20,
-                    endRadius: UIScreen.main.bounds.height * 0.5
+                    endRadius: 420
                 )
                 .ignoresSafeArea()
             } else {
@@ -44,7 +44,7 @@ struct GameOverView: View {
                     ],
                     center: .top,
                     startRadius: 20,
-                    endRadius: UIScreen.main.bounds.height * 0.5
+                    endRadius: 420
                 )
                 .ignoresSafeArea()
             }
