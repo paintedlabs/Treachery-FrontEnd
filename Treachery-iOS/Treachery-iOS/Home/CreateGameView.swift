@@ -135,7 +135,6 @@ struct CreateGameView: View {
                 .padding()
             }
         }
-        .navigationTitle("Create Game")
         .toolbarColorScheme(.dark, for: .navigationBar)
         .onChange(of: gameMode) { _, _ in
             // Clamp maxPlayers to valid range when switching modes
