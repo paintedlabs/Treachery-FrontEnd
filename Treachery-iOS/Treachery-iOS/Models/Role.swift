@@ -50,11 +50,6 @@ enum Role: String, Codable, CaseIterable, Identifiable {
     /// Returns (leaders, guardians, assassins, traitors).
     static func distribution(forPlayerCount count: Int) -> (leaders: Int, guardians: Int, assassins: Int, traitors: Int) {
         switch count {
-        #if DEBUG
-        case 1:  return (1, 0, 0, 0)   // Solo: leader only (test card/UI flow)
-        case 2:  return (1, 0, 1, 0)   // Leader vs assassin
-        case 3:  return (1, 0, 1, 1)   // Leader, assassin, traitor
-        #endif
         case 4:  return (1, 0, 2, 1)
         case 5:  return (1, 1, 2, 1)
         case 6:  return (1, 1, 3, 1)
@@ -65,11 +60,5 @@ enum Role: String, Codable, CaseIterable, Identifiable {
     }
 
     /// Minimum number of players required to start a game.
-    static var minimumPlayerCount: Int {
-        #if DEBUG
-        return UserDefaults.standard.bool(forKey: "devModeEnabled") ? 1 : 4
-        #else
-        return 4
-        #endif
-    }
+    static var minimumPlayerCount: Int { 4 }
 }

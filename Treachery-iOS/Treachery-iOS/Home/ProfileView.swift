@@ -246,7 +246,6 @@ struct ProfileView: View {
                 .padding()
             }
         }
-        .navigationTitle("Profile")
         .toolbarColorScheme(.dark, for: .navigationBar)
         .onAppear { AnalyticsService.trackScreen("Profile") }
         .toolbar {

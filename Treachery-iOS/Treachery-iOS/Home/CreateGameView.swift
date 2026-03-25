@@ -34,23 +34,6 @@ struct CreateGameView: View {
 
             ScrollView {
                 VStack(spacing: 24) {
-                    #if DEBUG
-                    if DevSettings.shared.devModeEnabled {
-                        HStack(spacing: 6) {
-                            Image(systemName: "hammer.fill")
-                                .foregroundStyle(.orange)
-                                .font(.caption)
-                            Text("Dev Mode: 1-player minimum")
-                                .font(.caption)
-                                .foregroundStyle(.orange)
-                        }
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 6)
-                        .background(.orange.opacity(0.1))
-                        .clipShape(Capsule())
-                    }
-                    #endif
-
                     // Game Mode selector
                     VStack(spacing: 8) {
                         MtgSectionHeader(title: "Game Mode")
