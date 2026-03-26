@@ -7,13 +7,18 @@
 
 import Foundation
 
-final class PlaneDatabase {
+final class PlaneDatabase: PlaneLookupProviding {
     static let shared = PlaneDatabase()
 
     private var cards: [PlaneCard] = []
 
     private init() {
         loadCards()
+    }
+
+    /// Test-only initializer with pre-loaded cards.
+    init(cards: [PlaneCard]) {
+        self.cards = cards
     }
 
     private func loadCards() {

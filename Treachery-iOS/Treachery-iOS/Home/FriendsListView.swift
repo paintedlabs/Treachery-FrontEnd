@@ -207,7 +207,7 @@ struct FriendsListView: View {
                 .padding()
             }
         }
-        .navigationTitle("Friends")
+        .navigationBarTitleDisplayMode(.inline)
         .toolbarColorScheme(.dark, for: .navigationBar)
         .onAppear { AnalyticsService.trackScreen("Friends") }
         .task {

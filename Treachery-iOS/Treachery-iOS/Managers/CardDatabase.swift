@@ -7,13 +7,18 @@
 
 import Foundation
 
-final class CardDatabase {
+final class CardDatabase: CardLookupProviding {
     static let shared = CardDatabase()
 
     private var cards: [IdentityCard] = []
 
     private init() {
         loadCards()
+    }
+
+    /// Test-only initializer with pre-loaded cards.
+    init(cards: [IdentityCard]) {
+        self.cards = cards
     }
 
     private func loadCards() {

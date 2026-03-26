@@ -8,7 +8,13 @@
 import Foundation
 import FirebaseFirestore
 
-final class FirestoreManager {
+/// Wraps a Firebase ListenerRegistration as a ListenerCancellable.
+private struct FirestoreListenerHandle: ListenerCancellable {
+    let registration: ListenerRegistration
+    func remove() { registration.remove() }
+}
+
+final class FirestoreManager: FirestoreManaging {
     private let db = Firestore.firestore()
 
     // MARK: - Collection References
@@ -181,12 +187,13 @@ final class FirestoreManager {
         return snapshot.documents.compactMap { try? $0.data(as: Game.self) }
     }
 
-    func listenToGame(id: String, onChange: @escaping (Game?) -> Void) -> ListenerRegistration {
-        gamesCollection.document(id).addSnapshotListener { snapshot, _ in
+    func listenToGame(id: String, onChange: @escaping (Game?) -> Void) -> ListenerCancellable {
+        let reg = gamesCollection.document(id).addSnapshotListener { snapshot, _ in
             guard let snapshot = snapshot else { return }
             let game = try? snapshot.data(as: Game.self)
             onChange(game)
         }
+        return FirestoreListenerHandle(registration: reg)
     }
 
     // MARK: - Players
@@ -217,8 +224,8 @@ final class FirestoreManager {
     func listenToPlayers(
         gameId: String,
         onChange: @escaping ([Player]) -> Void
-    ) -> ListenerRegistration {
-        playersCollection(gameId: gameId)
+    ) -> ListenerCancellable {
+        let reg = playersCollection(gameId: gameId)
             .order(by: "order_id")
             .addSnapshotListener { snapshot, _ in
                 guard let snapshot = snapshot else { return }
@@ -227,6 +234,7 @@ final class FirestoreManager {
                 }
                 onChange(players)
             }
+        return FirestoreListenerHandle(registration: reg)
     }
 
     // MARK: - Player Customization

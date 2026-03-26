@@ -27,9 +27,6 @@ struct HomeView: View {
     @State private var path = NavigationPath()
     @State private var activeGame: Game?
     private let firestoreManager = FirestoreManager()
-    #if DEBUG
-    @ObservedObject private var devSettings = DevSettings.shared
-    #endif
 
     var body: some View {
         NavigationStack(path: $path) {
@@ -50,24 +47,6 @@ struct HomeView: View {
                 .ignoresSafeArea()
 
                 VStack(spacing: 24) {
-                    #if DEBUG
-                    // Dev mode banner
-                    if devSettings.devModeEnabled {
-                        HStack(spacing: 6) {
-                            Image(systemName: "hammer.fill")
-                                .font(.caption)
-                            Text("DEV MODE")
-                                .font(.caption)
-                                .fontWeight(.bold)
-                        }
-                        .foregroundStyle(.white)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 6)
-                        .background(.orange)
-                        .clipShape(Capsule())
-                    }
-                    #endif
-
                     Spacer()
 
                     // Title treatment with subtle glow
@@ -189,22 +168,6 @@ struct HomeView: View {
                         }
                         .accessibilityLabel("Your profile")
 
-                        #if DEBUG
-                        Button {
-                            devSettings.devModeEnabled.toggle()
-                        } label: {
-                            VStack(spacing: 4) {
-                                Image(systemName: devSettings.devModeEnabled ? "hammer.fill" : "hammer")
-                                    .font(.title3)
-                                    .foregroundStyle(devSettings.devModeEnabled ? .orange : Color.mtgTextSecondary)
-                                Text("Dev")
-                                    .font(.caption)
-                                    .foregroundStyle(devSettings.devModeEnabled ? .orange : Color.mtgTextSecondary)
-                            }
-                        }
-                        .accessibilityLabel("Toggle dev mode")
-                        .accessibilityValue(devSettings.devModeEnabled ? "Enabled" : "Disabled")
-                        #endif
                     }
                     .padding(.vertical, 12)
                     .padding(.horizontal, 24)
@@ -221,7 +184,7 @@ struct HomeView: View {
                 }
                 .padding(.horizontal)
             }
-            .navigationTitle("Home")
+            .navigationBarHidden(true)
             .toolbarColorScheme(.dark, for: .navigationBar)
             .onAppear { AnalyticsService.trackScreen("Home") }
             .task(id: path.count) {

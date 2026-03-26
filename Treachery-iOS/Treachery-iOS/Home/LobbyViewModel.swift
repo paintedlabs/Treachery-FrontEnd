@@ -7,7 +7,6 @@
 
 import Foundation
 import SwiftUI
-import FirebaseFirestore
 
 @MainActor
 final class LobbyViewModel: ObservableObject {
@@ -20,10 +19,10 @@ final class LobbyViewModel: ObservableObject {
     let gameId: String
     let isHost: Bool
     var currentUserId: String?
-    private let firestoreManager = FirestoreManager()
-    private let cloudFunctions = CloudFunctions()
-    private var gameListener: ListenerRegistration?
-    private var playersListener: ListenerRegistration?
+    private let firestoreManager: FirestoreManaging
+    private let cloudFunctions: CloudFunctionsProtocol
+    private var gameListener: ListenerCancellable?
+    private var playersListener: ListenerCancellable?
     private var hasReceivedFirstSnapshot = false
 
     var currentPlayer: Player? {
@@ -46,9 +45,16 @@ final class LobbyViewModel: ObservableObject {
         game?.state == .inProgress
     }
 
-    init(gameId: String, isHost: Bool) {
+    init(
+        gameId: String,
+        isHost: Bool,
+        firestoreManager: FirestoreManaging = FirestoreManager(),
+        cloudFunctions: CloudFunctionsProtocol = CloudFunctions()
+    ) {
         self.gameId = gameId
         self.isHost = isHost
+        self.firestoreManager = firestoreManager
+        self.cloudFunctions = cloudFunctions
         startListening()
     }
 

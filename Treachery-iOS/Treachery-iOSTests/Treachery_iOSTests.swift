@@ -1,16 +1,8 @@
-//
-//  Treachery_iOSTests.swift
-//  Treachery-iOSTests
-//
-//  Created by Luke Solomon on 9/10/24.
-//
-
-import Testing
-
-struct Treachery_iOSTests {
-
-    @Test func example() async throws {
-        // Write your test here and use APIs like `#expect(...)` to check expected conditions.
-    }
-
-}
+// Tests are organized into separate files:
+// - RoleTests.swift
+// - GameModeTests.swift
+// - RarityTests.swift
+// - ModelDecodingTests.swift
+// - CardDatabaseTests.swift
+// - PlaneDatabaseTests.swift
+// - PlayerColorsTests.swift

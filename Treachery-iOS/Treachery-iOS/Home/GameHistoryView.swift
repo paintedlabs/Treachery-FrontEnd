@@ -62,7 +62,7 @@ struct GameHistoryView: View {
                 .padding(.top)
             }
         }
-        .navigationTitle("Game History")
+        .navigationBarTitleDisplayMode(.inline)
         .toolbarColorScheme(.dark, for: .navigationBar)
         .onAppear { AnalyticsService.trackScreen("GameHistory") }
         .task {
