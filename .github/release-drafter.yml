@@ -1,0 +1,59 @@
+name-template: "v$RESOLVED_VERSION"
+tag-template: "v$RESOLVED_VERSION"
+
+categories:
+  - title: "New Features"
+    labels:
+      - "feature"
+      - "enhancement"
+  - title: "Bug Fixes"
+    labels:
+      - "fix"
+      - "bugfix"
+      - "bug"
+  - title: "iOS"
+    labels:
+      - "ios"
+  - title: "Web"
+    labels:
+      - "web"
+  - title: "Cloud Functions"
+    labels:
+      - "functions"
+  - title: "Dependencies"
+    labels:
+      - "dependencies"
+  - title: "Documentation"
+    labels:
+      - "documentation"
+      - "docs"
+  - title: "Other Changes"
+    labels:
+      - "*"
+
+change-template: "- $TITLE (#$NUMBER) @$AUTHOR"
+change-title-escapes: '\<*_&'
+
+version-resolver:
+  major:
+    labels:
+      - "major"
+      - "breaking"
+  minor:
+    labels:
+      - "minor"
+      - "feature"
+      - "enhancement"
+  patch:
+    labels:
+      - "patch"
+      - "fix"
+      - "bugfix"
+  default: patch
+
+template: |
+  ## What's Changed
+
+  $CHANGES
+
+  **Full Changelog**: https://github.com/$OWNER/$REPOSITORY/compare/$PREVIOUS_TAG...v$RESOLVED_VERSION

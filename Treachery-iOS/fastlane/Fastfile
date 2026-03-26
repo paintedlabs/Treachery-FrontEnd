@@ -1,0 +1,117 @@
+default_platform(:ios)
+
+XCODEPROJ = "Treachery-iOS.xcodeproj"
+SCHEME    = "Treachery-iOS"
+
+platform :ios do
+
+  # ── Testing ────────────────────────────────────────────
+
+  desc "Run unit tests"
+  lane :test do
+    run_tests(
+      project: XCODEPROJ,
+      scheme: SCHEME,
+      devices: ["iPhone 16"],
+      code_coverage: true,
+      result_bundle: true,
+      output_directory: "./build/test_output",
+      clean: true
+    )
+  end
+
+  # ── Beta (TestFlight) ─────────────────────────────────
+
+  desc "Build and upload to TestFlight"
+  lane :beta do
+    setup_ci if is_ci
+
+    # Fetch App Store Connect API key from environment
+    api_key = app_store_connect_api_key(
+      key_id: ENV["APP_STORE_CONNECT_KEY_ID"],
+      issuer_id: ENV["APP_STORE_CONNECT_ISSUER_ID"],
+      key_content: ENV["APP_STORE_CONNECT_KEY"],
+      is_key_content_base64: true
+    )
+
+    # Auto-increment build number using App Store Connect
+    current = latest_testflight_build_number(api_key: api_key)
+    increment_build_number(
+      build_number: current + 1,
+      xcodeproj: XCODEPROJ
+    )
+
+    # Build
+    build_app(
+      project: XCODEPROJ,
+      scheme: SCHEME,
+      export_method: "app-store",
+      output_directory: "./build",
+      clean: true
+    )
+
+    # Upload to TestFlight
+    upload_to_testflight(
+      api_key: api_key,
+      skip_waiting_for_build_processing: true
+    )
+  end
+
+  # ── Release (App Store) ──────────────────────────────
+
+  desc "Build and submit to App Store review"
+  lane :release do
+    setup_ci if is_ci
+
+    api_key = app_store_connect_api_key(
+      key_id: ENV["APP_STORE_CONNECT_KEY_ID"],
+      issuer_id: ENV["APP_STORE_CONNECT_ISSUER_ID"],
+      key_content: ENV["APP_STORE_CONNECT_KEY"],
+      is_key_content_base64: true
+    )
+
+    # Increment build number
+    current = latest_testflight_build_number(api_key: api_key)
+    increment_build_number(
+      build_number: current + 1,
+      xcodeproj: XCODEPROJ
+    )
+
+    # Build
+    build_app(
+      project: XCODEPROJ,
+      scheme: SCHEME,
+      export_method: "app-store",
+      output_directory: "./build",
+      clean: true
+    )
+
+    # Upload and submit for review
+    upload_to_app_store(
+      api_key: api_key,
+      submit_for_review: true,
+      automatic_release: true,
+      force: true,
+      precheck_include_in_app_purchases: false,
+      submission_information: {
+        add_id_info_uses_idfa: false
+      }
+    )
+  end
+
+  # ── Utilities ────────────────────────────────────────
+
+  desc "Register new device UDIDs"
+  lane :register_devices_from_file do
+    register_devices(devices_file: "./fastlane/devices.txt")
+  end
+
+  desc "Sync code signing certificates"
+  lane :sync_signing do
+    # Uncomment and configure match when ready:
+    # match(type: "appstore")
+    # match(type: "development")
+    UI.message("Configure match in Matchfile when ready for automated signing")
+  end
+
+end

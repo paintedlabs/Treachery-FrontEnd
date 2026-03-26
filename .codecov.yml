@@ -1,0 +1,25 @@
+codecov:
+  require_ci_to_pass: true
+
+coverage:
+  precision: 2
+  round: down
+  range: "50...90"
+
+  status:
+    project:
+      default:
+        target: 60%
+        threshold: 5%
+    patch:
+      default:
+        target: 70%
+
+  ignore:
+    - "Treachery-iOS/Treachery-iOSUITests/**"
+    - "Treachery-iOS/Treachery-iOS/Treachery-iOS/Helpers/PreviewHelpers.swift"
+
+comment:
+  layout: "reach,diff,flags,files"
+  behavior: default
+  require_changes: true

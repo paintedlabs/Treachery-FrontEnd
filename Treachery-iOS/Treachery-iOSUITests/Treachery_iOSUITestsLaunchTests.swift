@@ -22,8 +22,10 @@ final class Treachery_iOSUITestsLaunchTests: XCTestCase {
         let app = XCUIApplication()
         app.launch()
 
-        // Insert steps here to perform after app launch but before taking a screenshot,
-        // such as logging into a test account or navigating somewhere in the app
+        // Verify the app launches and shows either login or home screen
+        let treacheryTitle = app.staticTexts["Treachery"]
+        XCTAssertTrue(treacheryTitle.waitForExistence(timeout: 10),
+                      "App should launch and display the Treachery title")
 
         let attachment = XCTAttachment(screenshot: app.screenshot())
         attachment.name = "Launch Screen"

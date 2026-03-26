@@ -1,0 +1,55 @@
+version: 2
+updates:
+  # Swift Package Manager (iOS)
+  - package-ecosystem: "swift"
+    directory: "/Treachery-iOS"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "ios"
+
+  # npm (Web App)
+  - package-ecosystem: "npm"
+    directory: "/Treachery"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "web"
+
+  # npm (Cloud Functions)
+  - package-ecosystem: "npm"
+    directory: "/functions"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "functions"
+
+  # GitHub Actions
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "ci"
+
+  # Bundler (Fastlane)
+  - package-ecosystem: "bundler"
+    directory: "/Treachery-iOS"
+    schedule:
+      interval: "monthly"
+    open-pull-requests-limit: 3
+    labels:
+      - "dependencies"
+      - "ios"
