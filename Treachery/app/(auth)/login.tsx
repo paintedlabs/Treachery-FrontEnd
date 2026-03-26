@@ -142,12 +142,21 @@ export default function LoginScreen() {
       <View style={styles.spacer} />
 
       <TouchableOpacity
-        style={styles.rulesLink}
+        style={styles.footerLink}
+        onPress={() => Linking.openURL('https://testflight.apple.com/join/Ws9HWGA7')}
+        accessibilityLabel="Download the iOS app on TestFlight"
+        accessibilityRole="link"
+      >
+        <Text style={styles.footerLinkText}>Download the iOS App (TestFlight)</Text>
+      </TouchableOpacity>
+
+      <TouchableOpacity
+        style={styles.footerLink}
         onPress={() => Linking.openURL('https://mtgtreachery.net')}
         accessibilityLabel="Learn the rules at MTGTreachery.net"
         accessibilityRole="link"
       >
-        <Text style={styles.rulesLinkText}>Learn the rules at MTGTreachery.net</Text>
+        <Text style={styles.footerLinkText}>Learn the rules at MTGTreachery.net</Text>
       </TouchableOpacity>
     </View>
   );
@@ -274,11 +283,11 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
   },
-  rulesLink: {
+  footerLink: {
     alignItems: 'center',
-    paddingBottom: spacing.md,
+    paddingBottom: spacing.sm,
   },
-  rulesLinkText: {
+  footerLinkText: {
     color: colors.textTertiary,
     fontSize: 12,
     fontFamily: fonts.serif,
