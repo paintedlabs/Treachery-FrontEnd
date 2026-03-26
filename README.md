@@ -4,7 +4,17 @@ A companion app for the [MTG Treachery](https://mtgtreachery.net) format — a m
 
 Currently running live at https://treachery-71922.web.app/ - check it out! No signup required.
 
-Available as a **native iOS app** and a **web app** hosted on Firebase.
+Available as a **native iOS app**, **native Android app**, and a **web app** hosted on Firebase.
+
+## Screenshots
+
+<p align="center">
+  <img src="screenshots/Homescreen-mobile.png" alt="Home Screen" width="250" />
+</p>
+
+<p align="center">
+  <img src="screenshots/Full-Showcase.png" alt="Cross-platform gameplay — iOS, web desktop, and web mobile" width="800" />
+</p>
 
 ## What is Treachery?
 
@@ -36,6 +46,11 @@ Each player also receives a secret **Identity Card** with a unique unveil abilit
 - Firebase Auth, Firestore, Cloud Functions, Crashlytics
 - MVVM architecture with async/await
 
+### Android App (`TreacheryAndroid/`)
+- Kotlin, Jetpack Compose, Android 9+ (API 28)
+- Firebase Auth, Firestore, Cloud Functions, Messaging, Analytics
+- MVVM architecture with Hilt DI, Coroutines, and StateFlow
+
 ### Web App (`Treachery/`)
 - Expo 55 / React Native 0.83 / React 19
 - TypeScript
@@ -59,6 +74,15 @@ Each player also receives a secret **Identity Card** with a unique unveil abilit
 │           ├── Models/      # Game, Player, Role, IdentityCard
 │           ├── Managers/    # Firebase & Firestore services
 │           └── Resources/   # Identity cards JSON
+├── TreacheryAndroid/    # Native Android app (Jetpack Compose)
+│   └── app/src/main/java/com/solomon/treachery/
+│       ├── ui/auth/     # Login, signup, forgot password
+│       ├── ui/home/     # Create game, join game
+│       ├── ui/lobby/    # Game lobby with real-time sync
+│       ├── ui/game/     # Game board, identity cards, planechase
+│       ├── ui/profile/  # Profile, friends, game history
+│       ├── model/       # Game, Player, Role, IdentityCard
+│       └── data/        # Firebase repositories & DI
 ├── Treachery/           # Web app (Expo/React Native)
 │   ├── app/             # File-based routes
 │   └── src/             # Components, hooks, services, models
@@ -71,6 +95,7 @@ Each player also receives a secret **Identity Card** with a unique unveil abilit
 
 ### Prerequisites
 - Xcode 16+ (for iOS)
+- Android Studio + JDK 17 (for Android)
 - Node.js 22+ (for web and Cloud Functions)
 - Firebase CLI (`npm install -g firebase-tools`)
 - A Firebase project with Auth, Firestore, and Cloud Functions enabled
@@ -79,6 +104,11 @@ Each player also receives a secret **Identity Card** with a unique unveil abilit
 1. Open `Treachery-iOS/Treachery-iOS.xcodeproj` in Xcode
 2. Add your `GoogleService-Info.plist` to the project
 3. Build and run on a simulator or device
+
+### Android
+1. Open `TreacheryAndroid/` in Android Studio
+2. Add your `google-services.json` to `TreacheryAndroid/app/`
+3. Build and run on an emulator or device
 
 ### Web
 ```bash
