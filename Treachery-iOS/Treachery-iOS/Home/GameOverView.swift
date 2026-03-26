@@ -258,7 +258,7 @@ struct GameOverView: View {
                 }
             }
         }
-        .navigationTitle("Results")
+        .navigationBarTitleDisplayMode(.inline)
         .toolbarColorScheme(.dark, for: .navigationBar)
         .navigationBarBackButtonHidden(true)
         .onAppear {

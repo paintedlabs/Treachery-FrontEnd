@@ -49,7 +49,7 @@ struct LobbyView: View {
                 }
             }
         }
-        .navigationTitle("Lobby")
+        .navigationBarTitleDisplayMode(.inline)
         .toolbarColorScheme(.dark, for: .navigationBar)
         .navigationBarBackButtonHidden(true)
         .onAppear {

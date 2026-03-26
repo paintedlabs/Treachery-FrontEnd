@@ -265,7 +265,7 @@ struct GameBoardView: View {
                 }
             }
         }
-        .navigationTitle("Game")
+        .navigationBarTitleDisplayMode(.inline)
         .toolbarColorScheme(.dark, for: .navigationBar)
         .navigationBarBackButtonHidden(true)
         .onAppear { AnalyticsService.trackScreen("GameBoard") }
@@ -914,7 +914,6 @@ private struct WinnerSelectionSheet: View {
                     .padding(.bottom)
                 }
             }
-            .navigationTitle("End Game")
             .navigationBarTitleDisplayMode(.inline)
             .toolbarColorScheme(.dark, for: .navigationBar)
             .toolbar {

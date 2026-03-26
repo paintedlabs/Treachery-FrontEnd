@@ -8,7 +8,7 @@
 import Foundation
 import FirebaseAuth
 
-struct FirebaseManager {
+struct FirebaseManager: AuthManaging {
 
     var currentUser: User? {
         Auth.auth().currentUser
@@ -57,6 +57,20 @@ struct FirebaseManager {
 
     func signOut() throws {
         try Auth.auth().signOut()
+    }
+
+    // MARK: - Auth State Listener
+
+    func addAuthStateListener(_ callback: @escaping (User?) -> Void) -> Any {
+        Auth.auth().addStateDidChangeListener { _, user in
+            callback(user)
+        }
+    }
+
+    func removeAuthStateListener(_ handle: Any) {
+        if let handle = handle as? AuthStateDidChangeListenerHandle {
+            Auth.auth().removeStateDidChangeListener(handle)
+        }
     }
 }
 

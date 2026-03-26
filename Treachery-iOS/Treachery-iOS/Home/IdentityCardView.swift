@@ -247,7 +247,6 @@ struct IdentityCardView: View {
                     }
                 }
             }
-            .navigationTitle("Identity Card")
             .navigationBarTitleDisplayMode(.inline)
             .toolbarColorScheme(.dark, for: .navigationBar)
             .toolbar {

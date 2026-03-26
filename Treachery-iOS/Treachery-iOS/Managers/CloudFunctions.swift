@@ -16,7 +16,7 @@ struct PhenomenonResult {
     let secondaryPlaneId: String? // For Spatial Merging
 }
 
-struct CloudFunctions {
+struct CloudFunctions: CloudFunctionsProtocol {
     private let functions = Functions.functions()
 
     func startGame(gameId: String) async throws {

@@ -20,9 +20,9 @@ final class AuthViewModel: ObservableObject {
     @Published var authState: AuthState = .loading
     @Published var errorMessage: String?
 
-    private let firebaseManager: FirebaseManager
-    private let firestoreManager: FirestoreManager
-    private var authStateHandle: AuthStateDidChangeListenerHandle?
+    private let firebaseManager: AuthManaging
+    private let firestoreManager: FirestoreManaging
+    private var authStateHandle: Any?
 
     var isAuthenticated: Bool {
         if case .authenticated = authState { return true }
@@ -37,8 +37,8 @@ final class AuthViewModel: ObservableObject {
     }
 
     init(
-        firebaseManager: FirebaseManager = FirebaseManager(),
-        firestoreManager: FirestoreManager = FirestoreManager()
+        firebaseManager: AuthManaging = FirebaseManager(),
+        firestoreManager: FirestoreManaging = FirestoreManager()
     ) {
         self.firebaseManager = firebaseManager
         self.firestoreManager = firestoreManager
@@ -47,14 +47,14 @@ final class AuthViewModel: ObservableObject {
 
     deinit {
         if let handle = authStateHandle {
-            Auth.auth().removeStateDidChangeListener(handle)
+            firebaseManager.removeAuthStateListener(handle)
         }
     }
 
     // MARK: - Auth State Listener
 
     private func listenToAuthState() {
-        authStateHandle = Auth.auth().addStateDidChangeListener { [weak self] _, user in
+        authStateHandle = firebaseManager.addAuthStateListener { [weak self] user in
             Task { @MainActor in
                 if let user = user {
                     self?.authState = .authenticated(user)

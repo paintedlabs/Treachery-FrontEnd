@@ -7,7 +7,6 @@
 
 import Foundation
 import SwiftUI
-import FirebaseFirestore
 
 @MainActor
 final class GameBoardViewModel: ObservableObject {
@@ -35,10 +34,12 @@ final class GameBoardViewModel: ObservableObject {
 
     let gameId: String
     var currentUserId: String?
-    private let firestoreManager = FirestoreManager()
-    private let cloudFunctions = CloudFunctions()
-    private var gameListener: ListenerRegistration?
-    private var playersListener: ListenerRegistration?
+    private let firestoreManager: FirestoreManaging
+    private let cloudFunctions: CloudFunctionsProtocol
+    private let cardDatabase: CardLookupProviding
+    private let planeDatabase: PlaneLookupProviding
+    private var gameListener: ListenerCancellable?
+    private var playersListener: ListenerCancellable?
     private var hasReceivedFirstGameSnapshot = false
 
     // MARK: - Computed Properties
@@ -50,7 +51,7 @@ final class GameBoardViewModel: ObservableObject {
 
     var currentIdentityCard: IdentityCard? {
         guard let cardId = currentPlayer?.identityCardId else { return nil }
-        return CardDatabase.shared.card(withId: cardId)
+        return cardDatabase.card(withId: cardId)
     }
 
     var isGameFinished: Bool {
@@ -89,12 +90,12 @@ final class GameBoardViewModel: ObservableObject {
 
     var currentPlane: PlaneCard? {
         guard let planeId = game?.planechase?.currentPlaneId else { return nil }
-        return PlaneDatabase.shared.plane(withId: planeId)
+        return planeDatabase.plane(withId: planeId)
     }
 
     var secondaryPlane: PlaneCard? {
         guard let planeId = game?.planechase?.secondaryPlaneId else { return nil }
-        return PlaneDatabase.shared.plane(withId: planeId)
+        return planeDatabase.plane(withId: planeId)
     }
 
     var isChaoticAetherActive: Bool {
@@ -115,15 +116,38 @@ final class GameBoardViewModel: ObservableObject {
 
     // MARK: - Init / Deinit
 
-    init(gameId: String) {
+    init(
+        gameId: String,
+        firestoreManager: FirestoreManaging = FirestoreManager(),
+        cloudFunctions: CloudFunctionsProtocol = CloudFunctions(),
+        cardDatabase: CardLookupProviding = CardDatabase.shared,
+        planeDatabase: PlaneLookupProviding = PlaneDatabase.shared
+    ) {
         self.gameId = gameId
+        self.firestoreManager = firestoreManager
+        self.cloudFunctions = cloudFunctions
+        self.cardDatabase = cardDatabase
+        self.planeDatabase = planeDatabase
         startListening()
     }
 
     #if DEBUG
     /// Preview-only initializer that populates with sample data and skips Firestore.
-    init(gameId: String, previewPlayers: [Player], previewGame: Game?, currentUserId: String?) {
+    init(
+        gameId: String,
+        previewPlayers: [Player],
+        previewGame: Game?,
+        currentUserId: String?,
+        firestoreManager: FirestoreManaging = FirestoreManager(),
+        cloudFunctions: CloudFunctionsProtocol = CloudFunctions(),
+        cardDatabase: CardLookupProviding = CardDatabase.shared,
+        planeDatabase: PlaneLookupProviding = PlaneDatabase.shared
+    ) {
         self.gameId = gameId
+        self.firestoreManager = firestoreManager
+        self.cloudFunctions = cloudFunctions
+        self.cardDatabase = cardDatabase
+        self.planeDatabase = planeDatabase
         self.currentUserId = currentUserId
         self.serverPlayers = previewPlayers
         self.players = previewPlayers
@@ -284,7 +308,7 @@ final class GameBoardViewModel: ObservableObject {
                 // Interplanar Tunnel — show picker
                 tunnelOptions = options.compactMap { dict in
                     guard let id = dict["id"] as? String else { return nil }
-                    return PlaneDatabase.shared.plane(withId: id)
+                    return planeDatabase.plane(withId: id)
                 }
             }
             // For other types, Firestore listener will update the state
@@ -337,7 +361,7 @@ final class GameBoardViewModel: ObservableObject {
 
     func identityCard(for player: Player) -> IdentityCard? {
         guard let cardId = player.identityCardId else { return nil }
-        return CardDatabase.shared.card(withId: cardId)
+        return cardDatabase.card(withId: cardId)
     }
 
     func canSeeRole(of player: Player) -> Bool {
