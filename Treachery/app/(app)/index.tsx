@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Platform } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Platform, Linking } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '@/hooks/useAuth';
@@ -143,6 +143,20 @@ export default function HomeScreen() {
         <Text style={styles.secondaryButtonText}>Join Game</Text>
       </TouchableOpacity>
 
+      <TouchableOpacity
+        style={styles.testflightBanner}
+        onPress={() => Linking.openURL('https://testflight.apple.com/join/YOUR_CODE')}
+        accessibilityLabel="Join the iOS beta on TestFlight"
+        accessibilityRole="link"
+      >
+        <Ionicons name="phone-portrait-outline" size={20} color={colors.primaryBright} />
+        <View style={styles.testflightInfo}>
+          <Text style={styles.testflightTitle}>Get the iOS App</Text>
+          <Text style={styles.testflightSubtitle}>Join the beta on TestFlight</Text>
+        </View>
+        <Ionicons name="chevron-forward" size={18} color={colors.primary} />
+      </TouchableOpacity>
+
       <View style={styles.spacer} />
 
       {/* Bottom navigation */}
@@ -284,6 +298,30 @@ const styles = StyleSheet.create({
     color: colors.primary,
     fontSize: 16,
     fontWeight: '600',
+  },
+  testflightBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.borderAccent,
+    borderRadius: 12,
+    padding: spacing.md,
+    gap: 12,
+    width: '100%',
+    maxWidth: 280,
+  },
+  testflightInfo: {
+    flex: 1,
+  },
+  testflightTitle: {
+    color: colors.primaryBright,
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  testflightSubtitle: {
+    color: colors.textSecondary,
+    fontSize: 12,
   },
   bottomNav: {
     flexDirection: 'row',

@@ -9,6 +9,7 @@ import {
   Linking,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '@/hooks/useAuth';
 import { ErrorBanner } from '@/components/ErrorBanner';
 import { colors, spacing, fonts } from '@/constants/theme';
@@ -142,6 +143,20 @@ export default function LoginScreen() {
       <View style={styles.spacer} />
 
       <TouchableOpacity
+        style={styles.testflightBanner}
+        onPress={() => Linking.openURL('https://testflight.apple.com/join/YOUR_CODE')}
+        accessibilityLabel="Join the iOS beta on TestFlight"
+        accessibilityRole="link"
+      >
+        <Ionicons name="phone-portrait-outline" size={24} color={colors.primaryBright} />
+        <View style={styles.testflightInfo}>
+          <Text style={styles.testflightTitle}>Get the iOS App</Text>
+          <Text style={styles.testflightSubtitle}>Join the beta on TestFlight</Text>
+        </View>
+        <Text style={styles.testflightArrow}>{'>'}</Text>
+      </TouchableOpacity>
+
+      <TouchableOpacity
         style={styles.rulesLink}
         onPress={() => Linking.openURL('https://mtgtreachery.net')}
         accessibilityLabel="Learn the rules at MTGTreachery.net"
@@ -272,6 +287,34 @@ const styles = StyleSheet.create({
   guestButtonText: {
     color: colors.primary,
     fontSize: 16,
+    fontWeight: '600',
+  },
+  testflightBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.borderAccent,
+    borderRadius: 12,
+    padding: spacing.md,
+    gap: 12,
+    marginBottom: spacing.md,
+  },
+  testflightInfo: {
+    flex: 1,
+  },
+  testflightTitle: {
+    color: colors.primaryBright,
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  testflightSubtitle: {
+    color: colors.textSecondary,
+    fontSize: 12,
+  },
+  testflightArrow: {
+    color: colors.primary,
+    fontSize: 18,
     fontWeight: '600',
   },
   rulesLink: {
