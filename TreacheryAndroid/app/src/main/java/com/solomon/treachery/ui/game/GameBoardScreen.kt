@@ -31,6 +31,7 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.solomon.treachery.data.AnalyticsService
 import com.solomon.treachery.model.*
+import com.solomon.treachery.ui.navigation.ConnectionBanner
 import com.solomon.treachery.ui.theme.*
 import com.solomon.treachery.ui.util.PlayerColors
 
@@ -173,6 +174,8 @@ fun GameBoardScreen(
             }
             else -> {
                 Column(modifier = Modifier.fillMaxSize().statusBarsPadding()) {
+                    ConnectionBanner()
+
                     // Identity card header (treachery only)
                     if (viewModel.isTreacheryActive) {
                         val card = viewModel.currentIdentityCard()

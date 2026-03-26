@@ -134,6 +134,8 @@ fun LobbyScreen(
             else -> {
                 // Lobby content
                 Column(modifier = Modifier.fillMaxSize().statusBarsPadding()) {
+                    com.solomon.treachery.ui.navigation.ConnectionBanner()
+
                     // Game code card
                     game?.let { g ->
                         GameCodeCard(

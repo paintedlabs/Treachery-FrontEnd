@@ -4,8 +4,10 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.firebase.Timestamp
 import com.google.firebase.auth.FirebaseUser
+import com.google.firebase.messaging.FirebaseMessaging
 import com.solomon.treachery.data.AnalyticsService
 import com.solomon.treachery.data.AuthRepository
+import com.solomon.treachery.data.CloudFunctionsRepository
 import com.solomon.treachery.data.FirestoreRepository
 import com.solomon.treachery.model.TreacheryUser
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -18,7 +20,8 @@ import javax.inject.Inject
 @HiltViewModel
 class AuthViewModel @Inject constructor(
     private val authRepository: AuthRepository,
-    private val firestoreRepository: FirestoreRepository
+    private val firestoreRepository: FirestoreRepository,
+    private val cloudFunctionsRepository: CloudFunctionsRepository
 ) : ViewModel() {
 
     private val _authState = MutableStateFlow<AuthState>(AuthState.Loading)
@@ -40,6 +43,7 @@ class AuthViewModel @Inject constructor(
                         mapOf("auth_method" to if (user.isAnonymous) "guest" else "email")
                     )
                     createUserDocumentIfNeeded(user)
+                    registerFcmToken()
                 } else {
                     _authState.value = AuthState.Unauthenticated
                     AnalyticsService.setUserId(null)
@@ -107,6 +111,16 @@ class AuthViewModel @Inject constructor(
 
     fun clearError() {
         _errorMessage.value = null
+    }
+
+    private fun registerFcmToken() {
+        FirebaseMessaging.getInstance().token.addOnSuccessListener { token ->
+            viewModelScope.launch {
+                try {
+                    cloudFunctionsRepository.registerFcmToken(token)
+                } catch (_: Exception) { }
+            }
+        }
     }
 
     private suspend fun createUserDocumentIfNeeded(user: FirebaseUser) {
