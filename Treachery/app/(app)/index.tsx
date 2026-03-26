@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Platform } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Platform, Linking } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '@/hooks/useAuth';
@@ -144,6 +144,15 @@ export default function HomeScreen() {
       </TouchableOpacity>
 
       <View style={styles.spacer} />
+
+      <TouchableOpacity
+        style={styles.testflightLink}
+        onPress={() => Linking.openURL('https://testflight.apple.com/join/Ws9HWGA7')}
+        accessibilityLabel="Download the iOS app on TestFlight"
+        accessibilityRole="link"
+      >
+        <Text style={styles.testflightLinkText}>Download the iOS App (TestFlight)</Text>
+      </TouchableOpacity>
 
       {/* Bottom navigation */}
       <View style={styles.bottomNav}>
@@ -298,5 +307,14 @@ const styles = StyleSheet.create({
   navLabel: {
     color: colors.textSecondary,
     fontSize: 12,
+  },
+  testflightLink: {
+    alignItems: 'center',
+  },
+  testflightLinkText: {
+    color: colors.textTertiary,
+    fontSize: 12,
+    fontFamily: fonts.serif,
+    fontStyle: 'italic',
   },
 });
