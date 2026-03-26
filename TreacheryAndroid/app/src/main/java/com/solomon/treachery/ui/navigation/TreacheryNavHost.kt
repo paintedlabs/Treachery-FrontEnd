@@ -14,6 +14,9 @@ import com.solomon.treachery.ui.home.CreateGameScreen
 import com.solomon.treachery.ui.home.HomeScreen
 import com.solomon.treachery.ui.home.JoinGameScreen
 import com.solomon.treachery.ui.lobby.LobbyScreen
+import com.solomon.treachery.ui.profile.FriendsListScreen
+import com.solomon.treachery.ui.profile.GameHistoryScreen
+import com.solomon.treachery.ui.profile.ProfileScreen
 
 @Composable
 fun TreacheryNavHost() {
@@ -162,15 +165,26 @@ fun TreacheryNavHost() {
         }
 
         composable(Routes.PROFILE) {
-            PlaceholderScreen("Profile", onBack = { navController.popBackStack() })
+            ProfileScreen(
+                authViewModel = authViewModel,
+                onNavigateBack = { navController.popBackStack() },
+                onNavigateToFriends = { navController.navigate(Routes.FRIENDS) },
+                onNavigateToHistory = { navController.navigate(Routes.GAME_HISTORY) }
+            )
         }
 
         composable(Routes.FRIENDS) {
-            PlaceholderScreen("Friends", onBack = { navController.popBackStack() })
+            FriendsListScreen(
+                currentUserId = authViewModel.currentUserId,
+                onNavigateBack = { navController.popBackStack() }
+            )
         }
 
         composable(Routes.GAME_HISTORY) {
-            PlaceholderScreen("Game History", onBack = { navController.popBackStack() })
+            GameHistoryScreen(
+                currentUserId = authViewModel.currentUserId,
+                onNavigateBack = { navController.popBackStack() }
+            )
         }
     }
 }
