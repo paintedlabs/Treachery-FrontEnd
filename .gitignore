@@ -67,3 +67,17 @@ functions/node_modules/
 .idea/
 *.swp
 *~
+
+# Android
+*.apk
+*.aab
+*.class
+*.dex
+local.properties
+.gradle/
+TreacheryAndroid/build/
+TreacheryAndroid/app/build/
+TreacheryAndroid/.idea/
+TreacheryAndroid/captures/
+TreacheryAndroid/app/google-services.json
+TreacheryAndroid/.cxx/
