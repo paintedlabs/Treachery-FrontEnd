@@ -8,7 +8,7 @@
 import Foundation
 
 struct FriendRequest: Codable, Identifiable {
-    let id: String
+    var id: String
     let fromUserId: String
     let fromDisplayName: String
     let toUserId: String
@@ -22,6 +22,32 @@ struct FriendRequest: Codable, Identifiable {
         case toUserId = "to_user_id"
         case status
         case createdAt = "created_at"
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decodeIfPresent(String.self, forKey: .id) ?? ""
+        fromUserId = try container.decode(String.self, forKey: .fromUserId)
+        fromDisplayName = try container.decode(String.self, forKey: .fromDisplayName)
+        toUserId = try container.decode(String.self, forKey: .toUserId)
+        status = try container.decode(FriendRequestStatus.self, forKey: .status)
+        createdAt = try container.decode(Date.self, forKey: .createdAt)
+    }
+
+    init(
+        id: String,
+        fromUserId: String,
+        fromDisplayName: String,
+        toUserId: String,
+        status: FriendRequestStatus,
+        createdAt: Date
+    ) {
+        self.id = id
+        self.fromUserId = fromUserId
+        self.fromDisplayName = fromDisplayName
+        self.toUserId = toUserId
+        self.status = status
+        self.createdAt = createdAt
     }
 }
 

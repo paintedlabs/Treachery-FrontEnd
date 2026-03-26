@@ -35,7 +35,9 @@ final class FirestoreManager: FirestoreManaging {
     func getUser(id: String) async throws -> TreacheryUser? {
         let snapshot = try await usersCollection.document(id).getDocument()
         guard snapshot.exists else { return nil }
-        return try snapshot.data(as: TreacheryUser.self)
+        guard var user = try? snapshot.data(as: TreacheryUser.self) else { return nil }
+        user.id = snapshot.documentID
+        return user
     }
 
     func updateUser(_ user: TreacheryUser) async throws {
@@ -49,7 +51,11 @@ final class FirestoreManager: FirestoreManaging {
             .whereField("display_name", isLessThan: end)
             .limit(to: 20)
             .getDocuments()
-        return snapshot.documents.compactMap { try? $0.data(as: TreacheryUser.self) }
+        return snapshot.documents.compactMap { doc -> TreacheryUser? in
+            guard var user = try? doc.data(as: TreacheryUser.self) else { return nil }
+            user.id = doc.documentID
+            return user
+        }
     }
 
     // MARK: - Friend Requests
@@ -67,7 +73,11 @@ final class FirestoreManager: FirestoreManaging {
             .whereField("to_user_id", isEqualTo: userId)
             .whereField("status", isEqualTo: "pending")
             .getDocuments()
-        return snapshot.documents.compactMap { try? $0.data(as: FriendRequest.self) }
+        return snapshot.documents.compactMap { doc -> FriendRequest? in
+            guard var request = try? doc.data(as: FriendRequest.self) else { return nil }
+            request.id = doc.documentID
+            return request
+        }
     }
 
     func updateFriendRequest(_ request: FriendRequest) async throws {
@@ -107,7 +117,11 @@ final class FirestoreManager: FirestoreManaging {
                     let snapshot = try await self.usersCollection
                         .whereField(FieldPath.documentID(), in: ids)
                         .getDocuments()
-                    return snapshot.documents.compactMap { try? $0.data(as: TreacheryUser.self) }
+                    return snapshot.documents.compactMap { doc -> TreacheryUser? in
+                        guard var user = try? doc.data(as: TreacheryUser.self) else { return nil }
+                        user.id = doc.documentID
+                        return user
+                    }
                 }
             }
             var result: [TreacheryUser] = []
@@ -128,7 +142,9 @@ final class FirestoreManager: FirestoreManaging {
     func getGame(id: String) async throws -> Game? {
         let snapshot = try await gamesCollection.document(id).getDocument()
         guard snapshot.exists else { return nil }
-        return try snapshot.data(as: Game.self)
+        guard var game = try? snapshot.data(as: Game.self) else { return nil }
+        game.id = snapshot.documentID
+        return game
     }
 
     func getGame(byCode code: String) async throws -> Game? {
@@ -136,7 +152,10 @@ final class FirestoreManager: FirestoreManaging {
             .whereField("code", isEqualTo: code)
             .limit(to: 1)
             .getDocuments()
-        return try snapshot.documents.first?.data(as: Game.self)
+        guard let doc = snapshot.documents.first,
+              var game = try? doc.data(as: Game.self) else { return nil }
+        game.id = doc.documentID
+        return game
     }
 
     func updateGame(_ game: Game) async throws {
@@ -161,7 +180,9 @@ final class FirestoreManager: FirestoreManaging {
             .limit(to: 1)
             .getDocuments()
         if let doc = inProgressSnapshot.documents.first {
-            return try doc.data(as: Game.self)
+            var game = try doc.data(as: Game.self)
+            game.id = doc.documentID
+            return game
         }
 
         // Then check waiting games
@@ -171,7 +192,9 @@ final class FirestoreManager: FirestoreManaging {
             .limit(to: 1)
             .getDocuments()
         if let doc = waitingSnapshot.documents.first {
-            return try doc.data(as: Game.self)
+            var game = try doc.data(as: Game.self)
+            game.id = doc.documentID
+            return game
         }
 
         return nil
@@ -184,13 +207,18 @@ final class FirestoreManager: FirestoreManaging {
             .order(by: "created_at", descending: true)
             .limit(to: 50)
             .getDocuments()
-        return snapshot.documents.compactMap { try? $0.data(as: Game.self) }
+        return snapshot.documents.compactMap { doc -> Game? in
+            guard var game = try? doc.data(as: Game.self) else { return nil }
+            game.id = doc.documentID
+            return game
+        }
     }
 
     func listenToGame(id: String, onChange: @escaping (Game?) -> Void) -> ListenerCancellable {
         let reg = gamesCollection.document(id).addSnapshotListener { snapshot, _ in
             guard let snapshot = snapshot else { return }
-            let game = try? snapshot.data(as: Game.self)
+            var game = try? snapshot.data(as: Game.self)
+            game?.id = snapshot.documentID
             onChange(game)
         }
         return FirestoreListenerHandle(registration: reg)
@@ -208,7 +236,11 @@ final class FirestoreManager: FirestoreManaging {
         let snapshot = try await playersCollection(gameId: gameId)
             .order(by: "order_id")
             .getDocuments()
-        return snapshot.documents.compactMap { try? $0.data(as: Player.self) }
+        return snapshot.documents.compactMap { doc -> Player? in
+            guard var player = try? doc.data(as: Player.self) else { return nil }
+            player.id = doc.documentID
+            return player
+        }
     }
 
     func updatePlayer(_ player: Player, inGame gameId: String) async throws {
@@ -229,8 +261,10 @@ final class FirestoreManager: FirestoreManaging {
             .order(by: "order_id")
             .addSnapshotListener { snapshot, _ in
                 guard let snapshot = snapshot else { return }
-                let players = snapshot.documents.compactMap {
-                    try? $0.data(as: Player.self)
+                let players = snapshot.documents.compactMap { doc -> Player? in
+                    guard var player = try? doc.data(as: Player.self) else { return nil }
+                    player.id = doc.documentID
+                    return player
                 }
                 onChange(players)
             }
