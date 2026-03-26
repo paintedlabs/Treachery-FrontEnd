@@ -15,7 +15,7 @@ struct DeckStat: Codable {
 }
 
 struct TreacheryUser: Codable, Identifiable {
-    let id: String
+    var id: String
     var displayName: String
     let email: String?
     var phoneNumber: String?
@@ -39,7 +39,7 @@ struct TreacheryUser: Codable, Identifiable {
 
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
-        id = try container.decode(String.self, forKey: .id)
+        id = try container.decodeIfPresent(String.self, forKey: .id) ?? ""
         displayName = try container.decode(String.self, forKey: .displayName)
         email = try container.decodeIfPresent(String.self, forKey: .email)
         phoneNumber = try container.decodeIfPresent(String.self, forKey: .phoneNumber)

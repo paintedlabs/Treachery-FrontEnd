@@ -26,6 +26,8 @@ final class MockFirestoreManager: FirestoreManaging {
     var createUserCalls: [TreacheryUser] = []
     var createGameCalls: [Game] = []
     var addPlayerCalls: [(Player, String)] = []
+    var updatePlayerColorCalls: [(gameId: String, playerId: String, color: String?)] = []
+    var updateCommanderNameCalls: [(gameId: String, playerId: String, name: String?)] = []
 
     // MARK: - Users
 
@@ -95,6 +97,12 @@ final class MockFirestoreManager: FirestoreManaging {
 
     // MARK: - Player Customization
 
-    func updatePlayerColor(gameId: String, playerId: String, color: String?) async throws {}
-    func updateCommanderName(gameId: String, playerId: String, name: String?) async throws {}
+    func updatePlayerColor(gameId: String, playerId: String, color: String?) async throws {
+        if let error = errorToThrow { throw error }
+        updatePlayerColorCalls.append((gameId, playerId, color))
+    }
+    func updateCommanderName(gameId: String, playerId: String, name: String?) async throws {
+        if let error = errorToThrow { throw error }
+        updateCommanderNameCalls.append((gameId, playerId, name))
+    }
 }

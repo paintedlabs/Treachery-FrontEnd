@@ -14,7 +14,7 @@ enum GameState: String, Codable {
 }
 
 struct Game: Codable, Identifiable, Hashable {
-    let id: String
+    var id: String
     let code: String
     let hostId: String
     var state: GameState
@@ -48,7 +48,7 @@ struct Game: Codable, Identifiable, Hashable {
     // this field existed, preventing decoding crashes on legacy data.
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
-        id = try container.decode(String.self, forKey: .id)
+        id = try container.decodeIfPresent(String.self, forKey: .id) ?? ""
         code = try container.decode(String.self, forKey: .code)
         hostId = try container.decode(String.self, forKey: .hostId)
         state = try container.decode(GameState.self, forKey: .state)

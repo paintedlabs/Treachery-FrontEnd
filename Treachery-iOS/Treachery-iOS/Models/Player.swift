@@ -8,7 +8,7 @@
 import Foundation
 
 struct Player: Codable, Identifiable, Equatable {
-    let id: String
+    var id: String
     let orderId: Int
     let userId: String
     var displayName: String
@@ -34,5 +34,53 @@ struct Player: Codable, Identifiable, Equatable {
         case joinedAt = "joined_at"
         case playerColor = "player_color"
         case commanderName = "commander_name"
+    }
+
+    // Custom decoder: uses decodeIfPresent for 'id' to handle documents
+    // created by other clients (e.g. Android) that store the player ID
+    // only as the Firestore document ID, not as a field in the data.
+    // The actual document ID is injected after decoding in FirestoreManager.
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decodeIfPresent(String.self, forKey: .id) ?? ""
+        orderId = try container.decode(Int.self, forKey: .orderId)
+        userId = try container.decode(String.self, forKey: .userId)
+        displayName = try container.decode(String.self, forKey: .displayName)
+        role = try container.decodeIfPresent(Role.self, forKey: .role)
+        identityCardId = try container.decodeIfPresent(String.self, forKey: .identityCardId)
+        lifeTotal = try container.decode(Int.self, forKey: .lifeTotal)
+        isEliminated = try container.decode(Bool.self, forKey: .isEliminated)
+        isUnveiled = try container.decode(Bool.self, forKey: .isUnveiled)
+        joinedAt = try container.decode(Date.self, forKey: .joinedAt)
+        playerColor = try container.decodeIfPresent(String.self, forKey: .playerColor)
+        commanderName = try container.decodeIfPresent(String.self, forKey: .commanderName)
+    }
+
+    init(
+        id: String,
+        orderId: Int,
+        userId: String,
+        displayName: String,
+        role: Role?,
+        identityCardId: String?,
+        lifeTotal: Int,
+        isEliminated: Bool,
+        isUnveiled: Bool,
+        joinedAt: Date,
+        playerColor: String? = nil,
+        commanderName: String? = nil
+    ) {
+        self.id = id
+        self.orderId = orderId
+        self.userId = userId
+        self.displayName = displayName
+        self.role = role
+        self.identityCardId = identityCardId
+        self.lifeTotal = lifeTotal
+        self.isEliminated = isEliminated
+        self.isUnveiled = isUnveiled
+        self.joinedAt = joinedAt
+        self.playerColor = playerColor
+        self.commanderName = commanderName
     }
 }
