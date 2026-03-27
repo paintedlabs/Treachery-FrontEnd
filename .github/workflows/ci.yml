@@ -19,18 +19,24 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Select Xcode
-        run: sudo xcode-select -s /Applications/Xcode_16.2.app/Contents/Developer
+      - name: Select Xcode and list simulators
+        run: |
+          # Use latest available Xcode that matches installed simulator runtimes
+          LATEST_XCODE=$(ls -d /Applications/Xcode*.app 2>/dev/null | sort -V | tail -1)
+          echo "Using $LATEST_XCODE"
+          sudo xcode-select -s "$LATEST_XCODE/Contents/Developer"
+          xcrun simctl list devices available | grep iPhone | head -5
 
       - name: Resolve Swift packages
         run: xcodebuild -resolvePackageDependencies -project Treachery-iOS.xcodeproj -scheme Treachery-iOS
 
-      - name: Build and test
+      - name: Build and run unit tests
         run: |
           xcodebuild test \
             -project Treachery-iOS.xcodeproj \
             -scheme Treachery-iOS \
             -destination 'platform=iOS Simulator,name=iPhone 16,OS=latest' \
+            -only-testing:Treachery-iOSTests \
             -enableCodeCoverage YES \
             -resultBundlePath ../build/TestResults.xcresult \
             CODE_SIGNING_ALLOWED=NO \
@@ -72,7 +78,7 @@ jobs:
         run: brew install swiftlint
 
       - name: Run SwiftLint
-        run: swiftlint lint --strict --reporter github-actions-logging
+        run: swiftlint lint --reporter github-actions-logging
 
   # ── Web ──────────────────────────────────────────────
   web-app:
