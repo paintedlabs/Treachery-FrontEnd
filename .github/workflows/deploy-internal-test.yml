@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - "TreacheryAndroid/**"
+  workflow_dispatch:
 
 concurrency:
   group: deploy-android-internal
