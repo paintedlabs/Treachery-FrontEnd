@@ -35,7 +35,7 @@ export async function createUser(user: TreacheryUser): Promise<void> {
 export async function getUser(id: string): Promise<TreacheryUser | null> {
   const snap = await getDoc(doc(usersCol(), id));
   if (!snap.exists()) return null;
-  return snap.data() as TreacheryUser;
+  return { ...snap.data(), id: snap.id } as TreacheryUser;
 }
 
 export async function updateUser(user: TreacheryUser): Promise<void> {
@@ -51,7 +51,7 @@ export async function searchUsers(name: string): Promise<TreacheryUser[]> {
     limit(20),
   );
   const snap = await getDocs(q);
-  return snap.docs.map((d) => d.data() as TreacheryUser);
+  return snap.docs.map((d) => ({ ...d.data(), id: d.id }) as TreacheryUser);
 }
 
 // ── Friend Requests ──
@@ -67,7 +67,7 @@ export async function getPendingFriendRequests(userId: string): Promise<FriendRe
     where('status', '==', 'pending'),
   );
   const snap = await getDocs(q);
-  return snap.docs.map((d) => d.data() as FriendRequest);
+  return snap.docs.map((d) => ({ ...d.data(), id: d.id }) as FriendRequest);
 }
 
 export async function updateFriendRequest(request: FriendRequest): Promise<void> {
@@ -106,7 +106,7 @@ export async function getFriends(userId: string): Promise<TreacheryUser[]> {
     chunks.map((chunk) => getDocs(query(usersCol(), where(documentId(), 'in', chunk)))),
   );
 
-  const friends = results.flatMap((snap) => snap.docs.map((d) => d.data() as TreacheryUser));
+  const friends = results.flatMap((snap) => snap.docs.map((d) => ({ ...d.data(), id: d.id }) as TreacheryUser));
   return friends.sort((a, b) => a.display_name.localeCompare(b.display_name));
 }
 
@@ -119,14 +119,15 @@ export async function createGame(game: Game): Promise<void> {
 export async function getGame(id: string): Promise<Game | null> {
   const snap = await getDoc(doc(gamesCol(), id));
   if (!snap.exists()) return null;
-  return snap.data() as Game;
+  return { ...snap.data(), id: snap.id } as Game;
 }
 
 export async function getGameByCode(code: string): Promise<Game | null> {
   const q = query(gamesCol(), where('code', '==', code), limit(1));
   const snap = await getDocs(q);
   if (snap.empty) return null;
-  return snap.docs[0].data() as Game;
+  const d = snap.docs[0];
+  return { ...d.data(), id: d.id } as Game;
 }
 
 export async function updateGame(game: Game): Promise<void> {
@@ -153,7 +154,8 @@ export async function getActiveGame(userId: string): Promise<Game | null> {
   );
   const inProgressSnap = await getDocs(inProgressQ);
   if (!inProgressSnap.empty) {
-    return inProgressSnap.docs[0].data() as Game;
+    const d = inProgressSnap.docs[0];
+    return { ...d.data(), id: d.id } as Game;
   }
 
   // Check for waiting games (lobby)
@@ -165,7 +167,8 @@ export async function getActiveGame(userId: string): Promise<Game | null> {
   );
   const waitingSnap = await getDocs(waitingQ);
   if (!waitingSnap.empty) {
-    return waitingSnap.docs[0].data() as Game;
+    const d = waitingSnap.docs[0];
+    return { ...d.data(), id: d.id } as Game;
   }
 
   return null;
@@ -180,7 +183,7 @@ export async function getFinishedGames(userId: string): Promise<Game[]> {
     limit(50),
   );
   const snap = await getDocs(q);
-  return snap.docs.map((d) => d.data() as Game);
+  return snap.docs.map((d) => ({ ...d.data(), id: d.id }) as Game);
 }
 
 export function listenToGame(id: string, onChange: (game: Game | null) => void): Unsubscribe {
@@ -189,7 +192,7 @@ export function listenToGame(id: string, onChange: (game: Game | null) => void):
       onChange(null);
       return;
     }
-    onChange(snap.data() as Game);
+    onChange({ ...snap.data(), id: snap.id } as Game);
   });
 }
 
@@ -202,7 +205,7 @@ export async function addPlayer(player: Player, gameId: string): Promise<void> {
 export async function getPlayers(gameId: string): Promise<Player[]> {
   const q = query(playersCol(gameId), orderBy('order_id'));
   const snap = await getDocs(q);
-  return snap.docs.map((d) => d.data() as Player);
+  return snap.docs.map((d) => ({ ...d.data(), id: d.id }) as Player);
 }
 
 export async function updatePlayer(player: Player, gameId: string): Promise<void> {
@@ -219,7 +222,7 @@ export function listenToPlayers(
 ): Unsubscribe {
   const q = query(playersCol(gameId), orderBy('order_id'));
   return onSnapshot(q, (snap) => {
-    const players = snap.docs.map((d) => d.data() as Player);
+    const players = snap.docs.map((d) => ({ ...d.data(), id: d.id }) as Player);
     onChange(players);
   });
 }

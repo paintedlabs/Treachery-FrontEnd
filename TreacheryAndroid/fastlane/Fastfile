@@ -1,0 +1,76 @@
+default_platform(:android)
+
+platform :android do
+
+  # ── Testing ────────────────────────────────────────────
+
+  desc "Run unit tests"
+  lane :test do
+    gradle(task: "testDebugUnitTest")
+  end
+
+  # ── Internal Test Track (like TestFlight) ─────────────
+
+  desc "Build and upload to Google Play internal test track"
+  lane :internal do
+    # Increment version code from Play Store
+    previous = google_play_track_version_codes(
+      track: "internal",
+      json_key: ENV["GOOGLE_PLAY_JSON_KEY_PATH"]
+    ).max || 0
+
+    version_code = previous + 1
+
+    UI.message("Building with version code: #{version_code}")
+
+    # Build release AAB
+    gradle(
+      task: "bundle",
+      build_type: "Release",
+      properties: {
+        "android.injected.version.code" => version_code,
+        "android.injected.version.name" => ENV["VERSION_NAME"] || "1.0.#{version_code}",
+      }
+    )
+
+    # Upload to internal test track
+    upload_to_play_store(
+      track: "internal",
+      aab: lane_context[SharedValues::GRADLE_AAB_OUTPUT_PATH],
+      json_key: ENV["GOOGLE_PLAY_JSON_KEY_PATH"],
+      skip_upload_metadata: true,
+      skip_upload_images: true,
+      skip_upload_screenshots: true,
+      skip_upload_changelogs: false,
+      release_status: "completed"
+    )
+  end
+
+  # ── Production ────────────────────────────────────────
+
+  desc "Promote internal test track to production"
+  lane :release do
+    # Promote the latest internal build to production
+    upload_to_play_store(
+      track: "internal",
+      track_promote_to: "production",
+      json_key: ENV["GOOGLE_PLAY_JSON_KEY_PATH"],
+      skip_upload_metadata: true,
+      skip_upload_images: true,
+      skip_upload_screenshots: true,
+      skip_upload_changelogs: false,
+      rollout: "1.0"
+    )
+  end
+
+  # ── Build Only (for CI validation) ───────────────────
+
+  desc "Build release AAB without uploading"
+  lane :build do
+    gradle(
+      task: "bundle",
+      build_type: "Release"
+    )
+  end
+
+end

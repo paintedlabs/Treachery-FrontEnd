@@ -13,12 +13,15 @@ interface AuthContextType {
   user: User | null;
   currentUserId: string | null;
   errorMessage: string | null;
+  isNewUser: boolean;
   signInAsGuest: () => Promise<void>;
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (email: string, password: string) => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
   signOut: () => Promise<void>;
   clearError: () => void;
+  completeOnboarding: () => void;
+  updateDisplayName: (name: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -27,6 +30,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [authState, setAuthState] = useState<AuthState>('loading');
   const [user, setUser] = useState<User | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [isNewUser, setIsNewUser] = useState(false);
 
   useEffect(() => {
     const unsubscribe = authService.onAuthStateChanged(async (firebaseUser) => {
@@ -37,7 +41,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setAnalyticsUserProperties({
           auth_method: firebaseUser.isAnonymous ? 'guest' : 'email',
         });
-        await createUserDocumentIfNeeded(firebaseUser);
+        const isNew = await createUserDocumentIfNeeded(firebaseUser);
+        if (isNew) setIsNewUser(true);
       } else {
         setUser(null);
         setAuthState('unauthenticated');
@@ -47,7 +52,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return unsubscribe;
   }, []);
 
-  const createUserDocumentIfNeeded = async (firebaseUser: User) => {
+  const createUserDocumentIfNeeded = async (firebaseUser: User): Promise<boolean> => {
     try {
       const existing = await firestoreService.getUser(firebaseUser.uid);
       if (!existing) {
@@ -60,9 +65,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           created_at: Timestamp.now(),
         };
         await firestoreService.createUser(newUser);
+        return true;
       }
+      return false;
     } catch (error) {
       console.warn('Failed to create user document:', error);
+      return false;
     }
   };
 
@@ -120,6 +128,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const clearError = useCallback(() => setErrorMessage(null), []);
 
+  const completeOnboarding = useCallback(() => setIsNewUser(false), []);
+
+  const updateDisplayName = useCallback(async (name: string) => {
+    if (!user) return;
+    try {
+      const existing = await firestoreService.getUser(user.uid);
+      if (existing) {
+        await firestoreService.updateUser({ ...existing, display_name: name });
+      }
+    } catch (error) {
+      console.warn('Failed to update display name:', error);
+    }
+  }, [user]);
+
   return (
     <AuthContext.Provider
       value={{
@@ -127,12 +149,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         user,
         currentUserId: user?.uid ?? null,
         errorMessage,
+        isNewUser,
         signInAsGuest,
         signIn,
         signUp,
         resetPassword,
         signOut,
         clearError,
+        completeOnboarding,
+        updateDisplayName,
       }}
     >
       {children}

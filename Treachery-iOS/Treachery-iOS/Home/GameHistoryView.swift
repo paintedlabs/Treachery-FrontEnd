@@ -81,10 +81,21 @@ struct GameHistoryView: View {
         do {
             games = try await firestoreManager.getFinishedGames(forUserId: userId)
 
-            // Load players for each game
-            for game in games {
-                let players = try await firestoreManager.getPlayers(gameId: game.id)
-                gamePlayers[game.id] = players
+            // Load players for all games concurrently
+            await withTaskGroup(of: (String, [Player])?.self) { group in
+                for game in games {
+                    group.addTask {
+                        guard let players = try? await firestoreManager.getPlayers(gameId: game.id) else {
+                            return nil
+                        }
+                        return (game.id, players)
+                    }
+                }
+                for await result in group {
+                    if let (gameId, players) = result {
+                        gamePlayers[gameId] = players
+                    }
+                }
             }
         } catch {
             errorMessage = error.localizedDescription

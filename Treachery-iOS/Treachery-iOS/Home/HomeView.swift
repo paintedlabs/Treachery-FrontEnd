@@ -206,7 +206,7 @@ struct HomeView: View {
                 case .lobby(let gameId, let isHost):
                     LobbyView(gameId: gameId, isHost: isHost, navigationPath: $path)
                 case .gameBoard(let gameId):
-                    GameBoardView(gameId: gameId, navigationPath: $path)
+                    GameBoardView(gameId: gameId, currentUserId: authViewModel.currentUserId, navigationPath: $path)
                 case .gameOver(let gameId):
                     GameOverView(gameId: gameId, navigationPath: $path)
                 case .profile:

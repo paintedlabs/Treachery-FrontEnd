@@ -23,12 +23,17 @@ fun TreacheryNavHost() {
     val navController = rememberNavController()
     val authViewModel: AuthViewModel = hiltViewModel()
     val authState by authViewModel.authState.collectAsState()
+    val isNewUser by authViewModel.isNewUser.collectAsState()
 
-    LaunchedEffect(authState) {
+    LaunchedEffect(authState, isNewUser) {
         when (authState) {
             is AuthState.Authenticated -> {
-                navController.navigate(Routes.HOME) {
-                    popUpTo(0) { inclusive = true }
+                val destination = if (isNewUser) Routes.DISPLAY_NAME_PROMPT else Routes.HOME
+                val currentRoute = navController.currentBackStackEntry?.destination?.route
+                if (currentRoute != destination) {
+                    navController.navigate(destination) {
+                        popUpTo(0) { inclusive = true }
+                    }
                 }
             }
             is AuthState.Unauthenticated -> {
@@ -70,6 +75,34 @@ fun TreacheryNavHost() {
         composable(Routes.PHONE_AUTH) {
             PhoneAuthScreen(
                 onNavigateBack = { navController.popBackStack() }
+            )
+        }
+
+        // Onboarding screens
+        composable(Routes.DISPLAY_NAME_PROMPT) {
+            DisplayNamePromptScreen(
+                authViewModel = authViewModel,
+                onContinue = {
+                    navController.navigate(Routes.WELCOME) {
+                        popUpTo(Routes.DISPLAY_NAME_PROMPT) { inclusive = true }
+                    }
+                },
+                onSkip = {
+                    navController.navigate(Routes.WELCOME) {
+                        popUpTo(Routes.DISPLAY_NAME_PROMPT) { inclusive = true }
+                    }
+                }
+            )
+        }
+
+        composable(Routes.WELCOME) {
+            WelcomeScreen(
+                onComplete = {
+                    authViewModel.completeOnboarding()
+                    navController.navigate(Routes.HOME) {
+                        popUpTo(0) { inclusive = true }
+                    }
+                }
             )
         }
 

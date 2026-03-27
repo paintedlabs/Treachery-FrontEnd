@@ -14,6 +14,7 @@ data class TreacheryUser(
     val deckStats: Map<String, DeckStat>? = null
 ) {
     fun toMap(): Map<String, Any?> = mapOf(
+        "id" to id,
         "display_name" to displayName,
         "email" to email,
         "phone_number" to phoneNumber,

@@ -8,6 +8,11 @@
 import Foundation
 import FirebaseFunctions
 
+struct JoinGameResult {
+    let action: String // "joined" or "already_joined"
+    let gameId: String
+}
+
 struct PhenomenonResult {
     let type: String // "resolved" or "choose"
     let newPlaneId: String?
@@ -18,6 +23,16 @@ struct PhenomenonResult {
 
 struct CloudFunctions: CloudFunctionsProtocol {
     private let functions = Functions.functions()
+
+    func joinGame(gameCode: String) async throws -> JoinGameResult {
+        let callable = functions.httpsCallable("joinGame")
+        let result = try await callable.call(["gameCode": gameCode])
+        let data = result.data as? [String: Any] ?? [:]
+        return JoinGameResult(
+            action: data["action"] as? String ?? "joined",
+            gameId: data["gameId"] as? String ?? ""
+        )
+    }
 
     func startGame(gameId: String) async throws {
         let callable = functions.httpsCallable("startGame")

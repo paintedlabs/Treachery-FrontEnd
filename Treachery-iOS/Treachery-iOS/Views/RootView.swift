@@ -25,7 +25,11 @@ struct RootView: View {
                     }
                 }
             case .authenticated:
-                HomeView()
+                if authViewModel.isNewUser {
+                    OnboardingFlow()
+                } else {
+                    HomeView()
+                }
             case .unauthenticated:
                 NavigationStack {
                     LoginView()
@@ -33,6 +37,27 @@ struct RootView: View {
             }
         }
         .preferredColorScheme(.dark)
+    }
+}
+
+// MARK: - Onboarding Flow
+
+private struct OnboardingFlow: View {
+    @EnvironmentObject var authViewModel: AuthViewModel
+    @State private var step = 0
+
+    var body: some View {
+        Group {
+            if step == 0 {
+                DisplayNamePromptView {
+                    step = 1
+                }
+            } else {
+                WelcomeView {
+                    authViewModel.completeOnboarding()
+                }
+            }
+        }
     }
 }
 

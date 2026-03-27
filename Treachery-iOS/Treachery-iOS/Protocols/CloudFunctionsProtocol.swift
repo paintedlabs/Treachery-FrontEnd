@@ -1,6 +1,7 @@
 import Foundation
 
 protocol CloudFunctionsProtocol {
+    func joinGame(gameCode: String) async throws -> JoinGameResult
     func startGame(gameId: String) async throws
     func adjustLife(gameId: String, playerId: String, amount: Int) async throws
     func eliminatePlayer(gameId: String) async throws
