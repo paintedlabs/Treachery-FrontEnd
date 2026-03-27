@@ -28,12 +28,8 @@ opt_in_rules:
   - enum_case_associated_values_count
   - fatal_error_message
   - first_where
-  - force_unwrapping
-  - implicitly_unwrapped_optional
   - last_where
   - literal_expression_end_indentation
-  - multiline_arguments
-  - multiline_parameters
   - operator_usage_whitespace
   - overridden_super_call
   - prefer_self_in_static_references
@@ -45,7 +41,6 @@ opt_in_rules:
   - sorted_first_last
   - toggle_bool
   - unneeded_parentheses_in_closure_argument
-  - vertical_parameter_alignment_on_call
   - yoda_condition
 
 # Configuration
@@ -56,12 +51,12 @@ line_length:
   ignores_urls: true
 
 file_length:
-  warning: 500
-  error: 1000
+  warning: 600
+  error: 1200
 
 type_body_length:
-  warning: 300
-  error: 500
+  warning: 350
+  error: 600
 
 function_body_length:
   warning: 60
@@ -74,6 +69,11 @@ function_parameter_count:
 type_name:
   min_length: 3
   max_length: 50
+  excluded:
+    - Treachery_iOSApp
+    - Treachery_iOSTests
+    - Treachery_iOSUITests
+    - Treachery_iOSUITestsLaunchTests
 
 identifier_name:
   min_length:
@@ -87,6 +87,10 @@ identifier_name:
     - x
     - y
     - i
+    - p
+
+large_tuple:
+  warning: 4
 
 nesting:
   type_level: 2
