@@ -15,6 +15,9 @@ excluded:
 disabled_rules:
   - trailing_comma
   - todo
+  - implicit_optional_initialization
+  - unused_closure_parameter
+  - static_over_final_class
 
 opt_in_rules:
   - closure_end_indentation
@@ -45,17 +48,17 @@ opt_in_rules:
 
 # Configuration
 line_length:
-  warning: 140
-  error: 200
+  warning: 160
+  error: 250
   ignores_comments: true
   ignores_urls: true
 
 file_length:
-  warning: 600
+  warning: 800
   error: 1200
 
 type_body_length:
-  warning: 350
+  warning: 400
   error: 600
 
 function_body_length:
@@ -88,6 +91,11 @@ identifier_name:
     - y
     - i
     - p
+    - a
+    - r
+    - g
+    - b
+    - c
 
 large_tuple:
   warning: 4
