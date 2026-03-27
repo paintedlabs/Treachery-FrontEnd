@@ -1,0 +1,43 @@
+name: Deploy to Google Play Store
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-android-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Promote to Production
+    runs-on: ubuntu-latest
+    environment: production
+    defaults:
+      run:
+        working-directory: TreacheryAndroid
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.3"
+          bundler-cache: true
+          working-directory: TreacheryAndroid
+
+      - name: Decode Google Play service account key
+        env:
+          GOOGLE_PLAY_JSON_KEY_BASE64: ${{ secrets.GOOGLE_PLAY_JSON_KEY_BASE64 }}
+        run: |
+          echo "$GOOGLE_PLAY_JSON_KEY_BASE64" | base64 --decode > $RUNNER_TEMP/google-play-key.json
+
+      - name: Promote internal to production
+        env:
+          GOOGLE_PLAY_JSON_KEY_PATH: ${{ runner.temp }}/google-play-key.json
+        run: bundle exec fastlane release
+
+      - name: Clean up secrets
+        if: always()
+        run: rm -f $RUNNER_TEMP/google-play-key.json

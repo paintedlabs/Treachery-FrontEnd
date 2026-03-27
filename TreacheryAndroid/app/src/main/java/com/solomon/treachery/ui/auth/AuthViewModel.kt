@@ -30,6 +30,9 @@ class AuthViewModel @Inject constructor(
     private val _errorMessage = MutableStateFlow<String?>(null)
     val errorMessage: StateFlow<String?> = _errorMessage.asStateFlow()
 
+    private val _isNewUser = MutableStateFlow(false)
+    val isNewUser: StateFlow<Boolean> = _isNewUser.asStateFlow()
+
     val currentUserId: String?
         get() = (authState.value as? AuthState.Authenticated)?.user?.uid
 
@@ -42,7 +45,8 @@ class AuthViewModel @Inject constructor(
                     AnalyticsService.setUserProperties(
                         mapOf("auth_method" to if (user.isAnonymous) "guest" else "email")
                     )
-                    createUserDocumentIfNeeded(user)
+                    val isNew = createUserDocumentIfNeeded(user)
+                    if (isNew) _isNewUser.value = true
                     registerFcmToken()
                 } else {
                     _authState.value = AuthState.Unauthenticated
@@ -113,6 +117,20 @@ class AuthViewModel @Inject constructor(
         _errorMessage.value = null
     }
 
+    fun completeOnboarding() {
+        _isNewUser.value = false
+    }
+
+    fun updateDisplayName(name: String) {
+        viewModelScope.launch {
+            try {
+                val userId = currentUserId ?: return@launch
+                val user = firestoreRepository.getUser(userId) ?: return@launch
+                firestoreRepository.updateUser(user.copy(displayName = name))
+            } catch (_: Exception) { }
+        }
+    }
+
     private fun registerFcmToken() {
         FirebaseMessaging.getInstance().token.addOnSuccessListener { token ->
             viewModelScope.launch {
@@ -123,8 +141,8 @@ class AuthViewModel @Inject constructor(
         }
     }
 
-    private suspend fun createUserDocumentIfNeeded(user: FirebaseUser) {
-        try {
+    private suspend fun createUserDocumentIfNeeded(user: FirebaseUser): Boolean {
+        return try {
             val existingUser = firestoreRepository.getUser(user.uid)
             if (existingUser == null) {
                 val displayName = user.displayName ?: user.email ?: "Guest"
@@ -137,9 +155,13 @@ class AuthViewModel @Inject constructor(
                     createdAt = Timestamp.now()
                 )
                 firestoreRepository.createUser(newUser)
+                true
+            } else {
+                false
             }
         } catch (e: Exception) {
             // Non-fatal: user document creation failure shouldn't block auth
+            false
         }
     }
 }
