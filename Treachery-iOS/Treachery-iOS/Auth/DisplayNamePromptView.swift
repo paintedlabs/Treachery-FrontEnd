@@ -85,7 +85,8 @@ struct DisplayNamePromptView: View {
         if case .authenticated(let user) = authViewModel.authState {
             if let email = user.email, !email.isEmpty {
                 let prefix = email.components(separatedBy: "@").first ?? ""
-                displayName = prefix.prefix(1).uppercased() + prefix.dropFirst()
+                let capitalized = prefix.prefix(1).uppercased() + prefix.dropFirst()
+                displayName = capitalized
             } else if user.isAnonymous {
                 displayName = "Guest"
             } else {
