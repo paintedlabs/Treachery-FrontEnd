@@ -5,15 +5,26 @@
 
 import SwiftUI
 
+private struct RoleInfo: Identifiable {
+    let id: String
+    let name: String
+    let color: Color
+    let description: String
+}
+
+private let allRoles = [
+    RoleInfo(id: "leader", name: "Leader", color: .roleLeader,
+             description: "Eliminate all Assassins and Traitors to win."),
+    RoleInfo(id: "guardian", name: "Guardian", color: .roleGuardian,
+             description: "Keep the Leader alive. Eliminate all Assassins and Traitors."),
+    RoleInfo(id: "assassin", name: "Assassin", color: .roleAssassin,
+             description: "Eliminate the Leader while at least one Assassin survives."),
+    RoleInfo(id: "traitor", name: "Traitor", color: .roleTraitor,
+             description: "Be the last player standing."),
+]
+
 struct WelcomeView: View {
     let onComplete: () -> Void
-
-    private let roles: [(name: String, color: Color, description: String)] = [
-        ("Leader", .roleLeader, "Eliminate all Assassins and Traitors to win."),
-        ("Guardian", .roleGuardian, "Keep the Leader alive. Eliminate all Assassins and Traitors."),
-        ("Assassin", .roleAssassin, "Eliminate the Leader while at least one Assassin survives."),
-        ("Traitor", .roleTraitor, "Be the last player standing."),
-    ]
 
     var body: some View {
         ScrollView {
@@ -40,9 +51,10 @@ struct WelcomeView: View {
                     .padding(.horizontal)
 
                 // Role cards
-                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
-                    ForEach(roles, id: \.name) { role in
-                        roleCard(name: role.name, color: role.color, description: role.description)
+                let columns = [GridItem(.flexible()), GridItem(.flexible())]
+                LazyVGrid(columns: columns, spacing: 12) {
+                    ForEach(allRoles) { role in
+                        roleCard(role)
                     }
                 }
                 .padding(.horizontal, 4)
@@ -50,7 +62,11 @@ struct WelcomeView: View {
                 OrnateDivider()
                     .padding(.vertical, 8)
 
-                Link(destination: URL(string: "https://mtgtreachery.net")!) {
+                Button {
+                    if let url = URL(string: "https://mtgtreachery.net") {
+                        UIApplication.shared.open(url)
+                    }
+                } label: {
                     Text("Read the full rules at mtgtreachery.net")
                         .font(.system(.footnote, design: .serif))
                         .italic()
@@ -72,14 +88,14 @@ struct WelcomeView: View {
         .mtgRadialBackground()
     }
 
-    private func roleCard(name: String, color: Color, description: String) -> some View {
+    private func roleCard(_ role: RoleInfo) -> some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text(name)
+            Text(role.name)
                 .font(.system(.headline, design: .serif))
                 .fontWeight(.bold)
-                .foregroundColor(color)
+                .foregroundColor(role.color)
 
-            Text(description)
+            Text(role.description)
                 .font(.system(.caption, design: .serif))
                 .foregroundColor(.mtgTextSecondary)
                 .lineLimit(3)
@@ -91,11 +107,11 @@ struct WelcomeView: View {
         .cornerRadius(10)
         .overlay(
             RoundedRectangle(cornerRadius: 10)
-                .stroke(color.opacity(0.3), lineWidth: 1)
+                .stroke(role.color.opacity(0.3), lineWidth: 1)
         )
         .overlay(alignment: .leading) {
             RoundedRectangle(cornerRadius: 10)
-                .fill(color)
+                .fill(role.color)
                 .frame(width: 3)
         }
     }
