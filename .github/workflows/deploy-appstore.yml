@@ -10,44 +10,6 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  deploy-web:
-    name: Deploy Web to Production
-    runs-on: ubuntu-latest
-    environment: production
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
-          cache-dependency-path: Treachery/package-lock.json
-
-      - name: Install web dependencies
-        run: npm ci
-        working-directory: Treachery
-
-      - name: Build web app
-        run: npm run build:web
-        working-directory: Treachery
-        env:
-          EXPO_PUBLIC_FIREBASE_API_KEY: ${{ secrets.FIREBASE_API_KEY }}
-          EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN: ${{ secrets.FIREBASE_AUTH_DOMAIN }}
-          EXPO_PUBLIC_FIREBASE_PROJECT_ID: ${{ secrets.FIREBASE_PROJECT_ID }}
-          EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET: ${{ secrets.FIREBASE_STORAGE_BUCKET }}
-          EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.FIREBASE_MESSAGING_SENDER_ID }}
-          EXPO_PUBLIC_FIREBASE_APP_ID: ${{ secrets.FIREBASE_APP_ID }}
-          EXPO_PUBLIC_ENVIRONMENT: production
-
-      - name: Install functions dependencies
-        run: npm ci
-        working-directory: functions
-
-      - name: Deploy to Firebase
-        run: npx firebase-tools deploy --only hosting:production,functions,firestore:rules,firestore:indexes
-        env:
-          FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
-
   deploy-ios:
     name: Submit iOS to App Store
     runs-on: macos-15
