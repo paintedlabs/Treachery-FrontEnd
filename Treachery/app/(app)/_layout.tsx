@@ -25,6 +25,14 @@ export default function AppLayout() {
         name="game-over/[gameId]"
         options={{ title: 'Results', headerBackVisible: false }}
       />
+      <Stack.Screen
+        name="onboarding/display-name"
+        options={{ title: 'Choose Name', headerShown: false }}
+      />
+      <Stack.Screen
+        name="onboarding/welcome"
+        options={{ title: 'Welcome', headerShown: false }}
+      />
       <Stack.Screen name="profile" options={{ title: 'Profile' }} />
       <Stack.Screen name="friends" options={{ title: 'Friends' }} />
       <Stack.Screen name="history" options={{ title: 'Game History' }} />

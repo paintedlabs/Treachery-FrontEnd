@@ -19,6 +19,7 @@ final class AuthViewModel: ObservableObject {
 
     @Published var authState: AuthState = .loading
     @Published var errorMessage: String?
+    @Published var isNewUser: Bool = false
 
     private let firebaseManager: AuthManaging
     private let firestoreManager: FirestoreManaging
@@ -60,7 +61,8 @@ final class AuthViewModel: ObservableObject {
                     self?.authState = .authenticated(user)
                     AnalyticsService.setUserId(user.uid)
                     AnalyticsService.setUserProperties(["auth_method": user.isAnonymous ? "guest" : "email"])
-                    await self?.createUserDocumentIfNeeded(for: user)
+                    let isNew = await self?.createUserDocumentIfNeeded(for: user) ?? false
+                    if isNew { self?.isNewUser = true }
                 } else {
                     self?.authState = .unauthenticated
                     AnalyticsService.setUserId(nil)
@@ -150,9 +152,28 @@ final class AuthViewModel: ObservableObject {
         }
     }
 
+    // MARK: - Onboarding
+
+    func completeOnboarding() {
+        isNewUser = false
+    }
+
+    func updateDisplayName(_ name: String) async {
+        guard let userId = currentUserId else { return }
+        do {
+            if var user = try await firestoreManager.getUser(id: userId) {
+                user.displayName = name
+                try await firestoreManager.updateUser(user)
+            }
+        } catch {
+            errorMessage = "Failed to save display name."
+        }
+    }
+
     // MARK: - User Document Creation
 
-    private func createUserDocumentIfNeeded(for user: User) async {
+    @discardableResult
+    private func createUserDocumentIfNeeded(for user: User) async -> Bool {
         do {
             let existingUser = try await firestoreManager.getUser(id: user.uid)
             if existingUser == nil {
@@ -166,9 +187,12 @@ final class AuthViewModel: ObservableObject {
                     createdAt: Date()
                 )
                 try await firestoreManager.createUser(newUser)
+                return true
             }
+            return false
         } catch {
             print("Failed to create user document: \(error)")
+            return false
         }
     }
 }

@@ -21,6 +21,7 @@ data class FriendRequest(
     val createdAt: Timestamp = Timestamp.now()
 ) {
     fun toMap(): Map<String, Any?> = mapOf(
+        "id" to id,
         "from_user_id" to fromUserId,
         "from_display_name" to fromDisplayName,
         "to_user_id" to toUserId,

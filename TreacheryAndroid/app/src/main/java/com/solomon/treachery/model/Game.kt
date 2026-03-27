@@ -18,6 +18,7 @@ data class Game(
     val winnerUserIds: List<String> = emptyList()
 ) {
     fun toMap(): Map<String, Any?> = mapOf(
+        "id" to id,
         "code" to code,
         "host_id" to hostId,
         "state" to state.value,

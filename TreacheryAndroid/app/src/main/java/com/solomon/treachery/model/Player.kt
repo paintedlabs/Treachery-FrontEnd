@@ -17,6 +17,7 @@ data class Player(
     val commanderName: String? = null
 ) {
     fun toMap(): Map<String, Any?> = mapOf(
+        "id" to id,
         "order_id" to orderId,
         "user_id" to userId,
         "display_name" to displayName,
