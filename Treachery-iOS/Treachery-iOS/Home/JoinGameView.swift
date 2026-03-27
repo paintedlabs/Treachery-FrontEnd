@@ -15,7 +15,7 @@ struct JoinGameView: View {
     @State private var isJoining = false
     @State private var errorMessage: String?
 
-    private let firestoreManager = FirestoreManager()
+    private let cloudFunctions = CloudFunctions()
 
     var body: some View {
         ZStack {
@@ -89,55 +89,17 @@ struct JoinGameView: View {
     }
 
     private func joinGame() async {
-        guard let userId = authViewModel.currentUserId else { return }
         isJoining = true
         errorMessage = nil
 
         do {
-            // Find game by code
-            guard let game = try await firestoreManager.getGame(byCode: gameCode) else {
-                throw GameError.gameNotFound
-            }
-
-            // Validate game state
-            guard game.state == .waiting else {
-                throw GameError.gameAlreadyStarted
-            }
-
-            // Check if game is full
-            let existingPlayers = try await firestoreManager.getPlayers(gameId: game.id)
-            guard existingPlayers.count < game.maxPlayers else {
-                throw GameError.gameFull
-            }
-
-            // Check if user is already in the game
-            if existingPlayers.contains(where: { $0.userId == userId }) {
-                navigationPath.append(AppDestination.lobby(gameId: game.id, isHost: false))
-                isJoining = false
-                return
-            }
-
-            // Add player
-            let user = try await firestoreManager.getUser(id: userId)
-            let player = Player(
-                id: UUID().uuidString,
-                orderId: existingPlayers.count,
-                userId: userId,
-                displayName: user?.displayName ?? "Player",
-                role: nil,
-                identityCardId: nil,
-                lifeTotal: game.startingLife,
-                isEliminated: false,
-                isUnveiled: false,
-                joinedAt: Date()
-            )
-            try await firestoreManager.addPlayer(player, toGame: game.id)
-
-            // Add user to game's playerIds for history queries
-            try await firestoreManager.addPlayerIdToGame(gameId: game.id, userId: userId)
+            // Use the transactional Cloud Function to join atomically.
+            // This prevents race conditions where two players join simultaneously
+            // and exceed maxPlayers or get duplicate orderIds.
+            let result = try await cloudFunctions.joinGame(gameCode: gameCode)
 
             AnalyticsService.trackEvent("join_game")
-            navigationPath.append(AppDestination.lobby(gameId: game.id, isHost: false))
+            navigationPath.append(AppDestination.lobby(gameId: result.gameId, isHost: false))
         } catch {
             errorMessage = error.localizedDescription
         }

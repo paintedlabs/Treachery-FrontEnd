@@ -9,13 +9,22 @@ final class MockCloudFunctions: CloudFunctionsProtocol {
         type: "resolved", newPlaneId: nil, isPhenomenon: nil, options: nil, secondaryPlaneId: nil
     )
 
+    var joinGameResult = JoinGameResult(action: "joined", gameId: "mock-game-id")
+
     // Call tracking
+    var joinGameCalls: [String] = []
     var startGameCalls: [String] = []
     var adjustLifeCalls: [(gameId: String, playerId: String, amount: Int)] = []
     var eliminatePlayerCalls: [String] = []
     var unveilPlayerCalls: [String] = []
     var leaveGameCalls: [String] = []
     var endGameCalls: [(gameId: String, winnerUserIds: [String]?)] = []
+
+    func joinGame(gameCode: String) async throws -> JoinGameResult {
+        if let error = errorToThrow { throw error }
+        joinGameCalls.append(gameCode)
+        return joinGameResult
+    }
 
     func startGame(gameId: String) async throws {
         if let error = errorToThrow { throw error }

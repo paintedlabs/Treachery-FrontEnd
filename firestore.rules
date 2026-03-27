@@ -13,7 +13,7 @@ service cloud.firestore {
 
       allow update: if request.auth != null
         && (request.auth.uid == userId
-            || onlyFriendIdsChanged()
+            || onlyFriendIdsChanged(userId)
             || onlyFcmTokenChanged(userId));
 
       allow delete: if false;
@@ -70,14 +70,12 @@ service cloud.firestore {
       // PLAYERS (subcollection of games)
       // ----------------------------------------------------------
       match /players/{playerId} {
-        // Authenticated users can read player docs, but role and
-        // identity_card_id are only meaningful for:
-        //   - The player themselves (user_id matches)
-        //   - Unveiled players (is_unveiled == true)
-        //   - Leaders (role == 'leader', always visible)
-        // Client-side canSeeRole() enforces display; the server
-        // enforces that clients cannot WRITE roles.
-        allow read: if request.auth != null;
+        // Restrict reads: only players in the game can read player docs.
+        // Role/identity data is still present in the doc, but limited to
+        // game participants. Full role hiding would require a separate
+        // secrets subcollection (future improvement).
+        allow read: if request.auth != null
+          && request.auth.uid in get(/databases/$(database)/documents/games/$(gameId)).data.player_ids;
 
         // Players can add themselves to a game
         // Note: Swift Codable skips nil fields, so we check for absence OR null
@@ -125,9 +123,15 @@ service cloud.firestore {
         && request.auth.uid in request.resource.data.player_ids;
     }
 
-    function onlyFriendIdsChanged() {
+    function onlyFriendIdsChanged(userId) {
       let affectedKeys = request.resource.data.diff(resource.data).affectedKeys();
-      return affectedKeys.hasOnly(['friend_ids']);
+      // Only allow friend_ids changes if the caller is adding/removing themselves
+      // from the target user's friend list (mutual friendship operations).
+      // The caller must appear in the new friend_ids list to prevent
+      // arbitrary modification of other users' friend lists.
+      return affectedKeys.hasOnly(['friend_ids'])
+        && (request.auth.uid == userId
+            || request.auth.uid in request.resource.data.friend_ids);
     }
 
     function onlyFcmTokenChanged(userId) {

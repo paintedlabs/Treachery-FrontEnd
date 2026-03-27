@@ -118,12 +118,14 @@ final class GameBoardViewModel: ObservableObject {
 
     init(
         gameId: String,
+        currentUserId: String? = nil,
         firestoreManager: FirestoreManaging = FirestoreManager(),
         cloudFunctions: CloudFunctionsProtocol = CloudFunctions(),
         cardDatabase: CardLookupProviding = CardDatabase.shared,
         planeDatabase: PlaneLookupProviding = PlaneDatabase.shared
     ) {
         self.gameId = gameId
+        self.currentUserId = currentUserId
         self.firestoreManager = firestoreManager
         self.cloudFunctions = cloudFunctions
         self.cardDatabase = cardDatabase

@@ -23,6 +23,64 @@ const CHAOTIC_AETHER_ID = "6dc67a65-31bf-4535-9e02-8f6d6ecefde5";
 const INTERPLANAR_TUNNEL_ID = "7812174b-2dc1-43e8-b98f-639905e20ab7";
 const SPATIAL_MERGING_ID = "aa166578-b13b-4adb-a78e-d5183e987112";
 
+function getPlaneCard(id) {
+  return PLANE_CARDS.find((p) => p.id === id);
+}
+
+// ── Chaos Ability Parsing ──
+// Extracts chaos ability text from plane card oracle_text.
+// Handles three formats:
+//   1. "Whenever chaos ensues, <effect>"   (most planes)
+//   2. "When chaos ensues, <effect>"        (Bad Wolf Bay, Pompeii, etc.)
+//   3. "Chaos: <effect>"                    (Bicycle Rack, Stroopwafel Cafe, etc.)
+
+function parseChaosAbility(oracleText) {
+  if (!oracleText) return null;
+
+  // Pattern 1: "Whenever chaos ensues, <effect>"
+  const wheneverMatch = oracleText.match(
+    /Whenever [Cc]haos ensues,\s*([\s\S]*?)(?:\n(?!.*chaos)|$)/i
+  );
+  if (wheneverMatch) return wheneverMatch[1].trim();
+
+  // Pattern 2: "When chaos ensues, <effect>" (no "ever")
+  const whenMatch = oracleText.match(
+    /When chaos ensues,\s*([\s\S]*?)(?:\n(?!.*chaos)|$)/i
+  );
+  if (whenMatch) return whenMatch[1].trim();
+
+  // Pattern 3: "Chaos: <effect>"
+  const colonMatch = oracleText.match(/Chaos:\s*([\s\S]*?)(?:\n|$)/i);
+  if (colonMatch) return colonMatch[1].trim();
+
+  // Special case: chaos ensues referenced but not as a standard trigger
+  if (/chaos ensues/i.test(oracleText)) {
+    const lines = oracleText.split("\n");
+    const chaosLine = lines.find((l) => /chaos ensues/i.test(l));
+    return chaosLine ? chaosLine.trim() : null;
+  }
+
+  return null;
+}
+
+// Categorize a chaos ability for game-mechanical display purposes
+function categorizeChaosAbility(abilityText) {
+  if (!abilityText) return "none";
+  const lower = abilityText.toLowerCase();
+
+  if (/deals?\s+\d+\s+damage/i.test(lower) || /loses?\s+\d+\s+life/i.test(lower))
+    return "damage";
+  if (/gains?\s+\d*\s*life/i.test(lower) || /gain\s+(three|two|one|\d+)\s+life/i.test(lower))
+    return "life_gain";
+  if (/draw/i.test(lower)) return "draw";
+  if (/destroy/i.test(lower) || /exile/i.test(lower)) return "removal";
+  if (/create/i.test(lower) && /token/i.test(lower)) return "tokens";
+  if (/counter/i.test(lower)) return "counters";
+  if (/planeswalk/i.test(lower)) return "planeswalk";
+  if (/discard/i.test(lower)) return "discard";
+  return "other";
+}
+
 function getCardsForRole(role) {
   return CARDS.filter((c) => c.role === role);
 }
@@ -496,6 +554,94 @@ exports.eliminatePlayer = onCall(callableOptions, async (request) => {
 });
 
 // ════════════════════════════════════════════════════════════════
+// CLOUD FUNCTION: joinGame
+// Atomically adds a player to a waiting lobby. Prevents race
+// conditions where two players join simultaneously and exceed
+// maxPlayers or get duplicate orderIds.
+// ════════════════════════════════════════════════════════════════
+
+exports.joinGame = onCall(callableOptions, async (request) => {
+  const uid = request.auth?.uid;
+  if (!uid) throw new HttpsError("unauthenticated", "Must be signed in.");
+
+  const { gameCode } = request.data;
+  if (!gameCode) throw new HttpsError("invalid-argument", "gameCode is required.");
+
+  // Look up the game by code (outside transaction since query-by-code is safe)
+  const gamesSnap = await db
+    .collection("games")
+    .where("game_code", "==", gameCode.toUpperCase())
+    .limit(1)
+    .get();
+
+  if (gamesSnap.empty) {
+    throw new HttpsError("not-found", "Game not found. Check the code and try again.");
+  }
+
+  const gameId = gamesSnap.docs[0].id;
+
+  return db.runTransaction(async (tx) => {
+    const gameRef = db.doc(`games/${gameId}`);
+    const gameSnap = await tx.get(gameRef);
+
+    if (!gameSnap.exists) throw new HttpsError("not-found", "Game not found.");
+    const game = gameSnap.data();
+
+    if (game.state !== "waiting") {
+      throw new HttpsError("failed-precondition", "This game has already started.");
+    }
+
+    // Get all current players atomically
+    const playersSnap = await tx.get(
+      db.collection(`games/${gameId}/players`).orderBy("order_id")
+    );
+    const existingPlayers = playersSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
+
+    // Check if already in game
+    if (existingPlayers.some((p) => p.user_id === uid)) {
+      return { action: "already_joined", gameId };
+    }
+
+    // Check capacity atomically
+    if (existingPlayers.length >= (game.max_players || 8)) {
+      throw new HttpsError("failed-precondition", "This game is full.");
+    }
+
+    // Get user display name
+    const userSnap = await tx.get(db.doc(`users/${uid}`));
+    const displayName = userSnap.exists
+      ? userSnap.data().display_name || "Player"
+      : "Player";
+
+    // Assign orderId safely based on current count
+    const orderId = existingPlayers.length;
+
+    // Create player doc
+    const playerRef = db.collection(`games/${gameId}/players`).doc();
+    tx.set(playerRef, {
+      user_id: uid,
+      display_name: displayName,
+      order_id: orderId,
+      role: null,
+      identity_card_id: null,
+      life_total: game.starting_life || 40,
+      is_eliminated: false,
+      is_unveiled: false,
+      joined_at: FieldValue.serverTimestamp(),
+    });
+
+    // Add to player_ids array
+    const updatedPlayerIds = [...(game.player_ids || []), uid];
+    tx.update(gameRef, {
+      player_ids: updatedPlayerIds,
+      last_activity_at: FieldValue.serverTimestamp(),
+    });
+
+    return { action: "joined", gameId };
+  });
+});
+
+// ════════════════════════════════════════════════════════════════
 // CLOUD FUNCTION: leaveGame
 // Removes the calling player from a waiting lobby. If host
 // leaves, promotes the next player to host instead of deleting.
@@ -577,46 +723,44 @@ exports.unveilPlayer = onCall(callableOptions, async (request) => {
   const { gameId } = request.data;
   if (!gameId) throw new HttpsError("invalid-argument", "gameId is required.");
 
-  const gameRef = db.doc(`games/${gameId}`);
-  const gameSnap = await gameRef.get();
+  return db.runTransaction(async (tx) => {
+    const gameRef = db.doc(`games/${gameId}`);
+    const gameSnap = await tx.get(gameRef);
 
-  if (!gameSnap.exists) throw new HttpsError("not-found", "Game not found.");
-  const game = gameSnap.data();
+    if (!gameSnap.exists) throw new HttpsError("not-found", "Game not found.");
+    const game = gameSnap.data();
 
-  if (game.state !== "in_progress") {
-    throw new HttpsError("failed-precondition", "Game is not in progress.");
-  }
+    if (game.state !== "in_progress") {
+      throw new HttpsError("failed-precondition", "Game is not in progress.");
+    }
 
-  // Find caller's player doc
-  const playersSnap = await db
-    .collection(`games/${gameId}/players`)
-    .where("user_id", "==", uid)
-    .limit(1)
-    .get();
+    // Find caller's player doc within the transaction
+    const playersSnap = await tx.get(
+      db.collection(`games/${gameId}/players`).where("user_id", "==", uid).limit(1)
+    );
 
-  if (playersSnap.empty) {
-    throw new HttpsError("not-found", "You are not in this game.");
-  }
+    if (playersSnap.empty) {
+      throw new HttpsError("not-found", "You are not in this game.");
+    }
 
-  const playerDoc = playersSnap.docs[0];
-  const player = playerDoc.data();
+    const playerDoc = playersSnap.docs[0];
+    const player = playerDoc.data();
 
-  if (player.is_eliminated) {
-    throw new HttpsError("failed-precondition", "Cannot unveil — you are eliminated.");
-  }
-  if (player.is_unveiled) {
-    throw new HttpsError("failed-precondition", "Already unveiled.");
-  }
-  if (player.role === "leader") {
-    throw new HttpsError("failed-precondition", "Leader is always visible.");
-  }
+    if (player.is_eliminated) {
+      throw new HttpsError("failed-precondition", "Cannot unveil — you are eliminated.");
+    }
+    if (player.is_unveiled) {
+      throw new HttpsError("failed-precondition", "Already unveiled.");
+    }
+    if (player.role === "leader") {
+      throw new HttpsError("failed-precondition", "Leader is always visible.");
+    }
 
-  await playerDoc.ref.update({ is_unveiled: true });
+    tx.update(playerDoc.ref, { is_unveiled: true });
+    tx.update(gameRef, { last_activity_at: FieldValue.serverTimestamp() });
 
-  // Update activity timestamp
-  await gameRef.update({ last_activity_at: FieldValue.serverTimestamp() });
-
-  return { success: true };
+    return { success: true };
+  });
 });
 
 // ════════════════════════════════════════════════════════════════
@@ -701,7 +845,40 @@ exports.rollPlanarDie = onCall(callableOptions, async (request) => {
 
     tx.update(gameRef, updateData);
 
-    return { result, manaCost, newPlaneId };
+    // Build response
+    const response = { result, manaCost, newPlaneId };
+
+    // When chaos ensues, include the chaos ability info so the client
+    // can display the effect without needing its own plane card database
+    if (result === "chaos") {
+      const currentPlane = getPlaneCard(planechase.current_plane_id);
+      if (currentPlane) {
+        const chaosText = parseChaosAbility(currentPlane.oracle_text);
+        response.chaosAbility = {
+          planeName: currentPlane.name,
+          planeId: currentPlane.id,
+          abilityText: chaosText,
+          category: categorizeChaosAbility(chaosText),
+        };
+      }
+
+      // Spatial Merging: if a secondary plane is active, include its chaos too
+      const secondaryPlaneId = planechase.secondary_plane_id;
+      if (secondaryPlaneId) {
+        const secondaryPlane = getPlaneCard(secondaryPlaneId);
+        if (secondaryPlane) {
+          const secondaryChaosText = parseChaosAbility(secondaryPlane.oracle_text);
+          response.secondaryChaosAbility = {
+            planeName: secondaryPlane.name,
+            planeId: secondaryPlane.id,
+            abilityText: secondaryChaosText,
+            category: categorizeChaosAbility(secondaryChaosText),
+          };
+        }
+      }
+    }
+
+    return response;
   });
 });
 

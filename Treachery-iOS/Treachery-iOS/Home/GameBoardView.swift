@@ -22,8 +22,8 @@ struct GameBoardView: View {
     @State private var inspectedPlayer: Player?
     @State private var showColorPicker = false
 
-    init(gameId: String, navigationPath: Binding<NavigationPath>) {
-        _viewModel = StateObject(wrappedValue: GameBoardViewModel(gameId: gameId))
+    init(gameId: String, currentUserId: String? = nil, navigationPath: Binding<NavigationPath>) {
+        _viewModel = StateObject(wrappedValue: GameBoardViewModel(gameId: gameId, currentUserId: currentUserId))
         _navigationPath = navigationPath
     }
 
@@ -270,8 +270,8 @@ struct GameBoardView: View {
         .navigationBarBackButtonHidden(true)
         .onAppear { AnalyticsService.trackScreen("GameBoard") }
         .toolbar {
-            // Forfeit button — only when treachery active
-            if viewModel.isTreacheryActive && !viewModel.isGameUnavailable && !(viewModel.currentPlayer?.isEliminated ?? true) {
+            // Forfeit button — available in all game modes so players can always leave
+            if !viewModel.isGameUnavailable && !(viewModel.currentPlayer?.isEliminated ?? true) {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {
                         showForfeitConfirmation = true
