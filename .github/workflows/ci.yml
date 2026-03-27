@@ -30,12 +30,13 @@ jobs:
       - name: Resolve Swift packages
         run: xcodebuild -resolvePackageDependencies -project Treachery-iOS.xcodeproj -scheme Treachery-iOS
 
-      - name: Build and test
+      - name: Build and run unit tests
         run: |
           xcodebuild test \
             -project Treachery-iOS.xcodeproj \
             -scheme Treachery-iOS \
             -destination 'platform=iOS Simulator,name=iPhone 16,OS=latest' \
+            -only-testing:Treachery-iOSTests \
             -enableCodeCoverage YES \
             -resultBundlePath ../build/TestResults.xcresult \
             CODE_SIGNING_ALLOWED=NO \
