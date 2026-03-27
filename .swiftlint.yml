@@ -18,6 +18,7 @@ disabled_rules:
   - implicit_optional_initialization
   - unused_closure_parameter
   - static_over_final_class
+  - empty_string
 
 opt_in_rules:
   - closure_end_indentation
@@ -96,6 +97,7 @@ identifier_name:
     - g
     - b
     - c
+    - d
 
 large_tuple:
   warning: 4
