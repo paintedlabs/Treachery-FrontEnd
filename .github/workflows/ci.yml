@@ -19,13 +19,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Select Xcode
-        run: sudo xcode-select -s /Applications/Xcode_16.2.app/Contents/Developer
-
-      - name: Install iOS Simulator runtime
+      - name: Select Xcode and list simulators
         run: |
-          xcodebuild -downloadPlatform iOS || true
-          xcrun simctl list runtimes
+          # Use latest available Xcode that matches installed simulator runtimes
+          LATEST_XCODE=$(ls -d /Applications/Xcode*.app 2>/dev/null | sort -V | tail -1)
+          echo "Using $LATEST_XCODE"
+          sudo xcode-select -s "$LATEST_XCODE/Contents/Developer"
+          xcrun simctl list devices available | grep iPhone | head -5
 
       - name: Resolve Swift packages
         run: xcodebuild -resolvePackageDependencies -project Treachery-iOS.xcodeproj -scheme Treachery-iOS
