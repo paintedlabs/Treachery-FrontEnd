@@ -50,7 +50,6 @@ export function useGameBoard(gameId: string, currentUserId: string | null): UseG
   const hasReceivedFirstSnapshot = useRef(false);
 
   // Planechase transient state
-  const [dieRollResult, setDieRollResult] = useState<string | null>(null);
   const [isRollingDie, setIsRollingDie] = useState(false);
   const [tunnelOptions, setTunnelOptions] = useState<PlaneCard[] | null>(null);
 
@@ -166,6 +165,10 @@ export function useGameBoard(gameId: string, currentUserId: string | null): UseG
     return game?.planechase?.die_roll_count ?? 0;
   }, [game?.planechase?.die_roll_count]);
 
+  const dieRollResult = useMemo(() => {
+    return game?.planechase?.last_die_result ?? null;
+  }, [game?.planechase?.last_die_result]);
+
   // ── All game actions now go through Cloud Functions ───────────────────
   // Win condition checking happens server-side automatically.
 
@@ -280,7 +283,6 @@ export function useGameBoard(gameId: string, currentUserId: string | null): UseG
     if (isRollingDie || isPending) return;
     setErrorMessage(null);
     setIsRollingDie(true);
-    setDieRollResult(null);
 
     try {
       const rollDieFn = httpsCallable<{ gameId: string }, { result: string }>(
@@ -288,7 +290,6 @@ export function useGameBoard(gameId: string, currentUserId: string | null): UseG
         'rollPlanarDie',
       );
       const response = await rollDieFn({ gameId });
-      setDieRollResult(response.data.result);
       trackEvent('roll_planar_die', { result: response.data.result });
     } catch (error: unknown) {
       setErrorMessage(error instanceof Error ? error.message : 'Failed to roll die.');

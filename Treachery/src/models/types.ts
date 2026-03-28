@@ -17,6 +17,7 @@ export interface PlanechaseState {
   used_plane_ids: string[];
   last_die_roller_id: string | null;
   die_roll_count: number;
+  last_die_result?: string | null;
   chaotic_aether_active?: boolean;
   secondary_plane_id?: string;
 }

@@ -775,7 +775,7 @@ exports.rollPlanarDie = onCall(callableOptions, async (request) => {
   const { gameId } = request.data;
   if (!gameId) throw new HttpsError("invalid-argument", "gameId is required.");
 
-  return db.runTransaction(async (tx) => {
+  const result = await db.runTransaction(async (tx) => {
     const gameRef = db.doc(`games/${gameId}`);
     const gameSnap = await tx.get(gameRef);
     if (!gameSnap.exists) throw new HttpsError("not-found", "Game not found.");
@@ -799,16 +799,16 @@ exports.rollPlanarDie = onCall(callableOptions, async (request) => {
 
     // Roll: 0-3 blank, 4 chaos, 5 planeswalk
     const roll = Math.floor(Math.random() * 6);
-    let result;
+    let dieResult;
     let newPlaneId = planechase.current_plane_id || null;
     let usedPlaneIds = planechase.used_plane_ids || [];
 
     if (roll < 4) {
-      result = "blank";
+      dieResult = "blank";
     } else if (roll === 4) {
-      result = "chaos";
+      dieResult = "chaos";
     } else {
-      result = "planeswalk";
+      dieResult = "planeswalk";
 
       if (!planechase.use_own_deck) {
         // Pick next plane (including phenomena this time - they get encountered)
@@ -825,20 +825,21 @@ exports.rollPlanarDie = onCall(callableOptions, async (request) => {
     }
 
     // Chaotic Aether: while active, blank rolls become chaos
-    if (planechase.chaotic_aether_active && result === "blank") {
-      result = "chaos";
+    if (planechase.chaotic_aether_active && dieResult === "blank") {
+      dieResult = "chaos";
     }
 
     const updateData = {
       "planechase.last_die_roller_id": uid,
       "planechase.die_roll_count": rollCount,
+      "planechase.last_die_result": dieResult,
       "planechase.current_plane_id": newPlaneId,
       "planechase.used_plane_ids": usedPlaneIds,
       last_activity_at: FieldValue.serverTimestamp(),
     };
 
     // Planeswalking resets Chaotic Aether and clears Spatial Merging
-    if (result === "planeswalk") {
+    if (dieResult === "planeswalk") {
       updateData["planechase.chaotic_aether_active"] = false;
       updateData["planechase.secondary_plane_id"] = null;
     }
@@ -846,11 +847,11 @@ exports.rollPlanarDie = onCall(callableOptions, async (request) => {
     tx.update(gameRef, updateData);
 
     // Build response
-    const response = { result, manaCost, newPlaneId };
+    const response = { result: dieResult, manaCost, newPlaneId };
 
     // When chaos ensues, include the chaos ability info so the client
     // can display the effect without needing its own plane card database
-    if (result === "chaos") {
+    if (dieResult === "chaos") {
       const currentPlane = getPlaneCard(planechase.current_plane_id);
       if (currentPlane) {
         const chaosText = parseChaosAbility(currentPlane.oracle_text);
@@ -880,6 +881,43 @@ exports.rollPlanarDie = onCall(callableOptions, async (request) => {
 
     return response;
   });
+
+  // Send push notifications for chaos and planeswalk results
+  if (result.result === "chaos" || result.result === "planeswalk") {
+    try {
+      const playerSnap = await db
+        .collection(`games/${gameId}/players`)
+        .where("user_id", "==", uid)
+        .limit(1)
+        .get();
+      const rollerName =
+        playerSnap.docs[0]?.data()?.display_name ?? "A player";
+
+      if (result.result === "chaos") {
+        const planeName = result.chaosAbility?.planeName ?? "the current plane";
+        await notifyPlayers(
+          gameId,
+          uid,
+          "Chaos Ensues!",
+          `${rollerName} rolled chaos on ${planeName}.`
+        );
+      } else {
+        const newPlane = getPlaneCard(result.newPlaneId);
+        const planeName = newPlane?.name ?? "a new plane";
+        await notifyPlayers(
+          gameId,
+          uid,
+          "Planeswalk!",
+          `${rollerName} planeswalked to ${planeName}.`
+        );
+      }
+    } catch (e) {
+      // Non-critical: don't fail the roll if notification fails
+      console.error("Failed to send planechase notification:", e);
+    }
+  }
+
+  return result;
 });
 
 // ════════════════════════════════════════════════════════════════
