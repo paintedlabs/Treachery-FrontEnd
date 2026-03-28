@@ -9,6 +9,7 @@ import {
   Platform,
   Modal,
   ScrollView,
+  Image,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -256,6 +257,23 @@ export default function GameBoardScreen() {
             )}
 
             {isPlanechaseActive && isChaoticAetherActive && <ChaoticAetherBanner />}
+
+            {/* Always-visible plane card image (rotated 90° clockwise) */}
+            {isPlanechaseActive && !isOwnDeckMode && currentPlane?.image_uri && (
+              <TouchableOpacity
+                style={styles.sidebarImageContainer}
+                onPress={() => setShowPlaneDetail(true)}
+                activeOpacity={0.8}
+                accessibilityLabel={`View ${currentPlane.name} details`}
+                accessibilityRole="button"
+              >
+                <Image
+                  source={{ uri: currentPlane.image_uri }}
+                  style={styles.sidebarPlaneImage}
+                  resizeMode="contain"
+                />
+              </TouchableOpacity>
+            )}
 
             <View style={{ flex: 1 }} />
 
@@ -573,6 +591,21 @@ const styles = StyleSheet.create({
   },
   mainContent: {
     flex: 1,
+  },
+  sidebarImageContainer: {
+    margin: 12,
+    borderRadius: 8,
+    overflow: 'hidden',
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  sidebarPlaneImage: {
+    width: '73%',
+    aspectRatio: 457 / 626,
+    transform: [{ rotate: '90deg' }],
   },
   centerContainer: {
     flex: 1,
