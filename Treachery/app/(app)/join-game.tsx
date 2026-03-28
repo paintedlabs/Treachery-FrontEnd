@@ -44,11 +44,13 @@ export default function JoinGameScreen() {
       if (!game) throw new Error('No game found with that code.');
       if (game.state !== 'waiting') throw new Error('This game has already started.');
 
-      const existingPlayers = await firestoreService.getPlayers(game.id);
-      if (existingPlayers.length >= game.max_players) throw new Error('This game is full.');
+      // Use game.player_ids for checks — reading the players subcollection
+      // requires being in player_ids (Firestore security rules).
+      const playerIds = game.player_ids ?? [];
+      if (playerIds.length >= game.max_players) throw new Error('This game is full.');
 
       // Check if already in game
-      if (existingPlayers.some((p) => p.user_id === currentUserId)) {
+      if (playerIds.includes(currentUserId)) {
         router.replace({
           pathname: '/(app)/lobby/[gameId]',
           params: { gameId: game.id, isHost: 'false' },
@@ -60,7 +62,7 @@ export default function JoinGameScreen() {
       const user = await firestoreService.getUser(currentUserId);
       const player: Player = {
         id: generateId(),
-        order_id: existingPlayers.length,
+        order_id: playerIds.length,
         user_id: currentUserId,
         display_name: user?.display_name ?? 'Player',
         role: null,
@@ -72,8 +74,8 @@ export default function JoinGameScreen() {
         player_color: null,
         commander_name: null,
       };
-      await firestoreService.addPlayer(player, game.id);
       await firestoreService.addPlayerIdToGame(game.id, currentUserId);
+      await firestoreService.addPlayer(player, game.id);
 
       trackEvent('join_game');
 
