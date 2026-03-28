@@ -14,6 +14,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '@/hooks/useAuth';
 import { useGameBoard } from '@/hooks/useGameBoard';
+import { useResponsive } from '@/hooks/useResponsive';
 import { IdentityCardHeader } from '@/components/IdentityCardHeader';
 import { IdentityCardDetail } from '@/components/IdentityCardDetail';
 import { PlaneCardBanner } from '@/components/PlaneCardBanner';
@@ -32,6 +33,7 @@ export default function GameBoardScreen() {
   const { gameId } = useLocalSearchParams<{ gameId: string }>();
   const router = useRouter();
   const { currentUserId } = useAuth();
+  const { isDesktop } = useResponsive();
 
   const {
     game,
@@ -228,129 +230,207 @@ export default function GameBoardScreen() {
 
       <ConnectionBanner />
 
-      {/* Identity card header — only when treachery active */}
-      {isTreacheryActive && currentIdentityCard && currentPlayer && (
-        <IdentityCardHeader
-          card={currentIdentityCard}
-          player={currentPlayer}
-          onPress={() => setShowCardDetail(true)}
-        />
-      )}
+      <View style={isDesktop ? styles.desktopRow : styles.mobileColumn}>
+        {/* ── Desktop sidebar ── */}
+        {isDesktop && (
+          <ScrollView style={styles.sidebar} contentContainerStyle={styles.sidebarContent}>
+            {isTreacheryActive && currentIdentityCard && currentPlayer && (
+              <IdentityCardHeader
+                card={currentIdentityCard}
+                player={currentPlayer}
+                onPress={() => setShowCardDetail(true)}
+              />
+            )}
 
-      {/* Plane card banner — only when planechase active and not own-deck */}
-      {isPlanechaseActive && !isOwnDeckMode && currentPlane && (
-        <PlaneCardBanner
-          planeCard={currentPlane}
-          secondaryPlaneCard={secondaryPlane}
-          onPress={() => setShowPlaneDetail(true)}
-          dieCost={dieRollCost}
-          isRolling={isRollingDie}
-          onRollDie={currentPlayer && !currentPlayer.is_eliminated ? rollDie : undefined}
-          lastDieResult={dieRollResult}
-          lastRollerName={lastRollerName}
-        />
-      )}
+            {isPlanechaseActive && !isOwnDeckMode && currentPlane && (
+              <PlaneCardBanner
+                planeCard={currentPlane}
+                secondaryPlaneCard={secondaryPlane}
+                onPress={() => setShowPlaneDetail(true)}
+                dieCost={dieRollCost}
+                isRolling={isRollingDie}
+                onRollDie={currentPlayer && !currentPlayer.is_eliminated ? rollDie : undefined}
+                lastDieResult={dieRollResult}
+                lastRollerName={lastRollerName}
+              />
+            )}
 
-      {/* Chaotic Aether warning banner */}
-      {isPlanechaseActive && isChaoticAetherActive && <ChaoticAetherBanner />}
+            {isPlanechaseActive && isChaoticAetherActive && <ChaoticAetherBanner />}
 
-      {/* Ornate divider */}
-      <View style={styles.ornateDividerRow}>
-        <View style={styles.ornateLine} />
-        <Text style={styles.ornateDiamond}>&#9670;</Text>
-        <View style={styles.ornateLine} />
-      </View>
+            <View style={{ flex: 1 }} />
 
-      {/* Player list — always shown */}
-      <FlatList
-        data={players}
-        keyExtractor={(p) => p.id}
-        renderItem={({ item }) => (
-          <PlayerRow
-            player={item}
-            isCurrentUser={item.user_id === currentUserId}
-            canSeeRole={isTreacheryActive ? canSeeRole(item) : false}
-            isUnveiledOrLeader={item.is_unveiled || item.role === 'leader'}
-            onAdjustLife={(amount) => adjustLife(item.id, amount)}
-            onViewCard={() => setInspectedPlayer(item)}
-            isDisabled={false}
-            onColorChange={item.user_id === currentUserId ? updatePlayerColor : undefined}
-            playerColor={item.player_color}
-          />
+            {isTreacheryActive && currentPlayer && !currentPlayer.is_eliminated && (
+              <View style={styles.actionBar}>
+                {!currentPlayer.is_unveiled && currentPlayer.role !== 'leader' && (
+                  <TouchableOpacity
+                    style={[styles.unveilButton, isPending && styles.buttonDisabled]}
+                    onPress={handleUnveil}
+                    disabled={isPending}
+                    accessibilityLabel="Unveil identity"
+                    accessibilityRole="button"
+                    accessibilityHint="Reveals your role and card to all players"
+                  >
+                    <Text style={styles.unveilButtonText}>Unveil Identity</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            )}
+
+            {isTreacheryActive && currentPlayer && !currentPlayer.is_eliminated && (
+              <TouchableOpacity
+                style={[styles.forfeitButton, isPending && { opacity: 0.5 }]}
+                onPress={handleForfeit}
+                disabled={isPending}
+                accessibilityLabel="Forfeit"
+                accessibilityRole="button"
+                accessibilityHint="Eliminates you from the game"
+              >
+                <Ionicons name="flag" size={16} color={colors.warning} />
+                <Text style={styles.forfeitText}>Forfeit</Text>
+              </TouchableOpacity>
+            )}
+
+            {!isTreacheryActive && isHost && currentPlayer && !currentPlayer.is_eliminated && (
+              <TouchableOpacity
+                style={[styles.endGameButton, isPending && { opacity: 0.5 }]}
+                onPress={handleEndGame}
+                disabled={isPending}
+                accessibilityLabel="End game"
+                accessibilityRole="button"
+                accessibilityHint="Ends the game for all players"
+              >
+                <Ionicons name="stop-circle" size={16} color={colors.error} />
+                <Text style={styles.endGameText}>End Game</Text>
+              </TouchableOpacity>
+            )}
+          </ScrollView>
         )}
-        style={styles.list}
-      />
 
-      {errorMessage && <ErrorBanner message={errorMessage} />}
+        {/* ── Main content area ── */}
+        <View style={isDesktop ? styles.mainContent : styles.mobileColumn}>
+          {/* Mobile-only: identity card header */}
+          {!isDesktop && isTreacheryActive && currentIdentityCard && currentPlayer && (
+            <IdentityCardHeader
+              card={currentIdentityCard}
+              player={currentPlayer}
+              onPress={() => setShowCardDetail(true)}
+            />
+          )}
 
-      {/* Spectator overlay for eliminated players */}
-      {currentPlayer?.is_eliminated && (
-        <View style={styles.spectatorBar}>
-          <View style={styles.spectatorBanner}>
-            <Ionicons name="skull" size={20} color={colors.error} />
-            <Text style={styles.spectatorTitle}>You&apos;ve Been Eliminated</Text>
+          {/* Mobile-only: plane card banner */}
+          {!isDesktop && isPlanechaseActive && !isOwnDeckMode && currentPlane && (
+            <PlaneCardBanner
+              planeCard={currentPlane}
+              secondaryPlaneCard={secondaryPlane}
+              onPress={() => setShowPlaneDetail(true)}
+              dieCost={dieRollCost}
+              isRolling={isRollingDie}
+              onRollDie={currentPlayer && !currentPlayer.is_eliminated ? rollDie : undefined}
+              lastDieResult={dieRollResult}
+              lastRollerName={lastRollerName}
+            />
+          )}
+
+          {/* Mobile-only: chaotic aether */}
+          {!isDesktop && isPlanechaseActive && isChaoticAetherActive && <ChaoticAetherBanner />}
+
+          {/* Ornate divider */}
+          <View style={styles.ornateDividerRow}>
+            <View style={styles.ornateLine} />
+            <Text style={styles.ornateDiamond}>&#9670;</Text>
+            <View style={styles.ornateLine} />
           </View>
-          <Text style={styles.spectatorSubtitle}>
-            You&apos;re now spectating. Watch the game unfold or leave.
-          </Text>
-          <TouchableOpacity
-            style={styles.spectatorLeaveButton}
-            onPress={navigateToGameOver}
-            accessibilityLabel="Leave game"
-            accessibilityRole="button"
-          >
-            <Text style={styles.spectatorLeaveText}>Leave Game</Text>
-          </TouchableOpacity>
-        </View>
-      )}
 
-      {/* Action bar (unveil/win) — only when treachery active */}
-      {isTreacheryActive && currentPlayer && !currentPlayer.is_eliminated && (
-        <View style={styles.actionBar}>
-          {!currentPlayer.is_unveiled && currentPlayer.role !== 'leader' && (
+          {/* Player list */}
+          <FlatList
+            data={players}
+            keyExtractor={(p) => p.id}
+            renderItem={({ item }) => (
+              <PlayerRow
+                player={item}
+                isCurrentUser={item.user_id === currentUserId}
+                canSeeRole={isTreacheryActive ? canSeeRole(item) : false}
+                isUnveiledOrLeader={item.is_unveiled || item.role === 'leader'}
+                onAdjustLife={(amount) => adjustLife(item.id, amount)}
+                onViewCard={() => setInspectedPlayer(item)}
+                isDisabled={false}
+                onColorChange={item.user_id === currentUserId ? updatePlayerColor : undefined}
+                playerColor={item.player_color}
+              />
+            )}
+            style={styles.list}
+          />
+
+          {errorMessage && <ErrorBanner message={errorMessage} />}
+
+          {/* Spectator overlay for eliminated players */}
+          {currentPlayer?.is_eliminated && (
+            <View style={styles.spectatorBar}>
+              <View style={styles.spectatorBanner}>
+                <Ionicons name="skull" size={20} color={colors.error} />
+                <Text style={styles.spectatorTitle}>You&apos;ve Been Eliminated</Text>
+              </View>
+              <Text style={styles.spectatorSubtitle}>
+                You&apos;re now spectating. Watch the game unfold or leave.
+              </Text>
+              <TouchableOpacity
+                style={styles.spectatorLeaveButton}
+                onPress={navigateToGameOver}
+                accessibilityLabel="Leave game"
+                accessibilityRole="button"
+              >
+                <Text style={styles.spectatorLeaveText}>Leave Game</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
+          {/* Mobile-only: action bar and buttons */}
+          {!isDesktop && isTreacheryActive && currentPlayer && !currentPlayer.is_eliminated && (
+            <View style={styles.actionBar}>
+              {!currentPlayer.is_unveiled && currentPlayer.role !== 'leader' && (
+                <TouchableOpacity
+                  style={[styles.unveilButton, isPending && styles.buttonDisabled]}
+                  onPress={handleUnveil}
+                  disabled={isPending}
+                  accessibilityLabel="Unveil identity"
+                  accessibilityRole="button"
+                  accessibilityHint="Reveals your role and card to all players"
+                >
+                  <Text style={styles.unveilButtonText}>Unveil Identity</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          )}
+
+          {!isDesktop && isTreacheryActive && currentPlayer && !currentPlayer.is_eliminated && (
             <TouchableOpacity
-              style={[styles.unveilButton, isPending && styles.buttonDisabled]}
-              onPress={handleUnveil}
+              style={[styles.forfeitButton, isPending && { opacity: 0.5 }]}
+              onPress={handleForfeit}
               disabled={isPending}
-              accessibilityLabel="Unveil identity"
+              accessibilityLabel="Forfeit"
               accessibilityRole="button"
-              accessibilityHint="Reveals your role and card to all players"
+              accessibilityHint="Eliminates you from the game"
             >
-              <Text style={styles.unveilButtonText}>Unveil Identity</Text>
+              <Ionicons name="flag" size={16} color={colors.warning} />
+              <Text style={styles.forfeitText}>Forfeit</Text>
+            </TouchableOpacity>
+          )}
+
+          {!isDesktop && !isTreacheryActive && isHost && currentPlayer && !currentPlayer.is_eliminated && (
+            <TouchableOpacity
+              style={[styles.endGameButton, isPending && { opacity: 0.5 }]}
+              onPress={handleEndGame}
+              disabled={isPending}
+              accessibilityLabel="End game"
+              accessibilityRole="button"
+              accessibilityHint="Ends the game for all players"
+            >
+              <Ionicons name="stop-circle" size={16} color={colors.error} />
+              <Text style={styles.endGameText}>End Game</Text>
             </TouchableOpacity>
           )}
         </View>
-      )}
-
-      {/* Forfeit button — only when treachery active */}
-      {isTreacheryActive && currentPlayer && !currentPlayer.is_eliminated && (
-        <TouchableOpacity
-          style={[styles.forfeitButton, isPending && { opacity: 0.5 }]}
-          onPress={handleForfeit}
-          disabled={isPending}
-          accessibilityLabel="Forfeit"
-          accessibilityRole="button"
-          accessibilityHint="Eliminates you from the game"
-        >
-          <Ionicons name="flag" size={16} color={colors.warning} />
-          <Text style={styles.forfeitText}>Forfeit</Text>
-        </TouchableOpacity>
-      )}
-
-      {/* End Game button — only when NOT treachery (host only) */}
-      {!isTreacheryActive && isHost && currentPlayer && !currentPlayer.is_eliminated && (
-        <TouchableOpacity
-          style={[styles.endGameButton, isPending && { opacity: 0.5 }]}
-          onPress={handleEndGame}
-          disabled={isPending}
-          accessibilityLabel="End game"
-          accessibilityRole="button"
-          accessibilityHint="Ends the game for all players"
-        >
-          <Ionicons name="stop-circle" size={16} color={colors.error} />
-          <Text style={styles.endGameText}>End Game</Text>
-        </TouchableOpacity>
-      )}
+      </View>
 
       {/* Identity card detail modal */}
       {isTreacheryActive && currentIdentityCard && currentPlayer && (
@@ -474,6 +554,25 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
+  },
+  desktopRow: {
+    flex: 1,
+    flexDirection: 'row',
+  },
+  mobileColumn: {
+    flex: 1,
+  },
+  sidebar: {
+    width: 320,
+    borderRightWidth: 1,
+    borderRightColor: colors.divider,
+    backgroundColor: colors.surface,
+  },
+  sidebarContent: {
+    flexGrow: 1,
+  },
+  mainContent: {
+    flex: 1,
   },
   centerContainer: {
     flex: 1,

@@ -1,9 +1,11 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, Pressable, PressableStateCallbackType } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Player, IdentityCard } from '@/models/types';
 import { ROLE_COLORS, ROLE_DISPLAY_NAMES } from '@/constants/roles';
 import { colors, fonts } from '@/constants/theme';
+
+type WebPressableState = PressableStateCallbackType & { hovered?: boolean };
 
 interface IdentityCardHeaderProps {
   card: IdentityCard;
@@ -17,32 +19,40 @@ export function IdentityCardHeader({ card, player, onPress }: IdentityCardHeader
 
   if (isAlwaysVisible) {
     return (
-      <TouchableOpacity
-        style={[styles.container, { borderColor: roleColor + '60' }]}
+      <Pressable
+        style={({ hovered, pressed }: WebPressableState) => [
+          styles.container,
+          { borderColor: roleColor + '60' },
+          hovered && styles.containerHovered,
+          pressed && styles.containerPressed,
+        ]}
         onPress={onPress}
-        activeOpacity={0.7}
         accessibilityLabel={`Your identity card: ${card.name}, ${player.role ? ROLE_DISPLAY_NAMES[player.role] : 'Unknown'} role, ${player.life_total} life`}
         accessibilityRole="button"
         accessibilityHint="Opens full identity card view"
       >
         <View style={[styles.topTrim, { backgroundColor: roleColor }]} />
         <RevealedContent card={card} player={player} roleColor={roleColor} />
-      </TouchableOpacity>
+      </Pressable>
     );
   }
 
   return (
-    <TouchableOpacity
-      style={[styles.container, { borderColor: colors.border }]}
+    <Pressable
+      style={({ hovered, pressed }: WebPressableState) => [
+        styles.container,
+        { borderColor: colors.border },
+        hovered && styles.containerHovered,
+        pressed && styles.containerPressed,
+      ]}
       onPress={onPress}
-      activeOpacity={0.7}
       accessibilityLabel="Your secret identity. Tap to peek."
       accessibilityRole="button"
       accessibilityHint="Opens full identity card view"
     >
       <View style={[styles.topTrim, { backgroundColor: colors.primary }]} />
       <ConcealedContent player={player} />
-    </TouchableOpacity>
+    </Pressable>
   );
 }
 
@@ -128,6 +138,12 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderTopWidth: 0,
     overflow: 'hidden',
+  },
+  containerHovered: {
+    backgroundColor: colors.surfaceLight,
+  },
+  containerPressed: {
+    opacity: 0.7,
   },
   topTrim: {
     height: 3,

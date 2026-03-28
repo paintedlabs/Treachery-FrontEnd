@@ -7,10 +7,12 @@ import { ErrorBanner } from '@/components/ErrorBanner';
 import { getCard } from '@/services/cardDatabase';
 import { ROLE_COLORS, ROLE_DISPLAY_NAMES } from '@/constants/roles';
 import { Game, Player, Role } from '@/models/types';
-import { colors, spacing, fonts } from '@/constants/theme';
+import { colors, spacing, fonts, contentMaxWidths } from '@/constants/theme';
+import { useResponsive } from '@/hooks/useResponsive';
 
 export default function HistoryScreen() {
   const { currentUserId } = useAuth();
+  const { isDesktop } = useResponsive();
   const { games, gamePlayers, isLoading, errorMessage, refresh } = useGameHistory(currentUserId);
 
   if (isLoading) {
@@ -33,7 +35,7 @@ export default function HistoryScreen() {
   }
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, isDesktop && styles.desktopContainer]}>
       <FlatList
         data={games}
         keyExtractor={(g) => g.id}
@@ -165,6 +167,11 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
+  },
+  desktopContainer: {
+    maxWidth: contentMaxWidths.medium,
+    alignSelf: 'center',
+    width: '100%',
   },
   centerContainer: {
     flex: 1,

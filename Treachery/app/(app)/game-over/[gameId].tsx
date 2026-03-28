@@ -6,13 +6,15 @@ import { useAuth } from '@/hooks/useAuth';
 import { useGameBoard } from '@/hooks/useGameBoard';
 import { LoadingScreen } from '@/components/LoadingScreen';
 import { ROLE_COLORS, ROLE_DISPLAY_NAMES } from '@/constants/roles';
-import { colors, spacing, fonts } from '@/constants/theme';
+import { colors, spacing, fonts, contentMaxWidths } from '@/constants/theme';
+import { useResponsive } from '@/hooks/useResponsive';
 
 export default function GameOverScreen() {
   const { gameId } = useLocalSearchParams<{ gameId: string }>();
   const router = useRouter();
   const { currentUserId } = useAuth();
 
+  const { isDesktop } = useResponsive();
   const { game, players, winningTeam, identityCard } = useGameBoard(gameId!, currentUserId);
 
   if (players.length === 0) {
@@ -25,7 +27,7 @@ export default function GameOverScreen() {
   const trophyColor = winningTeam ? ROLE_COLORS[winningTeam] : colors.text;
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, isDesktop && styles.desktopContainer]}>
       <View style={styles.spacer} />
 
       {/* Winner announcement — treachery modes with a winning team */}
@@ -144,6 +146,11 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.background,
     padding: spacing.lg,
+  },
+  desktopContainer: {
+    maxWidth: contentMaxWidths.medium,
+    alignSelf: 'center',
+    width: '100%',
   },
   spacer: {
     flex: 1,

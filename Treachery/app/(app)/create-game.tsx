@@ -16,7 +16,8 @@ import * as firestoreService from '@/services/firestore';
 import { CODE_CHARACTERS } from '@/constants/roles';
 import { Game, GameMode, Player } from '@/models/types';
 import { trackEvent } from '@/services/analytics';
-import { colors, spacing, fontSize } from '@/constants/theme';
+import { colors, spacing, fontSize, contentMaxWidths } from '@/constants/theme';
+import { useResponsive } from '@/hooks/useResponsive';
 
 const GAME_MODES: { value: GameMode; label: string }[] = [
   { value: 'treachery', label: 'Treachery' },
@@ -44,6 +45,7 @@ function generateId(): string {
 export default function CreateGameScreen() {
   const router = useRouter();
   const { currentUserId } = useAuth();
+  const { isDesktop } = useResponsive();
   const [gameMode, setGameMode] = useState<GameMode>('treachery');
   const [useOwnDeck, setUseOwnDeck] = useState(false);
   const [startingLife, setStartingLife] = useState(40);
@@ -140,7 +142,7 @@ export default function CreateGameScreen() {
   };
 
   return (
-    <ScrollView style={styles.scrollView} contentContainerStyle={styles.container}>
+    <ScrollView style={[styles.scrollView, isDesktop && styles.desktopScrollView]} contentContainerStyle={styles.container}>
       {/* Game Mode selector */}
       <View style={styles.section}>
         <Text style={styles.sectionHeader}>Game Mode</Text>
@@ -231,6 +233,11 @@ const styles = StyleSheet.create({
   scrollView: {
     flex: 1,
     backgroundColor: colors.background,
+  },
+  desktopScrollView: {
+    maxWidth: contentMaxWidths.narrow,
+    alignSelf: 'center',
+    width: '100%',
   },
   container: {
     padding: spacing.lg,

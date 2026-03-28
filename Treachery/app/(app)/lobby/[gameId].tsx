@@ -22,7 +22,8 @@ import { ErrorBanner } from '@/components/ErrorBanner';
 import { LoadingScreen } from '@/components/LoadingScreen';
 import { ConnectionBanner } from '@/components/ConnectionBanner';
 import { Player } from '@/models/types';
-import { colors, spacing, fonts, PLAYER_COLORS } from '@/constants/theme';
+import { colors, spacing, fonts, PLAYER_COLORS, contentMaxWidths } from '@/constants/theme';
+import { useResponsive } from '@/hooks/useResponsive';
 
 const MODE_DISPLAY: Record<string, string> = {
   treachery: 'Treachery',
@@ -198,6 +199,8 @@ export default function LobbyScreen() {
   const { currentUserId } = useAuth();
   const isHost = isHostParam === 'true';
 
+  const { isDesktop } = useResponsive();
+
   const {
     game,
     players,
@@ -308,7 +311,7 @@ export default function LobbyScreen() {
   const currentPlayerColor = players.find((p) => p.user_id === currentUserId)?.player_color;
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, isDesktop && styles.desktopContainer]}>
       {/* Player color background tint */}
       {currentPlayerColor && (
         <View
@@ -445,6 +448,11 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
+  },
+  desktopContainer: {
+    maxWidth: contentMaxWidths.medium,
+    alignSelf: 'center',
+    width: '100%',
   },
   centerContainer: {
     flex: 1,
