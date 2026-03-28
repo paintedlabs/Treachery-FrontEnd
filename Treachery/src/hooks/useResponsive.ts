@@ -1,5 +1,5 @@
 import { useWindowDimensions, Platform } from 'react-native';
-import { breakpoints, contentMaxWidths } from '@/constants/theme';
+import { breakpoints } from '@/constants/theme';
 
 export type Breakpoint = 'mobile' | 'tablet' | 'desktop';
 
