@@ -11,10 +11,12 @@ import {
 import { useAuth } from '@/hooks/useAuth';
 import { useFriends } from '@/hooks/useFriends';
 import { ErrorBanner } from '@/components/ErrorBanner';
-import { colors, spacing, fonts } from '@/constants/theme';
+import { colors, spacing, fonts, contentMaxWidths } from '@/constants/theme';
+import { useResponsive } from '@/hooks/useResponsive';
 
 export default function FriendsScreen() {
   const { currentUserId } = useAuth();
+  const { isDesktop } = useResponsive();
   const {
     friends,
     pendingRequests,
@@ -39,7 +41,7 @@ export default function FriendsScreen() {
   };
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, isDesktop && styles.desktopContainer]}>
       {/* Search section */}
       <View style={styles.searchSection}>
         <Text style={styles.sectionTitle}>Add Friends</Text>
@@ -167,6 +169,11 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
+  },
+  desktopContainer: {
+    maxWidth: contentMaxWidths.medium,
+    alignSelf: 'center',
+    width: '100%',
   },
   searchSection: {
     padding: spacing.lg,

@@ -15,11 +15,13 @@ import { StatBox } from '@/components/StatBox';
 import { ErrorBanner } from '@/components/ErrorBanner';
 import { ROLE_COLORS, ROLE_DISPLAY_NAMES } from '@/constants/roles';
 import { Role, DeckStat } from '@/models/types';
-import { colors, spacing, fonts } from '@/constants/theme';
+import { colors, spacing, fonts, contentMaxWidths } from '@/constants/theme';
+import { useResponsive } from '@/hooks/useResponsive';
 
 export default function ProfileScreen() {
   const router = useRouter();
   const { currentUserId, signOut } = useAuth();
+  const { isDesktop } = useResponsive();
   const { user, gameStats, errorMessage, isLoading, isSaving, saveName } =
     useProfile(currentUserId);
 
@@ -49,7 +51,7 @@ export default function ProfileScreen() {
   };
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+    <ScrollView style={[styles.container, isDesktop && styles.desktopContainer]} contentContainerStyle={styles.content}>
       {/* Profile section */}
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Profile</Text>
@@ -228,6 +230,11 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
+  },
+  desktopContainer: {
+    maxWidth: contentMaxWidths.medium,
+    alignSelf: 'center',
+    width: '100%',
   },
   content: {
     padding: spacing.lg,

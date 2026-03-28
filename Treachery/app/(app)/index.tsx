@@ -5,7 +5,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '@/hooks/useAuth';
 import { Game } from '@/models/types';
 import * as firestoreService from '@/services/firestore';
-import { colors, spacing, fonts } from '@/constants/theme';
+import { colors, spacing, fonts, contentMaxWidths } from '@/constants/theme';
+import { useResponsive } from '@/hooks/useResponsive';
 
 export default function HomeScreen() {
   const router = useRouter();
@@ -65,6 +66,8 @@ export default function HomeScreen() {
     };
   }, [authState, checkForActiveGame]);
 
+  const { isDesktop } = useResponsive();
+
   if (authState !== 'authenticated') return null;
 
   const handleRejoin = () => {
@@ -86,7 +89,7 @@ export default function HomeScreen() {
   };
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, isDesktop && styles.desktopContainer]}>
       <View style={styles.spacer} />
 
       {/* Title treatment */}
@@ -197,6 +200,11 @@ const styles = StyleSheet.create({
     padding: spacing.lg,
     alignItems: 'center',
     gap: spacing.lg,
+  },
+  desktopContainer: {
+    maxWidth: contentMaxWidths.narrow,
+    alignSelf: 'center',
+    width: '100%',
   },
   spacer: {
     flex: 1,

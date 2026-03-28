@@ -43,6 +43,17 @@ export const fonts = {
   body: undefined, // system default sans-serif
 };
 
+export const breakpoints = {
+  tablet: 768,
+  desktop: 1024,
+};
+
+export const contentMaxWidths = {
+  narrow: 480,
+  medium: 600,
+  wide: 1200,
+};
+
 export const PLAYER_COLORS = [
   { name: 'Crimson', hex: '#e74c3c' },
   { name: 'Sunset', hex: '#e67e22' },

@@ -1,9 +1,11 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Animated } from 'react-native';
+import { View, Text, TouchableOpacity, Pressable, PressableStateCallbackType, ScrollView, StyleSheet, Animated } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Player } from '@/models/types';
 import { ROLE_COLORS, ROLE_DISPLAY_NAMES } from '@/constants/roles';
 import { colors, fonts, PLAYER_COLORS } from '@/constants/theme';
+
+type WebPressableState = PressableStateCallbackType & { hovered?: boolean };
 
 interface PlayerRowProps {
   player: Player;
@@ -103,9 +105,12 @@ export function PlayerRow({
           ) : null}
 
           {isPublicRole ? (
-            <TouchableOpacity
+            <Pressable
               onPress={isUnveiledOrLeader && !isCurrentUser ? onViewCard : undefined}
-              style={styles.roleRow}
+              style={({ hovered }: WebPressableState) => [
+                styles.roleRow,
+                hovered && isUnveiledOrLeader && !isCurrentUser && styles.roleRowHovered,
+              ]}
               disabled={!isUnveiledOrLeader || isCurrentUser}
               accessibilityLabel={`${player.role ? ROLE_DISPLAY_NAMES[player.role] : 'Unknown'} role${isUnveiledOrLeader && !isCurrentUser ? ', view card' : ''}`}
               accessibilityRole="button"
@@ -120,7 +125,7 @@ export function PlayerRow({
               {isUnveiledOrLeader && !isCurrentUser && (
                 <Ionicons name="information-circle-outline" size={12} color={roleColor} />
               )}
-            </TouchableOpacity>
+            </Pressable>
           ) : (
             <Text style={styles.hiddenText}>Role Hidden</Text>
           )}
@@ -128,25 +133,35 @@ export function PlayerRow({
 
         {!player.is_eliminated ? (
           <View style={[styles.lifeControls, isDisabled && { opacity: 0.5 }]}>
-            <TouchableOpacity
+            <Pressable
               onPress={() => onAdjustLife(-1)}
               disabled={isDisabled}
+              style={({ hovered, pressed }: WebPressableState) => [
+                styles.lifeButton,
+                hovered && styles.lifeButtonDecrHovered,
+                pressed && styles.lifeButtonPressed,
+              ]}
               accessibilityLabel={`Decrease ${player.display_name} life`}
               accessibilityRole="button"
             >
               <Ionicons name="remove-circle" size={34} color={colors.error} />
-            </TouchableOpacity>
+            </Pressable>
             <View style={styles.lifeBox}>
               <Text style={styles.lifeText}>{player.life_total}</Text>
             </View>
-            <TouchableOpacity
+            <Pressable
               onPress={() => onAdjustLife(1)}
               disabled={isDisabled}
+              style={({ hovered, pressed }: WebPressableState) => [
+                styles.lifeButton,
+                hovered && styles.lifeButtonIncrHovered,
+                pressed && styles.lifeButtonPressed,
+              ]}
               accessibilityLabel={`Increase ${player.display_name} life`}
               accessibilityRole="button"
             >
               <Ionicons name="add-circle" size={34} color={colors.success} />
-            </TouchableOpacity>
+            </Pressable>
           </View>
         ) : (
           <Text style={styles.eliminatedText}>Eliminated</Text>
@@ -265,6 +280,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
+    borderRadius: 4,
+    paddingVertical: 1,
+    paddingHorizontal: 2,
+    marginHorizontal: -2,
+  },
+  roleRowHovered: {
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
   },
   roleDot: {
     width: 8,
@@ -306,6 +328,19 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     fontFamily: fonts.serif,
     textAlign: 'center',
+  },
+  lifeButton: {
+    borderRadius: 20,
+    padding: 2,
+  },
+  lifeButtonDecrHovered: {
+    backgroundColor: 'rgba(196, 60, 60, 0.15)',
+  },
+  lifeButtonIncrHovered: {
+    backgroundColor: 'rgba(60, 168, 92, 0.15)',
+  },
+  lifeButtonPressed: {
+    opacity: 0.7,
   },
   eliminatedText: {
     color: colors.error,

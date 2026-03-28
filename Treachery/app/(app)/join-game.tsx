@@ -15,7 +15,8 @@ import { ErrorBanner } from '@/components/ErrorBanner';
 import * as firestoreService from '@/services/firestore';
 import { Player } from '@/models/types';
 import { trackEvent } from '@/services/analytics';
-import { colors, spacing, fonts } from '@/constants/theme';
+import { colors, spacing, fonts, contentMaxWidths } from '@/constants/theme';
+import { useResponsive } from '@/hooks/useResponsive';
 
 function generateId(): string {
   return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
@@ -28,6 +29,7 @@ function generateId(): string {
 export default function JoinGameScreen() {
   const router = useRouter();
   const { currentUserId } = useAuth();
+  const { isDesktop } = useResponsive();
   const [gameCode, setGameCode] = useState('');
   const [isJoining, setIsJoining] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -86,7 +88,7 @@ export default function JoinGameScreen() {
   };
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, isDesktop && styles.desktopContainer]}>
       <Text style={styles.subtitle}>Enter the 4-character game code</Text>
 
       {/* Card-frame style code input */}
@@ -138,6 +140,11 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
     padding: spacing.lg,
     gap: spacing.xl,
+  },
+  desktopContainer: {
+    maxWidth: contentMaxWidths.narrow,
+    alignSelf: 'center',
+    width: '100%',
   },
   subtitle: {
     color: colors.textSecondary,
