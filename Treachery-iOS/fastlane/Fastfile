@@ -26,6 +26,17 @@ platform :ios do
   lane :beta do
     setup_ci if is_ci
 
+    # Import signing assets into Fastlane's temp keychain
+    if is_ci
+      import_certificate(
+        certificate_path: ENV["CERTIFICATE_PATH"],
+        certificate_password: ENV["P12_PASSWORD"],
+        keychain_name: "fastlane_tmp_keychain",
+        keychain_password: ""
+      )
+      install_provisioning_profile(path: ENV["PROFILE_PATH"])
+    end
+
     # Fetch App Store Connect API key from environment
     api_key = app_store_connect_api_key(
       key_id: ENV["APP_STORE_CONNECT_KEY_ID"],
@@ -62,6 +73,17 @@ platform :ios do
   desc "Build and submit to App Store review"
   lane :release do
     setup_ci if is_ci
+
+    # Import signing assets into Fastlane's temp keychain
+    if is_ci
+      import_certificate(
+        certificate_path: ENV["CERTIFICATE_PATH"],
+        certificate_password: ENV["P12_PASSWORD"],
+        keychain_name: "fastlane_tmp_keychain",
+        keychain_password: ""
+      )
+      install_provisioning_profile(path: ENV["PROFILE_PATH"])
+    end
 
     api_key = app_store_connect_api_key(
       key_id: ENV["APP_STORE_CONNECT_KEY_ID"],
