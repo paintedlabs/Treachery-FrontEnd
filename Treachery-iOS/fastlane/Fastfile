@@ -34,7 +34,8 @@ platform :ios do
         keychain_name: "fastlane_tmp_keychain",
         keychain_password: ""
       )
-      profile_uuid = install_provisioning_profile(path: ENV["PROFILE_PATH"])
+      profile_path = install_provisioning_profile(path: ENV["PROFILE_PATH"])
+      profile_uuid = File.basename(profile_path, ".mobileprovision")
 
       # Switch only the app target to manual signing (SPM packages stay automatic)
       update_code_signing_settings(
@@ -92,7 +93,8 @@ platform :ios do
         keychain_name: "fastlane_tmp_keychain",
         keychain_password: ""
       )
-      profile_uuid = install_provisioning_profile(path: ENV["PROFILE_PATH"])
+      profile_path = install_provisioning_profile(path: ENV["PROFILE_PATH"])
+      profile_uuid = File.basename(profile_path, ".mobileprovision")
 
       # Switch only the app target to manual signing (SPM packages stay automatic)
       update_code_signing_settings(
