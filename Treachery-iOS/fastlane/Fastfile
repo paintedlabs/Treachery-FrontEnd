@@ -2,6 +2,7 @@ default_platform(:ios)
 
 XCODEPROJ = "Treachery-iOS.xcodeproj"
 SCHEME    = "Treachery-iOS"
+BUNDLE_ID = "com.Solomon.Treachery-iOS"
 
 platform :ios do
 
@@ -27,6 +28,7 @@ platform :ios do
     setup_ci if is_ci
 
     # Import signing assets into Fastlane's temp keychain
+    profile_name = nil
     if is_ci
       import_certificate(
         certificate_path: ENV["CERTIFICATE_PATH"],
@@ -36,6 +38,9 @@ platform :ios do
       )
       profile_path = install_provisioning_profile(path: ENV["PROFILE_PATH"])
       profile_uuid = File.basename(profile_path, ".mobileprovision")
+
+      # Extract profile name for export options
+      profile_name = sh("security cms -D -i '#{ENV["PROFILE_PATH"]}' | plutil -extract Name raw -o - -").strip
 
       # Switch only the app target to manual signing (SPM packages stay automatic)
       update_code_signing_settings(
@@ -64,13 +69,19 @@ platform :ios do
     )
 
     # Build
-    build_app(
+    build_args = {
       project: XCODEPROJ,
       scheme: SCHEME,
       export_method: "app-store",
       output_directory: "./build",
       clean: true
-    )
+    }
+    if profile_name
+      build_args[:export_options] = {
+        provisioningProfiles: { BUNDLE_ID => profile_name }
+      }
+    end
+    build_app(build_args)
 
     # Upload to TestFlight
     upload_to_testflight(
@@ -86,6 +97,7 @@ platform :ios do
     setup_ci if is_ci
 
     # Import signing assets into Fastlane's temp keychain
+    profile_name = nil
     if is_ci
       import_certificate(
         certificate_path: ENV["CERTIFICATE_PATH"],
@@ -95,6 +107,9 @@ platform :ios do
       )
       profile_path = install_provisioning_profile(path: ENV["PROFILE_PATH"])
       profile_uuid = File.basename(profile_path, ".mobileprovision")
+
+      # Extract profile name for export options
+      profile_name = sh("security cms -D -i '#{ENV["PROFILE_PATH"]}' | plutil -extract Name raw -o - -").strip
 
       # Switch only the app target to manual signing (SPM packages stay automatic)
       update_code_signing_settings(
@@ -122,13 +137,19 @@ platform :ios do
     )
 
     # Build
-    build_app(
+    build_args = {
       project: XCODEPROJ,
       scheme: SCHEME,
       export_method: "app-store",
       output_directory: "./build",
       clean: true
-    )
+    }
+    if profile_name
+      build_args[:export_options] = {
+        provisioningProfiles: { BUNDLE_ID => profile_name }
+      }
+    end
+    build_app(build_args)
 
     # Upload and submit for review
     upload_to_app_store(
