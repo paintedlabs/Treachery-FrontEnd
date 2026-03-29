@@ -52,13 +52,14 @@ platform :ios do
       xcodeproj: XCODEPROJ
     )
 
-    # Build
+    # Build (override signing for CI — project uses Automatic but CI needs Manual)
     build_app(
       project: XCODEPROJ,
       scheme: SCHEME,
       export_method: "app-store",
       output_directory: "./build",
-      clean: true
+      clean: true,
+      xcargs: "CODE_SIGN_STYLE='Manual' CODE_SIGN_IDENTITY='Apple Distribution'"
     )
 
     # Upload to TestFlight
@@ -99,13 +100,14 @@ platform :ios do
       xcodeproj: XCODEPROJ
     )
 
-    # Build
+    # Build (override signing for CI — project uses Automatic but CI needs Manual)
     build_app(
       project: XCODEPROJ,
       scheme: SCHEME,
       export_method: "app-store",
       output_directory: "./build",
-      clean: true
+      clean: true,
+      xcargs: "CODE_SIGN_STYLE='Manual' CODE_SIGN_IDENTITY='Apple Distribution'"
     )
 
     # Upload and submit for review
