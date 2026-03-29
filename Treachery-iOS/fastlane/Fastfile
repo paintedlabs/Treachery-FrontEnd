@@ -34,7 +34,17 @@ platform :ios do
         keychain_name: "fastlane_tmp_keychain",
         keychain_password: ""
       )
-      install_provisioning_profile(path: ENV["PROFILE_PATH"])
+      profile_uuid = install_provisioning_profile(path: ENV["PROFILE_PATH"])
+
+      # Switch only the app target to manual signing (SPM packages stay automatic)
+      update_code_signing_settings(
+        use_automatic_signing: false,
+        path: XCODEPROJ,
+        team_id: ENV["TEAM_ID"],
+        code_sign_identity: "Apple Distribution",
+        profile_uuid: profile_uuid,
+        targets: ["Treachery-iOS"]
+      )
     end
 
     # Fetch App Store Connect API key from environment
@@ -52,14 +62,13 @@ platform :ios do
       xcodeproj: XCODEPROJ
     )
 
-    # Build (override signing for CI — project uses Automatic but CI needs Manual)
+    # Build
     build_app(
       project: XCODEPROJ,
       scheme: SCHEME,
       export_method: "app-store",
       output_directory: "./build",
-      clean: true,
-      xcargs: "CODE_SIGN_STYLE='Manual' CODE_SIGN_IDENTITY='Apple Distribution'"
+      clean: true
     )
 
     # Upload to TestFlight
@@ -83,7 +92,17 @@ platform :ios do
         keychain_name: "fastlane_tmp_keychain",
         keychain_password: ""
       )
-      install_provisioning_profile(path: ENV["PROFILE_PATH"])
+      profile_uuid = install_provisioning_profile(path: ENV["PROFILE_PATH"])
+
+      # Switch only the app target to manual signing (SPM packages stay automatic)
+      update_code_signing_settings(
+        use_automatic_signing: false,
+        path: XCODEPROJ,
+        team_id: ENV["TEAM_ID"],
+        code_sign_identity: "Apple Distribution",
+        profile_uuid: profile_uuid,
+        targets: ["Treachery-iOS"]
+      )
     end
 
     api_key = app_store_connect_api_key(
@@ -100,14 +119,13 @@ platform :ios do
       xcodeproj: XCODEPROJ
     )
 
-    # Build (override signing for CI — project uses Automatic but CI needs Manual)
+    # Build
     build_app(
       project: XCODEPROJ,
       scheme: SCHEME,
       export_method: "app-store",
       output_directory: "./build",
-      clean: true,
-      xcargs: "CODE_SIGN_STYLE='Manual' CODE_SIGN_IDENTITY='Apple Distribution'"
+      clean: true
     )
 
     # Upload and submit for review
