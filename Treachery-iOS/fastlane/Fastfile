@@ -80,8 +80,7 @@ platform :ios do
       export_method: "app-store",
       output_directory: "./build",
       clean: true,
-      xcargs: signing_args,
-      export_xcargs: signing_args
+      xcargs: signing_args
     )
 
     # Upload to TestFlight
@@ -129,8 +128,7 @@ platform :ios do
       export_method: "app-store",
       output_directory: "./build",
       clean: true,
-      xcargs: signing_args,
-      export_xcargs: signing_args
+      xcargs: signing_args
     )
 
     # Upload and submit for review
