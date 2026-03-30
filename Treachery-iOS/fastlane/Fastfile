@@ -70,17 +70,39 @@ platform :ios do
       xcodeproj: XCODEPROJ
     )
 
-    # Build — use -allowProvisioningUpdates on CI so xcodebuild
-    # resolves profiles automatically (handles Push Notifications,
-    # SPM packages, etc. without manual signing overrides)
+    # Download App Store distribution profile so the export step
+    # can find it locally (avoids cloud signing permission errors)
+    sigh(
+      api_key: api_key,
+      app_identifier: "com.Solomon.Treachery-iOS",
+      readonly: true
+    ) if is_ci
+
+    # Split archive and export: xcargs (with -allowProvisioningUpdates)
+    # applies to BOTH steps, but cloud-managed distribution signing
+    # fails on export. Archive separately, then export without those flags.
     signing_args = is_ci ? ci_signing_xcargs : ""
+    archive_path = "./build/Treachery-iOS.xcarchive"
+
+    # Archive — cloud signing resolves automatic signing on CI
+    build_app(
+      project: XCODEPROJ,
+      scheme: SCHEME,
+      clean: true,
+      xcargs: signing_args,
+      skip_package_ipa: true,
+      archive_path: archive_path
+    )
+
+    # Export IPA — no cloud signing flags; uses the distribution
+    # profile downloaded by sigh above
     build_app(
       project: XCODEPROJ,
       scheme: SCHEME,
       export_method: "app-store",
       output_directory: "./build",
-      clean: true,
-      xcargs: signing_args
+      archive_path: archive_path,
+      skip_build_archive: true
     )
 
     # Upload to TestFlight
@@ -120,15 +142,33 @@ platform :ios do
       xcodeproj: XCODEPROJ
     )
 
-    # Build
+    # Download distribution profile for export step
+    sigh(
+      api_key: api_key,
+      app_identifier: "com.Solomon.Treachery-iOS",
+      readonly: true
+    ) if is_ci
+
+    # Split archive/export to avoid cloud signing permission error on export
     signing_args = is_ci ? ci_signing_xcargs : ""
+    archive_path = "./build/Treachery-iOS.xcarchive"
+
+    build_app(
+      project: XCODEPROJ,
+      scheme: SCHEME,
+      clean: true,
+      xcargs: signing_args,
+      skip_package_ipa: true,
+      archive_path: archive_path
+    )
+
     build_app(
       project: XCODEPROJ,
       scheme: SCHEME,
       export_method: "app-store",
       output_directory: "./build",
-      clean: true,
-      xcargs: signing_args
+      archive_path: archive_path,
+      skip_build_archive: true
     )
 
     # Upload and submit for review
