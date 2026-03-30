@@ -49,6 +49,15 @@ class AppDelegate: NSObject, UIApplicationDelegate, MessagingDelegate, UNUserNot
         return true
     }
 
+    // MARK: - Orientation Lock (portrait only on iPhone)
+
+    func application(
+        _ application: UIApplication,
+        supportedInterfaceOrientationsFor window: UIWindow?
+    ) -> UIInterfaceOrientationMask {
+        return .portrait
+    }
+
     // MARK: - Phone Auth APNs Support
 
     func application(
