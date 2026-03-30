@@ -48,4 +48,5 @@ jobs:
           APP_STORE_CONNECT_KEY: ${{ secrets.APP_STORE_CONNECT_KEY }}
           CERTIFICATE_PATH: ${{ runner.temp }}/build_certificate.p12
           P12_PASSWORD: ${{ secrets.P12_PASSWORD }}
+          FASTLANE_XCODEBUILD_SETTINGS_TIMEOUT: 30
         run: bundle exec fastlane release
