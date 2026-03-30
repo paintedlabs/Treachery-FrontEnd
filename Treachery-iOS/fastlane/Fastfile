@@ -20,31 +20,38 @@ platform :ios do
     )
   end
 
+  # ── Shared CI setup ──────────────────────────────────────
+
+  # Writes the App Store Connect API key to a .p8 file and returns
+  # the xcargs string needed for -allowProvisioningUpdates.
+  # This lets xcodebuild resolve signing automatically on CI
+  # (profiles, Push Notifications, etc.) without manual overrides.
+  private_lane :ci_signing_xcargs do
+    require "base64"
+    api_key_path = File.join(Dir.tmpdir, "AuthKey_#{ENV['APP_STORE_CONNECT_KEY_ID']}.p8")
+    File.write(api_key_path, Base64.decode64(ENV["APP_STORE_CONNECT_KEY"]))
+
+    [
+      "-allowProvisioningUpdates",
+      "-authenticationKeyPath '#{api_key_path}'",
+      "-authenticationKeyID '#{ENV['APP_STORE_CONNECT_KEY_ID']}'",
+      "-authenticationKeyIssuerID '#{ENV['APP_STORE_CONNECT_ISSUER_ID']}'"
+    ].join(" ")
+  end
+
   # ── Beta (TestFlight) ─────────────────────────────────
 
   desc "Build and upload to TestFlight"
   lane :beta do
     setup_ci if is_ci
 
-    # Import signing assets into Fastlane's temp keychain
+    # Import distribution certificate into Fastlane's temp keychain
     if is_ci
       import_certificate(
         certificate_path: ENV["CERTIFICATE_PATH"],
         certificate_password: ENV["P12_PASSWORD"],
         keychain_name: "fastlane_tmp_keychain",
         keychain_password: ""
-      )
-      profile_path = install_provisioning_profile(path: ENV["PROFILE_PATH"])
-      profile_uuid = File.basename(profile_path, ".mobileprovision")
-
-      # Switch only the app target to manual signing (SPM packages stay automatic)
-      update_code_signing_settings(
-        use_automatic_signing: false,
-        path: XCODEPROJ,
-        team_id: ENV["TEAM_ID"],
-        code_sign_identity: "Apple Distribution",
-        profile_uuid: profile_uuid,
-        targets: ["Treachery-iOS"]
       )
     end
 
@@ -63,13 +70,18 @@ platform :ios do
       xcodeproj: XCODEPROJ
     )
 
-    # Build
+    # Build — use -allowProvisioningUpdates on CI so xcodebuild
+    # resolves profiles automatically (handles Push Notifications,
+    # SPM packages, etc. without manual signing overrides)
+    signing_args = is_ci ? ci_signing_xcargs : ""
     build_app(
       project: XCODEPROJ,
       scheme: SCHEME,
       export_method: "app-store",
       output_directory: "./build",
-      clean: true
+      clean: true,
+      xcargs: signing_args,
+      export_xcargs: signing_args
     )
 
     # Upload to TestFlight
@@ -85,25 +97,13 @@ platform :ios do
   lane :release do
     setup_ci if is_ci
 
-    # Import signing assets into Fastlane's temp keychain
+    # Import distribution certificate into Fastlane's temp keychain
     if is_ci
       import_certificate(
         certificate_path: ENV["CERTIFICATE_PATH"],
         certificate_password: ENV["P12_PASSWORD"],
         keychain_name: "fastlane_tmp_keychain",
         keychain_password: ""
-      )
-      profile_path = install_provisioning_profile(path: ENV["PROFILE_PATH"])
-      profile_uuid = File.basename(profile_path, ".mobileprovision")
-
-      # Switch only the app target to manual signing (SPM packages stay automatic)
-      update_code_signing_settings(
-        use_automatic_signing: false,
-        path: XCODEPROJ,
-        team_id: ENV["TEAM_ID"],
-        code_sign_identity: "Apple Distribution",
-        profile_uuid: profile_uuid,
-        targets: ["Treachery-iOS"]
       )
     end
 
@@ -122,12 +122,15 @@ platform :ios do
     )
 
     # Build
+    signing_args = is_ci ? ci_signing_xcargs : ""
     build_app(
       project: XCODEPROJ,
       scheme: SCHEME,
       export_method: "app-store",
       output_directory: "./build",
-      clean: true
+      clean: true,
+      xcargs: signing_args,
+      export_xcargs: signing_args
     )
 
     # Upload and submit for review
