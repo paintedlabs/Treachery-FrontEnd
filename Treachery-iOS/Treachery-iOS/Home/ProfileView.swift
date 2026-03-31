@@ -9,14 +9,7 @@ import SwiftUI
 
 struct ProfileView: View {
     @EnvironmentObject var authViewModel: AuthViewModel
-    @State private var user: TreacheryUser?
-    @State private var isEditingName = false
-    @State private var editedName = ""
-    @State private var errorMessage: String?
-    @State private var isSaving = false
-    @State private var gameStats: GameStats?
-
-    private let firestoreManager = FirestoreManager()
+    @StateObject private var viewModel = ProfileViewModel()
 
     var body: some View {
         ZStack {
@@ -46,10 +39,10 @@ struct ProfileView: View {
                             .padding(.horizontal, 16)
                             .padding(.bottom, 8)
 
-                        if let user = user {
-                            ProfileRow(label: "Display Name", value: isEditingName ? nil : user.displayName) {
-                                if isEditingName {
-                                    TextField("Name", text: $editedName)
+                        if let user = viewModel.user {
+                            ProfileRow(label: "Display Name", value: viewModel.isEditingName ? nil : user.displayName) {
+                                if viewModel.isEditingName {
+                                    TextField("Name", text: $viewModel.editedName)
                                         .multilineTextAlignment(.trailing)
                                         .textInputAutocapitalization(.words)
                                         .foregroundStyle(Color.mtgGoldBright)
@@ -61,13 +54,8 @@ struct ProfileView: View {
                                     .foregroundStyle(Color.mtgTextSecondary)
                             }
                         } else {
-                            HStack {
-                                Spacer()
-                                ProgressView()
-                                    .tint(Color.mtgGold)
-                                Spacer()
-                            }
-                            .padding()
+                            MtgLoadingView()
+                                .padding()
                         }
                     }
                     .mtgCardFrame()
@@ -84,7 +72,7 @@ struct ProfileView: View {
                             .padding(.horizontal, 16)
                             .padding(.bottom, 12)
 
-                        if let stats = gameStats {
+                        if let stats = viewModel.gameStats {
                             HStack(spacing: 8) {
                                 MtgStatBox(value: "\(stats.totalGames)", label: "Games", color: Color.mtgTextPrimary)
                                 MtgStatBox(value: "\(stats.wins)", label: "Wins", color: Color.mtgSuccess)
@@ -95,7 +83,7 @@ struct ProfileView: View {
                             .padding(.bottom, 8)
 
                             HStack(spacing: 8) {
-                                MtgStatBox(value: "\(user?.elo ?? 1500)", label: "ELO", color: Color.mtgGoldBright)
+                                MtgStatBox(value: "\(viewModel.user?.elo ?? 1500)", label: "ELO", color: Color.mtgGoldBright)
                             }
                             .padding(.horizontal, 16)
                             .padding(.bottom, 12)
@@ -140,20 +128,14 @@ struct ProfileView: View {
                                 .padding(.vertical, 12)
                             }
                         } else {
-                            HStack {
-                                Spacer()
-                                ProgressView("Loading stats...")
-                                    .tint(Color.mtgGold)
-                                    .foregroundStyle(Color.mtgTextSecondary)
-                                Spacer()
-                            }
-                            .padding()
+                            MtgLoadingView(message: "Loading stats...")
+                                .padding()
                         }
                     }
                     .mtgCardFrame()
 
                     // Deck Performance card
-                    if let deckStats = user?.deckStats, !deckStats.isEmpty {
+                    if let deckStats = viewModel.user?.deckStats, !deckStats.isEmpty {
                         VStack(spacing: 0) {
                             MtgSectionHeader(title: "Deck Performance")
                                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -211,7 +193,7 @@ struct ProfileView: View {
                     }
 
                     // Friends card
-                    if let user = user {
+                    if viewModel.user != nil {
                         NavigationLink {
                             FriendsListView()
                         } label: {
@@ -219,7 +201,7 @@ struct ProfileView: View {
                                 Text("Friends")
                                     .foregroundStyle(Color.mtgTextPrimary)
                                 Spacer()
-                                Text("\(user.friendIds.count)")
+                                Text("\(viewModel.user?.friendIds.count ?? 0)")
                                     .foregroundStyle(Color.mtgTextSecondary)
                                 Image(systemName: "chevron.right")
                                     .font(.caption)
@@ -231,7 +213,7 @@ struct ProfileView: View {
                     }
 
                     // Error
-                    if let error = errorMessage {
+                    if let error = viewModel.errorMessage {
                         VStack(alignment: .leading, spacing: 8) {
                             MtgErrorBanner(message: "Error loading profile")
                             Text(error)
@@ -261,101 +243,25 @@ struct ProfileView: View {
         .onAppear { AnalyticsService.trackScreen("Profile") }
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
-                if isEditingName {
-                    Button(isSaving ? "Saving..." : "Save") {
-                        Task { await saveName() }
+                if viewModel.isEditingName {
+                    Button(viewModel.isSaving ? "Saving..." : "Save") {
+                        Task { await viewModel.saveName() }
                     }
                     .foregroundStyle(Color.mtgGold)
-                    .disabled(editedName.isEmpty || isSaving)
+                    .disabled(viewModel.editedName.isEmpty || viewModel.isSaving)
                 } else {
                     Button("Edit") {
-                        editedName = user?.displayName ?? ""
-                        isEditingName = true
+                        viewModel.startEditing()
                     }
                     .foregroundStyle(Color.mtgGold)
-                    .disabled(user == nil)
+                    .disabled(viewModel.user == nil)
                 }
             }
         }
         .task {
-            await loadData()
+            guard let userId = authViewModel.currentUserId else { return }
+            await viewModel.loadData(userId: userId)
         }
-    }
-
-    // MARK: - Data Loading
-
-    private func loadData() async {
-        guard let userId = authViewModel.currentUserId else { return }
-        errorMessage = nil
-
-        do {
-            async let userTask = firestoreManager.getUser(id: userId)
-            async let gamesTask = firestoreManager.getFinishedGames(forUserId: userId)
-
-            user = try await userTask
-            let games = try await gamesTask
-
-            // Calculate stats
-            await calculateStats(games: games, userId: userId)
-        } catch {
-            errorMessage = error.localizedDescription
-        }
-    }
-
-    private func calculateStats(games: [Game], userId: String) async {
-        var wins = 0
-        var losses = 0
-        var roleBreakdown: [Role: Int] = [:]
-
-        for game in games {
-            // Fetch players to find this user's role
-            if let players = try? await firestoreManager.getPlayers(gameId: game.id),
-               let myPlayer = players.first(where: { $0.userId == userId }),
-               let myRole = myPlayer.role {
-
-                roleBreakdown[myRole, default: 0] += 1
-
-                // Determine if this was a win
-                if let winTeamString = game.winningTeam,
-                   let winRole = Role(rawValue: winTeamString) {
-                    let didWin: Bool
-                    if winRole == .leader {
-                        didWin = myRole == .leader || myRole == .guardian
-                    } else {
-                        didWin = myRole == winRole
-                    }
-                    if didWin {
-                        wins += 1
-                    } else {
-                        losses += 1
-                    }
-                }
-            }
-        }
-
-        gameStats = GameStats(
-            totalGames: games.count,
-            wins: wins,
-            losses: losses,
-            roleBreakdown: roleBreakdown
-        )
-    }
-
-    private func saveName() async {
-        guard var updatedUser = user else { return }
-        guard !editedName.trimmingCharacters(in: .whitespaces).isEmpty else { return }
-        isSaving = true
-        errorMessage = nil
-
-        updatedUser.displayName = editedName.trimmingCharacters(in: .whitespaces)
-        do {
-            try await firestoreManager.updateUser(updatedUser)
-            user = updatedUser
-            isEditingName = false
-        } catch {
-            errorMessage = error.localizedDescription
-        }
-        isSaving = false
     }
 }
 
@@ -399,21 +305,6 @@ private struct ProfileRow<Content: View>: View {
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 10)
-    }
-}
-
-// MARK: - Game Stats
-
-private struct GameStats {
-    let totalGames: Int
-    let wins: Int
-    let losses: Int
-    let roleBreakdown: [Role: Int]
-
-    var winRateText: String {
-        guard totalGames > 0 else { return "--" }
-        let rate = Double(wins) / Double(totalGames) * 100
-        return "\(Int(rate))%"
     }
 }
 

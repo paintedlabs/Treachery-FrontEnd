@@ -9,12 +9,7 @@ import SwiftUI
 
 struct GameHistoryView: View {
     @EnvironmentObject var authViewModel: AuthViewModel
-    @State private var games: [Game] = []
-    @State private var gamePlayers: [String: [Player]] = [:]
-    @State private var isLoading = true
-    @State private var errorMessage: String?
-
-    private let firestoreManager = FirestoreManager()
+    @StateObject private var viewModel = GameHistoryViewModel()
 
     var body: some View {
         ZStack {
@@ -22,13 +17,11 @@ struct GameHistoryView: View {
 
             ScrollView {
                 VStack(spacing: 16) {
-                    if isLoading {
+                    if viewModel.isLoading {
                         Spacer(minLength: 100)
-                        ProgressView("Loading game history...")
-                            .tint(Color.mtgGold)
-                            .foregroundStyle(Color.mtgTextSecondary)
+                        MtgLoadingView(message: "Loading game history...")
                         Spacer()
-                    } else if games.isEmpty {
+                    } else if viewModel.games.isEmpty {
                         Spacer(minLength: 80)
                         VStack(spacing: 12) {
                             Image(systemName: "clock.badge.questionmark")
@@ -44,17 +37,17 @@ struct GameHistoryView: View {
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 32)
                     } else {
-                        ForEach(games) { game in
+                        ForEach(viewModel.games) { game in
                             GameHistoryRow(
                                 game: game,
-                                players: gamePlayers[game.id] ?? [],
+                                players: viewModel.gamePlayers[game.id] ?? [],
                                 currentUserId: authViewModel.currentUserId
                             )
                             .padding(.horizontal)
                         }
                     }
 
-                    if let error = errorMessage {
+                    if let error = viewModel.errorMessage {
                         MtgErrorBanner(message: error)
                             .padding(.horizontal)
                     }
@@ -66,41 +59,13 @@ struct GameHistoryView: View {
         .toolbarColorScheme(.dark, for: .navigationBar)
         .onAppear { AnalyticsService.trackScreen("GameHistory") }
         .task {
-            await loadHistory()
+            guard let userId = authViewModel.currentUserId else { return }
+            await viewModel.loadHistory(userId: userId)
         }
         .refreshable {
-            await loadHistory()
+            guard let userId = authViewModel.currentUserId else { return }
+            await viewModel.loadHistory(userId: userId)
         }
-    }
-
-    private func loadHistory() async {
-        guard let userId = authViewModel.currentUserId else { return }
-        isLoading = true
-        errorMessage = nil
-
-        do {
-            games = try await firestoreManager.getFinishedGames(forUserId: userId)
-
-            // Load players for all games concurrently
-            await withTaskGroup(of: (String, [Player])?.self) { group in
-                for game in games {
-                    group.addTask {
-                        guard let players = try? await firestoreManager.getPlayers(gameId: game.id) else {
-                            return nil
-                        }
-                        return (game.id, players)
-                    }
-                }
-                for await result in group {
-                    if let (gameId, players) = result {
-                        gamePlayers[gameId] = players
-                    }
-                }
-            }
-        } catch {
-            errorMessage = error.localizedDescription
-        }
-        isLoading = false
     }
 }
 
@@ -124,7 +89,6 @@ private struct GameHistoryRow: View {
     private var didWin: Bool {
         guard let myRole = currentPlayerInGame?.role,
               let winRole = winningRole else { return false }
-        // Leader and Guardian share a win condition
         if winRole == .leader {
             return myRole == .leader || myRole == .guardian
         }

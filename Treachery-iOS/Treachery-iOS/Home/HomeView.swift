@@ -9,7 +9,7 @@ import SwiftUI
 
 // MARK: - Navigation Destinations
 
-/// All navigation destinations managed by the root NavigationStack.
+/// Game-flow destinations managed by the Home tab's NavigationStack.
 /// Using a single enum lets `path.removeLast(path.count)` pop to root reliably.
 enum AppDestination: Hashable {
     case createGame
@@ -17,16 +17,86 @@ enum AppDestination: Hashable {
     case lobby(gameId: String, isHost: Bool)
     case gameBoard(gameId: String)
     case gameOver(gameId: String)
-    case profile
-    case friends
-    case gameHistory
 }
+
+// MARK: - Tab Selection
+
+enum AppTab: Hashable {
+    case home
+    case history
+    case friends
+    case profile
+}
+
+// MARK: - Root Tab View
 
 struct HomeView: View {
     @EnvironmentObject var authViewModel: AuthViewModel
+    @State private var selectedTab: AppTab = .home
+
+    init() {
+        let appearance = UITabBarAppearance()
+        appearance.configureWithOpaqueBackground()
+        appearance.backgroundColor = UIColor(Color.mtgSurface)
+
+        let normalAttributes: [NSAttributedString.Key: Any] = [
+            .foregroundColor: UIColor(Color.mtgTextSecondary)
+        ]
+        let selectedAttributes: [NSAttributedString.Key: Any] = [
+            .foregroundColor: UIColor(Color.mtgGold)
+        ]
+
+        appearance.stackedLayoutAppearance.normal.titleTextAttributes = normalAttributes
+        appearance.stackedLayoutAppearance.normal.iconColor = UIColor(Color.mtgTextSecondary)
+        appearance.stackedLayoutAppearance.selected.titleTextAttributes = selectedAttributes
+        appearance.stackedLayoutAppearance.selected.iconColor = UIColor(Color.mtgGold)
+
+        UITabBar.appearance().standardAppearance = appearance
+        UITabBar.appearance().scrollEdgeAppearance = appearance
+    }
+
+    var body: some View {
+        TabView(selection: $selectedTab) {
+            HomeTab()
+                .tabItem {
+                    Label("Play", systemImage: "gamecontroller.fill")
+                }
+                .tag(AppTab.home)
+
+            NavigationStack {
+                GameHistoryView()
+            }
+            .tabItem {
+                Label("History", systemImage: "clock.fill")
+            }
+            .tag(AppTab.history)
+
+            NavigationStack {
+                FriendsListView()
+            }
+            .tabItem {
+                Label("Friends", systemImage: "person.2.fill")
+            }
+            .tag(AppTab.friends)
+
+            NavigationStack {
+                ProfileView()
+            }
+            .tabItem {
+                Label("Profile", systemImage: "person.circle.fill")
+            }
+            .tag(AppTab.profile)
+        }
+    }
+}
+
+// MARK: - Home Tab
+
+/// The main Play tab — contains the game flow NavigationStack.
+private struct HomeTab: View {
+    @EnvironmentObject var authViewModel: AuthViewModel
     @State private var path = NavigationPath()
-    @State private var activeGame: Game?
-    private let firestoreManager = FirestoreManager()
+    @StateObject private var viewModel = HomeViewModel()
 
     var body: some View {
         NavigationStack(path: $path) {
@@ -71,7 +141,7 @@ struct HomeView: View {
                         .frame(height: 20)
 
                     // Rejoin active game banner
-                    if let game = activeGame {
+                    if let game = viewModel.activeGame {
                         Button {
                             if game.state == .inProgress {
                                 path.append(AppDestination.gameBoard(gameId: game.id))
@@ -129,58 +199,6 @@ struct HomeView: View {
                     .padding(.horizontal)
 
                     Spacer()
-                        .frame(height: 16)
-
-                    Spacer()
-
-                    // Bottom navigation with tab bar surface
-                    HStack(spacing: 24) {
-                        NavigationLink(value: AppDestination.gameHistory) {
-                            VStack(spacing: 4) {
-                                Image(systemName: "clock.fill")
-                                    .font(.title3)
-                                Text("History")
-                                    .font(.caption)
-                            }
-                            .foregroundStyle(Color.mtgTextSecondary)
-                        }
-                        .accessibilityLabel("Game history")
-
-                        NavigationLink(value: AppDestination.friends) {
-                            VStack(spacing: 4) {
-                                Image(systemName: "person.2.fill")
-                                    .font(.title3)
-                                Text("Friends")
-                                    .font(.caption)
-                            }
-                            .foregroundStyle(Color.mtgTextSecondary)
-                        }
-                        .accessibilityLabel("Friends list")
-
-                        NavigationLink(value: AppDestination.profile) {
-                            VStack(spacing: 4) {
-                                Image(systemName: "person.circle.fill")
-                                    .font(.title3)
-                                Text("Profile")
-                                    .font(.caption)
-                            }
-                            .foregroundStyle(Color.mtgTextSecondary)
-                        }
-                        .accessibilityLabel("Your profile")
-
-                    }
-                    .padding(.vertical, 12)
-                    .padding(.horizontal, 24)
-                    .frame(maxWidth: .infinity)
-                    .background(
-                        Color.mtgSurface.opacity(0.85)
-                            .overlay(
-                                Rectangle()
-                                    .fill(Color.mtgDivider)
-                                    .frame(height: 1),
-                                alignment: .top
-                            )
-                    )
                 }
                 .padding(.horizontal)
             }
@@ -191,11 +209,7 @@ struct HomeView: View {
                 // Re-check every time we return to the home screen (path becomes empty)
                 guard path.isEmpty,
                       let userId = authViewModel.currentUserId else { return }
-                do {
-                    activeGame = try await firestoreManager.getActiveGame(forUserId: userId)
-                } catch {
-                    activeGame = nil
-                }
+                await viewModel.checkForActiveGame(userId: userId)
             }
             .navigationDestination(for: AppDestination.self) { destination in
                 switch destination {
@@ -205,16 +219,13 @@ struct HomeView: View {
                     JoinGameView(navigationPath: $path)
                 case .lobby(let gameId, let isHost):
                     LobbyView(gameId: gameId, isHost: isHost, navigationPath: $path)
+                        .toolbar(.hidden, for: .tabBar)
                 case .gameBoard(let gameId):
                     GameBoardView(gameId: gameId, currentUserId: authViewModel.currentUserId, navigationPath: $path)
+                        .toolbar(.hidden, for: .tabBar)
                 case .gameOver(let gameId):
                     GameOverView(gameId: gameId, navigationPath: $path)
-                case .profile:
-                    ProfileView()
-                case .friends:
-                    FriendsListView()
-                case .gameHistory:
-                    GameHistoryView()
+                        .toolbar(.hidden, for: .tabBar)
                 }
             }
         }

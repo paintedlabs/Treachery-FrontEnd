@@ -52,9 +52,7 @@ struct GameOverView: View {
             VStack(spacing: 24) {
                 if viewModel.players.isEmpty {
                     Spacer()
-                    ProgressView("Loading results...")
-                        .tint(Color.mtgGold)
-                        .foregroundStyle(Color.mtgTextSecondary)
+                    MtgLoadingView(message: "Loading results...")
                     Spacer()
                 } else {
                     let isTreacheryMode = viewModel.game?.gameMode.includesTreachery ?? true
@@ -179,14 +177,7 @@ struct GameOverView: View {
                                 .padding(.horizontal, 40)
 
                             if let mode = viewModel.game?.gameMode {
-                                Text(mode.displayName)
-                                    .font(.caption)
-                                    .fontWeight(.semibold)
-                                    .foregroundStyle(Color.mtgBackground)
-                                    .padding(.horizontal, 12)
-                                    .padding(.vertical, 4)
-                                    .background(Color.mtgGold)
-                                    .clipShape(Capsule())
+                                MtgBadge(text: mode.displayName, font: .caption, fontWeight: .semibold)
                             }
 
                             Text("\(viewModel.players.count) player\(viewModel.players.count == 1 ? "" : "s")")
