@@ -9,16 +9,7 @@ import SwiftUI
 
 struct FriendsListView: View {
     @EnvironmentObject var authViewModel: AuthViewModel
-    @State private var friends: [TreacheryUser] = []
-    @State private var pendingRequests: [FriendRequest] = []
-    @State private var searchText = ""
-    @State private var searchResults: [TreacheryUser] = []
-    @State private var isSearching = false
-    @State private var isLoading = true
-    @State private var errorMessage: String?
-    @State private var sentRequestUserIds: Set<String> = []
-
-    private let firestoreManager = FirestoreManager()
+    @StateObject private var viewModel = FriendsListViewModel()
 
     var body: some View {
         ZStack {
@@ -37,7 +28,7 @@ struct FriendsListView: View {
                             .padding(.horizontal, 16)
 
                         HStack(spacing: 8) {
-                            TextField("Search by display name", text: $searchText)
+                            TextField("Search by display name", text: $viewModel.searchText)
                                 .padding(.horizontal, 12)
                                 .padding(.vertical, 10)
                                 .foregroundStyle(Color.mtgTextPrimary)
@@ -50,15 +41,15 @@ struct FriendsListView: View {
                                 .textInputAutocapitalization(.never)
                                 .autocorrectionDisabled()
                                 .onSubmit {
-                                    Task { await searchUsers() }
+                                    Task { await viewModel.searchUsers() }
                                 }
 
-                            if isSearching {
+                            if viewModel.isSearching {
                                 ProgressView()
                                     .tint(Color.mtgGold)
-                            } else if !searchText.isEmpty {
+                            } else if !viewModel.searchText.isEmpty {
                                 Button("Search") {
-                                    Task { await searchUsers() }
+                                    Task { await viewModel.searchUsers() }
                                 }
                                 .foregroundStyle(Color.mtgGold)
                                 .font(.subheadline)
@@ -66,23 +57,23 @@ struct FriendsListView: View {
                         }
                         .padding(.horizontal, 16)
 
-                        ForEach(searchResults) { user in
+                        ForEach(viewModel.searchResults) { user in
                             if user.id != authViewModel.currentUserId {
                                 HStack {
                                     Text(user.displayName)
                                         .foregroundStyle(Color.mtgTextPrimary)
                                     Spacer()
-                                    if isFriend(user) {
+                                    if viewModel.isFriend(user) {
                                         Text("Friends")
                                             .font(.caption)
                                             .foregroundStyle(Color.mtgSuccess)
-                                    } else if sentRequestUserIds.contains(user.id) {
+                                    } else if viewModel.sentRequestUserIds.contains(user.id) {
                                         Text("Request Sent")
                                             .font(.caption)
                                             .foregroundStyle(Color.mtgGold)
                                     } else {
                                         Button("Add") {
-                                            Task { await sendRequest(to: user) }
+                                            Task { await viewModel.sendRequest(to: user) }
                                         }
                                         .font(.caption)
                                         .foregroundStyle(Color.mtgBackground)
@@ -103,9 +94,9 @@ struct FriendsListView: View {
                     .mtgCardFrame()
 
                     // Pending requests
-                    if !pendingRequests.isEmpty {
+                    if !viewModel.pendingRequests.isEmpty {
                         VStack(spacing: 0) {
-                            MtgSectionHeader(title: "Friend Requests (\(pendingRequests.count))")
+                            MtgSectionHeader(title: "Friend Requests (\(viewModel.pendingRequests.count))")
                                 .frame(maxWidth: .infinity, alignment: .leading)
                                 .padding(.horizontal, 16)
                                 .padding(.top, 16)
@@ -115,7 +106,7 @@ struct FriendsListView: View {
                                 .padding(.horizontal, 16)
                                 .padding(.bottom, 8)
 
-                            ForEach(pendingRequests) { request in
+                            ForEach(viewModel.pendingRequests) { request in
                                 HStack {
                                     VStack(alignment: .leading) {
                                         Text(request.fromDisplayName)
@@ -127,7 +118,7 @@ struct FriendsListView: View {
                                     }
                                     Spacer()
                                     Button("Accept") {
-                                        Task { await acceptRequest(request) }
+                                        Task { await viewModel.acceptRequest(request) }
                                     }
                                     .font(.caption)
                                     .foregroundStyle(Color.mtgBackground)
@@ -138,7 +129,7 @@ struct FriendsListView: View {
                                     .accessibilityLabel("Accept friend request from \(request.fromDisplayName)")
 
                                     Button("Decline") {
-                                        Task { await declineRequest(request) }
+                                        Task { await viewModel.declineRequest(request) }
                                     }
                                     .font(.caption)
                                     .foregroundStyle(Color.mtgTextSecondary)
@@ -159,7 +150,7 @@ struct FriendsListView: View {
 
                     // Friends list
                     VStack(spacing: 0) {
-                        MtgSectionHeader(title: "Friends (\(friends.count))")
+                        MtgSectionHeader(title: "Friends (\(viewModel.friends.count))")
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .padding(.horizontal, 16)
                             .padding(.top, 16)
@@ -169,17 +160,16 @@ struct FriendsListView: View {
                             .padding(.horizontal, 16)
                             .padding(.bottom, 8)
 
-                        if isLoading {
-                            ProgressView()
-                                .tint(Color.mtgGold)
+                        if viewModel.isLoading {
+                            MtgLoadingView()
                                 .padding()
-                        } else if friends.isEmpty {
+                        } else if viewModel.friends.isEmpty {
                             Text("No friends yet. Search for players above.")
                                 .foregroundStyle(Color.mtgTextSecondary)
                                 .font(.subheadline)
                                 .padding(16)
                         } else {
-                            ForEach(friends) { friend in
+                            ForEach(viewModel.friends) { friend in
                                 HStack {
                                     Text(friend.displayName)
                                         .foregroundStyle(Color.mtgTextPrimary)
@@ -188,7 +178,7 @@ struct FriendsListView: View {
                                 .padding(.horizontal, 16)
                                 .padding(.vertical, 10)
 
-                                if friend.id != friends.last?.id {
+                                if friend.id != viewModel.friends.last?.id {
                                     Rectangle()
                                         .fill(Color.mtgDivider)
                                         .frame(height: 1)
@@ -199,7 +189,7 @@ struct FriendsListView: View {
                     }
                     .mtgCardFrame()
 
-                    if let error = errorMessage {
+                    if let error = viewModel.errorMessage {
                         MtgErrorBanner(message: error)
                             .padding(.horizontal)
                     }
@@ -211,121 +201,13 @@ struct FriendsListView: View {
         .toolbarColorScheme(.dark, for: .navigationBar)
         .onAppear { AnalyticsService.trackScreen("Friends") }
         .task {
-            await loadData()
+            guard let userId = authViewModel.currentUserId else { return }
+            await viewModel.loadData(userId: userId)
         }
         .refreshable {
-            await loadData()
+            guard let userId = authViewModel.currentUserId else { return }
+            await viewModel.loadData(userId: userId)
         }
-    }
-
-    // MARK: - Data Loading
-
-    private func loadData() async {
-        guard let userId = authViewModel.currentUserId else { return }
-        isLoading = true
-        errorMessage = nil
-
-        do {
-            async let friendsTask = firestoreManager.getFriends(forUserId: userId)
-            async let requestsTask = firestoreManager.getPendingFriendRequests(forUserId: userId)
-
-            friends = try await friendsTask
-            pendingRequests = try await requestsTask
-        } catch {
-            errorMessage = error.localizedDescription
-        }
-        isLoading = false
-    }
-
-    private func searchUsers() async {
-        guard !searchText.trimmingCharacters(in: .whitespaces).isEmpty else { return }
-        isSearching = true
-        errorMessage = nil
-
-        do {
-            searchResults = try await firestoreManager.searchUsers(
-                byDisplayName: searchText.trimmingCharacters(in: .whitespaces)
-            )
-        } catch {
-            errorMessage = error.localizedDescription
-        }
-        isSearching = false
-    }
-
-    // MARK: - Friend Actions
-
-    private func sendRequest(to user: TreacheryUser) async {
-        guard let userId = authViewModel.currentUserId else { return }
-        errorMessage = nil
-
-        do {
-            let currentUser = try await firestoreManager.getUser(id: userId)
-            let request = FriendRequest(
-                id: UUID().uuidString,
-                fromUserId: userId,
-                fromDisplayName: currentUser?.displayName ?? "Player",
-                toUserId: user.id,
-                status: .pending,
-                createdAt: Date()
-            )
-            try await firestoreManager.sendFriendRequest(request)
-            AnalyticsService.trackEvent("send_friend_request")
-            sentRequestUserIds.insert(user.id)
-        } catch {
-            errorMessage = error.localizedDescription
-        }
-    }
-
-    private func acceptRequest(_ request: FriendRequest) async {
-        guard let userId = authViewModel.currentUserId else { return }
-        errorMessage = nil
-
-        do {
-            // Update request status
-            let updatedRequest = FriendRequest(
-                id: request.id,
-                fromUserId: request.fromUserId,
-                fromDisplayName: request.fromDisplayName,
-                toUserId: request.toUserId,
-                status: .accepted,
-                createdAt: request.createdAt
-            )
-            try await firestoreManager.updateFriendRequest(updatedRequest)
-
-            // Add to both friend lists
-            try await firestoreManager.addFriend(userId: userId, friendId: request.fromUserId)
-            AnalyticsService.trackEvent("accept_friend_request")
-
-            // Refresh data
-            await loadData()
-        } catch {
-            errorMessage = error.localizedDescription
-        }
-    }
-
-    private func declineRequest(_ request: FriendRequest) async {
-        errorMessage = nil
-
-        do {
-            let updatedRequest = FriendRequest(
-                id: request.id,
-                fromUserId: request.fromUserId,
-                fromDisplayName: request.fromDisplayName,
-                toUserId: request.toUserId,
-                status: .declined,
-                createdAt: request.createdAt
-            )
-            try await firestoreManager.updateFriendRequest(updatedRequest)
-            pendingRequests.removeAll { $0.id == request.id }
-        } catch {
-            errorMessage = error.localizedDescription
-        }
-    }
-
-    // MARK: - Helpers
-
-    private func isFriend(_ user: TreacheryUser) -> Bool {
-        friends.contains { $0.id == user.id }
     }
 }
 

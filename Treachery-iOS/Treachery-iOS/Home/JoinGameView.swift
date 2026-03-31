@@ -10,12 +10,7 @@ import SwiftUI
 struct JoinGameView: View {
     @EnvironmentObject var authViewModel: AuthViewModel
     @Binding var navigationPath: NavigationPath
-
-    @State private var gameCode = ""
-    @State private var isJoining = false
-    @State private var errorMessage: String?
-
-    private let cloudFunctions = CloudFunctions()
+    @StateObject private var viewModel = JoinGameViewModel()
 
     var body: some View {
         ZStack {
@@ -35,7 +30,7 @@ struct JoinGameView: View {
                         .font(.subheadline)
                         .foregroundStyle(Color.mtgTextSecondary)
 
-                    TextField("ABCD", text: $gameCode)
+                    TextField("ABCD", text: $viewModel.gameCode)
                         .padding(.horizontal, 16)
                         .padding(.vertical, 16)
                         .foregroundStyle(Color.mtgGoldBright)
@@ -51,21 +46,25 @@ struct JoinGameView: View {
                         .multilineTextAlignment(.center)
                         .accessibilityLabel("Game code")
                         .accessibilityHint("Enter the 4-character code to join a game")
-                        .onChange(of: gameCode) { _, newValue in
-                            gameCode = String(newValue.uppercased().prefix(4))
+                        .onChange(of: viewModel.gameCode) { _, newValue in
+                            viewModel.formatGameCode(newValue)
                         }
                 }
                 .padding(20)
                 .mtgCardFrame()
 
-                if let error = errorMessage {
+                if let error = viewModel.errorMessage {
                     MtgErrorBanner(message: error)
                 }
 
                 Button {
-                    Task { await joinGame() }
+                    Task {
+                        if let destination = await viewModel.joinGame() {
+                            navigationPath.append(destination)
+                        }
+                    }
                 } label: {
-                    if isJoining {
+                    if viewModel.isJoining {
                         HStack(spacing: 8) {
                             ProgressView()
                                 .controlSize(.small)
@@ -76,9 +75,9 @@ struct JoinGameView: View {
                         Text("Join Game")
                     }
                 }
-                .buttonStyle(MtgPrimaryButtonStyle(isDisabled: gameCode.count < 4 || isJoining))
-                .disabled(gameCode.count < 4 || isJoining)
-                .accessibilityLabel(isJoining ? "Joining game" : "Join game")
+                .buttonStyle(MtgPrimaryButtonStyle(isDisabled: viewModel.gameCode.count < 4 || viewModel.isJoining))
+                .disabled(viewModel.gameCode.count < 4 || viewModel.isJoining)
+                .accessibilityLabel(viewModel.isJoining ? "Joining game" : "Join game")
 
                 Spacer()
             }
@@ -86,24 +85,6 @@ struct JoinGameView: View {
         }
         .toolbarColorScheme(.dark, for: .navigationBar)
         .onAppear { AnalyticsService.trackScreen("JoinGame") }
-    }
-
-    private func joinGame() async {
-        isJoining = true
-        errorMessage = nil
-
-        do {
-            // Use the transactional Cloud Function to join atomically.
-            // This prevents race conditions where two players join simultaneously
-            // and exceed maxPlayers or get duplicate orderIds.
-            let result = try await cloudFunctions.joinGame(gameCode: gameCode)
-
-            AnalyticsService.trackEvent("join_game")
-            navigationPath.append(AppDestination.lobby(gameId: result.gameId, isHost: false))
-        } catch {
-            errorMessage = error.localizedDescription
-        }
-        isJoining = false
     }
 }
 

@@ -10,19 +10,7 @@ import SwiftUI
 struct CreateGameView: View {
     @EnvironmentObject var authViewModel: AuthViewModel
     @Binding var navigationPath: NavigationPath
-
-    @State private var gameMode: GameMode = .treachery
-    @State private var useOwnDeck = false
-    @State private var startingLife = 40
-    @State private var isCreating = false
-    @State private var errorMessage: String?
-
-    private let firestoreManager = FirestoreManager()
-
-    /// Max players is determined by game mode — no user input needed.
-    private var maxPlayers: Int {
-        gameMode.includesTreachery ? 8 : 12
-    }
+    @StateObject private var viewModel = CreateGameViewModel()
 
     var body: some View {
         ZStack {
@@ -35,7 +23,7 @@ struct CreateGameView: View {
                         MtgSectionHeader(title: "Game Mode")
                             .frame(maxWidth: .infinity, alignment: .leading)
 
-                        Picker("Game Mode", selection: $gameMode) {
+                        Picker("Game Mode", selection: $viewModel.gameMode) {
                             ForEach(GameMode.allCases, id: \.self) { mode in
                                 Text(mode.displayName).tag(mode)
                             }
@@ -44,8 +32,8 @@ struct CreateGameView: View {
                     }
                     .padding(.horizontal)
 
-                    if gameMode.includesPlanechase {
-                        Toggle("I have my own planar deck", isOn: $useOwnDeck)
+                    if viewModel.gameMode.includesPlanechase {
+                        Toggle("I have my own planar deck", isOn: $viewModel.useOwnDeck)
                             .foregroundStyle(Color.mtgTextPrimary)
                             .tint(Color.mtgGold)
                             .padding(.horizontal)
@@ -57,21 +45,26 @@ struct CreateGameView: View {
 
                         OrnateDivider()
 
-                        Stepper("Starting Life: \(startingLife)", value: $startingLife, in: 20...60, step: 5)
+                        Stepper("Starting Life: \(viewModel.startingLife)", value: $viewModel.startingLife, in: 20...60, step: 5)
                             .foregroundStyle(Color.mtgTextPrimary)
-                            .accessibilityValue("\(startingLife) life")
+                            .accessibilityValue("\(viewModel.startingLife) life")
                     }
                     .padding(16)
                     .mtgCardFrame()
 
-                    if let error = errorMessage {
+                    if let error = viewModel.errorMessage {
                         MtgErrorBanner(message: error)
                     }
 
                     Button {
-                        Task { await createGame() }
+                        Task {
+                            guard let userId = authViewModel.currentUserId else { return }
+                            if let destination = await viewModel.createGame(userId: userId) {
+                                navigationPath.append(destination)
+                            }
+                        }
                     } label: {
-                        if isCreating {
+                        if viewModel.isCreating {
                             HStack(spacing: 8) {
                                 ProgressView()
                                     .controlSize(.small)
@@ -82,9 +75,9 @@ struct CreateGameView: View {
                             Text("Create Game")
                         }
                     }
-                    .buttonStyle(MtgPrimaryButtonStyle(isDisabled: isCreating))
-                    .disabled(isCreating)
-                    .accessibilityLabel(isCreating ? "Creating game" : "Create game")
+                    .buttonStyle(MtgPrimaryButtonStyle(isDisabled: viewModel.isCreating))
+                    .disabled(viewModel.isCreating)
+                    .accessibilityLabel(viewModel.isCreating ? "Creating game" : "Create game")
                 }
                 .padding()
             }
@@ -92,80 +85,9 @@ struct CreateGameView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbarColorScheme(.dark, for: .navigationBar)
         .onAppear { AnalyticsService.trackScreen("CreateGame") }
-        .onChange(of: gameMode) { _, _ in
-            // Reset own deck toggle when planechase is disabled
-            if !gameMode.includesPlanechase {
-                useOwnDeck = false
-            }
+        .onChange(of: viewModel.gameMode) { _, _ in
+            viewModel.resetOwnDeckIfNeeded()
         }
-    }
-
-    private func createGame() async {
-        guard let userId = authViewModel.currentUserId else { return }
-        isCreating = true
-        errorMessage = nil
-
-        do {
-            let code = try await generateUniqueCode()
-            let game = Game(
-                id: UUID().uuidString,
-                code: code,
-                hostId: userId,
-                state: .waiting,
-                gameMode: gameMode,
-                maxPlayers: maxPlayers,
-                startingLife: startingLife,
-                winningTeam: nil,
-                playerIds: [userId],
-                createdAt: Date(),
-                lastActivityAt: Date(),
-                planechase: gameMode.includesPlanechase ? PlanechaseState(
-                    useOwnDeck: useOwnDeck,
-                    currentPlaneId: nil,
-                    usedPlaneIds: [],
-                    lastDieRollerId: nil,
-                    dieRollCount: 0
-                ) : nil
-            )
-            try await firestoreManager.createGame(game)
-
-            // Add host as first player
-            let user = try await firestoreManager.getUser(id: userId)
-            let player = Player(
-                id: UUID().uuidString,
-                orderId: 0,
-                userId: userId,
-                displayName: user?.displayName ?? "Host",
-                role: nil,
-                identityCardId: nil,
-                lifeTotal: startingLife,
-                isEliminated: false,
-                isUnveiled: false,
-                joinedAt: Date()
-            )
-            try await firestoreManager.addPlayer(player, toGame: game.id)
-
-            AnalyticsService.trackEvent("create_game", params: [
-                "game_mode": gameMode.rawValue
-            ])
-            navigationPath.append(AppDestination.lobby(gameId: game.id, isHost: true))
-        } catch {
-            errorMessage = error.localizedDescription
-        }
-        isCreating = false
-    }
-
-    private func generateUniqueCode() async throws -> String {
-        // Charset excludes ambiguous characters: I, O, 0, 1
-        let characters = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
-        for _ in 0..<10 {
-            let code = String((0..<4).map { _ in characters.randomElement()! })
-            let existing = try await firestoreManager.getGame(byCode: code)
-            if existing == nil {
-                return code
-            }
-        }
-        throw GameError.codeGenerationFailed
     }
 }
 
