@@ -405,7 +405,8 @@ export default function DevTestAbilitiesScreen() {
     setShowSheet(false);
   };
 
-  if (!__DEV__) return null;
+  const isDevToolsEnabled = process.env.EXPO_PUBLIC_ENVIRONMENT !== 'production';
+  if (!isDevToolsEnabled) return null;
 
   return (
     <View style={styles.container}>
