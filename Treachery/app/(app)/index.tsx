@@ -146,7 +146,7 @@ export default function HomeScreen() {
         <Text style={styles.secondaryButtonText}>Join Game</Text>
       </TouchableOpacity>
 
-      {__DEV__ && (
+      {process.env.EXPO_PUBLIC_ENVIRONMENT !== 'production' && (
         <TouchableOpacity
           style={styles.secondaryButton}
           onPress={() => router.push('/(app)/dev-test-abilities')}
