@@ -18,6 +18,7 @@ final class GameBoardViewModel: ObservableObject {
     @Published var errorMessage: String?
     @Published var isGameUnavailable = false
     @Published var isPending = false
+    @Published var pendingAbilityResolution: AbilityResolution?
 
     // Planechase transient state
     @Published var dieRollResult: String?
@@ -252,10 +253,44 @@ final class GameBoardViewModel: ObservableObject {
         do {
             try await cloudFunctions.unveilPlayer(gameId: gameId)
             AnalyticsService.trackEvent("unveil_identity")
+            checkForAbilityTrigger(player: player)
         } catch {
             errorMessage = error.localizedDescription
         }
         isPending = false
+    }
+
+    private func checkForAbilityTrigger(player: Player) {
+        guard let cardId = player.identityCardId,
+              let ability = ExecutableAbility(cardId: cardId) else { return }
+
+        let resolution: AbilityResolution
+        switch ability {
+        case .metamorph:
+            let eliminated = players.filter { $0.isEliminated && $0.role != .leader && $0.userId != player.userId }
+            resolution = AbilityResolution(
+                abilityType: .metamorph,
+                actingPlayerId: player.id,
+                candidateCards: [],
+                candidatePlayers: eliminated
+            )
+        case .puppetMaster:
+            let otherAlive = players.filter { !$0.isEliminated && $0.userId != player.userId }
+            resolution = AbilityResolution(
+                abilityType: .puppetMaster,
+                actingPlayerId: player.id,
+                candidateCards: [],
+                candidatePlayers: otherAlive
+            )
+        case .wearerOfMasks:
+            resolution = AbilityResolution(
+                abilityType: .wearerOfMasks,
+                actingPlayerId: player.id,
+                candidateCards: [],
+                candidatePlayers: []
+            )
+        }
+        pendingAbilityResolution = resolution
     }
 
     // MARK: - Leave Game (via Cloud Function)
@@ -359,6 +394,73 @@ final class GameBoardViewModel: ObservableObject {
         }
     }
 
+    // MARK: - Ability Resolution
+
+    func resolveMetamorph(targetPlayerId: String) async {
+        guard currentPlayer != nil else { return }
+        errorMessage = nil
+
+        do {
+            try await cloudFunctions.resolveMetamorph(gameId: gameId, targetPlayerId: targetPlayerId)
+            AnalyticsService.trackEvent("ability_metamorph", params: ["target": targetPlayerId])
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+        pendingAbilityResolution = nil
+    }
+
+    func resolvePuppetMaster(redistributions: [String: String]) async {
+        errorMessage = nil
+
+        // Filter out unchanged assignments
+        let changes = redistributions.filter { playerId, newCardId in
+            players.first(where: { $0.id == playerId })?.identityCardId != newCardId
+        }
+
+        guard !changes.isEmpty else {
+            pendingAbilityResolution = nil
+            return
+        }
+
+        do {
+            try await cloudFunctions.resolvePuppetMaster(gameId: gameId, redistributions: changes)
+            AnalyticsService.trackEvent("ability_puppet_master", params: ["swaps": changes.count])
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+        pendingAbilityResolution = nil
+    }
+
+    func resolveWearerOfMasks(chosenCardId: String?) async {
+        guard currentPlayer != nil else {
+            pendingAbilityResolution = nil
+            return
+        }
+        errorMessage = nil
+
+        do {
+            try await cloudFunctions.resolveWearerOfMasks(gameId: gameId, chosenCardId: chosenCardId)
+            if chosenCardId != nil {
+                AnalyticsService.trackEvent("ability_wearer_of_masks", params: ["chosen_card": chosenCardId ?? ""])
+            }
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+        pendingAbilityResolution = nil
+    }
+
+    func dismissAbility() {
+        pendingAbilityResolution = nil
+    }
+
+    /// Returns non-Leader cards not currently assigned to any player in this game.
+    func cardsOutsideGame() -> [IdentityCard] {
+        let usedIds = Set(players.compactMap(\.identityCardId))
+        return cardDatabase.allCards.filter { card in
+            card.role != .leader && !usedIds.contains(card.id)
+        }
+    }
+
     // MARK: - Helpers
 
     func identityCard(for player: Player) -> IdentityCard? {
@@ -366,13 +468,23 @@ final class GameBoardViewModel: ObservableObject {
         return cardDatabase.card(withId: cardId)
     }
 
+    func identityCard(withId cardId: String) -> IdentityCard? {
+        cardDatabase.card(withId: cardId)
+    }
+
     func canSeeRole(of player: Player) -> Bool {
         // You can always see your own role
         if player.userId == currentUserId { return true }
-        // You can see unveiled players' roles
-        if player.isUnveiled { return true }
         // Leaders are always face-up (visible to everyone)
         if player.role == .leader { return true }
+        // Unveiled but face-down cards are hidden (Puppet Master / Metamorph swap)
+        if player.isUnveiled && !player.isFaceDown { return true }
+        // Puppet Master can peek at all face-down cards
+        if let myCardId = currentPlayer?.identityCardId,
+           myCardId == ExecutableAbility.puppetMaster.rawValue,
+           currentPlayer?.isUnveiled == true {
+            return true
+        }
         return false
     }
 }

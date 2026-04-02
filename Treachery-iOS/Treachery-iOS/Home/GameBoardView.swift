@@ -334,6 +334,22 @@ struct GameBoardView: View {
                 showWinnerSelection = false
             }
         }
+        .sheet(item: $viewModel.pendingAbilityResolution) { resolution in
+            switch resolution.abilityType {
+            case .metamorph:
+                MetamorphAbilitySheet(
+                    viewModel: viewModel,
+                    eliminatedPlayers: resolution.candidatePlayers
+                )
+            case .puppetMaster:
+                PuppetMasterAbilitySheet(
+                    viewModel: viewModel,
+                    players: resolution.candidatePlayers
+                )
+            case .wearerOfMasks:
+                WearerOfMasksAbilitySheet(viewModel: viewModel)
+            }
+        }
     }
 
     // MARK: - Unveil Animation

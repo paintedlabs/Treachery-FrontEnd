@@ -32,7 +32,7 @@ export function PlayerRow({
 }: PlayerRowProps) {
   const roleColor = player.role ? ROLE_COLORS[player.role] : colors.textSecondary;
   const effectiveColor = player.player_color || playerColor;
-  const isPublicRole = player.role && (player.is_unveiled || player.role === 'leader');
+  const isPublicRole = player.role && ((player.is_unveiled && !player.is_face_down) || player.role === 'leader');
   const accentColor = effectiveColor || (isPublicRole ? roleColor : null);
 
   const [showColorPicker, setShowColorPicker] = useState(false);

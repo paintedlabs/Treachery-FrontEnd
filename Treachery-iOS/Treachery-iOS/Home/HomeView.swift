@@ -17,6 +17,9 @@ enum AppDestination: Hashable {
     case lobby(gameId: String, isHost: Bool)
     case gameBoard(gameId: String)
     case gameOver(gameId: String)
+    #if DEBUG
+    case devTestAbilities
+    #endif
 }
 
 // MARK: - Tab Selection
@@ -198,6 +201,17 @@ private struct HomeTab: View {
                     .accessibilityHint("Enter a game code to join")
                     .padding(.horizontal)
 
+                    #if DEBUG
+                    NavigationLink(value: AppDestination.devTestAbilities) {
+                        HStack(spacing: 6) {
+                            Image(systemName: "hammer.fill")
+                            Text("Dev: Test Abilities")
+                        }
+                    }
+                    .buttonStyle(MtgSecondaryButtonStyle())
+                    .padding(.horizontal)
+                    #endif
+
                     Spacer()
                 }
                 .padding(.horizontal)
@@ -226,6 +240,11 @@ private struct HomeTab: View {
                 case .gameOver(let gameId):
                     GameOverView(gameId: gameId, navigationPath: $path)
                         .toolbar(.hidden, for: .tabBar)
+                #if DEBUG
+                case .devTestAbilities:
+                    AbilityTestingView()
+                        .toolbar(.hidden, for: .tabBar)
+                #endif
                 }
             }
         }

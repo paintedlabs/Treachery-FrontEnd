@@ -15,7 +15,7 @@ interface IdentityCardHeaderProps {
 
 export function IdentityCardHeader({ card, player, onPress }: IdentityCardHeaderProps) {
   const roleColor = player.role ? ROLE_COLORS[player.role] : colors.textSecondary;
-  const isAlwaysVisible = player.is_unveiled || player.role === 'leader';
+  const isAlwaysVisible = (player.is_unveiled && !player.is_face_down) || player.role === 'leader';
 
   if (isAlwaysVisible) {
     return (

@@ -33,6 +33,9 @@ protocol FirestoreManaging {
     func removePlayer(id: String, fromGame gameId: String) async throws
     func listenToPlayers(gameId: String, onChange: @escaping ([Player]) -> Void) -> ListenerCancellable
 
+    // Batch Updates
+    func batchUpdatePlayers(_ players: [Player], inGame gameId: String) async throws
+
     // Player Customization
     func updatePlayerColor(gameId: String, playerId: String, color: String?) async throws
     func updateCommanderName(gameId: String, playerId: String, name: String?) async throws

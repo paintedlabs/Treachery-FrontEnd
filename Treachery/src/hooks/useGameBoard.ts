@@ -265,11 +265,16 @@ export function useGameBoard(gameId: string, currentUserId: string | null): UseG
   const canSeeRole = useCallback(
     (player: Player): boolean => {
       if (player.user_id === currentUserId) return true;
-      if (player.is_unveiled) return true;
       if (player.role === 'leader') return true;
+      // Face-down cards (from Puppet Master/Metamorph swap) are hidden
+      if (player.is_unveiled && !player.is_face_down) return true;
+      // Puppet Master can peek at all face-down cards
+      if (currentPlayer?.identity_card_id === 'traitor_09' && currentPlayer?.is_unveiled) {
+        return true;
+      }
       return false;
     },
-    [currentUserId],
+    [currentUserId, currentPlayer?.identity_card_id, currentPlayer?.is_unveiled],
   );
 
   const identityCardFn = useCallback((player: Player): IdentityCard | undefined => {

@@ -51,6 +51,26 @@ final class MockCloudFunctions: CloudFunctionsProtocol {
         leaveGameCalls.append(gameId)
     }
 
+    // Traitor Abilities
+    var resolveMetamorphCalls: [(gameId: String, targetPlayerId: String)] = []
+    var resolvePuppetMasterCalls: [(gameId: String, redistributions: [String: String])] = []
+    var resolveWearerOfMasksCalls: [(gameId: String, chosenCardId: String?)] = []
+
+    func resolveMetamorph(gameId: String, targetPlayerId: String) async throws {
+        if let error = errorToThrow { throw error }
+        resolveMetamorphCalls.append((gameId, targetPlayerId))
+    }
+
+    func resolvePuppetMaster(gameId: String, redistributions: [String: String]) async throws {
+        if let error = errorToThrow { throw error }
+        resolvePuppetMasterCalls.append((gameId, redistributions))
+    }
+
+    func resolveWearerOfMasks(gameId: String, chosenCardId: String?) async throws {
+        if let error = errorToThrow { throw error }
+        resolveWearerOfMasksCalls.append((gameId, chosenCardId))
+    }
+
     func registerFcmToken(_ token: String) async throws {
         if let error = errorToThrow { throw error }
     }
