@@ -63,6 +63,33 @@ struct CloudFunctions: CloudFunctionsProtocol {
         _ = try await callable.call(["gameId": gameId])
     }
 
+    // MARK: - Traitor Abilities
+
+    func resolveMetamorph(gameId: String, targetPlayerId: String) async throws {
+        let callable = functions.httpsCallable("resolveMetamorph")
+        _ = try await callable.call([
+            "gameId": gameId,
+            "targetPlayerId": targetPlayerId,
+        ])
+    }
+
+    func resolvePuppetMaster(gameId: String, redistributions: [String: String]) async throws {
+        let callable = functions.httpsCallable("resolvePuppetMaster")
+        _ = try await callable.call([
+            "gameId": gameId,
+            "redistributions": redistributions,
+        ])
+    }
+
+    func resolveWearerOfMasks(gameId: String, chosenCardId: String?) async throws {
+        let callable = functions.httpsCallable("resolveWearerOfMasks")
+        var data: [String: Any] = ["gameId": gameId]
+        if let cardId = chosenCardId {
+            data["chosenCardId"] = cardId
+        }
+        _ = try await callable.call(data)
+    }
+
     func registerFcmToken(_ token: String) async throws {
         let callable = functions.httpsCallable("registerFcmToken")
         _ = try await callable.call(["token": token])

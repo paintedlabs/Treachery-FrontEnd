@@ -9,9 +9,10 @@ struct IdentityCardHeader: View {
     let card: IdentityCard
     let player: Player
 
-    /// Leaders are always face-up; unveiled players show openly; everyone else is hidden.
+    /// Leaders are always face-up; unveiled players show openly; face-down cards (from ability swaps) stay hidden.
     private var isAlwaysVisible: Bool {
-        player.isUnveiled || player.role == .leader
+        if player.isFaceDown { return false }
+        return player.isUnveiled || player.role == .leader
     }
 
     var body: some View {

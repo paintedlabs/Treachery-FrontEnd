@@ -82,6 +82,8 @@ export interface Player {
   joined_at: Timestamp;
   player_color: string | null;
   commander_name: string | null;
+  original_identity_card_id?: string | null;
+  is_face_down?: boolean;
 }
 
 export interface IdentityCard {

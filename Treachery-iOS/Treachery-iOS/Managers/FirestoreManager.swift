@@ -271,6 +271,17 @@ final class FirestoreManager: FirestoreManaging {
         return FirestoreListenerHandle(registration: reg)
     }
 
+    // MARK: - Batch Updates
+
+    func batchUpdatePlayers(_ players: [Player], inGame gameId: String) async throws {
+        let batch = db.batch()
+        for player in players {
+            let ref = playersCollection(gameId: gameId).document(player.id)
+            try batch.setData(from: player, forDocument: ref, merge: true)
+        }
+        try await batch.commit()
+    }
+
     // MARK: - Player Customization
 
     func updatePlayerColor(gameId: String, playerId: String, color: String?) async throws {

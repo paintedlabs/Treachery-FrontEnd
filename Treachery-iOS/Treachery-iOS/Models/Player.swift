@@ -20,6 +20,8 @@ struct Player: Codable, Identifiable, Equatable {
     let joinedAt: Date
     var playerColor: String?
     var commanderName: String?
+    var originalIdentityCardId: String?
+    var isFaceDown: Bool
 
     enum CodingKeys: String, CodingKey {
         case id
@@ -34,6 +36,8 @@ struct Player: Codable, Identifiable, Equatable {
         case joinedAt = "joined_at"
         case playerColor = "player_color"
         case commanderName = "commander_name"
+        case originalIdentityCardId = "original_identity_card_id"
+        case isFaceDown = "is_face_down"
     }
 
     // Custom decoder: uses decodeIfPresent for 'id' to handle documents
@@ -54,6 +58,8 @@ struct Player: Codable, Identifiable, Equatable {
         joinedAt = try container.decode(Date.self, forKey: .joinedAt)
         playerColor = try container.decodeIfPresent(String.self, forKey: .playerColor)
         commanderName = try container.decodeIfPresent(String.self, forKey: .commanderName)
+        originalIdentityCardId = try container.decodeIfPresent(String.self, forKey: .originalIdentityCardId)
+        isFaceDown = try container.decodeIfPresent(Bool.self, forKey: .isFaceDown) ?? false
     }
 
     init(
@@ -68,7 +74,9 @@ struct Player: Codable, Identifiable, Equatable {
         isUnveiled: Bool,
         joinedAt: Date,
         playerColor: String? = nil,
-        commanderName: String? = nil
+        commanderName: String? = nil,
+        originalIdentityCardId: String? = nil,
+        isFaceDown: Bool = false
     ) {
         self.id = id
         self.orderId = orderId
@@ -82,5 +90,7 @@ struct Player: Codable, Identifiable, Equatable {
         self.joinedAt = joinedAt
         self.playerColor = playerColor
         self.commanderName = commanderName
+        self.originalIdentityCardId = originalIdentityCardId
+        self.isFaceDown = isFaceDown
     }
 }

@@ -17,10 +17,11 @@ struct GameBoardPlayerRow: View {
 
     /// Whether this player's card can be inspected by the current user.
     /// True for unveiled players and leaders (but not yourself -- you have the header).
+    /// Face-down cards (from Puppet Master/Metamorph swap) are not inspectable unless you're the Puppet Master.
     private var canInspectCard: Bool {
         guard !isCurrentUser else { return false }
         guard viewModel.identityCard(for: player) != nil else { return false }
-        return player.isUnveiled || player.role == .leader
+        return viewModel.canSeeRole(of: player)
     }
 
     var body: some View {
@@ -87,9 +88,9 @@ struct GameBoardPlayerRow: View {
                             .foregroundStyle(Color.mtgTextSecondary)
                     }
 
-                    // Role visibility — only show for unveiled players and leaders
-                    // to prevent leaking info when the phone is on the table
-                    if player.isUnveiled || player.role == .leader {
+                    // Role visibility — only show for visible players
+                    // Face-down cards (from ability swaps) stay hidden
+                    if viewModel.canSeeRole(of: player) {
                         if canInspectCard {
                             Button {
                                 onViewCard?(player)

@@ -95,6 +95,15 @@ final class MockFirestoreManager: FirestoreManaging {
         return MockListenerCancellable()
     }
 
+    // MARK: - Batch Updates
+
+    var batchUpdatePlayersCalls: [([Player], String)] = []
+
+    func batchUpdatePlayers(_ players: [Player], inGame gameId: String) async throws {
+        if let error = errorToThrow { throw error }
+        batchUpdatePlayersCalls.append((players, gameId))
+    }
+
     // MARK: - Player Customization
 
     func updatePlayerColor(gameId: String, playerId: String, color: String?) async throws {

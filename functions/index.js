@@ -764,6 +764,207 @@ exports.unveilPlayer = onCall(callableOptions, async (request) => {
 });
 
 // ════════════════════════════════════════════════════════════════
+// CLOUD FUNCTION: resolveMetamorph
+// The Metamorph (traitor_07): steal an eliminated opponent's
+// identity card. Calling player must have just unveiled traitor_07.
+// ════════════════════════════════════════════════════════════════
+
+exports.resolveMetamorph = onCall(callableOptions, async (request) => {
+  const uid = request.auth?.uid;
+  if (!uid) throw new HttpsError("unauthenticated", "Must be signed in.");
+
+  const { gameId, targetPlayerId } = request.data;
+  if (!gameId || !targetPlayerId) {
+    throw new HttpsError("invalid-argument", "gameId and targetPlayerId are required.");
+  }
+
+  return db.runTransaction(async (tx) => {
+    const gameRef = db.doc(`games/${gameId}`);
+    const gameSnap = await tx.get(gameRef);
+    if (!gameSnap.exists) throw new HttpsError("not-found", "Game not found.");
+    const game = gameSnap.data();
+    if (game.state !== "in_progress") {
+      throw new HttpsError("failed-precondition", "Game is not in progress.");
+    }
+
+    const playersSnap = await tx.get(
+      db.collection(`games/${gameId}/players`).orderBy("order_id")
+    );
+    const allPlayers = playersSnap.docs.map((d) => ({ ref: d.ref, id: d.id, ...d.data() }));
+    const caller = allPlayers.find((p) => p.user_id === uid);
+    const target = allPlayers.find((p) => p.id === targetPlayerId);
+
+    if (!caller) throw new HttpsError("not-found", "You are not in this game.");
+    if (!target) throw new HttpsError("not-found", "Target player not found.");
+    if (caller.identity_card_id !== "traitor_07") {
+      throw new HttpsError("failed-precondition", "Your card is not The Metamorph.");
+    }
+    if (!caller.is_unveiled) {
+      throw new HttpsError("failed-precondition", "You must unveil first.");
+    }
+    if (!target.is_eliminated) {
+      throw new HttpsError("failed-precondition", "Target must be eliminated.");
+    }
+    if (target.role === "leader") {
+      throw new HttpsError("failed-precondition", "Cannot steal a Leader's card.");
+    }
+
+    const targetCard = _getCard(target.identity_card_id);
+    const isFaceDown = targetCard ? targetCard.role !== "leader" : true;
+
+    tx.update(caller.ref, {
+      original_identity_card_id: caller.original_identity_card_id || caller.identity_card_id,
+      identity_card_id: target.identity_card_id,
+      is_face_down: isFaceDown,
+    });
+    tx.update(gameRef, { last_activity_at: FieldValue.serverTimestamp() });
+
+    return { success: true, newCardId: target.identity_card_id, isFaceDown };
+  });
+});
+
+// ════════════════════════════════════════════════════════════════
+// CLOUD FUNCTION: resolvePuppetMaster
+// The Puppet Master (traitor_09): redistribute identity cards
+// among other players. Non-Leader cards get turned face-down.
+// ════════════════════════════════════════════════════════════════
+
+exports.resolvePuppetMaster = onCall(callableOptions, async (request) => {
+  const uid = request.auth?.uid;
+  if (!uid) throw new HttpsError("unauthenticated", "Must be signed in.");
+
+  const { gameId, redistributions } = request.data;
+  if (!gameId || !redistributions || typeof redistributions !== "object") {
+    throw new HttpsError("invalid-argument", "gameId and redistributions are required.");
+  }
+
+  return db.runTransaction(async (tx) => {
+    const gameRef = db.doc(`games/${gameId}`);
+    const gameSnap = await tx.get(gameRef);
+    if (!gameSnap.exists) throw new HttpsError("not-found", "Game not found.");
+    const game = gameSnap.data();
+    if (game.state !== "in_progress") {
+      throw new HttpsError("failed-precondition", "Game is not in progress.");
+    }
+
+    const playersSnap = await tx.get(
+      db.collection(`games/${gameId}/players`).orderBy("order_id")
+    );
+    const allPlayers = playersSnap.docs.map((d) => ({ ref: d.ref, id: d.id, ...d.data() }));
+    const caller = allPlayers.find((p) => p.user_id === uid);
+
+    if (!caller) throw new HttpsError("not-found", "You are not in this game.");
+    if (caller.identity_card_id !== "traitor_09") {
+      throw new HttpsError("failed-precondition", "Your card is not The Puppet Master.");
+    }
+    if (!caller.is_unveiled) {
+      throw new HttpsError("failed-precondition", "You must unveil first.");
+    }
+
+    // Validate: each player in redistributions must exist and not be the caller
+    // Each player must still end up with exactly one card
+    const assignedCards = new Set();
+    for (const [playerId, newCardId] of Object.entries(redistributions)) {
+      const player = allPlayers.find((p) => p.id === playerId);
+      if (!player) throw new HttpsError("not-found", `Player ${playerId} not found.`);
+      if (player.id === caller.id) {
+        throw new HttpsError("failed-precondition", "Cannot redistribute your own card.");
+      }
+      if (player.is_eliminated) {
+        throw new HttpsError("failed-precondition", `${player.display_name} is eliminated.`);
+      }
+      if (assignedCards.has(newCardId)) {
+        throw new HttpsError("failed-precondition", "Each card can only be assigned to one player.");
+      }
+      assignedCards.add(newCardId);
+    }
+
+    // Apply redistributions
+    for (const [playerId, newCardId] of Object.entries(redistributions)) {
+      const player = allPlayers.find((p) => p.id === playerId);
+      if (newCardId === player.identity_card_id) continue; // No change
+
+      const newCard = _getCard(newCardId);
+      const isFaceDown = newCard ? newCard.role !== "leader" : true;
+
+      tx.update(player.ref, {
+        original_identity_card_id: player.original_identity_card_id || player.identity_card_id,
+        identity_card_id: newCardId,
+        is_face_down: isFaceDown,
+      });
+    }
+
+    tx.update(gameRef, { last_activity_at: FieldValue.serverTimestamp() });
+
+    return { success: true };
+  });
+});
+
+// ════════════════════════════════════════════════════════════════
+// CLOUD FUNCTION: resolveWearerOfMasks
+// The Wearer of Masks (traitor_13): become a copy of a random
+// non-Leader card from outside the game. Stays a Traitor.
+// ════════════════════════════════════════════════════════════════
+
+exports.resolveWearerOfMasks = onCall(callableOptions, async (request) => {
+  const uid = request.auth?.uid;
+  if (!uid) throw new HttpsError("unauthenticated", "Must be signed in.");
+
+  const { gameId, chosenCardId } = request.data;
+  if (!gameId) throw new HttpsError("invalid-argument", "gameId is required.");
+  // chosenCardId can be null (player declines)
+  if (!chosenCardId) return { success: true, declined: true };
+
+  return db.runTransaction(async (tx) => {
+    const gameRef = db.doc(`games/${gameId}`);
+    const gameSnap = await tx.get(gameRef);
+    if (!gameSnap.exists) throw new HttpsError("not-found", "Game not found.");
+    const game = gameSnap.data();
+    if (game.state !== "in_progress") {
+      throw new HttpsError("failed-precondition", "Game is not in progress.");
+    }
+
+    const playersSnap = await tx.get(
+      db.collection(`games/${gameId}/players`).orderBy("order_id")
+    );
+    const allPlayers = playersSnap.docs.map((d) => ({ ref: d.ref, id: d.id, ...d.data() }));
+    const caller = allPlayers.find((p) => p.user_id === uid);
+
+    if (!caller) throw new HttpsError("not-found", "You are not in this game.");
+    if (caller.identity_card_id !== "traitor_13") {
+      throw new HttpsError("failed-precondition", "Your card is not The Wearer of Masks.");
+    }
+    if (!caller.is_unveiled) {
+      throw new HttpsError("failed-precondition", "You must unveil first.");
+    }
+
+    // Validate the chosen card exists and is not a Leader
+    const chosenCard = _getCard(chosenCardId);
+    if (!chosenCard) {
+      throw new HttpsError("not-found", "Card not found.");
+    }
+    if (chosenCard.role === "leader") {
+      throw new HttpsError("failed-precondition", "Cannot choose a Leader card.");
+    }
+
+    // Validate the card is not currently in use by any player
+    const usedCardIds = new Set(allPlayers.map((p) => p.identity_card_id).filter(Boolean));
+    if (usedCardIds.has(chosenCardId)) {
+      throw new HttpsError("failed-precondition", "That card is already in the game.");
+    }
+
+    // Role stays traitor — only the card changes
+    tx.update(caller.ref, {
+      original_identity_card_id: caller.original_identity_card_id || caller.identity_card_id,
+      identity_card_id: chosenCardId,
+    });
+    tx.update(gameRef, { last_activity_at: FieldValue.serverTimestamp() });
+
+    return { success: true, newCardId: chosenCardId };
+  });
+});
+
+// ════════════════════════════════════════════════════════════════
 // CLOUD FUNCTION: rollPlanarDie
 // Rolls the planar die for a Planechase game.
 // ════════════════════════════════════════════════════════════════
