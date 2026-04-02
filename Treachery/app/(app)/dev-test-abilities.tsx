@@ -78,7 +78,7 @@ function MetamorphSheet({ players, onResolve, onDismiss }: {
       <Ionicons name="swap-horizontal" size={36} color={ROLE_COLORS.traitor} />
       <Text style={sheetStyles.title}>The Metamorph</Text>
       <Text style={sheetStyles.reminder}>
-        Steal an eliminated opponent's identity card. Turn it face down if it isn't a Leader.
+        {"Steal an eliminated opponent's identity card. Turn it face down if it isn't a Leader."}
       </Text>
       {eliminated.length === 0 ? (
         <View style={sheetStyles.emptyBox}>
