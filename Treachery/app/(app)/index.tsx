@@ -146,6 +146,17 @@ export default function HomeScreen() {
         <Text style={styles.secondaryButtonText}>Join Game</Text>
       </TouchableOpacity>
 
+      {__DEV__ && (
+        <TouchableOpacity
+          style={styles.secondaryButton}
+          onPress={() => router.push('/(app)/dev-test-abilities')}
+          accessibilityLabel="Dev: Test abilities"
+          accessibilityRole="button"
+        >
+          <Text style={styles.secondaryButtonText}>Dev: Test Abilities</Text>
+        </TouchableOpacity>
+      )}
+
       <View style={styles.spacer} />
 
       <TouchableOpacity
