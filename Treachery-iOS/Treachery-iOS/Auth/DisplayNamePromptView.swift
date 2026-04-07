@@ -42,6 +42,11 @@ struct DisplayNamePromptView: View {
                 .textContentType(.name)
                 .autocapitalization(.words)
                 .disabled(isSaving)
+                .onChange(of: displayName) { _, newValue in
+                    if newValue.count > 30 {
+                        displayName = String(newValue.prefix(30))
+                    }
+                }
 
             if let error = validationError {
                 MtgErrorBanner(message: error)

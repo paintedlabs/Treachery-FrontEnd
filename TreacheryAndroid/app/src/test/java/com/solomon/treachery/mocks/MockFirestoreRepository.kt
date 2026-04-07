@@ -176,4 +176,10 @@ class MockFirestoreRepository : FirestoreRepository {
         throwIfNeeded()
         updateCommanderNameCalls.add(Triple(gameId, playerId, name))
     }
+
+    val updatePlayerReadyCalls = mutableListOf<Triple<String, String, Boolean>>()
+    override suspend fun updatePlayerReady(gameId: String, playerId: String, isReady: Boolean) {
+        throwIfNeeded()
+        updatePlayerReadyCalls.add(Triple(gameId, playerId, isReady))
+    }
 }

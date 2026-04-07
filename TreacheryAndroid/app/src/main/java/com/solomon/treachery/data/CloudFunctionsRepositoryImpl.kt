@@ -69,10 +69,28 @@ class CloudFunctionsRepositoryImpl @Inject constructor(
             .await()
     }
 
+    override suspend fun joinGame(gameCode: String): Map<String, Any?> {
+        val result = functions.getHttpsCallable("joinGame")
+            .call(mapOf("gameCode" to gameCode))
+            .await()
+        @Suppress("UNCHECKED_CAST")
+        return result.getData() as? Map<String, Any?> ?: emptyMap()
+    }
+
     override suspend fun endGame(gameId: String, winnerUserIds: List<String>?) {
         val data = mutableMapOf<String, Any>("gameId" to gameId)
         winnerUserIds?.let { data["winnerUserIds"] = it }
         functions.getHttpsCallable("endGame")
+            .call(data)
+            .await()
+    }
+
+    override suspend fun updateGameSettings(gameId: String, maxPlayers: Int?, startingLife: Int?, gameMode: String?) {
+        val data = mutableMapOf<String, Any>("gameId" to gameId)
+        maxPlayers?.let { data["maxPlayers"] = it }
+        startingLife?.let { data["startingLife"] = it }
+        gameMode?.let { data["gameMode"] = it }
+        functions.getHttpsCallable("updateGameSettings")
             .call(data)
             .await()
     }

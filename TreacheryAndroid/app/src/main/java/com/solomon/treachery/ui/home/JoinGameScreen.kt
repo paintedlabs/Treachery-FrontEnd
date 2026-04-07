@@ -113,8 +113,7 @@ fun JoinGameScreen(
             MtgPrimaryButton(
                 text = if (isJoining) "Joining..." else "Join Game",
                 onClick = {
-                    val userId = currentUserId ?: return@MtgPrimaryButton
-                    viewModel.joinGame(userId, gameCode) { gameId, isHost ->
+                    viewModel.joinGame(gameCode) { gameId, isHost ->
                         onNavigateToLobby(gameId, isHost)
                     }
                 },

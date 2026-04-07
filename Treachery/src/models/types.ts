@@ -84,6 +84,7 @@ export interface Player {
   commander_name: string | null;
   original_identity_card_id?: string | null;
   is_face_down?: boolean;
+  is_ready: boolean;
 }
 
 export interface IdentityCard {

@@ -289,6 +289,17 @@ exports.startGame = onCall(callableOptions, async (request) => {
     );
     const players = playersSnap.docs.map((d) => ({ ref: d.ref, ...d.data() }));
 
+    // Enforce ready-up for games with 2+ players
+    if (players.length >= 2) {
+      const notReady = players.filter((p) => p.is_ready !== true);
+      if (notReady.length > 0) {
+        throw new HttpsError(
+          "failed-precondition",
+          "All players must be ready before starting."
+        );
+      }
+    }
+
     if (includesTreachery) {
       // Validate minimum player count against role distribution
       if (players.length < 1) {
@@ -570,7 +581,7 @@ exports.joinGame = onCall(callableOptions, async (request) => {
   // Look up the game by code (outside transaction since query-by-code is safe)
   const gamesSnap = await db
     .collection("games")
-    .where("game_code", "==", gameCode.toUpperCase())
+    .where("code", "==", gameCode.toUpperCase())
     .limit(1)
     .get();
 
@@ -627,6 +638,7 @@ exports.joinGame = onCall(callableOptions, async (request) => {
       life_total: game.starting_life || 40,
       is_eliminated: false,
       is_unveiled: false,
+      is_ready: false,
       joined_at: FieldValue.serverTimestamp(),
     });
 
@@ -1322,6 +1334,70 @@ exports.endGame = onCall(callableOptions, async (request) => {
     tx.update(gameRef, update);
 
     return { action: "ended" };
+  });
+});
+
+// ════════════════════════════════════════════════════════════════
+// CLOUD FUNCTION: updateGameSettings
+// Host-only: update game settings (max players, starting life,
+// game mode) while game is in waiting state.
+// ════════════════════════════════════════════════════════════════
+
+exports.updateGameSettings = onCall(callableOptions, async (request) => {
+  const uid = request.auth?.uid;
+  if (!uid) throw new HttpsError("unauthenticated", "Must be signed in.");
+
+  const { gameId, maxPlayers, startingLife, gameMode } = request.data;
+  if (!gameId) throw new HttpsError("invalid-argument", "gameId is required.");
+
+  return db.runTransaction(async (tx) => {
+    const gameRef = db.doc(`games/${gameId}`);
+    const gameSnap = await tx.get(gameRef);
+    if (!gameSnap.exists) throw new HttpsError("not-found", "Game not found.");
+    const game = gameSnap.data();
+
+    if (game.host_id !== uid) {
+      throw new HttpsError("permission-denied", "Only the host can change settings.");
+    }
+    if (game.state !== "waiting") {
+      throw new HttpsError("failed-precondition", "Cannot change settings after game starts.");
+    }
+
+    const update = { last_activity_at: FieldValue.serverTimestamp() };
+
+    if (maxPlayers !== undefined) {
+      const mp = Number(maxPlayers);
+      if (mp < 2 || mp > 8) throw new HttpsError("invalid-argument", "Max players must be 2-8.");
+      update.max_players = mp;
+    }
+
+    if (startingLife !== undefined) {
+      const sl = Number(startingLife);
+      if (![20, 25, 30, 40, 50].includes(sl)) {
+        throw new HttpsError("invalid-argument", "Invalid starting life value.");
+      }
+      update.starting_life = sl;
+    }
+
+    if (gameMode !== undefined) {
+      const validModes = ["treachery", "planechase", "treachery_planechase", "none"];
+      if (!validModes.includes(gameMode)) {
+        throw new HttpsError("invalid-argument", "Invalid game mode.");
+      }
+      update.game_mode = gameMode;
+    }
+
+    tx.update(gameRef, update);
+
+    // If starting life changed, update all existing players' life totals
+    if (startingLife !== undefined) {
+      const playersSnap = await tx.get(db.collection(`games/${gameId}/players`));
+      playersSnap.docs.forEach((doc) => {
+        tx.update(doc.ref, { life_total: Number(startingLife) });
+      });
+    }
+
+    return { success: true };
   });
 });
 

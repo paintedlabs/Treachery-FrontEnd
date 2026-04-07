@@ -9,79 +9,38 @@ import {
   Platform,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Timestamp } from 'firebase/firestore';
-import { useAuth } from '@/hooks/useAuth';
+import { httpsCallable } from 'firebase/functions';
+import { functions } from '@/config/firebase';
 import { ErrorBanner } from '@/components/ErrorBanner';
-import * as firestoreService from '@/services/firestore';
-import { Player } from '@/models/types';
 import { trackEvent } from '@/services/analytics';
 import { colors, spacing, fonts, contentMaxWidths } from '@/constants/theme';
 import { useResponsive } from '@/hooks/useResponsive';
 
-function generateId(): string {
-  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
-    const r = (Math.random() * 16) | 0;
-    const v = c === 'x' ? r : (r & 0x3) | 0x8;
-    return v.toString(16);
-  });
-}
-
 export default function JoinGameScreen() {
   const router = useRouter();
-  const { currentUserId } = useAuth();
   const { isDesktop } = useResponsive();
   const [gameCode, setGameCode] = useState('');
   const [isJoining, setIsJoining] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const handleJoin = async () => {
-    if (!currentUserId || gameCode.length < 4) return;
+    if (gameCode.length < 4) return;
     setIsJoining(true);
     setErrorMessage(null);
 
     try {
-      const game = await firestoreService.getGameByCode(gameCode);
-      if (!game) throw new Error('No game found with that code.');
-      if (game.state !== 'waiting') throw new Error('This game has already started.');
+      const joinGameFn = httpsCallable<
+        { gameCode: string },
+        { action: string; gameId: string }
+      >(functions, 'joinGame');
+      const result = await joinGameFn({ gameCode: gameCode.toUpperCase() });
+      const { gameId, action } = result.data;
 
-      // Use game.player_ids for checks — reading the players subcollection
-      // requires being in player_ids (Firestore security rules).
-      const playerIds = game.player_ids ?? [];
-      if (playerIds.length >= game.max_players) throw new Error('This game is full.');
-
-      // Check if already in game
-      if (playerIds.includes(currentUserId)) {
-        router.replace({
-          pathname: '/(app)/lobby/[gameId]',
-          params: { gameId: game.id, isHost: 'false' },
-        });
-        setIsJoining(false);
-        return;
-      }
-
-      const user = await firestoreService.getUser(currentUserId);
-      const player: Player = {
-        id: generateId(),
-        order_id: playerIds.length,
-        user_id: currentUserId,
-        display_name: user?.display_name ?? 'Player',
-        role: null,
-        identity_card_id: null,
-        life_total: game.starting_life,
-        is_eliminated: false,
-        is_unveiled: false,
-        joined_at: Timestamp.now(),
-        player_color: null,
-        commander_name: null,
-      };
-      await firestoreService.addPlayerIdToGame(game.id, currentUserId);
-      await firestoreService.addPlayer(player, game.id);
-
-      trackEvent('join_game');
+      trackEvent(action === 'already_joined' ? 'rejoin_game' : 'join_game');
 
       router.replace({
         pathname: '/(app)/lobby/[gameId]',
-        params: { gameId: game.id, isHost: 'false' },
+        params: { gameId, isHost: 'false' },
       });
     } catch (error: unknown) {
       setErrorMessage(error instanceof Error ? error.message : 'Failed to join game.');

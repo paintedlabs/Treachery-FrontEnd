@@ -39,4 +39,5 @@ protocol FirestoreManaging {
     // Player Customization
     func updatePlayerColor(gameId: String, playerId: String, color: String?) async throws
     func updateCommanderName(gameId: String, playerId: String, name: String?) async throws
+    func updatePlayerReady(gameId: String, playerId: String, isReady: Bool) async throws
 }

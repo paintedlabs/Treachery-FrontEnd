@@ -12,6 +12,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.solomon.treachery.ui.theme.*
+import kotlinx.coroutines.launch
 
 @Composable
 fun DisplayNamePromptScreen(
@@ -23,6 +24,7 @@ fun DisplayNamePromptScreen(
     var displayName by remember { mutableStateOf("") }
     var isSaving by remember { mutableStateOf(false) }
     var validationError by remember { mutableStateOf<String?>(null) }
+    val scope = rememberCoroutineScope()
 
     // Pre-fill from email
     LaunchedEffect(authState) {
@@ -75,8 +77,10 @@ fun DisplayNamePromptScreen(
             MtgTextField(
                 value = displayName,
                 onValueChange = {
-                    displayName = it
-                    validationError = null
+                    if (it.length <= 30) {
+                        displayName = it
+                        validationError = null
+                    }
                 },
                 placeholder = "Display Name",
                 enabled = !isSaving,
@@ -99,9 +103,11 @@ fun DisplayNamePromptScreen(
                     }
                     validationError = null
                     isSaving = true
-                    authViewModel.updateDisplayName(trimmed)
-                    isSaving = false
-                    onContinue()
+                    scope.launch {
+                        authViewModel.updateDisplayName(trimmed)
+                        isSaving = false
+                        onContinue()
+                    }
                 },
                 enabled = !isSaving,
             )

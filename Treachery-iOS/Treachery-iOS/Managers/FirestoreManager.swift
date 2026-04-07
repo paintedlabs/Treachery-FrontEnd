@@ -299,4 +299,8 @@ final class FirestoreManager: FirestoreManaging {
             try await playersCollection(gameId: gameId).document(playerId).updateData(["commander_name": FieldValue.delete()])
         }
     }
+
+    func updatePlayerReady(gameId: String, playerId: String, isReady: Bool) async throws {
+        try await playersCollection(gameId: gameId).document(playerId).updateData(["is_ready": isReady])
+    }
 }

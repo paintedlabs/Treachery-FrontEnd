@@ -143,6 +143,10 @@ function LobbyPlayerRow({
           )}
         </View>
 
+        {item.is_ready && (
+          <Ionicons name="checkmark-circle" size={20} color="#4CAF50" style={{ marginRight: 6 }} />
+        )}
+
         {isHostPlayer && (
           <View style={styles.hostBadge}>
             <Text style={styles.hostBadgeText}>Host</Text>
@@ -209,11 +213,14 @@ export default function LobbyScreen() {
     isGameDisbanded,
     isGameStarted,
     canStartGame,
+    allPlayersReady,
     minPlayers,
     startGame,
     leaveGame,
     updatePlayerColor,
     updateCommanderName,
+    toggleReady,
+    updateGameSettings,
   } = useLobby(gameId!, isHost, currentUserId);
 
   // On web, intercept browser back button — prevent accidental lobby exit
@@ -356,6 +363,70 @@ export default function LobbyScreen() {
         <View style={styles.ornateLine} />
       </View>
 
+      {/* Game settings (host only) */}
+      {isHost && game && (
+        <View style={styles.settingsCard}>
+          <Text style={styles.settingsTitle}>GAME SETTINGS</Text>
+
+          <View style={styles.settingsRow}>
+            <Text style={styles.settingsLabel}>Max Players</Text>
+            <View style={styles.settingsStepper}>
+              <TouchableOpacity
+                onPress={() => updateGameSettings({ maxPlayers: Math.max(2, game.max_players - 1) })}
+                disabled={game.max_players <= 2}
+                accessibilityLabel="Decrease max players"
+              >
+                <Ionicons name="remove-circle-outline" size={24} color={game.max_players > 2 ? colors.primary : colors.textTertiary} />
+              </TouchableOpacity>
+              <Text style={styles.settingsValue}>{game.max_players}</Text>
+              <TouchableOpacity
+                onPress={() => updateGameSettings({ maxPlayers: Math.min(8, game.max_players + 1) })}
+                disabled={game.max_players >= 8}
+                accessibilityLabel="Increase max players"
+              >
+                <Ionicons name="add-circle-outline" size={24} color={game.max_players < 8 ? colors.primary : colors.textTertiary} />
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          <View style={styles.settingsDivider} />
+
+          <View style={styles.settingsRow}>
+            <Text style={styles.settingsLabel}>Starting Life</Text>
+            <View style={styles.settingsChips}>
+              {[20, 25, 30, 40, 50].map((life) => (
+                <TouchableOpacity
+                  key={life}
+                  style={[styles.chip, game.starting_life === life && styles.chipActive]}
+                  onPress={() => updateGameSettings({ startingLife: life })}
+                  accessibilityLabel={`Set starting life to ${life}`}
+                >
+                  <Text style={[styles.chipText, game.starting_life === life && styles.chipTextActive]}>{life}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+
+          <View style={styles.settingsDivider} />
+
+          <View style={styles.settingsRow}>
+            <Text style={styles.settingsLabel}>Game Mode</Text>
+            <View style={styles.settingsChips}>
+              {Object.entries(MODE_DISPLAY).map(([key, label]) => (
+                <TouchableOpacity
+                  key={key}
+                  style={[styles.chip, game.game_mode === key && styles.chipActive]}
+                  onPress={() => updateGameSettings({ gameMode: key })}
+                  accessibilityLabel={`Set game mode to ${label}`}
+                >
+                  <Text style={[styles.chipText, game.game_mode === key && styles.chipTextActive]}>{label}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+        </View>
+      )}
+
       {/* Player list */}
       <Text style={styles.sectionTitle}>
         Players ({players.length})
@@ -383,6 +454,32 @@ export default function LobbyScreen() {
           keyboardShouldPersistTaps="handled"
         />
       )}
+
+      {/* Ready toggle button (shown when 2+ players) */}
+      {players.length >= 2 && (() => {
+        const currentPlayer = players.find((p) => p.user_id === currentUserId);
+        const isReady = currentPlayer?.is_ready ?? false;
+        return (
+          <TouchableOpacity
+            style={[
+              styles.readyToggle,
+              isReady && styles.readyToggleActive,
+            ]}
+            onPress={toggleReady}
+            accessibilityLabel={isReady ? 'Mark as not ready' : 'Mark as ready'}
+            accessibilityRole="button"
+          >
+            <Ionicons
+              name={isReady ? 'checkmark-circle' : 'ellipse-outline'}
+              size={20}
+              color={isReady ? '#4CAF50' : colors.textSecondary}
+            />
+            <Text style={[styles.readyToggleText, isReady && styles.readyToggleTextActive]}>
+              {isReady ? 'Ready' : 'Not Ready'}
+            </Text>
+          </TouchableOpacity>
+        );
+      })()}
 
       {!isHost && (
         <View style={styles.waitingRow}>
@@ -417,8 +514,12 @@ export default function LobbyScreen() {
               )}
             </TouchableOpacity>
 
-            {!canStartGame && players.length < minPlayers && (
-              <Text style={styles.minPlayersText}>Need at least {minPlayers} players to start</Text>
+            {!canStartGame && (
+              players.length < minPlayers ? (
+                <Text style={styles.minPlayersText}>Need at least {minPlayers} players to start</Text>
+              ) : !allPlayersReady ? (
+                <Text style={styles.minPlayersText}>All players must be ready to start</Text>
+              ) : null
             )}
           </>
         )}
@@ -534,6 +635,72 @@ const styles = StyleSheet.create({
     color: colors.primary,
     fontSize: 10,
   },
+  settingsCard: {
+    marginHorizontal: spacing.lg,
+    marginBottom: spacing.sm,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 10,
+    padding: spacing.md,
+    gap: 10,
+  },
+  settingsTitle: {
+    color: colors.textSecondary,
+    fontSize: 11,
+    fontWeight: '600',
+    letterSpacing: 1.5,
+  },
+  settingsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  settingsLabel: {
+    color: colors.textSecondary,
+    fontSize: 14,
+  },
+  settingsStepper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  settingsValue: {
+    color: colors.text,
+    fontSize: 16,
+    fontWeight: '600',
+    minWidth: 24,
+    textAlign: 'center',
+  },
+  settingsChips: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+  },
+  chip: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.background,
+  },
+  chipActive: {
+    borderColor: colors.primary,
+    backgroundColor: 'rgba(201, 168, 76, 0.15)',
+  },
+  chipText: {
+    color: colors.textSecondary,
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  chipTextActive: {
+    color: colors.primary,
+  },
+  settingsDivider: {
+    height: 1,
+    backgroundColor: colors.divider,
+  },
   sectionTitle: {
     color: colors.textSecondary,
     fontSize: 12,
@@ -647,6 +814,31 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  readyToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    marginHorizontal: spacing.lg,
+    marginVertical: spacing.sm,
+    paddingVertical: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+  },
+  readyToggleActive: {
+    backgroundColor: 'rgba(76, 175, 80, 0.15)',
+    borderColor: 'rgba(76, 175, 80, 0.5)',
+  },
+  readyToggleText: {
+    color: colors.text,
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  readyToggleTextActive: {
+    color: '#4CAF50',
   },
   waitingRow: {
     flexDirection: 'row',

@@ -76,4 +76,18 @@ class MockCloudFunctionsRepository : CloudFunctionsRepository {
         throwIfNeeded()
         endGameCalls.add(gameId to winnerUserIds)
     }
+
+    var joinGameResult: Map<String, Any?> = mapOf("action" to "joined", "gameId" to "test-game-id")
+    val joinGameCalls = mutableListOf<String>()
+    override suspend fun joinGame(gameCode: String): Map<String, Any?> {
+        throwIfNeeded()
+        joinGameCalls.add(gameCode)
+        return joinGameResult
+    }
+
+    val updateGameSettingsCalls = mutableListOf<Map<String, Any?>>()
+    override suspend fun updateGameSettings(gameId: String, maxPlayers: Int?, startingLife: Int?, gameMode: String?) {
+        throwIfNeeded()
+        updateGameSettingsCalls.add(mapOf("gameId" to gameId, "maxPlayers" to maxPlayers, "startingLife" to startingLife, "gameMode" to gameMode))
+    }
 }

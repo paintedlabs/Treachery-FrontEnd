@@ -141,4 +141,13 @@ struct CloudFunctions: CloudFunctionsProtocol {
         }
         _ = try await callable.call(data)
     }
+
+    func updateGameSettings(gameId: String, maxPlayers: Int?, startingLife: Int?, gameMode: String?) async throws {
+        let callable = functions.httpsCallable("updateGameSettings")
+        var data: [String: Any] = ["gameId": gameId]
+        if let maxPlayers { data["maxPlayers"] = maxPlayers }
+        if let startingLife { data["startingLife"] = startingLife }
+        if let gameMode { data["gameMode"] = gameMode }
+        _ = try await callable.call(data)
+    }
 }
