@@ -34,31 +34,31 @@ function buildMockPlayers(abilityType: AbilityType): Player[] {
       id: 'p1', order_id: 0, user_id: 'dev_leader', display_name: 'Aragorn',
       role: 'leader', identity_card_id: leaderCard?.id ?? null,
       life_total: 45, is_eliminated: false, is_unveiled: false,
-      joined_at: Timestamp.now(), player_color: null, commander_name: null,
+      joined_at: Timestamp.now(), player_color: null, commander_name: null, is_ready: false,
     },
     {
       id: 'p2', order_id: 1, user_id: 'dev_guardian', display_name: 'Gandalf',
       role: 'guardian', identity_card_id: guardianCard?.id ?? null,
       life_total: 40, is_eliminated: false, is_unveiled: false,
-      joined_at: Timestamp.now(), player_color: null, commander_name: null,
+      joined_at: Timestamp.now(), player_color: null, commander_name: null, is_ready: false,
     },
     {
       id: 'p3', order_id: 2, user_id: 'dev_assassin1', display_name: 'Sauron',
       role: 'assassin', identity_card_id: assassinCard1?.id ?? null,
       life_total: 35, is_eliminated: false, is_unveiled: true,
-      joined_at: Timestamp.now(), player_color: null, commander_name: null,
+      joined_at: Timestamp.now(), player_color: null, commander_name: null, is_ready: false,
     },
     {
       id: 'p4', order_id: 3, user_id: 'dev_user', display_name: 'You (Traitor)',
       role: 'traitor', identity_card_id: ABILITY_CARD_IDS[abilityType],
       life_total: 40, is_eliminated: false, is_unveiled: true,
-      joined_at: Timestamp.now(), player_color: null, commander_name: null,
+      joined_at: Timestamp.now(), player_color: null, commander_name: null, is_ready: false,
     },
     {
       id: 'p5', order_id: 4, user_id: 'dev_assassin2', display_name: 'Saruman',
       role: 'assassin', identity_card_id: assassinCard2?.id ?? null,
       life_total: 0, is_eliminated: true, is_unveiled: true,
-      joined_at: Timestamp.now(), player_color: null, commander_name: null,
+      joined_at: Timestamp.now(), player_color: null, commander_name: null, is_ready: false,
     },
   ];
 }
