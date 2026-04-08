@@ -121,13 +121,13 @@ class AuthViewModel @Inject constructor(
         _isNewUser.value = false
     }
 
-    fun updateDisplayName(name: String) {
-        viewModelScope.launch {
-            try {
-                val userId = currentUserId ?: return@launch
-                val user = firestoreRepository.getUser(userId) ?: return@launch
-                firestoreRepository.updateUser(user.copy(displayName = name))
-            } catch (_: Exception) { }
+    suspend fun updateDisplayName(name: String) {
+        try {
+            val userId = currentUserId ?: return
+            val user = firestoreRepository.getUser(userId) ?: return
+            firestoreRepository.updateUser(user.copy(displayName = name))
+        } catch (e: Exception) {
+            _errorMessage.value = "Failed to save display name."
         }
     }
 

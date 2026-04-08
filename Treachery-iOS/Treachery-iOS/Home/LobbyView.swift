@@ -139,6 +139,11 @@ struct LobbyView: View {
                 .padding(.horizontal)
                 .padding(.vertical, 12)
 
+            if viewModel.isHost {
+                gameSettingsSection
+                    .padding(.bottom, 8)
+            }
+
             playerListSection
 
             if let error = viewModel.errorMessage {
@@ -162,6 +167,137 @@ struct LobbyView: View {
                 }
             )
         }
+    }
+
+    // MARK: - Game Settings (Host Only)
+
+    private var gameSettingsSection: some View {
+        VStack(spacing: 12) {
+            MtgSectionHeader(title: "Game Settings")
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+            if let game = viewModel.game {
+                VStack(spacing: 12) {
+                    // Max Players
+                    HStack {
+                        Text("Max Players")
+                            .foregroundStyle(Color.mtgTextSecondary)
+                            .font(.subheadline)
+                        Spacer()
+                        HStack(spacing: 12) {
+                            Button {
+                                let newVal = max(2, game.maxPlayers - 1)
+                                Task { await viewModel.updateGameSettings(maxPlayers: newVal) }
+                            } label: {
+                                Image(systemName: "minus.circle")
+                                    .foregroundStyle(game.maxPlayers > 2 ? Color.mtgGold : Color.mtgTextSecondary.opacity(0.3))
+                            }
+                            .disabled(game.maxPlayers <= 2)
+
+                            Text("\(game.maxPlayers)")
+                                .foregroundStyle(Color.mtgTextPrimary)
+                                .fontWeight(.semibold)
+                                .frame(width: 24, alignment: .center)
+
+                            Button {
+                                let newVal = min(8, game.maxPlayers + 1)
+                                Task { await viewModel.updateGameSettings(maxPlayers: newVal) }
+                            } label: {
+                                Image(systemName: "plus.circle")
+                                    .foregroundStyle(game.maxPlayers < 8 ? Color.mtgGold : Color.mtgTextSecondary.opacity(0.3))
+                            }
+                            .disabled(game.maxPlayers >= 8)
+                        }
+                    }
+
+                    Rectangle().fill(Color.mtgDivider).frame(height: 1)
+
+                    // Starting Life
+                    HStack {
+                        Text("Starting Life")
+                            .foregroundStyle(Color.mtgTextSecondary)
+                            .font(.subheadline)
+                        Spacer()
+                        Menu {
+                            ForEach([20, 25, 30, 40, 50], id: \.self) { life in
+                                Button("\(life)") {
+                                    Task { await viewModel.updateGameSettings(startingLife: life) }
+                                }
+                            }
+                        } label: {
+                            HStack(spacing: 4) {
+                                Text("\(game.startingLife)")
+                                    .foregroundStyle(Color.mtgTextPrimary)
+                                    .fontWeight(.semibold)
+                                Image(systemName: "chevron.up.chevron.down")
+                                    .foregroundStyle(Color.mtgGold)
+                                    .font(.caption2)
+                            }
+                        }
+                    }
+
+                    Rectangle().fill(Color.mtgDivider).frame(height: 1)
+
+                    // Game Mode
+                    HStack {
+                        Text("Game Mode")
+                            .foregroundStyle(Color.mtgTextSecondary)
+                            .font(.subheadline)
+                        Spacer()
+                        Menu {
+                            ForEach(GameMode.allCases, id: \.self) { mode in
+                                Button(mode.displayName) {
+                                    Task { await viewModel.updateGameSettings(gameMode: mode.rawValue) }
+                                }
+                            }
+                        } label: {
+                            HStack(spacing: 4) {
+                                Text(game.gameMode.displayName)
+                                    .foregroundStyle(Color.mtgTextPrimary)
+                                    .fontWeight(.semibold)
+                                Image(systemName: "chevron.up.chevron.down")
+                                    .foregroundStyle(Color.mtgGold)
+                                    .font(.caption2)
+                            }
+                        }
+                    }
+                }
+                .padding(16)
+                .mtgCardFrame()
+            }
+        }
+        .padding(.horizontal)
+    }
+
+    // MARK: - Ready Toggle
+
+    private var readyToggle: some View {
+        Button {
+            Task { await viewModel.toggleReady() }
+        } label: {
+            HStack(spacing: 8) {
+                Image(systemName: viewModel.currentPlayer?.isReady == true ? "checkmark.circle.fill" : "circle")
+                    .foregroundStyle(viewModel.currentPlayer?.isReady == true ? Color.green : Color.mtgTextSecondary)
+                Text(viewModel.currentPlayer?.isReady == true ? "Ready" : "Not Ready")
+                    .fontWeight(.semibold)
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 12)
+            .background(
+                viewModel.currentPlayer?.isReady == true
+                    ? Color.green.opacity(0.15)
+                    : Color.mtgSurface
+            )
+            .clipShape(RoundedRectangle(cornerRadius: 8))
+            .overlay(
+                RoundedRectangle(cornerRadius: 8)
+                    .stroke(
+                        viewModel.currentPlayer?.isReady == true ? Color.green.opacity(0.5) : Color.mtgDivider,
+                        lineWidth: 1
+                    )
+            )
+        }
+        .foregroundStyle(viewModel.currentPlayer?.isReady == true ? Color.green : Color.mtgTextPrimary)
     }
 
     // MARK: - Player List
@@ -220,6 +356,12 @@ struct LobbyView: View {
                     .animation(.easeInOut(duration: 0.3), value: viewModel.players.map(\.id))
                     .mtgCardFrame()
                     .padding(.horizontal)
+                }
+
+                if viewModel.players.count >= 2 {
+                    readyToggle
+                        .padding(.top, 16)
+                        .padding(.horizontal)
                 }
 
                 if !viewModel.isHost {

@@ -39,4 +39,5 @@ interface FirestoreRepository {
     // Player customization
     suspend fun updatePlayerColor(gameId: String, playerId: String, color: String?)
     suspend fun updateCommanderName(gameId: String, playerId: String, name: String?)
+    suspend fun updatePlayerReady(gameId: String, playerId: String, isReady: Boolean)
 }

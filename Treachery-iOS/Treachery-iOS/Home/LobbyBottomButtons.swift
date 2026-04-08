@@ -30,10 +30,16 @@ struct LobbyBottomButtons: View {
                 .buttonStyle(MtgPrimaryButtonStyle(isDisabled: !viewModel.canStartGame || viewModel.isStartingGame))
                 .disabled(!viewModel.canStartGame || viewModel.isStartingGame)
 
-                if !viewModel.canStartGame && viewModel.players.count < viewModel.minimumPlayerCount {
-                    Text("Need at least \(viewModel.minimumPlayerCount) player\(viewModel.minimumPlayerCount == 1 ? "" : "s") to start")
-                        .font(.caption)
-                        .foregroundStyle(Color.mtgTextSecondary)
+                if !viewModel.canStartGame {
+                    if viewModel.players.count < viewModel.minimumPlayerCount {
+                        Text("Need at least \(viewModel.minimumPlayerCount) player\(viewModel.minimumPlayerCount == 1 ? "" : "s") to start")
+                            .font(.caption)
+                            .foregroundStyle(Color.mtgTextSecondary)
+                    } else if !viewModel.allPlayersReady {
+                        Text("All players must be ready to start")
+                            .font(.caption)
+                            .foregroundStyle(Color.mtgTextSecondary)
+                    }
                 }
             }
 

@@ -244,3 +244,12 @@ export async function updateCommanderName(
   const ref = doc(db, 'games', gameId, 'players', playerId);
   await updateDoc(ref, { commander_name: name && name.trim() ? name.trim() : null });
 }
+
+export async function updatePlayerReady(
+  gameId: string,
+  playerId: string,
+  isReady: boolean,
+): Promise<void> {
+  const ref = doc(db, 'games', gameId, 'players', playerId);
+  await updateDoc(ref, { is_ready: isReady });
+}

@@ -146,6 +146,21 @@ fun LobbyScreen(
 
                     OrnateDivider(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp))
 
+                    // Game settings (host only)
+                    if (viewModel.isHost) {
+                        game?.let { g ->
+                            GameSettingsCard(
+                                maxPlayers = g.maxPlayers,
+                                startingLife = g.startingLife,
+                                gameMode = g.gameMode,
+                                onMaxPlayersChange = { viewModel.updateGameSettings(maxPlayers = it) },
+                                onStartingLifeChange = { viewModel.updateGameSettings(startingLife = it) },
+                                onGameModeChange = { viewModel.updateGameSettings(gameMode = it.value) },
+                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
+                            )
+                        }
+                    }
+
                     // Player list
                     Column(
                         modifier = Modifier
@@ -197,6 +212,40 @@ fun LobbyScreen(
                             }
                         }
 
+                        // Ready toggle button (shown when 2+ players)
+                        if (players.size >= 2) {
+                            val isReady = viewModel.currentPlayer?.isReady == true
+                            OutlinedButton(
+                                onClick = { viewModel.toggleReady() },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                                colors = ButtonDefaults.outlinedButtonColors(
+                                    containerColor = if (isReady) Color(0xFF4CAF50).copy(alpha = 0.15f) else MtgSurface
+                                ),
+                                border = ButtonDefaults.outlinedButtonBorder(enabled = true).copy(
+                                    brush = Brush.linearGradient(
+                                        if (isReady) listOf(Color(0xFF4CAF50).copy(alpha = 0.5f), Color(0xFF4CAF50).copy(alpha = 0.5f))
+                                        else listOf(MtgDivider, MtgDivider)
+                                    )
+                                ),
+                                shape = RoundedCornerShape(8.dp)
+                            ) {
+                                Icon(
+                                    if (isReady) Icons.Default.CheckCircle else Icons.Default.RadioButtonUnchecked,
+                                    contentDescription = null,
+                                    tint = if (isReady) Color(0xFF4CAF50) else MtgTextSecondary,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                                Spacer(Modifier.width(8.dp))
+                                Text(
+                                    if (isReady) "Ready" else "Not Ready",
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = if (isReady) Color(0xFF4CAF50) else MtgTextPrimary
+                                )
+                            }
+                        }
+
                         if (!viewModel.isHost) {
                             Row(
                                 modifier = Modifier.fillMaxWidth().padding(top = 16.dp),
@@ -228,14 +277,24 @@ fun LobbyScreen(
                                 enabled = viewModel.canStartGame && !isStartingGame,
                                 isLoading = isStartingGame
                             )
-                            if (!viewModel.canStartGame && players.size < viewModel.minimumPlayerCount) {
-                                Text(
-                                    "Need at least ${viewModel.minimumPlayerCount} players to start",
-                                    color = MtgTextSecondary,
-                                    fontSize = 12.sp,
-                                    modifier = Modifier.fillMaxWidth(),
-                                    textAlign = TextAlign.Center
-                                )
+                            if (!viewModel.canStartGame) {
+                                if (players.size < viewModel.minimumPlayerCount) {
+                                    Text(
+                                        "Need at least ${viewModel.minimumPlayerCount} players to start",
+                                        color = MtgTextSecondary,
+                                        fontSize = 12.sp,
+                                        modifier = Modifier.fillMaxWidth(),
+                                        textAlign = TextAlign.Center
+                                    )
+                                } else if (!viewModel.allPlayersReady) {
+                                    Text(
+                                        "All players must be ready to start",
+                                        color = MtgTextSecondary,
+                                        fontSize = 12.sp,
+                                        modifier = Modifier.fillMaxWidth(),
+                                        textAlign = TextAlign.Center
+                                    )
+                                }
                             }
                         }
 
@@ -377,6 +436,16 @@ private fun PlayerRow(
                 }
             }
 
+            if (player.isReady) {
+                Icon(
+                    Icons.Default.CheckCircle,
+                    contentDescription = "Ready",
+                    tint = Color(0xFF4CAF50),
+                    modifier = Modifier.size(20.dp)
+                )
+                Spacer(Modifier.width(4.dp))
+            }
+
             if (isHost) {
                 Text(
                     "Host",
@@ -464,6 +533,92 @@ private fun PlayerRow(
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(Icons.Default.Close, "Clear", tint = MtgTextSecondary, modifier = Modifier.size(12.dp))
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun GameSettingsCard(
+    maxPlayers: Int,
+    startingLife: Int,
+    gameMode: com.solomon.treachery.model.GameMode,
+    onMaxPlayersChange: (Int) -> Unit,
+    onStartingLifeChange: (Int) -> Unit,
+    onGameModeChange: (com.solomon.treachery.model.GameMode) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    var showLifeMenu by remember { mutableStateOf(false) }
+    var showModeMenu by remember { mutableStateOf(false) }
+
+    MtgCardFrame(modifier = modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            MtgSectionHeader("Game Settings")
+
+            // Max Players
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("Max Players", color = MtgTextSecondary, fontSize = 14.sp)
+                Spacer(Modifier.weight(1f))
+                IconButton(
+                    onClick = { if (maxPlayers > 2) onMaxPlayersChange(maxPlayers - 1) },
+                    enabled = maxPlayers > 2,
+                    modifier = Modifier.size(32.dp)
+                ) {
+                    Icon(Icons.Default.RemoveCircleOutline, "Decrease", tint = if (maxPlayers > 2) MtgGold else MtgTextSecondary.copy(alpha = 0.3f))
+                }
+                Text("$maxPlayers", color = MtgTextPrimary, fontWeight = FontWeight.SemiBold, modifier = Modifier.width(24.dp), textAlign = TextAlign.Center)
+                IconButton(
+                    onClick = { if (maxPlayers < 8) onMaxPlayersChange(maxPlayers + 1) },
+                    enabled = maxPlayers < 8,
+                    modifier = Modifier.size(32.dp)
+                ) {
+                    Icon(Icons.Default.AddCircleOutline, "Increase", tint = if (maxPlayers < 8) MtgGold else MtgTextSecondary.copy(alpha = 0.3f))
+                }
+            }
+
+            HorizontalDivider(color = MtgDivider)
+
+            // Starting Life
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("Starting Life", color = MtgTextSecondary, fontSize = 14.sp)
+                Spacer(Modifier.weight(1f))
+                Box {
+                    TextButton(onClick = { showLifeMenu = true }) {
+                        Text("$startingLife", color = MtgTextPrimary, fontWeight = FontWeight.SemiBold)
+                        Icon(Icons.Default.UnfoldMore, null, tint = MtgGold, modifier = Modifier.size(16.dp))
+                    }
+                    DropdownMenu(expanded = showLifeMenu, onDismissRequest = { showLifeMenu = false }) {
+                        listOf(20, 25, 30, 40, 50).forEach { life ->
+                            DropdownMenuItem(
+                                text = { Text("$life") },
+                                onClick = { onStartingLifeChange(life); showLifeMenu = false }
+                            )
+                        }
+                    }
+                }
+            }
+
+            HorizontalDivider(color = MtgDivider)
+
+            // Game Mode
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("Game Mode", color = MtgTextSecondary, fontSize = 14.sp)
+                Spacer(Modifier.weight(1f))
+                Box {
+                    TextButton(onClick = { showModeMenu = true }) {
+                        Text(gameMode.displayName, color = MtgTextPrimary, fontWeight = FontWeight.SemiBold)
+                        Icon(Icons.Default.UnfoldMore, null, tint = MtgGold, modifier = Modifier.size(16.dp))
+                    }
+                    DropdownMenu(expanded = showModeMenu, onDismissRequest = { showModeMenu = false }) {
+                        com.solomon.treachery.model.GameMode.entries.forEach { mode ->
+                            DropdownMenuItem(
+                                text = { Text(mode.displayName) },
+                                onClick = { onGameModeChange(mode); showModeMenu = false }
+                            )
+                        }
+                    }
                 }
             }
         }
