@@ -50,5 +50,11 @@ jobs:
           node-version: 22
           cache: npm
           cache-dependency-path: functions/package-lock.json
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
       - run: npm ci
       - run: npm run lint
+      - run: npm test
+      - run: npx --yes firebase-tools@latest emulators:exec --project=demo-test --only firestore 'node --test test/integration/*.test.js'
