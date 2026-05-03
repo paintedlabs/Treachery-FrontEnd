@@ -33,12 +33,7 @@ final class LobbyViewModel: ObservableObject {
     var canStartGame: Bool {
         guard let game = game else { return false }
         let minPlayers = game.gameMode.includesTreachery ? Role.minimumPlayerCount : 1
-        let allReady = players.count < 2 || players.allSatisfy { $0.isReady }
-        return isHost && players.count >= minPlayers && allReady
-    }
-
-    var allPlayersReady: Bool {
-        players.count < 2 || players.allSatisfy { $0.isReady }
+        return isHost && players.count >= minPlayers
     }
 
     var minimumPlayerCount: Int {
@@ -156,12 +151,4 @@ final class LobbyViewModel: ObservableObject {
         }
     }
 
-    func toggleReady() async {
-        guard let player = currentPlayer else { return }
-        do {
-            try await firestoreManager.updatePlayerReady(gameId: gameId, playerId: player.id, isReady: !player.isReady)
-        } catch {
-            errorMessage = error.localizedDescription
-        }
-    }
 }

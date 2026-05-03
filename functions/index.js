@@ -289,17 +289,6 @@ exports.startGame = onCall(callableOptions, async (request) => {
     );
     const players = playersSnap.docs.map((d) => ({ ref: d.ref, ...d.data() }));
 
-    // Enforce ready-up for games with 2+ players
-    if (players.length >= 2) {
-      const notReady = players.filter((p) => p.is_ready !== true);
-      if (notReady.length > 0) {
-        throw new HttpsError(
-          "failed-precondition",
-          "All players must be ready before starting."
-        );
-      }
-    }
-
     if (includesTreachery) {
       // Validate minimum player count against role distribution
       if (players.length < 1) {
@@ -638,7 +627,6 @@ exports.joinGame = onCall(callableOptions, async (request) => {
       life_total: game.starting_life || 40,
       is_eliminated: false,
       is_unveiled: false,
-      is_ready: false,
       joined_at: FieldValue.serverTimestamp(),
     });
 

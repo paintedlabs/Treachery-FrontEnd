@@ -284,10 +284,4 @@ class FirestoreRepositoryImpl @Inject constructor(
             .await()
     }
 
-    override suspend fun updatePlayerReady(gameId: String, playerId: String, isReady: Boolean) {
-        firestore.collection("games").document(gameId)
-            .collection("players").document(playerId)
-            .update(mapOf("is_ready" to isReady))
-            .await()
-    }
 }

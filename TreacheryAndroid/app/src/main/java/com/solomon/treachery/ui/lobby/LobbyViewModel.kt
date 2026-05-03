@@ -50,12 +50,8 @@ class LobbyViewModel @Inject constructor(
         get() {
             val g = game.value ?: return false
             val minPlayers = if (g.gameMode.includesTreachery) Role.MINIMUM_PLAYER_COUNT else 1
-            val allReady = players.value.size < 2 || players.value.all { it.isReady }
-            return isHost && players.value.size >= minPlayers && allReady
+            return isHost && players.value.size >= minPlayers
         }
-
-    val allPlayersReady: Boolean
-        get() = players.value.size < 2 || players.value.all { it.isReady }
 
     val minimumPlayerCount: Int
         get() {
@@ -150,14 +146,4 @@ class LobbyViewModel @Inject constructor(
         }
     }
 
-    fun toggleReady() {
-        val player = currentPlayer ?: return
-        viewModelScope.launch {
-            try {
-                firestoreRepository.updatePlayerReady(gameId, player.id, !player.isReady)
-            } catch (e: Exception) {
-                _errorMessage.value = e.localizedMessage
-            }
-        }
-    }
 }

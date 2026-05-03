@@ -14,13 +14,11 @@ interface UseLobbyReturn {
   isGameDisbanded: boolean;
   isGameStarted: boolean;
   canStartGame: boolean;
-  allPlayersReady: boolean;
   minPlayers: number;
   startGame: () => Promise<void>;
   leaveGame: (userId: string) => Promise<void>;
   updatePlayerColor: (color: string | null) => Promise<void>;
   updateCommanderName: (name: string | null) => Promise<void>;
-  toggleReady: () => Promise<void>;
   updateGameSettings: (settings: { maxPlayers?: number; startingLife?: number; gameMode?: string }) => Promise<void>;
 }
 
@@ -63,8 +61,7 @@ export function useLobby(
     game?.game_mode === 'treachery' || game?.game_mode === 'treachery_planechase';
   const minPlayers = isTreacheryMode ? MINIMUM_PLAYER_COUNT : 1;
 
-  const allPlayersReady = players.length < 2 || players.every((p) => p.is_ready);
-  const canStartGame = isHost && players.length >= minPlayers && allPlayersReady;
+  const canStartGame = isHost && players.length >= minPlayers;
 
   const startGame = useCallback(async () => {
     if (!isHost || !game) return;
@@ -127,15 +124,6 @@ export function useLobby(
     [gameId, currentPlayer],
   );
 
-  const toggleReady = useCallback(async () => {
-    if (!currentPlayer) return;
-    try {
-      await firestoreService.updatePlayerReady(gameId, currentPlayer.id, !currentPlayer.is_ready);
-    } catch (error: unknown) {
-      setErrorMessage(error instanceof Error ? error.message : 'Failed to update ready status.');
-    }
-  }, [gameId, currentPlayer]);
-
   const updateGameSettings = useCallback(
     async (settings: { maxPlayers?: number; startingLife?: number; gameMode?: string }) => {
       if (!isHost || !game) return;
@@ -157,13 +145,11 @@ export function useLobby(
     isGameDisbanded,
     isGameStarted,
     canStartGame,
-    allPlayersReady,
     minPlayers,
     startGame,
     leaveGame,
     updatePlayerColor,
     updateCommanderName,
-    toggleReady,
     updateGameSettings,
   };
 }

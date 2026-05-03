@@ -269,37 +269,6 @@ struct LobbyView: View {
         .padding(.horizontal)
     }
 
-    // MARK: - Ready Toggle
-
-    private var readyToggle: some View {
-        Button {
-            Task { await viewModel.toggleReady() }
-        } label: {
-            HStack(spacing: 8) {
-                Image(systemName: viewModel.currentPlayer?.isReady == true ? "checkmark.circle.fill" : "circle")
-                    .foregroundStyle(viewModel.currentPlayer?.isReady == true ? Color.green : Color.mtgTextSecondary)
-                Text(viewModel.currentPlayer?.isReady == true ? "Ready" : "Not Ready")
-                    .fontWeight(.semibold)
-            }
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 12)
-            .background(
-                viewModel.currentPlayer?.isReady == true
-                    ? Color.green.opacity(0.15)
-                    : Color.mtgSurface
-            )
-            .clipShape(RoundedRectangle(cornerRadius: 8))
-            .overlay(
-                RoundedRectangle(cornerRadius: 8)
-                    .stroke(
-                        viewModel.currentPlayer?.isReady == true ? Color.green.opacity(0.5) : Color.mtgDivider,
-                        lineWidth: 1
-                    )
-            )
-        }
-        .foregroundStyle(viewModel.currentPlayer?.isReady == true ? Color.green : Color.mtgTextPrimary)
-    }
-
     // MARK: - Player List
 
     private var playerListSection: some View {
@@ -356,12 +325,6 @@ struct LobbyView: View {
                     .animation(.easeInOut(duration: 0.3), value: viewModel.players.map(\.id))
                     .mtgCardFrame()
                     .padding(.horizontal)
-                }
-
-                if viewModel.players.count >= 2 {
-                    readyToggle
-                        .padding(.top, 16)
-                        .padding(.horizontal)
                 }
 
                 if !viewModel.isHost {

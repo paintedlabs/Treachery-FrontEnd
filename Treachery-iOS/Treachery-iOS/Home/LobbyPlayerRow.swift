@@ -45,13 +45,6 @@ struct LobbyPlayerRow: View {
 
                 Spacer()
 
-                if player.isReady {
-                    Image(systemName: "checkmark.circle.fill")
-                        .foregroundStyle(Color.green)
-                        .font(.body)
-                        .transition(.scale.combined(with: .opacity))
-                }
-
                 if isHost {
                     MtgBadge(text: "Host", foregroundColor: .mtgGold, backgroundColor: Color.mtgGold.opacity(0.15), font: .caption)
                 }

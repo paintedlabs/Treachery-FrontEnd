@@ -212,40 +212,6 @@ fun LobbyScreen(
                             }
                         }
 
-                        // Ready toggle button (shown when 2+ players)
-                        if (players.size >= 2) {
-                            val isReady = viewModel.currentPlayer?.isReady == true
-                            OutlinedButton(
-                                onClick = { viewModel.toggleReady() },
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = 16.dp, vertical = 12.dp),
-                                colors = ButtonDefaults.outlinedButtonColors(
-                                    containerColor = if (isReady) Color(0xFF4CAF50).copy(alpha = 0.15f) else MtgSurface
-                                ),
-                                border = ButtonDefaults.outlinedButtonBorder(enabled = true).copy(
-                                    brush = Brush.linearGradient(
-                                        if (isReady) listOf(Color(0xFF4CAF50).copy(alpha = 0.5f), Color(0xFF4CAF50).copy(alpha = 0.5f))
-                                        else listOf(MtgDivider, MtgDivider)
-                                    )
-                                ),
-                                shape = RoundedCornerShape(8.dp)
-                            ) {
-                                Icon(
-                                    if (isReady) Icons.Default.CheckCircle else Icons.Default.RadioButtonUnchecked,
-                                    contentDescription = null,
-                                    tint = if (isReady) Color(0xFF4CAF50) else MtgTextSecondary,
-                                    modifier = Modifier.size(20.dp)
-                                )
-                                Spacer(Modifier.width(8.dp))
-                                Text(
-                                    if (isReady) "Ready" else "Not Ready",
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = if (isReady) Color(0xFF4CAF50) else MtgTextPrimary
-                                )
-                            }
-                        }
-
                         if (!viewModel.isHost) {
                             Row(
                                 modifier = Modifier.fillMaxWidth().padding(top = 16.dp),
@@ -277,24 +243,14 @@ fun LobbyScreen(
                                 enabled = viewModel.canStartGame && !isStartingGame,
                                 isLoading = isStartingGame
                             )
-                            if (!viewModel.canStartGame) {
-                                if (players.size < viewModel.minimumPlayerCount) {
-                                    Text(
-                                        "Need at least ${viewModel.minimumPlayerCount} players to start",
-                                        color = MtgTextSecondary,
-                                        fontSize = 12.sp,
-                                        modifier = Modifier.fillMaxWidth(),
-                                        textAlign = TextAlign.Center
-                                    )
-                                } else if (!viewModel.allPlayersReady) {
-                                    Text(
-                                        "All players must be ready to start",
-                                        color = MtgTextSecondary,
-                                        fontSize = 12.sp,
-                                        modifier = Modifier.fillMaxWidth(),
-                                        textAlign = TextAlign.Center
-                                    )
-                                }
+                            if (!viewModel.canStartGame && players.size < viewModel.minimumPlayerCount) {
+                                Text(
+                                    "Need at least ${viewModel.minimumPlayerCount} players to start",
+                                    color = MtgTextSecondary,
+                                    fontSize = 12.sp,
+                                    modifier = Modifier.fillMaxWidth(),
+                                    textAlign = TextAlign.Center
+                                )
                             }
                         }
 
@@ -434,16 +390,6 @@ private fun PlayerRow(
                         color = MtgTextSecondary
                     )
                 }
-            }
-
-            if (player.isReady) {
-                Icon(
-                    Icons.Default.CheckCircle,
-                    contentDescription = "Ready",
-                    tint = Color(0xFF4CAF50),
-                    modifier = Modifier.size(20.dp)
-                )
-                Spacer(Modifier.width(4.dp))
             }
 
             if (isHost) {
