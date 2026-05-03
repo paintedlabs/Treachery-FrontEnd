@@ -143,10 +143,6 @@ function LobbyPlayerRow({
           )}
         </View>
 
-        {item.is_ready && (
-          <Ionicons name="checkmark-circle" size={20} color="#4CAF50" style={{ marginRight: 6 }} />
-        )}
-
         {isHostPlayer && (
           <View style={styles.hostBadge}>
             <Text style={styles.hostBadgeText}>Host</Text>
@@ -213,13 +209,11 @@ export default function LobbyScreen() {
     isGameDisbanded,
     isGameStarted,
     canStartGame,
-    allPlayersReady,
     minPlayers,
     startGame,
     leaveGame,
     updatePlayerColor,
     updateCommanderName,
-    toggleReady,
     updateGameSettings,
   } = useLobby(gameId!, isHost, currentUserId);
 
@@ -455,32 +449,6 @@ export default function LobbyScreen() {
         />
       )}
 
-      {/* Ready toggle button (shown when 2+ players) */}
-      {players.length >= 2 && (() => {
-        const currentPlayer = players.find((p) => p.user_id === currentUserId);
-        const isReady = currentPlayer?.is_ready ?? false;
-        return (
-          <TouchableOpacity
-            style={[
-              styles.readyToggle,
-              isReady && styles.readyToggleActive,
-            ]}
-            onPress={toggleReady}
-            accessibilityLabel={isReady ? 'Mark as not ready' : 'Mark as ready'}
-            accessibilityRole="button"
-          >
-            <Ionicons
-              name={isReady ? 'checkmark-circle' : 'ellipse-outline'}
-              size={20}
-              color={isReady ? '#4CAF50' : colors.textSecondary}
-            />
-            <Text style={[styles.readyToggleText, isReady && styles.readyToggleTextActive]}>
-              {isReady ? 'Ready' : 'Not Ready'}
-            </Text>
-          </TouchableOpacity>
-        );
-      })()}
-
       {!isHost && (
         <View style={styles.waitingRow}>
           <ActivityIndicator size="small" color={colors.primary} />
@@ -514,12 +482,8 @@ export default function LobbyScreen() {
               )}
             </TouchableOpacity>
 
-            {!canStartGame && (
-              players.length < minPlayers ? (
-                <Text style={styles.minPlayersText}>Need at least {minPlayers} players to start</Text>
-              ) : !allPlayersReady ? (
-                <Text style={styles.minPlayersText}>All players must be ready to start</Text>
-              ) : null
+            {!canStartGame && players.length < minPlayers && (
+              <Text style={styles.minPlayersText}>Need at least {minPlayers} players to start</Text>
             )}
           </>
         )}
@@ -814,31 +778,6 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  readyToggle: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    marginHorizontal: spacing.lg,
-    marginVertical: spacing.sm,
-    paddingVertical: 12,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
-  },
-  readyToggleActive: {
-    backgroundColor: 'rgba(76, 175, 80, 0.15)',
-    borderColor: 'rgba(76, 175, 80, 0.5)',
-  },
-  readyToggleText: {
-    color: colors.text,
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  readyToggleTextActive: {
-    color: '#4CAF50',
   },
   waitingRow: {
     flexDirection: 'row',

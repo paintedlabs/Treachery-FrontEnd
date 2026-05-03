@@ -126,7 +126,6 @@ export default function CreateGameScreen() {
         joined_at: Timestamp.now(),
         player_color: null,
         commander_name: null,
-        is_ready: false,
       };
       await firestoreService.addPlayer(player, gameId);
 

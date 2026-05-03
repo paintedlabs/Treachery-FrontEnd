@@ -22,7 +22,6 @@ struct Player: Codable, Identifiable, Equatable {
     var commanderName: String?
     var originalIdentityCardId: String?
     var isFaceDown: Bool
-    var isReady: Bool
 
     enum CodingKeys: String, CodingKey {
         case id
@@ -39,7 +38,6 @@ struct Player: Codable, Identifiable, Equatable {
         case commanderName = "commander_name"
         case originalIdentityCardId = "original_identity_card_id"
         case isFaceDown = "is_face_down"
-        case isReady = "is_ready"
     }
 
     // Custom decoder: uses decodeIfPresent for 'id' to handle documents
@@ -62,7 +60,6 @@ struct Player: Codable, Identifiable, Equatable {
         commanderName = try container.decodeIfPresent(String.self, forKey: .commanderName)
         originalIdentityCardId = try container.decodeIfPresent(String.self, forKey: .originalIdentityCardId)
         isFaceDown = try container.decodeIfPresent(Bool.self, forKey: .isFaceDown) ?? false
-        isReady = try container.decodeIfPresent(Bool.self, forKey: .isReady) ?? false
     }
 
     init(
@@ -79,8 +76,7 @@ struct Player: Codable, Identifiable, Equatable {
         playerColor: String? = nil,
         commanderName: String? = nil,
         originalIdentityCardId: String? = nil,
-        isFaceDown: Bool = false,
-        isReady: Bool = false
+        isFaceDown: Bool = false
     ) {
         self.id = id
         self.orderId = orderId
@@ -96,6 +92,5 @@ struct Player: Codable, Identifiable, Equatable {
         self.commanderName = commanderName
         self.originalIdentityCardId = originalIdentityCardId
         self.isFaceDown = isFaceDown
-        self.isReady = isReady
     }
 }

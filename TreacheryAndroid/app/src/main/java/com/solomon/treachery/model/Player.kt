@@ -16,8 +16,7 @@ data class Player(
     val playerColor: String? = null,
     val commanderName: String? = null,
     val originalIdentityCardId: String? = null,
-    val isFaceDown: Boolean = false,
-    val isReady: Boolean = false
+    val isFaceDown: Boolean = false
 ) {
     fun toMap(): Map<String, Any?> = mapOf(
         "id" to id,
@@ -33,8 +32,7 @@ data class Player(
         "player_color" to playerColor,
         "commander_name" to commanderName,
         "original_identity_card_id" to originalIdentityCardId,
-        "is_face_down" to isFaceDown,
-        "is_ready" to isReady
+        "is_face_down" to isFaceDown
     )
 
     companion object {
@@ -52,8 +50,7 @@ data class Player(
             playerColor = data["player_color"] as? String,
             commanderName = data["commander_name"] as? String,
             originalIdentityCardId = data["original_identity_card_id"] as? String,
-            isFaceDown = data["is_face_down"] as? Boolean ?: false,
-            isReady = data["is_ready"] as? Boolean ?: false
+            isFaceDown = data["is_face_down"] as? Boolean ?: false
         )
     }
 }
