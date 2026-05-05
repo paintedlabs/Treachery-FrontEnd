@@ -48,6 +48,14 @@ fastlane/test_output
 # Firebase
 .firebase/
 GoogleService-Info.plist
+firebase-debug.log
+firestore-debug.log
+**/firebase-debug.log
+**/firestore-debug.log
+
+# Playwright
+Treachery/test-results/
+Treachery/playwright-report/
 
 # APNs auth keys
 *.p8
