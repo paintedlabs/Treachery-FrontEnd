@@ -65,7 +65,7 @@ export function getRoleDistribution(playerCount: number): RoleDistribution {
   }
 }
 
-export const MINIMUM_PLAYER_COUNT = __DEV__ ? 1 : 4;
+export const MINIMUM_PLAYER_COUNT = process.env.EXPO_PUBLIC_ENVIRONMENT !== 'production' ? 1 : 4;
 
 // Characters for game code generation (excludes ambiguous: I, O, 0, 1)
 export const CODE_CHARACTERS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
