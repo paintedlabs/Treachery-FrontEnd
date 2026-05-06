@@ -26,6 +26,7 @@ import { PlayerRow } from '@/components/PlayerRow';
 import { ErrorBanner } from '@/components/ErrorBanner';
 import { LoadingScreen } from '@/components/LoadingScreen';
 import { ConnectionBanner } from '@/components/ConnectionBanner';
+import { AbilityResolver, shouldShowAbilityResolver } from '@/components/AbilityResolver';
 import { ROLE_DISPLAY_NAMES } from '@/constants/roles';
 import { Player } from '@/models/types';
 import { colors, spacing, fonts } from '@/constants/theme';
@@ -73,8 +74,20 @@ export default function GameBoardScreen() {
   const [inspectedPlayer, setInspectedPlayer] = useState<Player | null>(null);
   const [showWinnerSelection, setShowWinnerSelection] = useState(false);
   const [selectedWinners, setSelectedWinners] = useState<Set<string>>(new Set());
+  const [showAbilityResolver, setShowAbilityResolver] = useState(false);
+  const [hasAutoTriggeredAbility, setHasAutoTriggeredAbility] = useState(false);
 
   const isHost = game?.host_id === currentUserId;
+  const canResolveAbility = shouldShowAbilityResolver(currentPlayer);
+
+  // Auto-open the ability resolver the first time the current player flips to
+  // unveiled while holding one of the three traitor cards that need a follow-up.
+  useEffect(() => {
+    if (canResolveAbility && !hasAutoTriggeredAbility) {
+      setShowAbilityResolver(true);
+      setHasAutoTriggeredAbility(true);
+    }
+  }, [canResolveAbility, hasAutoTriggeredAbility]);
 
   // Derive last roller name from players
   const lastRollerName = (() => {
@@ -291,6 +304,17 @@ export default function GameBoardScreen() {
                     <Text style={styles.unveilButtonText}>Unveil Identity</Text>
                   </TouchableOpacity>
                 )}
+                {canResolveAbility && (
+                  <TouchableOpacity
+                    style={[styles.unveilButton, isPending && styles.buttonDisabled]}
+                    onPress={() => setShowAbilityResolver(true)}
+                    disabled={isPending}
+                    accessibilityLabel="Activate ability"
+                    accessibilityRole="button"
+                  >
+                    <Text style={styles.unveilButtonText}>Activate Ability</Text>
+                  </TouchableOpacity>
+                )}
               </View>
             )}
 
@@ -417,6 +441,17 @@ export default function GameBoardScreen() {
                   <Text style={styles.unveilButtonText}>Unveil Identity</Text>
                 </TouchableOpacity>
               )}
+              {canResolveAbility && (
+                <TouchableOpacity
+                  style={[styles.unveilButton, isPending && styles.buttonDisabled]}
+                  onPress={() => setShowAbilityResolver(true)}
+                  disabled={isPending}
+                  accessibilityLabel="Activate ability"
+                  accessibilityRole="button"
+                >
+                  <Text style={styles.unveilButtonText}>Activate Ability</Text>
+                </TouchableOpacity>
+              )}
             </View>
           )}
 
@@ -476,6 +511,17 @@ export default function GameBoardScreen() {
           player={inspectedPlayer}
           visible={!!inspectedPlayer}
           onClose={() => setInspectedPlayer(null)}
+        />
+      )}
+
+      {/* Traitor ability resolver (Metamorph / Puppet Master / Wearer of Masks) */}
+      {currentPlayer && (
+        <AbilityResolver
+          gameId={gameId!}
+          currentPlayer={currentPlayer}
+          players={players}
+          visible={showAbilityResolver && canResolveAbility}
+          onClose={() => setShowAbilityResolver(false)}
         />
       )}
 
