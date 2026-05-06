@@ -8,11 +8,13 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "build:web": "expo export --platform web",
+    "build:web:emulator": "EXPO_PUBLIC_USE_EMULATOR=true EXPO_PUBLIC_ENVIRONMENT=test expo export --platform web",
     "typecheck": "tsc --noEmit",
     "lint": "eslint . --ext .ts,.tsx --max-warnings 0",
     "lint:fix": "eslint . --ext .ts,.tsx --fix",
     "format": "prettier --write \"src/**/*.{ts,tsx}\" \"app/**/*.{ts,tsx}\"",
-    "format:check": "prettier --check \"src/**/*.{ts,tsx}\" \"app/**/*.{ts,tsx}\""
+    "format:check": "prettier --check \"src/**/*.{ts,tsx}\" \"app/**/*.{ts,tsx}\"",
+    "test:e2e": "firebase emulators:exec --project=demo-test --only auth,firestore,functions --config=../firebase.json 'npm run build:web:emulator && playwright test'"
   },
   "dependencies": {
     "@expo/metro-runtime": "~55.0.6",
@@ -35,6 +37,7 @@
     "react-native-web": "^0.21.0"
   },
   "devDependencies": {
+    "@playwright/test": "^1.50.0",
     "@types/react": "~19.2.2",
     "@typescript-eslint/eslint-plugin": "^8.0.0",
     "@typescript-eslint/parser": "^8.0.0",
@@ -43,6 +46,7 @@
     "eslint-plugin-react": "^7.37.0",
     "eslint-plugin-react-hooks": "^5.0.0",
     "prettier": "^3.4.0",
+    "serve": "^14.2.4",
     "typescript": "~5.9.2"
   },
   "private": true
