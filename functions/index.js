@@ -295,37 +295,96 @@ exports.startGame = onCall(callableOptions, async (request) => {
         throw new HttpsError("failed-precondition", "Not enough players.");
       }
 
-      // Build and shuffle roles
       const dist = getRoleDistribution(players.length);
-      const roles = [];
-      for (let i = 0; i < dist.leaders; i++) roles.push("leader");
-      for (let i = 0; i < dist.guardians; i++) roles.push("guardian");
-      for (let i = 0; i < dist.assassins; i++) roles.push("assassin");
-      for (let i = 0; i < dist.traitors; i++) roles.push("traitor");
 
-      const shuffledRoles = shuffle(roles);
+      // Test-seed override: when running in the firebase emulator, accept an
+      // explicit { user_id -> { role, identityCardId } } map so E2E tests can
+      // drive deterministic role/card assignments. Stripped in production
+      // because process.env.FUNCTIONS_EMULATOR is only set in the emulator.
+      const isEmulator = process.env.FUNCTIONS_EMULATOR === "true";
+      const testSeed = isEmulator ? request.data.testSeed : null;
 
-      // Assign roles and cards
-      const usedCardIds = new Set();
-
-      for (let i = 0; i < players.length; i++) {
-        const role = shuffledRoles[i];
-        const availableCards = getCardsForRole(role).filter(
-          (c) => !usedCardIds.has(c.id)
-        );
-
-        if (availableCards.length === 0) {
-          throw new HttpsError("internal", "Not enough identity cards for role: " + role);
+      if (testSeed) {
+        if (!testSeed.assignments || typeof testSeed.assignments !== "object") {
+          throw new HttpsError("invalid-argument", "testSeed.assignments must be an object.");
         }
+        // Validate role counts match the distribution for this player count.
+        const counts = { leader: 0, guardian: 0, assassin: 0, traitor: 0 };
+        for (const a of Object.values(testSeed.assignments)) {
+          if (counts[a.role] === undefined) {
+            throw new HttpsError("invalid-argument", `Invalid role: ${a.role}`);
+          }
+          counts[a.role]++;
+        }
+        if (
+          counts.leader !== dist.leaders ||
+          counts.guardian !== dist.guardians ||
+          counts.assassin !== dist.assassins ||
+          counts.traitor !== dist.traitors
+        ) {
+          throw new HttpsError(
+            "invalid-argument",
+            `testSeed role counts ${JSON.stringify(counts)} do not match distribution ${JSON.stringify(dist)} for ${players.length} players.`
+          );
+        }
+        const usedCardIds = new Set();
+        for (const player of players) {
+          const assignment = testSeed.assignments[player.user_id];
+          if (!assignment) {
+            throw new HttpsError("invalid-argument", `Missing testSeed assignment for user ${player.user_id}.`);
+          }
+          const card = _getCard(assignment.identityCardId);
+          if (!card) {
+            throw new HttpsError("invalid-argument", `Card ${assignment.identityCardId} not found.`);
+          }
+          if (card.role !== assignment.role) {
+            throw new HttpsError(
+              "invalid-argument",
+              `Card ${card.id} has role ${card.role} but assignment specifies ${assignment.role}.`
+            );
+          }
+          if (usedCardIds.has(card.id)) {
+            throw new HttpsError("invalid-argument", `Card ${card.id} assigned to multiple players.`);
+          }
+          usedCardIds.add(card.id);
+          tx.update(player.ref, {
+            role: assignment.role,
+            identity_card_id: card.id,
+            life_total: game.starting_life + (card.life_modifier || 0),
+          });
+        }
+      } else {
+        // Build and shuffle roles
+        const roles = [];
+        for (let i = 0; i < dist.leaders; i++) roles.push("leader");
+        for (let i = 0; i < dist.guardians; i++) roles.push("guardian");
+        for (let i = 0; i < dist.assassins; i++) roles.push("assassin");
+        for (let i = 0; i < dist.traitors; i++) roles.push("traitor");
 
-        const card = availableCards[Math.floor(Math.random() * availableCards.length)];
-        usedCardIds.add(card.id);
+        const shuffledRoles = shuffle(roles);
 
-        tx.update(players[i].ref, {
-          role: role,
-          identity_card_id: card.id,
-          life_total: game.starting_life + (card.life_modifier || 0),
-        });
+        // Assign roles and cards
+        const usedCardIds = new Set();
+
+        for (let i = 0; i < players.length; i++) {
+          const role = shuffledRoles[i];
+          const availableCards = getCardsForRole(role).filter(
+            (c) => !usedCardIds.has(c.id)
+          );
+
+          if (availableCards.length === 0) {
+            throw new HttpsError("internal", "Not enough identity cards for role: " + role);
+          }
+
+          const card = availableCards[Math.floor(Math.random() * availableCards.length)];
+          usedCardIds.add(card.id);
+
+          tx.update(players[i].ref, {
+            role: role,
+            identity_card_id: card.id,
+            life_total: game.starting_life + (card.life_modifier || 0),
+          });
+        }
       }
     } else {
       // Non-treachery modes: just require at least 1 player
@@ -812,9 +871,14 @@ exports.resolveMetamorph = onCall(callableOptions, async (request) => {
     const targetCard = _getCard(target.identity_card_id);
     const isFaceDown = targetCard ? targetCard.role !== "leader" : true;
 
+    // Role follows the stolen card. The Metamorph "gains control of that
+    // player's identity card" — they become the stolen identity, with its
+    // role. (Pre-validated above that target.role !== 'leader'.)
     tx.update(caller.ref, {
       original_identity_card_id: caller.original_identity_card_id || caller.identity_card_id,
+      original_role: caller.original_role || caller.role,
       identity_card_id: target.identity_card_id,
+      role: target.role,
       is_face_down: isFaceDown,
     });
     tx.update(gameRef, { last_activity_at: FieldValue.serverTimestamp() });
@@ -885,11 +949,19 @@ exports.resolvePuppetMaster = onCall(callableOptions, async (request) => {
       if (newCardId === player.identity_card_id) continue; // No change
 
       const newCard = _getCard(newCardId);
-      const isFaceDown = newCard ? newCard.role !== "leader" : true;
+      if (!newCard) {
+        throw new HttpsError("not-found", `Card ${newCardId} not found.`);
+      }
+      const isFaceDown = newCard.role !== "leader";
 
+      // Role follows the redistributed card. Per the Puppet Master text,
+      // "redistribute control of identity cards" transfers the identity
+      // itself, including which role the player has for win-detection.
       tx.update(player.ref, {
         original_identity_card_id: player.original_identity_card_id || player.identity_card_id,
+        original_role: player.original_role || player.role,
         identity_card_id: newCardId,
+        role: newCard.role,
         is_face_down: isFaceDown,
       });
     }
