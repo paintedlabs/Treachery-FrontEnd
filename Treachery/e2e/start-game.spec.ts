@@ -23,7 +23,9 @@ test('host creates, three guests join, host starts the game', async ({ browser }
     contexts.map((ctx) => ctx.newPage()),
   );
 
-  await Promise.all([host, guest1, guest2, guest3].map(signInAsGuest));
+  // Wrap to avoid Array.map passing the array index as the second arg
+  // (signInAsGuest now takes an optional displayName).
+  await Promise.all([host, guest1, guest2, guest3].map((p) => signInAsGuest(p)));
 
   const { code } = await hostCreateGame(host);
 

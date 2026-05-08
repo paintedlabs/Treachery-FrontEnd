@@ -871,9 +871,14 @@ exports.resolveMetamorph = onCall(callableOptions, async (request) => {
     const targetCard = _getCard(target.identity_card_id);
     const isFaceDown = targetCard ? targetCard.role !== "leader" : true;
 
+    // Role follows the stolen card. The Metamorph "gains control of that
+    // player's identity card" — they become the stolen identity, with its
+    // role. (Pre-validated above that target.role !== 'leader'.)
     tx.update(caller.ref, {
       original_identity_card_id: caller.original_identity_card_id || caller.identity_card_id,
+      original_role: caller.original_role || caller.role,
       identity_card_id: target.identity_card_id,
+      role: target.role,
       is_face_down: isFaceDown,
     });
     tx.update(gameRef, { last_activity_at: FieldValue.serverTimestamp() });
@@ -944,11 +949,19 @@ exports.resolvePuppetMaster = onCall(callableOptions, async (request) => {
       if (newCardId === player.identity_card_id) continue; // No change
 
       const newCard = _getCard(newCardId);
-      const isFaceDown = newCard ? newCard.role !== "leader" : true;
+      if (!newCard) {
+        throw new HttpsError("not-found", `Card ${newCardId} not found.`);
+      }
+      const isFaceDown = newCard.role !== "leader";
 
+      // Role follows the redistributed card. Per the Puppet Master text,
+      // "redistribute control of identity cards" transfers the identity
+      // itself, including which role the player has for win-detection.
       tx.update(player.ref, {
         original_identity_card_id: player.original_identity_card_id || player.identity_card_id,
+        original_role: player.original_role || player.role,
         identity_card_id: newCardId,
+        role: newCard.role,
         is_face_down: isFaceDown,
       });
     }

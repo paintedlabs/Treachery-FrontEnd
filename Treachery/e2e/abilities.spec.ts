@@ -51,16 +51,17 @@ test.describe('Traitor abilities', () => {
     await traitor.page.getByRole('button', { name: /^Steal from / }).first().click();
     await traitor.page.getByRole('button', { name: 'Steal identity' }).click();
 
-    // After the cloud function returns, the traitor's identity_card_id should
-    // be the assassin's old card (assassin_01 from the seed cursor) and the
-    // traitor's role should still be 'traitor'.
+    // After the cloud function returns, the traitor "gains control of that
+    // player's identity card" — they BECOME the stolen identity, so role
+    // follows the stolen card. (Original role is preserved for game-over.)
     await expect(async () => {
       const docs = await fetchPlayerDocs(traitor.page, gameId);
       const traitorDoc = docs.find((d) => d.user_id === traitor.userId);
       expect(traitorDoc?.identity_card_id).toBe(assassinA.identityCardId);
-      expect(traitorDoc?.role).toBe('traitor'); // role doesn't change, only the card
+      expect(traitorDoc?.role).toBe('assassin'); // role follows the stolen card
       expect(traitorDoc?.is_face_down).toBe(true); // non-leader stolen card
       expect(traitorDoc?.original_identity_card_id).toBe('traitor_07');
+      expect(traitorDoc?.original_role).toBe('traitor');
     }).toPass({ timeout: 10_000 });
 
     // Sanity: we also still have unverified guests (assassinB and leader)
@@ -72,6 +73,10 @@ test.describe('Traitor abilities', () => {
   });
 
   test('Puppet Master — redistribute identity cards among other players', async ({ browser }) => {
+    // Regression for the staging bug where a Puppet Master swap moved the
+    // identity *card* but left `player.role` untouched, so the lobby/score
+    // UI showed stale roles and `checkWinConditions` would fire on the wrong
+    // role mapping. After this test passes, role follows the card.
     const { players, gameId } = await setupSeededGame(
       browser,
       FOUR_PLAYER_LAYOUT,
@@ -81,56 +86,48 @@ test.describe('Traitor abilities', () => {
     const leader = playerWithRole(players, 'leader');
     const [assassinA, assassinB] = playersWithRole(players, 'assassin');
 
-    // Traitor unveils — Puppet Master modal auto-opens with the other 3
-    // players (host=leader, assassinA, assassinB) and their current cards.
+    // Traitor unveils — Puppet Master modal auto-opens. The modal shows one
+    // "Swap with {display_name}" button per non-traitor (3 buttons total).
     await unveilSelf(traitor.page);
+    await expect(traitor.page.getByRole('button', { name: /^Swap with / })).toHaveCount(3, { timeout: 10_000 });
 
-    // Tap leader's row → tap assassinA's row → swaps their cards.
-    // The modal labels each row with "Swap with {display_name}".
-    const swapButtons = traitor.page.getByRole('button', { name: /^Swap with / });
-    await expect(swapButtons.first()).toBeVisible({ timeout: 10_000 });
-
-    // Match exactly 3 swap buttons (leader + 2 assassins; traitor excludes self).
-    await expect(swapButtons).toHaveCount(3);
-    // Tap first then second — swaps cards between players 1 and 2.
-    await swapButtons.nth(0).click();
-    await swapButtons.nth(1).click();
-
+    // Target the leader and assassinA explicitly (rather than relying on
+    // modal order). Tapping their two rows swaps their cards.
+    await traitor.page.getByRole('button', { name: `Swap with ${leader.name}` }).click();
+    await traitor.page.getByRole('button', { name: `Swap with ${assassinA.name}` }).click();
     await traitor.page.getByRole('button', { name: 'Confirm redistribution' }).click();
 
-    // After resolution, exactly two of (leader, assassinA, assassinB) have
-    // had their cards changed. We don't know the modal ordering, so just
-    // assert that the multiset of identity_card_ids on those three players
-    // is unchanged but their pairings have shifted.
+    // After resolution: leader holds assassinA's card and BECOMES an
+    // assassin (role follows card). assassinA holds the leader card and
+    // BECOMES the leader. assassinB is untouched. Original roles are
+    // preserved on both swapped players.
     await expect(async () => {
       const docs = await fetchPlayerDocs(traitor.page, gameId);
-      const others = [leader, assassinA, assassinB].map((p) =>
-        docs.find((d) => d.user_id === p.userId),
-      );
-      // Original cards were leader.identityCardId + 2 assassin cards.
-      const originalCards = new Set([
-        leader.identityCardId,
-        assassinA.identityCardId,
-        assassinB.identityCardId,
-      ]);
-      const currentCards = new Set(others.map((d) => d?.identity_card_id));
-      // Multiset preserved.
-      expect(currentCards).toEqual(originalCards);
-      // ≥1 player has a different card from where they started (a swap occurred).
-      const swappedCount = others.filter(
-        (d, i) =>
-          d?.identity_card_id !== [leader, assassinA, assassinB][i].identityCardId,
-      ).length;
-      expect(swappedCount).toBeGreaterThan(0);
-      // Each non-leader card that was reassigned is now is_face_down.
-      for (const d of others) {
-        if (d?.identity_card_id !== d?.original_identity_card_id && d?.original_identity_card_id) {
-          // Card changed — non-leader cards should be face down.
-          if (d?.identity_card_id?.startsWith('leader_') === false) {
-            expect(d?.is_face_down).toBe(true);
-          }
-        }
-      }
+      const leaderDoc = docs.find((d) => d.user_id === leader.userId);
+      const assassinADoc = docs.find((d) => d.user_id === assassinA.userId);
+      const assassinBDoc = docs.find((d) => d.user_id === assassinB.userId);
+
+      // Cards swapped.
+      expect(leaderDoc?.identity_card_id).toBe(assassinA.identityCardId);
+      expect(assassinADoc?.identity_card_id).toBe(leader.identityCardId);
+      expect(assassinBDoc?.identity_card_id).toBe(assassinB.identityCardId);
+
+      // Roles followed the cards — this is what the staging bug got wrong.
+      expect(leaderDoc?.role).toBe('assassin');
+      expect(assassinADoc?.role).toBe('leader');
+      expect(assassinBDoc?.role).toBe('assassin');
+
+      // Original roles preserved for game-over reveal.
+      expect(leaderDoc?.original_role).toBe('leader');
+      expect(assassinADoc?.original_role).toBe('assassin');
+      // Untouched player has no original_role recorded (no swap happened).
+      expect(assassinBDoc?.original_role ?? null).toBe(null);
+
+      // The non-Leader card given to the original leader is face-down per
+      // the rules ("Then turn face down each of those cards that isn't a
+      // Leader"). The Leader card given to the assassin stays face-up.
+      expect(leaderDoc?.is_face_down).toBe(true);
+      expect(assassinADoc?.is_face_down).toBe(false);
     }).toPass({ timeout: 10_000 });
   });
 

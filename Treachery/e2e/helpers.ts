@@ -48,10 +48,16 @@ const CARDS_BY_ROLE: Record<Role, string[]> = {
 
 // ── Auth + lobby ─────────────────────────────────────────────────
 
-export async function signInAsGuest(page: Page) {
+export async function signInAsGuest(page: Page, displayName?: string) {
   await page.goto('/');
   await page.getByRole('button', { name: 'Play as Guest' }).click();
-  // Onboarding: display name (default ok), welcome
+  // Onboarding: optionally override the default "Guest" display name so
+  // tests can disambiguate players in UI selectors (e.g. the Puppet Master
+  // modal's "Swap with {display_name}" buttons).
+  if (displayName) {
+    const input = page.getByLabel('Display name');
+    await input.fill(displayName);
+  }
   await page.getByRole('button', { name: 'Continue' }).click();
   await page.getByRole('button', { name: "Let's Play" }).click();
   await expect(page.getByRole('button', { name: 'Create game' })).toBeVisible({ timeout: 20_000 });
@@ -205,8 +211,12 @@ export async function setupSeededGame(
   );
   const pages = await Promise.all(contexts.map((c) => c.newPage()));
 
-  // Sign all in in parallel.
-  await Promise.all(pages.map(signInAsGuest));
+  // Sign all in in parallel, each with a unique display name. The names
+  // ("Player 1", "Player 2", ...) make modal selectors deterministic
+  // (e.g. the Puppet Master swap rows are labeled by display_name).
+  await Promise.all(
+    pages.map((p, i) => signInAsGuest(p, `Player ${i + 1}`)),
+  );
 
   // Host creates, guests join.
   const [hostPage, ...guestPages] = pages;
@@ -309,12 +319,12 @@ export function playersWithRole(players: PlayerHandle[], role: Role): PlayerHand
 export async function fetchPlayerDocs(
   page: Page,
   gameId: string,
-): Promise<Array<{ id: string; user_id: string; identity_card_id: string | null; role: Role | null; is_eliminated?: boolean; is_unveiled?: boolean; is_face_down?: boolean; original_identity_card_id?: string | null }>> {
+): Promise<Array<{ id: string; user_id: string; identity_card_id: string | null; role: Role | null; is_eliminated?: boolean; is_unveiled?: boolean; is_face_down?: boolean; original_identity_card_id?: string | null; original_role?: Role | null }>> {
   return page.evaluate(async ({ gameId }) => {
     const e2e = (window as unknown as {
       __e2e?: { fetchPlayers: (gid: string) => Promise<unknown[]> };
     }).__e2e;
     if (!e2e) throw new Error('window.__e2e missing');
     return e2e.fetchPlayers(gameId);
-  }, { gameId }) as Promise<Array<{ id: string; user_id: string; identity_card_id: string | null; role: Role | null; is_eliminated?: boolean; is_unveiled?: boolean; is_face_down?: boolean; original_identity_card_id?: string | null }>>;
+  }, { gameId }) as Promise<Array<{ id: string; user_id: string; identity_card_id: string | null; role: Role | null; is_eliminated?: boolean; is_unveiled?: boolean; is_face_down?: boolean; original_identity_card_id?: string | null; original_role?: Role | null }>>;
 }
