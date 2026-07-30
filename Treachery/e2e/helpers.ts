@@ -83,7 +83,12 @@ export async function guestJoinGame(page: Page, code: string) {
   await expect(page).toHaveURL(/\/join-game/);
   await page.getByLabel('Game code').fill(code);
   await page.getByRole('button', { name: 'Join game' }).click();
-  await expect(page).toHaveURL(/\/lobby\//);
+  // Specs join guests concurrently (Promise.all), and every joinGame call runs
+  // a transaction against the same game doc, so they serialize and retry under
+  // contention — an 8-player join has been measured at ~9.5s in the emulator,
+  // right at the 10s default. Give it the same headroom signInAsGuest uses
+  // rather than letting a slow-but-successful join read as a failure.
+  await expect(page).toHaveURL(/\/lobby\//, { timeout: 20_000 });
 }
 
 function parseGameIdFromUrl(url: string): string {
