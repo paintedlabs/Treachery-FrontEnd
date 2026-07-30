@@ -67,6 +67,9 @@ export interface Game {
   game_mode?: GameMode;
   planechase?: PlanechaseState;
   winner_user_ids?: string[];
+  // Caps which traitor identities can appear in startGame's random pool.
+  // Absent means no cap ('special' — all traitors allowed).
+  max_traitor_rarity?: Rarity;
 }
 
 export interface Player {

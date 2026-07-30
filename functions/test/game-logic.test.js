@@ -28,6 +28,23 @@ function getCardsForRole(role) {
   return CARDS.filter((c) => c.role === role);
 }
 
+// Mirrors the traitor rarity cap in index.js
+const RARITY_ORDER = { uncommon: 1, rare: 2, mythic: 3, special: 4 };
+
+function isValidRarity(value) {
+  return (
+    typeof value === "string" &&
+    Object.prototype.hasOwnProperty.call(RARITY_ORDER, value)
+  );
+}
+
+function getTraitorPool(maxRarity) {
+  const traitors = getCardsForRole("traitor");
+  if (!isValidRarity(maxRarity)) return traitors;
+  const cap = RARITY_ORDER[maxRarity];
+  return traitors.filter((c) => RARITY_ORDER[c.rarity] <= cap);
+}
+
 function getRoleDistribution(playerCount) {
   const table = {
     1: { leaders: 1, guardians: 0, assassins: 0, traitors: 0 },
@@ -813,6 +830,129 @@ suite("Role Assignment — Full Simulation", () => {
           usedCardIds.add(card.id);
         }
       }
+    }
+  });
+});
+
+suite("Traitor Rarity Cap", () => {
+  const allTraitors = getCardsForRole("traitor");
+
+  test("every traitor card has a known rarity tier", () => {
+    for (const card of allTraitors) {
+      assert.ok(
+        RARITY_ORDER[card.rarity],
+        `Traitor ${card.id} (${card.name}) has unknown rarity: ${card.rarity}`
+      );
+    }
+  });
+
+  test("no cap (undefined) returns the full traitor pool", () => {
+    assert.strictEqual(getTraitorPool(undefined).length, allTraitors.length);
+  });
+
+  test("unknown cap value returns the full traitor pool (graceful fallback)", () => {
+    assert.strictEqual(getTraitorPool("bogus").length, allTraitors.length);
+    assert.strictEqual(getTraitorPool(null).length, allTraitors.length);
+    // Prototype-chain keys must not be treated as valid tiers
+    assert.strictEqual(getTraitorPool("constructor").length, allTraitors.length);
+    assert.strictEqual(getTraitorPool("hasOwnProperty").length, allTraitors.length);
+  });
+
+  test("'special' cap includes every traitor", () => {
+    assert.strictEqual(getTraitorPool("special").length, allTraitors.length);
+  });
+
+  test("pool sizes shrink monotonically as the cap tightens", () => {
+    const uncommon = getTraitorPool("uncommon").length;
+    const rare = getTraitorPool("rare").length;
+    const mythic = getTraitorPool("mythic").length;
+    const special = getTraitorPool("special").length;
+    assert.ok(
+      uncommon <= rare && rare <= mythic && mythic <= special,
+      `Pools not monotonic: ${uncommon}/${rare}/${mythic}/${special}`
+    );
+  });
+
+  test("current data: pool sizes are 4 (uncommon), 7 (rare), 9 (mythic), 13 (special)", () => {
+    assert.strictEqual(getTraitorPool("uncommon").length, 4);
+    assert.strictEqual(getTraitorPool("rare").length, 7);
+    assert.strictEqual(getTraitorPool("mythic").length, 9);
+    assert.strictEqual(getTraitorPool("special").length, 13);
+  });
+
+  test("capped pool never contains a card above the cap", () => {
+    for (const cap of ["uncommon", "rare", "mythic", "special"]) {
+      for (const card of getTraitorPool(cap)) {
+        assert.ok(
+          RARITY_ORDER[card.rarity] <= RARITY_ORDER[cap],
+          `Cap '${cap}' pool contains ${card.id} with rarity ${card.rarity}`
+        );
+      }
+    }
+  });
+
+  test("tightest cap (uncommon) still covers the 8-player max of 2 traitors", () => {
+    assert.ok(
+      getTraitorPool("uncommon").length >= 2,
+      "Uncommon-only pool cannot seat 2 traitors"
+    );
+  });
+
+  test("the four 'special' traitors are exactly the table-warping ability cards", () => {
+    const specialIds = allTraitors
+      .filter((c) => c.rarity === "special")
+      .map((c) => c.id)
+      .sort();
+    assert.deepStrictEqual(specialIds, [
+      "traitor_07", // The Metamorph
+      "traitor_09", // The Puppet Master
+      "traitor_12", // The Treacherous Masochist
+      "traitor_13", // The Wearer of Masks
+    ]);
+  });
+
+  test("simulation: 500 8-player assignments per cap never exceed the cap", () => {
+    for (const cap of ["uncommon", "rare", "mythic", "special"]) {
+      for (let trial = 0; trial < 500; trial++) {
+        const dist = getRoleDistribution(8);
+        const roles = [];
+        for (let i = 0; i < dist.leaders; i++) roles.push("leader");
+        for (let i = 0; i < dist.guardians; i++) roles.push("guardian");
+        for (let i = 0; i < dist.assassins; i++) roles.push("assassin");
+        for (let i = 0; i < dist.traitors; i++) roles.push("traitor");
+
+        const shuffledRoles = shuffle(roles);
+        const usedCardIds = new Set();
+
+        for (let i = 0; i < 8; i++) {
+          const role = shuffledRoles[i];
+          const rolePool =
+            role === "traitor" ? getTraitorPool(cap) : getCardsForRole(role);
+          const available = rolePool.filter((c) => !usedCardIds.has(c.id));
+          assert.ok(
+            available.length > 0,
+            `Cap '${cap}', trial ${trial}: ran out of ${role} cards`
+          );
+          const card =
+            available[Math.floor(Math.random() * available.length)];
+          if (role === "traitor") {
+            assert.ok(
+              RARITY_ORDER[card.rarity] <= RARITY_ORDER[cap],
+              `Cap '${cap}': assigned traitor ${card.id} with rarity ${card.rarity}`
+            );
+          }
+          usedCardIds.add(card.id);
+        }
+      }
+    }
+  });
+
+  test("updateGameSettings validation: known tiers accepted, junk rejected", () => {
+    for (const good of ["uncommon", "rare", "mythic", "special"]) {
+      assert.ok(isValidRarity(good), `${good} should be accepted`);
+    }
+    for (const bad of ["common", "SPECIAL", "", "constructor", "__proto__", 3, null, {}, []]) {
+      assert.ok(!isValidRarity(bad), `${JSON.stringify(bad)} should be rejected`);
     }
   });
 });

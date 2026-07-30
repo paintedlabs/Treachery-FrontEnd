@@ -22,6 +22,11 @@ import { ErrorBanner } from '@/components/ErrorBanner';
 import { LoadingScreen } from '@/components/LoadingScreen';
 import { ConnectionBanner } from '@/components/ConnectionBanner';
 import { Player } from '@/models/types';
+import {
+  DEFAULT_MAX_TRAITOR_RARITY,
+  RARITY_DISPLAY_NAMES,
+  TRAITOR_RARITY_OPTIONS,
+} from '@/constants/roles';
 import { colors, spacing, fonts, PLAYER_COLORS, contentMaxWidths } from '@/constants/theme';
 import { useResponsive } from '@/hooks/useResponsive';
 
@@ -418,6 +423,36 @@ export default function LobbyScreen() {
               ))}
             </View>
           </View>
+
+          {/* Max traitor rarity — only meaningful in treachery modes */}
+          {((game.game_mode ?? 'treachery') === 'treachery' ||
+            game.game_mode === 'treachery_planechase') && (
+            <>
+              <View style={styles.settingsDivider} />
+              <View style={styles.settingsRow}>
+                <Text style={styles.settingsLabel}>Max Traitor Rarity</Text>
+                <View style={styles.settingsChips}>
+                  {TRAITOR_RARITY_OPTIONS.map((rarity) => {
+                    const active =
+                      (game.max_traitor_rarity ?? DEFAULT_MAX_TRAITOR_RARITY) === rarity;
+                    return (
+                      <TouchableOpacity
+                        key={rarity}
+                        style={[styles.chip, active && styles.chipActive]}
+                        onPress={() => updateGameSettings({ maxTraitorRarity: rarity })}
+                        accessibilityLabel={`Set max traitor rarity to ${RARITY_DISPLAY_NAMES[rarity]}`}
+                        accessibilityRole="button"
+                      >
+                        <Text style={[styles.chipText, active && styles.chipTextActive]}>
+                          {RARITY_DISPLAY_NAMES[rarity]}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              </View>
+            </>
+          )}
         </View>
       )}
 

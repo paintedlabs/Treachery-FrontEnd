@@ -13,8 +13,13 @@ import { Timestamp } from 'firebase/firestore';
 import { useAuth } from '@/hooks/useAuth';
 import { ErrorBanner } from '@/components/ErrorBanner';
 import * as firestoreService from '@/services/firestore';
-import { CODE_CHARACTERS } from '@/constants/roles';
-import { Game, GameMode, Player } from '@/models/types';
+import {
+  CODE_CHARACTERS,
+  DEFAULT_MAX_TRAITOR_RARITY,
+  RARITY_DISPLAY_NAMES,
+  TRAITOR_RARITY_OPTIONS,
+} from '@/constants/roles';
+import { Game, GameMode, Player, Rarity } from '@/models/types';
 import { trackEvent } from '@/services/analytics';
 import { colors, spacing, fontSize, contentMaxWidths } from '@/constants/theme';
 import { useResponsive } from '@/hooks/useResponsive';
@@ -49,6 +54,7 @@ export default function CreateGameScreen() {
   const [gameMode, setGameMode] = useState<GameMode>('treachery');
   const [useOwnDeck, setUseOwnDeck] = useState(false);
   const [startingLife, setStartingLife] = useState(40);
+  const [maxTraitorRarity, setMaxTraitorRarity] = useState<Rarity>(DEFAULT_MAX_TRAITOR_RARITY);
   const [isCreating, setIsCreating] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -97,6 +103,7 @@ export default function CreateGameScreen() {
         created_at: Timestamp.now(),
         last_activity_at: Timestamp.now(),
         game_mode: gameMode,
+        ...(hasTreachery ? { max_traitor_rarity: maxTraitorRarity } : {}),
         ...(hasPlanechase
           ? {
               planechase: {
@@ -168,6 +175,40 @@ export default function CreateGameScreen() {
           ))}
         </View>
       </View>
+
+      {/* Max traitor rarity selector for treachery modes */}
+      {hasTreachery && (
+        <View style={styles.section}>
+          <Text style={styles.sectionHeader}>Max Traitor Rarity</Text>
+          <View style={styles.modeRow}>
+            {TRAITOR_RARITY_OPTIONS.map((rarity) => (
+              <TouchableOpacity
+                key={rarity}
+                style={[
+                  styles.modeButton,
+                  maxTraitorRarity === rarity && styles.modeButtonSelected,
+                ]}
+                onPress={() => setMaxTraitorRarity(rarity)}
+                accessibilityLabel={`Max traitor rarity ${RARITY_DISPLAY_NAMES[rarity]}`}
+                accessibilityRole="button"
+                accessibilityState={{ selected: maxTraitorRarity === rarity }}
+              >
+                <Text
+                  style={[
+                    styles.modeButtonText,
+                    maxTraitorRarity === rarity && styles.modeButtonTextSelected,
+                  ]}
+                >
+                  {RARITY_DISPLAY_NAMES[rarity]}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+          <Text style={styles.sectionCaption}>
+            Traitor identities up to this rarity can appear in the random pool.
+          </Text>
+        </View>
+      )}
 
       {/* Own deck toggle for planechase */}
       {hasPlanechase && (
@@ -252,6 +293,11 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     textTransform: 'uppercase',
     letterSpacing: 1.5,
+  },
+  sectionCaption: {
+    color: colors.textTertiary,
+    fontSize: fontSize.sm,
+    fontStyle: 'italic',
   },
   modeRow: {
     flexDirection: 'row',
