@@ -312,6 +312,26 @@ export function playersWithRole(players: PlayerHandle[], role: Role): PlayerHand
 }
 
 /**
+ * Read the game doc itself using one of the authenticated browser contexts.
+ * Useful for asserting host settings (e.g. max_traitor_rarity) persisted.
+ */
+export async function fetchGameDoc(
+  page: Page,
+  gameId: string,
+): Promise<(Record<string, unknown> & { max_traitor_rarity?: string }) | null> {
+  return page.evaluate(
+    async ({ gameId }) => {
+      const e2e = (window as unknown as {
+        __e2e?: { fetchGame: (gid: string) => Promise<unknown> };
+      }).__e2e;
+      if (!e2e) throw new Error('window.__e2e missing');
+      return e2e.fetchGame(gameId);
+    },
+    { gameId },
+  ) as Promise<(Record<string, unknown> & { max_traitor_rarity?: string }) | null>;
+}
+
+/**
  * Read all player docs from `/games/{gameId}/players` using one of the
  * authenticated browser contexts. Useful for asserting on identity-card and
  * is_face_down state after an ability resolves.

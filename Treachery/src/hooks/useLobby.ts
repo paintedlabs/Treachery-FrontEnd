@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { httpsCallable } from 'firebase/functions';
-import { Game, Player } from '@/models/types';
+import { Game, Player, Rarity } from '@/models/types';
 import * as firestoreService from '@/services/firestore';
 import { functions } from '@/config/firebase';
 import { MINIMUM_PLAYER_COUNT } from '@/constants/roles';
@@ -19,7 +19,12 @@ interface UseLobbyReturn {
   leaveGame: (userId: string) => Promise<void>;
   updatePlayerColor: (color: string | null) => Promise<void>;
   updateCommanderName: (name: string | null) => Promise<void>;
-  updateGameSettings: (settings: { maxPlayers?: number; startingLife?: number; gameMode?: string }) => Promise<void>;
+  updateGameSettings: (settings: {
+    maxPlayers?: number;
+    startingLife?: number;
+    gameMode?: string;
+    maxTraitorRarity?: Rarity;
+  }) => Promise<void>;
 }
 
 export function useLobby(
@@ -125,7 +130,12 @@ export function useLobby(
   );
 
   const updateGameSettings = useCallback(
-    async (settings: { maxPlayers?: number; startingLife?: number; gameMode?: string }) => {
+    async (settings: {
+      maxPlayers?: number;
+      startingLife?: number;
+      gameMode?: string;
+      maxTraitorRarity?: Rarity;
+    }) => {
       if (!isHost || !game) return;
       try {
         const fn = httpsCallable(functions, 'updateGameSettings');

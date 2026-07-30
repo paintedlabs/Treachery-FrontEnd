@@ -1,6 +1,13 @@
 import { initializeApp } from 'firebase/app';
 import { getAuth, connectAuthEmulator } from 'firebase/auth';
-import { collection, getDocs, getFirestore, connectFirestoreEmulator } from 'firebase/firestore';
+import {
+  collection,
+  doc,
+  getDoc,
+  getDocs,
+  getFirestore,
+  connectFirestoreEmulator,
+} from 'firebase/firestore';
 import { getFunctions, connectFunctionsEmulator, httpsCallable } from 'firebase/functions';
 
 const useEmulator = process.env.EXPO_PUBLIC_USE_EMULATOR === 'true';
@@ -40,6 +47,12 @@ if (useEmulator) {
       fetchPlayers: async (gameId: string) => {
         const snap = await getDocs(collection(db, `games/${gameId}/players`));
         return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      },
+      // Reads the game doc itself — used to assert host settings persisted
+      // (e.g. max_traitor_rarity) before the game starts.
+      fetchGame: async (gameId: string) => {
+        const snap = await getDoc(doc(db, `games/${gameId}`));
+        return snap.exists() ? { id: snap.id, ...snap.data() } : null;
       },
     };
   }

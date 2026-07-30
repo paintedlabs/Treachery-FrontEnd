@@ -1,4 +1,4 @@
-import { Role } from '@/models/types';
+import { Rarity, Role } from '@/models/types';
 
 export const ROLE_DISPLAY_NAMES: Record<Role, string> = {
   leader: 'Leader',
@@ -34,6 +34,12 @@ export const RARITY_COLORS: Record<string, string> = {
   mythic: '#d4943c',
   special: '#9c4cc9',
 };
+
+// Escalating rarity tiers for the max-traitor-rarity game setting.
+// Choosing a tier allows all traitor identities at or below it;
+// 'special' (the default) allows every traitor.
+export const TRAITOR_RARITY_OPTIONS: Rarity[] = ['uncommon', 'rare', 'mythic', 'special'];
+export const DEFAULT_MAX_TRAITOR_RARITY: Rarity = 'special';
 
 export interface RoleDistribution {
   leaders: number;

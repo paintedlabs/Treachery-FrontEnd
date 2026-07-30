@@ -85,6 +85,28 @@ function getCardsForRole(role) {
   return CARDS.filter((c) => c.role === role);
 }
 
+// ── Traitor Rarity Cap ──
+// Escalating tiers; "special" marks the four table-warping traitors
+// (Metamorph, Puppet Master, Treacherous Masochist, Wearer of Masks).
+// A game's max_traitor_rarity caps which traitor identities can be
+// randomly assigned in startGame; absent/unknown values mean no cap.
+
+const RARITY_ORDER = { uncommon: 1, rare: 2, mythic: 3, special: 4 };
+
+function isValidRarity(value) {
+  return (
+    typeof value === "string" &&
+    Object.prototype.hasOwnProperty.call(RARITY_ORDER, value)
+  );
+}
+
+function getTraitorPool(maxRarity) {
+  const traitors = getCardsForRole("traitor");
+  if (!isValidRarity(maxRarity)) return traitors;
+  const cap = RARITY_ORDER[maxRarity];
+  return traitors.filter((c) => RARITY_ORDER[c.rarity] <= cap);
+}
+
 function _getCard(id) {
   return CARDS.find((c) => c.id === id);
 }
@@ -368,7 +390,11 @@ exports.startGame = onCall(callableOptions, async (request) => {
 
         for (let i = 0; i < players.length; i++) {
           const role = shuffledRoles[i];
-          const availableCards = getCardsForRole(role).filter(
+          const rolePool =
+            role === "traitor"
+              ? getTraitorPool(game.max_traitor_rarity)
+              : getCardsForRole(role);
+          const availableCards = rolePool.filter(
             (c) => !usedCardIds.has(c.id)
           );
 
@@ -1407,7 +1433,7 @@ exports.updateGameSettings = onCall(callableOptions, async (request) => {
   const uid = request.auth?.uid;
   if (!uid) throw new HttpsError("unauthenticated", "Must be signed in.");
 
-  const { gameId, maxPlayers, startingLife, gameMode } = request.data;
+  const { gameId, maxPlayers, startingLife, gameMode, maxTraitorRarity } = request.data;
   if (!gameId) throw new HttpsError("invalid-argument", "gameId is required.");
 
   return db.runTransaction(async (tx) => {
@@ -1445,6 +1471,13 @@ exports.updateGameSettings = onCall(callableOptions, async (request) => {
         throw new HttpsError("invalid-argument", "Invalid game mode.");
       }
       update.game_mode = gameMode;
+    }
+
+    if (maxTraitorRarity !== undefined) {
+      if (!isValidRarity(maxTraitorRarity)) {
+        throw new HttpsError("invalid-argument", "Invalid max traitor rarity.");
+      }
+      update.max_traitor_rarity = maxTraitorRarity;
     }
 
     tx.update(gameRef, update);
