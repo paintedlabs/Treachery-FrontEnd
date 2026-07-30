@@ -1,0 +1,33 @@
+{
+  "_comment": [
+    "Emulator config used ONLY by `npm run test:integration` (functions/).",
+    "Deliberately separate from the repo-root firebase.json so the integration",
+    "suite can run on its own ports without colliding with the Playwright E2E",
+    "suite (auth 9099 / firestore 8087 / functions 5001). The auxiliary",
+    "emulators (hub / logging / eventarc / tasks / firestore websocket) are",
+    "pinned off their defaults for the same reason.",
+    "Paths are resolved relative to THIS file's directory, which firebase-tools",
+    "treats as the project root when --config points here.",
+    "No firestore.rules entry: the suite only touches Firestore through the",
+    "Admin SDK (which bypasses rules) and through the callables themselves."
+  ],
+  "firestore": {},
+  "functions": [
+    {
+      "source": "../../..",
+      "codebase": "default",
+      "ignore": ["node_modules", ".git", "test"]
+    }
+  ],
+  "emulators": {
+    "auth": { "port": 9299 },
+    "firestore": { "port": 8288, "websocketPort": 9151 },
+    "functions": { "port": 5201 },
+    "eventarc": { "port": 9298 },
+    "tasks": { "port": 9297 },
+    "hub": { "port": 4460 },
+    "logging": { "port": 4560 },
+    "ui": { "enabled": false },
+    "singleProjectMode": true
+  }
+}
