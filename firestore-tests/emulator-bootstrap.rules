@@ -1,0 +1,14 @@
+rules_version = '2';
+
+// Placeholder ruleset the emulator boots with. It is NOT the ruleset under
+// test — test/helpers.js immediately replaces it with the repo-root
+// ../firestore.rules via initializeTestEnvironment(). Deny-all is deliberate:
+// if that replacement ever fails, every positive-path test fails loudly rather
+// than passing against the wrong rules.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
