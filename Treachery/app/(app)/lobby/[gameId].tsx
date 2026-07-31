@@ -18,6 +18,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
 import { useAuth } from '@/hooks/useAuth';
 import { useLobby } from '@/hooks/useLobby';
+import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { ErrorBanner } from '@/components/ErrorBanner';
 import { LoadingScreen } from '@/components/LoadingScreen';
 import { ConnectionBanner } from '@/components/ConnectionBanner';
@@ -266,8 +267,13 @@ export default function LobbyScreen() {
   };
 
   const [isLeaving, setIsLeaving] = useState(false);
+  // In-app ConfirmDialog instead of window.confirm/Alert.alert — one themed
+  // code path on every platform, and clickable under automation (Playwright
+  // silently cancels native dialogs).
+  const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
 
   const doLeave = async () => {
+    setShowLeaveConfirm(false);
     setIsLeaving(true);
     if (currentUserId) {
       await leaveGame(currentUserId);
@@ -275,22 +281,7 @@ export default function LobbyScreen() {
     router.replace('/(app)');
   };
 
-  const handleLeave = () => {
-    if (Platform.OS === 'web') {
-      if (window.confirm('Are you sure you want to leave?')) {
-        doLeave();
-      }
-    } else {
-      Alert.alert('Leave Game', 'Are you sure you want to leave?', [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Leave',
-          style: 'destructive',
-          onPress: doLeave,
-        },
-      ]);
-    }
-  };
+  const handleLeave = () => setShowLeaveConfirm(true);
 
   if (!game && !errorMessage && !isGameDisbanded) {
     return <LoadingScreen message="Loading lobby..." />;
@@ -540,6 +531,17 @@ export default function LobbyScreen() {
           )}
         </TouchableOpacity>
       </View>
+
+      <ConfirmDialog
+        visible={showLeaveConfirm}
+        title="Leave Game"
+        message="Are you sure you want to leave?"
+        confirmLabel="Leave"
+        confirmAccessibilityLabel="Confirm leave"
+        destructive
+        onConfirm={doLeave}
+        onCancel={() => setShowLeaveConfirm(false)}
+      />
     </View>
   );
 }

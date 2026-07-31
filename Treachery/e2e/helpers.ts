@@ -437,16 +437,16 @@ export async function eliminateByDamage(actor: Page, targetName: string, startin
   await damage(actor, targetName, startingLife);
 }
 
-/** Click Unveil and confirm the window.confirm dialog. */
+/** Click Unveil and accept the in-app confirmation dialog. */
 export async function unveilSelf(page: Page) {
-  page.once('dialog', (d) => d.accept());
   await page.getByRole('button', { name: 'Unveil identity' }).click();
+  await page.getByRole('button', { name: 'Confirm unveil' }).click();
 }
 
-/** Click Forfeit and confirm. */
+/** Click Forfeit and accept the in-app confirmation dialog. */
 export async function forfeit(page: Page) {
-  page.once('dialog', (d) => d.accept());
-  await page.getByRole('button', { name: 'Forfeit' }).click();
+  await page.getByRole('button', { name: 'Forfeit', exact: true }).click();
+  await page.getByRole('button', { name: 'Confirm forfeit' }).click();
 }
 
 /**
