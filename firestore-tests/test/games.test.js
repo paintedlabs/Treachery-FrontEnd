@@ -178,9 +178,7 @@ describe("games/{gameId}", () => {
         })
       );
     });
-
-    // SKIP: currently vulnerable — see finding #2. Un-skip when firestore.rules is fixed.
-    it.skip("stops a non-participant from injecting themselves into an in_progress game", async () => {
+    it("stops a non-participant from injecting themselves into an in_progress game", async () => {
       const db = await authedDb(OUTSIDER);
       await assertFails(
         updateDoc(doc(db, "games", IN_PROGRESS), {
@@ -189,9 +187,7 @@ describe("games/{gameId}", () => {
         })
       );
     });
-
-    // SKIP: currently vulnerable — see finding #2. Un-skip when firestore.rules is fixed.
-    it.skip("stops a user from joining a lobby that is already at max_players", async () => {
+    it("stops a user from joining a lobby that is already at max_players", async () => {
       const db = await authedDb(OUTSIDER);
       await assertFails(
         updateDoc(doc(db, "games", FULL), {
@@ -200,9 +196,7 @@ describe("games/{gameId}", () => {
         })
       );
     });
-
-    // SKIP: currently vulnerable — see finding #3. Un-skip when firestore.rules is fixed.
-    it.skip("stops player_ids from being overwritten in a way that evicts existing members", async () => {
+    it("stops player_ids from being overwritten in a way that evicts existing members", async () => {
       // An existing member cannot kick everyone else out...
       const player = await authedDb(PLAYER);
       await assertFails(

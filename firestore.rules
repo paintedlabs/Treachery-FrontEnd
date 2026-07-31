@@ -117,21 +117,65 @@ service cloud.firestore {
       return get(/databases/$(database)/documents/games/$(gameId)).data.host_id == request.auth.uid;
     }
 
+    // True only for a write that appends the CALLER to an open lobby's
+    // player_ids, leaving every existing member in place.
+    //
+    // The previous version checked only which keys changed plus "the caller
+    // ends up in the new array", which permitted any array whatsoever. That
+    // let a non-participant add themselves to an in_progress game and then
+    // read every player's secret role (player docs are gated on membership),
+    // overwrite player_ids to evict the whole table, or walk past max_players.
+    //
+    // Joins normally go through the joinGame callable, which enforces all of
+    // this in a transaction. This path is kept — rather than denied outright —
+    // because older iOS/Android builds in the wild may still write directly,
+    // and a legitimate join from one of those must keep working.
     function isOnlyAddingSelfToPlayerIds() {
-      let affectedKeys = request.resource.data.diff(resource.data).affectedKeys();
-      return affectedKeys.hasOnly(['player_ids', 'last_activity_at'])
-        && request.auth.uid in request.resource.data.player_ids;
+      let before = resource.data.player_ids;
+      let after = request.resource.data.player_ids;
+      let cap = 'max_players' in resource.data ? resource.data.max_players : 8;
+      return request.resource.data.diff(resource.data).affectedKeys()
+               .hasOnly(['player_ids', 'last_activity_at'])
+        // The lobby must still be open.
+        && resource.data.state == 'waiting'
+        // Append-only: everyone already seated stays seated.
+        && after.hasAll(before)
+        && after.size() == before.size() + 1
+        // ...and the single addition is the caller, joining for the first time.
+        && !(request.auth.uid in before)
+        && request.auth.uid in after
+        // Mirror the capacity joinGame enforces so a direct write can't bypass it.
+        && after.size() <= cap;
     }
 
+    // Friendship is mutual, so accepting a request writes friend_ids on BOTH
+    // user docs — which means a user must be able to touch someone else's doc.
+    // The previous version allowed that whenever the caller ended up in the new
+    // array, without requiring the existing entries survive, so anyone could
+    // overwrite a victim's friend_ids with [attacker] and wipe their friends.
+    //
+    // Cross-user writes are now append-only and limited to the caller.
+    //
+    // Residual gap: this still permits forcing a one-sided friendship without
+    // an accepted request. Rules cannot check for one — friend_requests use
+    // random document ids, so there is no deterministic get() path. Closing
+    // that requires moving accept/remove into a callable, which would also fix
+    // removeFriend (its arrayRemove on the friend's doc cannot satisfy any
+    // version of this rule, since the caller is absent from the result).
     function onlyFriendIdsChanged(userId) {
-      let affectedKeys = request.resource.data.diff(resource.data).affectedKeys();
-      // Only allow friend_ids changes if the caller is adding/removing themselves
-      // from the target user's friend list (mutual friendship operations).
-      // The caller must appear in the new friend_ids list to prevent
-      // arbitrary modification of other users' friend lists.
-      return affectedKeys.hasOnly(['friend_ids'])
-        && (request.auth.uid == userId
-            || request.auth.uid in request.resource.data.friend_ids);
+      let before = resource.data.friend_ids;
+      let after = request.resource.data.friend_ids;
+      return request.resource.data.diff(resource.data).affectedKeys()
+               .hasOnly(['friend_ids'])
+        && (
+          // Owners edit their own list freely.
+          request.auth.uid == userId
+          // Anyone else may only append themselves, preserving what is there.
+          || (after.hasAll(before)
+              && after.size() == before.size() + 1
+              && !(request.auth.uid in before)
+              && request.auth.uid in after)
+        );
     }
 
     function onlyFcmTokenChanged(userId) {
