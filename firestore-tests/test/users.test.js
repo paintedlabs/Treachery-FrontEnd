@@ -133,16 +133,18 @@ describe("users/{userId}", () => {
       await assertFails(updateDoc(doc(db, "users", ALICE), { display_name: "x" }));
     });
 
-    // SKIP: currently vulnerable — see finding #5. Un-skip when firestore.rules is fixed.
+    // SKIP: residual gap after the friend_ids hardening — the wipe is now
+    // blocked, but a one-sided friendship can still be forced. Rules cannot
+    // verify an accepted friend_request (random doc ids, so no deterministic
+    // get() path), so closing this means moving accept/remove into a callable
+    // and denying cross-user writes entirely. Un-skip then.
     it.skip("stops a user from forcing themselves into another user's friend_ids", async () => {
       const mallory = await authedDb(MALLORY);
       await assertFails(
         updateDoc(doc(mallory, "users", BOB), { friend_ids: [CAROL, MALLORY] })
       );
     });
-
-    // SKIP: currently vulnerable — see finding #5. Un-skip when firestore.rules is fixed.
-    it.skip("stops a user from overwriting another user's friend_ids and wiping their real friends", async () => {
+    it("stops a user from overwriting another user's friend_ids and wiping their real friends", async () => {
       const mallory = await authedDb(MALLORY);
       await assertFails(
         updateDoc(doc(mallory, "users", BOB), { friend_ids: [MALLORY] })

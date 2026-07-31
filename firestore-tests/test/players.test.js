@@ -93,9 +93,7 @@ describe("games/{gameId}/players/{playerId}", () => {
       const db = await anonDb();
       await assertFails(getDoc(doc(db, ...waitingPlayer(IN_PROGRESS, P_PLAYER))));
     });
-
-    // SKIP: currently vulnerable — see finding #2. Un-skip when firestore.rules is fixed.
-    it.skip("keeps secret roles hidden from an outsider who tries the player_ids injection", async () => {
+    it("keeps secret roles hidden from an outsider who tries the player_ids injection", async () => {
       const db = await authedDb(OUTSIDER);
 
       // Attempt the finding-#2 injection. Once the join rule is fixed this write
