@@ -15,8 +15,8 @@
     "format": "prettier --write \"src/**/*.{ts,tsx}\" \"app/**/*.{ts,tsx}\"",
     "format:check": "prettier --check \"src/**/*.{ts,tsx}\" \"app/**/*.{ts,tsx}\"",
     "test:e2e": "node scripts/emulators-exec.js 'npm run build:web:emulator && playwright test'",
-    "playtest": "node scripts/emulators-exec.js 'npm run build:web:emulator && playwright test --config=playwright.playground.config.ts'",
-    "playtest:nobuild": "node scripts/emulators-exec.js 'playwright test --config=playwright.playground.config.ts'"
+    "playtest": "node scripts/playtest.js",
+    "playtest:nobuild": "node scripts/playtest.js --nobuild"
   },
   "dependencies": {
     "@expo/metro-runtime": "~55.0.6",

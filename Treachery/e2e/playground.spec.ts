@@ -119,6 +119,16 @@ test('playground', async ({ browser }) => {
     ({ players, gameId, code } = game);
   }
 
+  // Playwright auto-DISMISSES native dialogs (window.confirm etc.) unless a
+  // handler is registered — so a human clicking Unveil/Forfeit/Leave in a
+  // playground window would have the confirm silently answered "Cancel"
+  // before it even renders. Auto-accept instead: in a disposable playtest
+  // game, "are you sure?" is always yes. (The real fix is the in-app confirm
+  // dialog — once no native dialogs remain, this handler simply never fires.)
+  for (const p of players) {
+    p.page.on('dialog', (d) => void d.accept());
+  }
+
   banner([
     `game code   ${code}`,
     `mode        ${MODE}`,
