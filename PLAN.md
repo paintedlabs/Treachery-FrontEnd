@@ -1,5 +1,12 @@
 # Treachery iOS - Implementation Plan
 
+> **Historical document** (March 2026). This was the original iOS-only build
+> plan; the project has since grown into a monorepo with web and Android
+> clients, server-side game logic in Cloud Functions, Planechase/Life Tracker
+> modes, ELO, and a four-layer test harness. For the current state of the
+> project see the [README](README.md) and [docs/](docs/). Kept for the
+> Firestore schema reference and as a record of the original design.
+
 ## Overview
 Build a full remote-multiplayer Treachery companion app with real-time game state sync,
 identity cards with unveil abilities, game code + friends-based joining.

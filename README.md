@@ -34,8 +34,14 @@ Each player also receives a secret **Identity Card** with a unique unveil abilit
 - **Life tracking** — Tap +/- to adjust any player's life total, synced in real-time with optimistic updates
 - **Role & identity assignment** — Automatic role distribution and identity card dealing based on player count
 - **Unveil mechanic** — One-time reveal of your identity to activate your card's ability
+- **Traitor abilities** — Server-resolved unveil effects for the Metamorph, Puppet Master, and Wearer of Masks
 - **Elimination & win detection** — Automatic win condition checking when players are eliminated
 - **62 identity cards** — 13 Leaders, 18 Guardians, 18 Assassins, 13 Traitors
+- **Game settings** — Max players, starting life, game mode, and a max traitor rarity cap for the random pool (rarity selector currently web-only; the backend supports all clients)
+- **Planechase mode** — Shared planar deck, die rolls with chaos/planeswalk resolution, phenomena — playable standalone or combined with Treachery
+- **Life Tracker mode** — Plain multiplayer life tracking for regular Commander games
+- **ELO & deck stats** — Per-player and per-commander ratings updated when games finish
+- **Push notifications** — Joins, game start, eliminations, and planeswalks via FCM
 - **Friends system** — Add friends and invite them to games
 - **Game history** — View past games and results
 - **Multiple auth methods** — Email/password, phone number, or guest sign-in
@@ -86,10 +92,14 @@ Each player also receives a secret **Identity Card** with a unique unveil abilit
 │       └── data/        # Firebase repositories & DI
 ├── Treachery/           # Web app (Expo/React Native)
 │   ├── app/             # File-based routes
-│   └── src/             # Components, hooks, services, models
-├── functions/           # Firebase Cloud Functions
+│   ├── src/             # Components, hooks, services, models
+│   └── e2e/             # Playwright suite + simulation harness + playtest tool
+├── functions/           # Firebase Cloud Functions (all game logic)
+│   └── test/            # Unit suite + integration suite vs. real callables
+├── firestore-tests/     # Security-rules test suite (rules-unit-testing)
+├── docs/                # TESTING, DEPLOYMENT, KNOWN-ISSUES
 ├── firebase.json        # Firebase project config
-└── firestore.rules      # Firestore security rules
+└── firestore.rules      # Firestore security rules (source of truth — never edit in console)
 ```
 
 ## Getting Started
@@ -118,20 +128,35 @@ npm install
 npx expo start --web
 ```
 
-### Cloud Functions
+## Testing
+
+Four automated layers run on every PR — functions unit + integration
+(against the real callables), Firestore security rules, and a Playwright E2E
+suite that includes a seeded multi-player simulation/fuzz harness. Known bugs
+are tracked as *skipped tests asserting the correct behaviour*, so the suites
+double as an executable backlog.
+
 ```bash
-cd functions
-npm install
-firebase deploy --only functions
+cd functions && npm test                  # unit (~2s)
+cd functions && npm run test:integration  # real callables vs emulator (~70s)
+cd firestore-tests && npm test            # security rules (~3s)
+cd Treachery && npm run test:e2e          # browsers + simulation (~2min, needs Java 21+)
 ```
 
-### Deploy Web to Firebase Hosting
-```bash
-cd Treachery
-npx expo export --platform web
-cd ..
-firebase deploy --only hosting
-```
+To playtest by hand without opening four browsers, `cd Treachery && npm run
+playtest` opens one signed-in window per player already seated in a game.
+
+Details, fuzzing knobs, and the skip convention: [docs/TESTING.md](docs/TESTING.md)
+
+## Deployment
+
+Push to `main` auto-deploys the **staging** web app plus the *shared*
+functions/rules; publishing a GitHub release promotes to production (web +
+App Store + Play). Staging and production share one Firebase project, so
+backend changes reach production users immediately — the full pipeline map
+and its implications: [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)
+
+Current bug backlog and audit findings: [docs/KNOWN-ISSUES.md](docs/KNOWN-ISSUES.md)
 
 ## Game Flow
 
