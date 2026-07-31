@@ -13,6 +13,10 @@ import { defineConfig, devices } from '@playwright/test';
  */
 export default defineConfig({
   testDir: './e2e',
+  // The manual playtest harness parks on page.pause() and never terminates by
+  // design — it must never be collected into an automated run.
+  // See playwright.playground.config.ts / `npm run playtest`.
+  testIgnore: '**/playground.spec.ts',
   timeout: 60_000,
   expect: { timeout: 10_000 },
   fullyParallel: false,
