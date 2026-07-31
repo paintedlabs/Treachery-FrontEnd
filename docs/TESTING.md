@@ -62,15 +62,23 @@ fuzzer starts enforcing that invariant again.
 cd Treachery && npm run playtest
 ```
 
-Opens one real signed-in browser window per player, already in a started game
-(against the local emulator — disposable, no real data), prints who holds
-which role, and stays interactive until you dismiss the Playwright Inspector.
-Knobs: `PLAYTEST_PLAYERS` (4–8), `PLAYTEST_MODE`
-(`treachery`/`treachery_planechase`/`planechase`/`none`), `PLAYTEST_LIFE`,
-`PLAYTEST_START` (`seeded` = deterministic, player 1 is the Leader; `real` =
-the actual Start button; `lobby` = stop before starting — the one for testing
-lobby settings with a full table). `npm run playtest:nobuild` skips the ~30s
-web rebuild if `dist/` is already an emulator build.
+Asks which format (Treachery / Treachery + Planechase / Planechase / Life
+Tracker) and how many players, then opens one real signed-in browser window
+per player, already in a started game (against the local emulator —
+disposable, no real data), prints who holds which role, and stays interactive
+until you dismiss the Playwright Inspector.
+
+Env vars answer questions in advance and skip those prompts —
+`PLAYTEST_MODE=none PLAYTEST_PLAYERS=2 npm run playtest` asks nothing.
+Additional knobs (never prompted): `PLAYTEST_LIFE`, and `PLAYTEST_START`
+(`seeded` = deterministic, player 1 is the Leader; `real` = the actual Start
+button; `lobby` = stop before starting — the one for testing lobby settings
+with a full table). `npm run playtest:nobuild` skips the ~30s web rebuild if
+`dist/` is already an emulator build.
+
+Native browser dialogs (`window.confirm`) are auto-accepted in playground
+windows — Playwright silently *cancels* them otherwise, which reads as
+buttons doing nothing.
 
 ## Known flake
 
