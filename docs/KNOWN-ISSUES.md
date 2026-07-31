@@ -20,11 +20,11 @@ writes. Encoded in `firestore-tests/`.
 | Issue | Status |
 |---|---|
 | Every user doc world-readable: `email`, `phone_number`, `fcm_token` exposed to any signed-in user. Needs PII split into an owner-only subcollection — rules cannot withhold individual fields | **open** |
-| Non-participants can inject themselves into `player_ids` of an `in_progress` game, then read every player's hidden role/identity | **fix in review — #97** |
-| `player_ids` can be overwritten wholesale (evict the whole table) | **fix in review — #97** |
-| Join rule enforces no `max_players` capacity | **fix in review — #97** |
+| Non-participants can inject themselves into `player_ids` of an `in_progress` game, then read every player's hidden role/identity | **fixed — #97** |
+| `player_ids` can be overwritten wholesale (evict the whole table) | **fixed — #97** |
+| Join rule enforces no `max_players` capacity | **fixed — #97** |
 | Player docs creatable in any game with attacker-chosen `life_total`/`order_id` (rules have no state/membership/capacity check). Needs the host's own client-side create moved server-side before the rule can be denied | **open** |
-| A victim's `friend_ids` can be wiped by overwrite | **fix in review — #97** |
+| A victim's `friend_ids` can be wiped by overwrite | **fixed — #97** |
 | A one-sided friendship can be forced without an accepted request (residual after #97 — rules can't verify a request exists; needs accept/remove moved into a callable) | **open** |
 
 ## Critical gameplay (Cloud Functions)
