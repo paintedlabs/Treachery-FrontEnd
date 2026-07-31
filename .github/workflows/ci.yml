@@ -52,6 +52,8 @@ jobs:
           cache-dependency-path: functions/package-lock.json
       - run: npm ci
       - run: npm run lint
+      # The unit suite was previously not run in CI at all — it gated nothing.
+      - run: npm test
 
   # ── Playwright E2E ───────────────────────────────────
   e2e:
