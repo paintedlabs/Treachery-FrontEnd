@@ -25,6 +25,12 @@ interface UseGameBoardReturn {
   identityCard: (player: Player) => IdentityCard | undefined;
   updatePlayerColor: (color: string | null) => Promise<void>;
   renameCurrentPlayer: (name: string) => Promise<void>;
+  /** Player doc id whose turn it is, or null when unmarked. */
+  activePlayerId: string | null;
+  setActivePlayer: (playerId: string | null) => Promise<void>;
+  advanceTurn: () => Promise<void>;
+  /** Persist a new seating ring (player doc ids, seat 0 first). */
+  reorderSeats: (orderedPlayerIds: string[]) => Promise<void>;
   // Planechase
   isPlanechaseActive: boolean;
   isTreacheryActive: boolean;
@@ -265,6 +271,48 @@ export function useGameBoard(gameId: string, currentUserId: string | null): UseG
     }
   }, [currentPlayer, gameId, isPending]);
 
+  // ── Turn marker & seating ──────────────────────────────────────
+  // Both live on the server: a turn marker or seat ring that differed between
+  // clients would be worse than not having one. Reordering goes through a
+  // callable rather than direct writes because the invariant ("the new order
+  // is a permutation of the current seats") spans documents, which security
+  // rules cannot express.
+
+  const activePlayerId = game?.active_player_id ?? null;
+
+  const setActivePlayer = useCallback(
+    async (playerId: string | null) => {
+      try {
+        const fn = httpsCallable(functions, 'setActivePlayer');
+        await fn({ gameId, playerId });
+      } catch (error: unknown) {
+        setErrorMessage(error instanceof Error ? error.message : 'Failed to set the turn.');
+      }
+    },
+    [gameId],
+  );
+
+  const advanceTurn = useCallback(async () => {
+    try {
+      const fn = httpsCallable(functions, 'advanceTurn');
+      await fn({ gameId });
+    } catch (error: unknown) {
+      setErrorMessage(error instanceof Error ? error.message : 'Failed to advance the turn.');
+    }
+  }, [gameId]);
+
+  const reorderSeats = useCallback(
+    async (orderedPlayerIds: string[]) => {
+      try {
+        const fn = httpsCallable(functions, 'reorderSeats');
+        await fn({ gameId, orderedPlayerIds });
+      } catch (error: unknown) {
+        setErrorMessage(error instanceof Error ? error.message : 'Failed to reorder seats.');
+      }
+    },
+    [gameId],
+  );
+
   const updatePlayerColor = useCallback(
     async (color: string | null) => {
       if (!currentPlayer) return;
@@ -420,6 +468,10 @@ export function useGameBoard(gameId: string, currentUserId: string | null): UseG
     identityCard: identityCardFn,
     updatePlayerColor,
     renameCurrentPlayer,
+    activePlayerId,
+    setActivePlayer,
+    advanceTurn,
+    reorderSeats,
     // Planechase
     isPlanechaseActive,
     isTreacheryActive,

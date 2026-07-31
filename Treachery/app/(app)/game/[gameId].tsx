@@ -23,6 +23,8 @@ import { ChaoticAetherBanner } from '@/components/ChaoticAetherBanner';
 import { InterplanarTunnelPicker } from '@/components/InterplanarTunnelPicker';
 import { PhenomenonOverlay } from '@/components/PhenomenonOverlay';
 import { PlayerRow } from '@/components/PlayerRow';
+import { PlayerTile } from '@/components/PlayerTile';
+import { RoundTable } from '@/components/RoundTable';
 import { ErrorBanner } from '@/components/ErrorBanner';
 import { LoadingScreen } from '@/components/LoadingScreen';
 import { ConnectionBanner } from '@/components/ConnectionBanner';
@@ -54,6 +56,9 @@ export default function GameBoardScreen() {
     identityCard,
     updatePlayerColor,
     renameCurrentPlayer,
+    activePlayerId,
+    advanceTurn,
+    reorderSeats,
     alivePlayers,
     // Planechase
     isPlanechaseActive,
@@ -381,26 +386,66 @@ export default function GameBoardScreen() {
             <View style={styles.ornateLine} />
           </View>
 
-          {/* Player list */}
-          <FlatList
-            data={players}
-            keyExtractor={(p) => p.id}
-            renderItem={({ item }) => (
-              <PlayerRow
-                player={item}
-                isCurrentUser={item.user_id === currentUserId}
-                canSeeRole={isTreacheryActive ? canSeeRole(item) : false}
-                isUnveiledOrLeader={item.is_unveiled || item.role === 'leader'}
-                onAdjustLife={(amount) => adjustLife(item.id, amount)}
-                onViewCard={() => setInspectedPlayer(item)}
-                isDisabled={false}
-                onColorChange={item.user_id === currentUserId ? updatePlayerColor : undefined}
-                playerColor={item.player_color}
-                onRename={item.user_id === currentUserId ? renameCurrentPlayer : undefined}
-              />
-            )}
-            style={styles.list}
-          />
+          {/* Player list — desktop gets the Round Table board, mobile keeps
+              the vertical roster it has always had. */}
+          {isDesktop ? (
+            <RoundTable
+              players={players}
+              currentUserId={currentUserId}
+              activePlayerId={activePlayerId}
+              onReorder={reorderSeats}
+              center={
+                <>
+                  <TouchableOpacity
+                    style={styles.turnButton}
+                    onPress={advanceTurn}
+                    accessibilityLabel="Next turn"
+                    accessibilityRole="button"
+                  >
+                    <Ionicons name="play-forward" size={16} color="#0d0b1a" />
+                    <Text style={styles.turnButtonText}>Next Turn</Text>
+                  </TouchableOpacity>
+                  <Text style={styles.tableHint}>Drag a player onto another seat to swap</Text>
+                </>
+              }
+              renderTile={(item, state) => (
+                <PlayerTile
+                  player={item}
+                  isCurrentUser={item.user_id === currentUserId}
+                  isActiveTurn={state.isActiveTurn}
+                  canSeeRole={isTreacheryActive ? canSeeRole(item) : false}
+                  isUnveiledOrLeader={item.is_unveiled || item.role === 'leader'}
+                  onAdjustLife={(amount) => adjustLife(item.id, amount)}
+                  onViewCard={() => setInspectedPlayer(item)}
+                  onRename={item.user_id === currentUserId ? renameCurrentPlayer : undefined}
+                  onColorChange={item.user_id === currentUserId ? updatePlayerColor : undefined}
+                  playerColor={item.player_color}
+                  isDragging={state.isDragging}
+                  isDropTarget={state.isDropTarget}
+                />
+              )}
+            />
+          ) : (
+            <FlatList
+              data={players}
+              keyExtractor={(p) => p.id}
+              renderItem={({ item }) => (
+                <PlayerRow
+                  player={item}
+                  isCurrentUser={item.user_id === currentUserId}
+                  canSeeRole={isTreacheryActive ? canSeeRole(item) : false}
+                  isUnveiledOrLeader={item.is_unveiled || item.role === 'leader'}
+                  onAdjustLife={(amount) => adjustLife(item.id, amount)}
+                  onViewCard={() => setInspectedPlayer(item)}
+                  isDisabled={false}
+                  onColorChange={item.user_id === currentUserId ? updatePlayerColor : undefined}
+                  playerColor={item.player_color}
+                  onRename={item.user_id === currentUserId ? renameCurrentPlayer : undefined}
+                />
+              )}
+              style={styles.list}
+            />
+          )}
 
           {errorMessage && <ErrorBanner message={errorMessage} />}
 
@@ -677,6 +722,25 @@ const styles = StyleSheet.create({
   ornateDiamond: {
     color: colors.primary,
     fontSize: 8,
+  },
+  turnButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: colors.primary,
+    borderRadius: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 18,
+  },
+  turnButtonText: {
+    color: '#0d0b1a',
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  tableHint: {
+    color: colors.textTertiary,
+    fontSize: 11,
+    fontStyle: 'italic',
   },
   list: {
     flex: 1,

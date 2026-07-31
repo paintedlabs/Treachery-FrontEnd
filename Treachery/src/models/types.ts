@@ -70,6 +70,10 @@ export interface Game {
   // Caps which traitor identities can appear in startGame's random pool.
   // Absent means no cap ('special' — all traitors allowed).
   max_traitor_rarity?: Rarity;
+  // Player DOC id whose turn it is (not a seat index — seats can be dragged
+  // around, and the turn must follow the person, not the chair). Absent or
+  // null means no turn is marked.
+  active_player_id?: string | null;
 }
 
 export interface Player {

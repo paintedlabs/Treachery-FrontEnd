@@ -705,6 +705,10 @@ exports.startGame = onCall(callableOptions, async (request) => {
     const gameUpdate = {
       state: "in_progress",
       last_activity_at: FieldValue.serverTimestamp(),
+      // Turn starts on the first seat. Optional field — clients that don't
+      // know about turns ignore it, and a game doc without it simply has no
+      // active player highlighted.
+      active_player_id: players.length > 0 ? players[0].ref.id : null,
     };
 
     if (includesPlanechase && !(game.planechase?.use_own_deck)) {
@@ -1850,6 +1854,184 @@ exports.updateGameSettings = onCall(callableOptions, async (request) => {
     }
 
     return { success: true };
+  });
+});
+
+// ════════════════════════════════════════════════════════════════
+// CLOUD FUNCTION: setActivePlayer
+// Sets whose turn it is. Any player at the table may set it —
+// this is a shared companion app for an in-person game, not an
+// enforcement engine, and the same permissiveness already applies
+// to adjustLife.
+// ════════════════════════════════════════════════════════════════
+
+exports.setActivePlayer = onCall(callableOptions, async (request) => {
+  const uid = request.auth?.uid;
+  if (!uid) throw new HttpsError("unauthenticated", "Must be signed in.");
+
+  const { gameId, playerId } = request.data;
+  if (!gameId) throw new HttpsError("invalid-argument", "gameId is required.");
+
+  return db.runTransaction(async (tx) => {
+    const gameRef = db.doc(`games/${gameId}`);
+    const gameSnap = await tx.get(gameRef);
+    if (!gameSnap.exists) throw new HttpsError("not-found", "Game not found.");
+    const game = gameSnap.data();
+
+    if (game.state !== "in_progress") {
+      throw new HttpsError("failed-precondition", "Game is not in progress.");
+    }
+    if (!(game.player_ids || []).includes(uid)) {
+      throw new HttpsError("permission-denied", "You are not in this game.");
+    }
+
+    // null clears the turn marker; anything else must be a real player.
+    if (playerId !== null && playerId !== undefined) {
+      const playerSnap = await tx.get(db.doc(`games/${gameId}/players/${playerId}`));
+      if (!playerSnap.exists) throw new HttpsError("not-found", "Player not found.");
+      if (playerSnap.data().is_eliminated) {
+        throw new HttpsError("failed-precondition", "That player is eliminated.");
+      }
+    }
+
+    tx.update(gameRef, {
+      active_player_id: playerId ?? null,
+      last_activity_at: FieldValue.serverTimestamp(),
+    });
+
+    return { activePlayerId: playerId ?? null };
+  });
+});
+
+// ════════════════════════════════════════════════════════════════
+// CLOUD FUNCTION: advanceTurn
+// Moves the turn to the next seat, skipping eliminated players.
+// ════════════════════════════════════════════════════════════════
+
+exports.advanceTurn = onCall(callableOptions, async (request) => {
+  const uid = request.auth?.uid;
+  if (!uid) throw new HttpsError("unauthenticated", "Must be signed in.");
+
+  const { gameId } = request.data;
+  if (!gameId) throw new HttpsError("invalid-argument", "gameId is required.");
+
+  return db.runTransaction(async (tx) => {
+    const gameRef = db.doc(`games/${gameId}`);
+    const gameSnap = await tx.get(gameRef);
+    if (!gameSnap.exists) throw new HttpsError("not-found", "Game not found.");
+    const game = gameSnap.data();
+
+    if (game.state !== "in_progress") {
+      throw new HttpsError("failed-precondition", "Game is not in progress.");
+    }
+    if (!(game.player_ids || []).includes(uid)) {
+      throw new HttpsError("permission-denied", "You are not in this game.");
+    }
+
+    const playersSnap = await tx.get(
+      db.collection(`games/${gameId}/players`).orderBy("order_id")
+    );
+    const seats = playersSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    const alive = seats.filter((p) => !p.is_eliminated);
+
+    // Everyone eliminated: nothing sensible to advance to. Clear the marker
+    // rather than pointing at a dead seat.
+    if (alive.length === 0) {
+      tx.update(gameRef, {
+        active_player_id: null,
+        last_activity_at: FieldValue.serverTimestamp(),
+      });
+      return { activePlayerId: null };
+    }
+
+    // Walk forward from the current seat around the ring to the next living
+    // player. Starting from -1 when unset means an unset turn advances to the
+    // first seat rather than nowhere.
+    const currentIndex = seats.findIndex((p) => p.id === game.active_player_id);
+    let next = null;
+    for (let step = 1; step <= seats.length; step++) {
+      const candidate = seats[(currentIndex + step + seats.length) % seats.length];
+      if (!candidate.is_eliminated) {
+        next = candidate;
+        break;
+      }
+    }
+
+    tx.update(gameRef, {
+      active_player_id: next.id,
+      last_activity_at: FieldValue.serverTimestamp(),
+    });
+
+    return { activePlayerId: next.id };
+  });
+});
+
+// ════════════════════════════════════════════════════════════════
+// CLOUD FUNCTION: reorderSeats
+// Rewrites every player's order_id to match a caller-supplied
+// seating order — the persistence behind dragging players around
+// the table. Runs server-side rather than through security rules
+// because the invariant is "the new order is a PERMUTATION of the
+// existing seats", which spans documents and rules cannot express.
+//
+// Side benefit: because it always writes a contiguous 0..N-1 run,
+// it also repairs duplicate order_ids if a client ever left the ring
+// in a bad state. leaveGame already renumbers survivors.
+// ════════════════════════════════════════════════════════════════
+
+exports.reorderSeats = onCall(callableOptions, async (request) => {
+  const uid = request.auth?.uid;
+  if (!uid) throw new HttpsError("unauthenticated", "Must be signed in.");
+
+  const { gameId, orderedPlayerIds } = request.data;
+  if (!gameId) throw new HttpsError("invalid-argument", "gameId is required.");
+  if (!Array.isArray(orderedPlayerIds)) {
+    throw new HttpsError("invalid-argument", "orderedPlayerIds must be an array.");
+  }
+
+  return db.runTransaction(async (tx) => {
+    const gameRef = db.doc(`games/${gameId}`);
+    const gameSnap = await tx.get(gameRef);
+    if (!gameSnap.exists) throw new HttpsError("not-found", "Game not found.");
+    const game = gameSnap.data();
+
+    if (!(game.player_ids || []).includes(uid)) {
+      throw new HttpsError("permission-denied", "You are not in this game.");
+    }
+
+    const playersSnap = await tx.get(db.collection(`games/${gameId}/players`));
+    const existingIds = playersSnap.docs.map((d) => d.id);
+
+    // Permutation check: same size, no duplicates, exactly the same members.
+    // Without this a caller could drop players out of the seating (leaving
+    // them with a stale order_id) or smuggle in ids from another game.
+    if (orderedPlayerIds.length !== existingIds.length) {
+      throw new HttpsError(
+        "invalid-argument",
+        `Expected ${existingIds.length} seats, got ${orderedPlayerIds.length}.`
+      );
+    }
+    const seen = new Set();
+    const existing = new Set(existingIds);
+    for (const id of orderedPlayerIds) {
+      if (typeof id !== "string") {
+        throw new HttpsError("invalid-argument", "Seat ids must be strings.");
+      }
+      if (seen.has(id)) {
+        throw new HttpsError("invalid-argument", `Duplicate seat id: ${id}`);
+      }
+      if (!existing.has(id)) {
+        throw new HttpsError("invalid-argument", `Unknown player id: ${id}`);
+      }
+      seen.add(id);
+    }
+
+    orderedPlayerIds.forEach((playerId, index) => {
+      tx.update(db.doc(`games/${gameId}/players/${playerId}`), { order_id: index });
+    });
+    tx.update(gameRef, { last_activity_at: FieldValue.serverTimestamp() });
+
+    return { success: true, seats: orderedPlayerIds.length };
   });
 });
 
