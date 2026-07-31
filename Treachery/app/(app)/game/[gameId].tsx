@@ -88,6 +88,31 @@ export default function GameBoardScreen() {
   const isHost = game?.host_id === currentUserId;
   const canResolveAbility = shouldShowAbilityResolver(currentPlayer);
 
+  /**
+   * Whether a player's role may be shown on the board roster.
+   *
+   * useGameBoard's canSeeRole() reports true for your OWN player, which is
+   * fine for "do I know this role" but wrong for the roster: your identity
+   * lives in the header card, and the roster deliberately conceals it (the
+   * mobile PlayerRow has always done this). Showing it in both places is
+   * redundant, and it makes the board disagree with the concealment model
+   * the visibility specs enforce.
+   *
+   * Leaders stay public — that is a rule of the game — and canSeeRole still
+   * governs everyone else, so the Puppet Master's face-down peek keeps
+   * working.
+   */
+  const mayRevealRole = (player: Player) => {
+    if (!isTreacheryActive) return false;
+    if (player.role === 'leader') return true;
+    // Once unveiled the role is public to the whole table, including on your
+    // own tile — unveiling is exactly the act of making it public.
+    if (player.is_unveiled && !player.is_face_down) return true;
+    // Still concealed: your own role stays in the header, off the roster.
+    if (player.user_id === currentUserId) return false;
+    return canSeeRole(player);
+  };
+
   // Auto-open the ability resolver the first time the current player flips to
   // unveiled while holding one of the three traitor cards that need a follow-up.
   useEffect(() => {
@@ -413,7 +438,7 @@ export default function GameBoardScreen() {
                   player={item}
                   isCurrentUser={item.user_id === currentUserId}
                   isActiveTurn={state.isActiveTurn}
-                  canSeeRole={isTreacheryActive ? canSeeRole(item) : false}
+                  canSeeRole={mayRevealRole(item)}
                   isUnveiledOrLeader={item.is_unveiled || item.role === 'leader'}
                   onAdjustLife={(amount) => adjustLife(item.id, amount)}
                   onViewCard={() => setInspectedPlayer(item)}

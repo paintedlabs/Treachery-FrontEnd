@@ -1,11 +1,5 @@
 import React, { useMemo, useRef, useState } from 'react';
-import {
-  Animated,
-  LayoutChangeEvent,
-  PanResponder,
-  StyleSheet,
-  View,
-} from 'react-native';
+import { Animated, LayoutChangeEvent, StyleSheet, View } from 'react-native';
 import { Player } from '@/models/types';
 import { TILE_HEIGHT, TILE_WIDTH } from '@/components/PlayerTile';
 import { rotateToLocalFirst, seatPositions } from '@/components/seatPositions';
@@ -23,16 +17,18 @@ import { colors } from '@/constants/theme';
  * who is on whose left, while each person sees the table from their own
  * chair. Dragging therefore changes the shared ring, not just your view.
  *
- * Dragging uses PanResponder + Animated (core React Native, already the
- * codebase's animation approach in PlayerRow) rather than gesture-handler or
- * reanimated: it behaves consistently under react-native-web, where the
- * gesture libraries are fiddlier, and adds no new dependency.
+ * Dragging uses the Pointer Events API (see DraggableSeat below for why
+ * PanResponder does not work here) with core Animated for the transform —
+ * no new dependency.
  *
  * A drop SWAPS the dragged tile with the seat it lands on, rather than
  * splicing the ring. Swapping is what people expect when physically trading
  * chairs, and it keeps everyone else's position stable — a splice would shift
  * every downstream seat and make the board lurch.
  */
+
+/** Breathing room between a tile edge and the board edge. */
+const SEAT_PADDING = 8;
 
 export interface RoundTableProps {
   /** All players, in shared seat order (order_id ascending). */
@@ -78,12 +74,35 @@ export function RoundTable({
     setSize((prev) => (prev.width === width && prev.height === height ? prev : { width, height }));
   };
 
+  // seatPositions works in fractions of the container, but tiles are a fixed
+  // pixel size — so a fraction that fits a wide board overflows a narrow one
+  // (the desktop board is a ~560px column once the identity sidebar takes its
+  // half). Rescale the ring to the space actually available after reserving
+  // room for a tile, so the layout is correct at any container size.
+  //
+  // The scale is derived from the positions themselves rather than from the
+  // ellipse constants, so this stays correct if that geometry ever changes.
+  const extent = useMemo(() => {
+    let dx = 0;
+    let dy = 0;
+    for (const p of positions) {
+      dx = Math.max(dx, Math.abs(p.x - 0.5));
+      dy = Math.max(dy, Math.abs(p.y - 0.5));
+    }
+    return { dx, dy };
+  }, [positions]);
+
   /** Absolute top-left pixel position of a seat, given its centre fraction. */
   const seatOrigin = (index: number) => {
     const pos = positions[index] ?? { x: 0.5, y: 0.5 };
+    const availX = Math.max(0, (size.width - TILE_WIDTH) / 2 - SEAT_PADDING);
+    const availY = Math.max(0, (size.height - TILE_HEIGHT) / 2 - SEAT_PADDING);
+    // extent 0 means a single seat dead centre — no offset to scale.
+    const offsetX = extent.dx > 0 ? ((pos.x - 0.5) / extent.dx) * availX : 0;
+    const offsetY = extent.dy > 0 ? ((pos.y - 0.5) / extent.dy) * availY : 0;
     return {
-      left: pos.x * size.width - TILE_WIDTH / 2,
-      top: pos.y * size.height - TILE_HEIGHT / 2,
+      left: size.width / 2 + offsetX - TILE_WIDTH / 2,
+      top: size.height / 2 + offsetY - TILE_HEIGHT / 2,
     };
   };
 
@@ -177,6 +196,21 @@ interface DraggableSeatProps {
   children: React.ReactNode;
 }
 
+/**
+ * Pointer events rather than PanResponder.
+ *
+ * PanResponder never grants on react-native-web here: its gestureState is
+ * synthesised from a touch history that reports zero deltas for mouse input,
+ * and even an unconditional `onMoveShouldSetPanResponder` failed to take the
+ * responder for real (CDP-dispatched) mouse drags. The Pointer Events API is
+ * forwarded straight to the DOM by react-native-web and is supported by React
+ * Native itself since 0.71, so this is the portable choice rather than a
+ * web-only escape hatch.
+ *
+ * `setPointerCapture` keeps the gesture attached to this tile once it starts,
+ * so dragging across a neighbouring tile (or off the board) still tracks and
+ * still delivers the release.
+ */
 function DraggableSeat({
   origin,
   isDragging,
@@ -186,41 +220,62 @@ function DraggableSeat({
   children,
 }: DraggableSeatProps) {
   const pan = useRef(new Animated.ValueXY({ x: 0, y: 0 })).current;
+  const start = useRef<{ x: number; y: number } | null>(null);
+  const moved = useRef(false);
 
-  const responder = useRef(
-    PanResponder.create({
-      // Don't capture the touch on press — the tile's own +/- buttons must
-      // still work. Only claim the gesture once it's clearly a drag.
-      onMoveShouldSetPanResponder: (_evt, gesture) =>
-        Math.abs(gesture.dx) > 6 || Math.abs(gesture.dy) > 6,
-      onPanResponderGrant: () => {
-        pan.setValue({ x: 0, y: 0 });
-        onDragStart();
-      },
-      onPanResponderMove: (evt, gesture) => {
-        pan.setValue({ x: gesture.dx, y: gesture.dy });
-        onDragMove(gesture.dx, gesture.dy);
-      },
-      onPanResponderRelease: () => {
-        onDragEnd();
-        // Spring home: the tile's real position comes from the seat ring once
-        // the server round-trips, so the drag offset must always reset.
-        Animated.spring(pan, {
-          toValue: { x: 0, y: 0 },
-          useNativeDriver: false,
-          friction: 7,
-        }).start();
-      },
-      onPanResponderTerminate: () => {
-        onDragEnd();
-        pan.setValue({ x: 0, y: 0 });
-      },
-    }),
-  ).current;
+  const handlePointerDown = (e: PointerEventLike) => {
+    // Record the origin but do NOT capture the pointer yet. Capturing here
+    // redirects every later pointer event to this tile, so the +/- buttons
+    // inside it never receive their pointerup and never fire a click.
+    // Capture is taken below, only once the gesture is confirmed a drag.
+    start.current = { x: e.nativeEvent.clientX, y: e.nativeEvent.clientY };
+    moved.current = false;
+  };
+
+  const handlePointerMove = (e: PointerEventLike) => {
+    if (!start.current) return;
+    const dx = e.nativeEvent.clientX - start.current.x;
+    const dy = e.nativeEvent.clientY - start.current.y;
+    // A few pixels of slop so a click on +/- isn't read as a drag.
+    if (!moved.current && Math.abs(dx) < 6 && Math.abs(dy) < 6) return;
+    if (!moved.current) {
+      moved.current = true;
+      // Now that this is definitely a drag, capture so it keeps tracking
+      // across neighbouring tiles and off the board.
+      const target = e.currentTarget as unknown as {
+        setPointerCapture?: (id: number) => void;
+      };
+      target?.setPointerCapture?.(e.nativeEvent.pointerId);
+      onDragStart();
+    }
+    pan.setValue({ x: dx, y: dy });
+    onDragMove(dx, dy);
+  };
+
+  const endDrag = (e: PointerEventLike) => {
+    const target = e.currentTarget as unknown as {
+      releasePointerCapture?: (id: number) => void;
+    };
+    target?.releasePointerCapture?.(e.nativeEvent.pointerId);
+    start.current = null;
+    if (!moved.current) return; // a tap, not a drag — leave it to the buttons
+    moved.current = false;
+    onDragEnd();
+    // Spring home: the tile's real position comes from the seat ring once the
+    // server round-trips, so the drag offset must always reset.
+    Animated.spring(pan, {
+      toValue: { x: 0, y: 0 },
+      useNativeDriver: false,
+      friction: 7,
+    }).start();
+  };
 
   return (
     <Animated.View
-      {...responder.panHandlers}
+      onPointerDown={handlePointerDown}
+      onPointerMove={handlePointerMove}
+      onPointerUp={endDrag}
+      onPointerCancel={endDrag}
       style={[
         styles.seat,
         origin,
@@ -231,6 +286,12 @@ function DraggableSeat({
       {children}
     </Animated.View>
   );
+}
+
+/** Minimal shape of the pointer events react-native-web forwards. */
+interface PointerEventLike {
+  currentTarget: unknown;
+  nativeEvent: { clientX: number; clientY: number; pointerId: number };
 }
 
 const styles = StyleSheet.create({
