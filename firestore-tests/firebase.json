@@ -1,0 +1,24 @@
+{
+  "_comment": [
+    "Emulator config OWNED BY firestore-tests/. The repo-root firebase.json is shared",
+    "by the web E2E suite and the functions emulator, so this suite keeps its own file",
+    "and its own port (8098) so they can all run at the same time.",
+    "",
+    "firebase-tools refuses to reference a rules file outside the config's own directory,",
+    "so this points at the local deny-all bootstrap. The REAL ruleset under test",
+    "(../firestore.rules) is loaded into the emulator by initializeTestEnvironment() in",
+    "test/helpers.js. The bootstrap denies everything on purpose: if that load ever",
+    "silently fails, the positive-path tests break loudly instead of passing vacuously."
+  ],
+  "firestore": {
+    "rules": "emulator-bootstrap.rules"
+  },
+  "emulators": {
+    "firestore": {
+      "port": 8098,
+      "host": "127.0.0.1"
+    },
+    "ui": { "enabled": false },
+    "singleProjectMode": true
+  }
+}
