@@ -14,7 +14,9 @@
     "lint:fix": "eslint . --ext .ts,.tsx --fix",
     "format": "prettier --write \"src/**/*.{ts,tsx}\" \"app/**/*.{ts,tsx}\"",
     "format:check": "prettier --check \"src/**/*.{ts,tsx}\" \"app/**/*.{ts,tsx}\"",
-    "test:e2e": "firebase emulators:exec --project=demo-test --only auth,firestore,functions --config=../firebase.json 'npm run build:web:emulator && playwright test'"
+    "test:e2e": "firebase emulators:exec --project=demo-test --only auth,firestore,functions --config=../firebase.json 'npm run build:web:emulator && playwright test'",
+    "playtest": "firebase emulators:exec --project=demo-test --only auth,firestore,functions --config=../firebase.json 'npm run build:web:emulator && playwright test --config=playwright.playground.config.ts'",
+    "playtest:nobuild": "firebase emulators:exec --project=demo-test --only auth,firestore,functions --config=../firebase.json 'playwright test --config=playwright.playground.config.ts'"
   },
   "dependencies": {
     "@expo/metro-runtime": "~55.0.6",
