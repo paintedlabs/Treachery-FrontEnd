@@ -24,6 +24,7 @@ interface UseGameBoardReturn {
   canSeeRole: (player: Player) => boolean;
   identityCard: (player: Player) => IdentityCard | undefined;
   updatePlayerColor: (color: string | null) => Promise<void>;
+  renameCurrentPlayer: (name: string) => Promise<void>;
   // Planechase
   isPlanechaseActive: boolean;
   isTreacheryActive: boolean;
@@ -276,6 +277,23 @@ export function useGameBoard(gameId: string, currentUserId: string | null): UseG
     [gameId, currentPlayer],
   );
 
+  const renameCurrentPlayer = useCallback(
+    async (name: string) => {
+      const trimmed = name.trim();
+      if (!currentPlayer || !currentUserId || !trimmed) return;
+      try {
+        // The player doc is what the table sees this game; the user doc makes
+        // the name stick for future games. Player doc first — if the rules
+        // reject it the user doc stays consistent with what others see.
+        await firestoreService.updatePlayerDisplayName(gameId, currentPlayer.id, trimmed);
+        await firestoreService.updateUserDisplayName(currentUserId, trimmed);
+      } catch (error: unknown) {
+        setErrorMessage(error instanceof Error ? error.message : 'Failed to change name.');
+      }
+    },
+    [gameId, currentPlayer, currentUserId],
+  );
+
   const canSeeRole = useCallback(
     (player: Player): boolean => {
       if (player.user_id === currentUserId) return true;
@@ -401,6 +419,7 @@ export function useGameBoard(gameId: string, currentUserId: string | null): UseG
     canSeeRole,
     identityCard: identityCardFn,
     updatePlayerColor,
+    renameCurrentPlayer,
     // Planechase
     isPlanechaseActive,
     isTreacheryActive,

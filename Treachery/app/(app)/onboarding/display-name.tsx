@@ -10,6 +10,7 @@ import {
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/hooks/useAuth';
 import { ErrorBanner } from '@/components/ErrorBanner';
+import { randomGuestName } from '@/constants/guestNames';
 import { colors, spacing, fonts } from '@/constants/theme';
 
 export default function DisplayNameScreen() {
@@ -25,7 +26,10 @@ export default function DisplayNameScreen() {
       const prefix = user.email.split('@')[0] || '';
       setDisplayName(prefix.charAt(0).toUpperCase() + prefix.slice(1));
     } else if (user.isAnonymous) {
-      setDisplayName('Guest');
+      // A random Magic character instead of "Guest" — otherwise a table of
+      // four guests is four players all named "Guest". The input is
+      // prefilled, so the player sees the name and can replace it.
+      setDisplayName(randomGuestName());
     } else {
       setDisplayName('Player');
     }
@@ -44,7 +48,16 @@ export default function DisplayNameScreen() {
     router.replace('/(app)/onboarding/welcome');
   };
 
-  const handleSkip = () => {
+  const handleSkip = async () => {
+    // Skip keeps the suggested name rather than abandoning it — the user doc
+    // was created with display_name "Guest", so skipping without saving would
+    // put the whole "four players named Guest" problem right back.
+    const trimmed = displayName.trim();
+    if (trimmed) {
+      setIsSaving(true);
+      await updateDisplayName(trimmed);
+      setIsSaving(false);
+    }
     router.replace('/(app)/onboarding/welcome');
   };
 

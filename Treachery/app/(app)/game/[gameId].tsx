@@ -53,6 +53,7 @@ export default function GameBoardScreen() {
     canSeeRole,
     identityCard,
     updatePlayerColor,
+    renameCurrentPlayer,
     alivePlayers,
     // Planechase
     isPlanechaseActive,
@@ -395,6 +396,7 @@ export default function GameBoardScreen() {
                 isDisabled={false}
                 onColorChange={item.user_id === currentUserId ? updatePlayerColor : undefined}
                 playerColor={item.player_color}
+                onRename={item.user_id === currentUserId ? renameCurrentPlayer : undefined}
               />
             )}
             style={styles.list}
