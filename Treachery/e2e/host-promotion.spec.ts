@@ -19,9 +19,9 @@ test.describe('Host leaves a lobby with players still in it', () => {
 
     expect((await fetchGameDoc(hostPage, gameId))?.host_id).toBe(userIds[0]);
 
-    // Host leaves (window.confirm on web).
-    hostPage.once('dialog', (d) => d.accept());
+    // Host leaves, accepting the in-app confirmation.
     await hostPage.getByRole('button', { name: 'Leave game' }).click();
+    await hostPage.getByRole('button', { name: 'Confirm leave' }).click();
 
     // The game survives, and host_id moves to the next seat.
     await expect
@@ -54,8 +54,8 @@ test.describe('Host leaves a lobby with players still in it', () => {
     const { pages, userIds, gameId } = await setupLobby(browser, 3);
     const [hostPage, secondPage, thirdPage] = pages;
 
-    hostPage.once('dialog', (d) => d.accept());
     await hostPage.getByRole('button', { name: 'Leave game' }).click();
+    await hostPage.getByRole('button', { name: 'Confirm leave' }).click();
 
     await expect
       .poll(async () => (await fetchGameDoc(secondPage, gameId))?.host_id, { timeout: 15_000 })

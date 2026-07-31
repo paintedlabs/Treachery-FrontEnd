@@ -27,6 +27,7 @@ import { ErrorBanner } from '@/components/ErrorBanner';
 import { LoadingScreen } from '@/components/LoadingScreen';
 import { ConnectionBanner } from '@/components/ConnectionBanner';
 import { AbilityResolver, shouldShowAbilityResolver } from '@/components/AbilityResolver';
+import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { ROLE_DISPLAY_NAMES } from '@/constants/roles';
 import { Player } from '@/models/types';
 import { colors, spacing, fonts } from '@/constants/theme';
@@ -139,47 +140,43 @@ export default function GameBoardScreen() {
     });
   };
 
-  const handleForfeit = () => {
-    if (Platform.OS === 'web') {
-      const confirmed = window.confirm(
-        'Forfeit Game?\n\nYou will be eliminated from the game. This cannot be undone.',
-      );
-      if (confirmed) {
-        eliminateAndLeave().then(navigateToGameOver);
-      }
-    } else {
-      Alert.alert('Forfeit Game?', 'You will be eliminated from the game. This cannot be undone.', [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Forfeit',
-          style: 'destructive',
-          onPress: async () => {
-            await eliminateAndLeave();
-            navigateToGameOver();
-          },
-        },
-      ]);
-    }
-  };
+  // Which confirmation (if any) is showing. In-app ConfirmDialog instead of
+  // window.confirm/Alert.alert: one themed code path on every platform, and
+  // it stays clickable under automation (Playwright silently cancels native
+  // dialogs, which made these buttons appear dead in the playtest harness).
+  const [pendingConfirm, setPendingConfirm] = useState<'unveil' | 'forfeit' | null>(null);
 
-  const handleUnveil = () => {
+  const handleForfeit = () => setPendingConfirm('forfeit');
+  const handleUnveil = () => setPendingConfirm('unveil');
+
+  const confirmDialogProps = () => {
+    if (pendingConfirm === 'forfeit') {
+      return {
+        title: 'Forfeit Game?',
+        message: 'You will be eliminated from the game. This cannot be undone.',
+        confirmLabel: 'Forfeit',
+        confirmAccessibilityLabel: 'Confirm forfeit',
+        destructive: true,
+        onConfirm: async () => {
+          setPendingConfirm(null);
+          await eliminateAndLeave();
+          navigateToGameOver();
+        },
+      };
+    }
     const roleName = currentPlayer?.role ? ROLE_DISPLAY_NAMES[currentPlayer.role] : '';
     const cardName = currentIdentityCard?.name ?? '';
-    if (Platform.OS === 'web') {
-      const confirmed = window.confirm(
-        `Unveil your identity?\n\nThis will reveal your role (${roleName}) and card (${cardName}) to all players. This cannot be undone.`,
-      );
-      if (confirmed) unveilCurrentPlayer();
-    } else {
-      Alert.alert(
-        'Unveil your identity?',
-        `This will reveal your role (${roleName}) and card (${cardName}) to all players. This cannot be undone.`,
-        [
-          { text: 'Cancel', style: 'cancel' },
-          { text: 'Unveil', onPress: () => unveilCurrentPlayer() },
-        ],
-      );
-    }
+    return {
+      title: 'Unveil your identity?',
+      message: `This will reveal your role (${roleName}) and card (${cardName}) to all players. This cannot be undone.`,
+      confirmLabel: 'Unveil',
+      confirmAccessibilityLabel: 'Confirm unveil',
+      destructive: false,
+      onConfirm: () => {
+        setPendingConfirm(null);
+        unveilCurrentPlayer();
+      },
+    };
   };
 
   const handleEndGame = () => {
@@ -610,6 +607,8 @@ export default function GameBoardScreen() {
           </View>
         </View>
       </Modal>
+
+      <ConfirmDialog visible={pendingConfirm !== null} {...confirmDialogProps()} onCancel={() => setPendingConfirm(null)} />
     </View>
   );
 }
