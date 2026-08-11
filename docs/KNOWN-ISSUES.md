@@ -47,12 +47,12 @@ Encoded in `Treachery/e2e/` (`test.fixme`) and `KNOWN_BROKEN_INVARIANTS`.
 
 | Issue | Status |
 |---|---|
-| Game-over screen reveals every hidden identity and is reachable mid-game (eliminated spectator "Leave Game", forfeit, or direct `/game-over/<id>` URL) | **open** |
-| Server-promoted host can't start the game — lobby freezes `isHost` from a navigation param instead of reading `game.host_id` | **open** |
-| Near-simultaneous life adjustments silently drop taps (optimistic-delta clearing races the snapshot) | **open** |
-| Planechase phenomena unreachable: `resolvePhenomenon` has no UI caller, so Interplanar Tunnel / Spatial Merging / Chaotic Aether park the table | **open** |
-| Puppet Master resolver sheet shows all players' hidden cards before redistribution | **open** |
-| `canSeeRole` is a dead prop in `PlayerRow` — the Puppet Master face-down peek never renders | **open** |
+| Game-over screen reveals every hidden identity and is reachable mid-game (eliminated spectator "Leave Game", forfeit, or direct `/game-over/<id>` URL) | **fixed** — gate results on `state === finished`; leave/forfeit no longer mid-game spoils |
+| Server-promoted host can't start the game — lobby freezes `isHost` from a navigation param instead of reading `game.host_id` | **fixed** — live `host_id` across web/iOS/Android |
+| Near-simultaneous life adjustments silently drop taps (optimistic-delta clearing races the snapshot) | **fixed** — keep unflushed pending across peer snapshots |
+| Planechase phenomena unreachable: `resolvePhenomenon` has no UI caller, so Interplanar Tunnel / Spatial Merging / Chaotic Aether park the table | **fixed** (web) — `PhenomenonOverlay`; native already had UI |
+| Puppet Master resolver sheet shows all players' hidden cards before redistribution | **fixed** — player names only until resolve |
+| `canSeeRole` is a dead prop in `PlayerRow` — the Puppet Master face-down peek never renders | **fixed** |
 | `Alert.alert` is a no-op on react-native-web: forgot-password confirmation and lobby "Copied!" never show; forgot-password also reads a stale error closure and reports success on failure | **open** |
 
 ## Lower severity

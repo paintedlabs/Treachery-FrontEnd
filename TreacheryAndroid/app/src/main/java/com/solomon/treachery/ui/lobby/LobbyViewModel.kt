@@ -22,7 +22,7 @@ class LobbyViewModel @Inject constructor(
 ) : ViewModel() {
 
     val gameId: String = savedStateHandle["gameId"] ?: ""
-    val isHost: Boolean = savedStateHandle["isHost"] ?: false
+    private val navIsHost: Boolean = savedStateHandle["isHost"] ?: false
 
     private val _game = MutableStateFlow<Game?>(null)
     val game: StateFlow<Game?> = _game.asStateFlow()
@@ -45,6 +45,14 @@ class LobbyViewModel @Inject constructor(
 
     val currentPlayer: Player?
         get() = currentUserId?.let { uid -> players.value.find { it.userId == uid } }
+
+    /** True when the signed-in user is the live host (updates after host promotion). */
+    val isHost: Boolean
+        get() {
+            val uid = currentUserId ?: return navIsHost
+            val hostId = game.value?.hostId
+            return if (hostId != null) hostId == uid else navIsHost
+        }
 
     val canStartGame: Boolean
         get() {

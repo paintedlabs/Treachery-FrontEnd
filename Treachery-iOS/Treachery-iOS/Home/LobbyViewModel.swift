@@ -17,7 +17,8 @@ final class LobbyViewModel: ObservableObject {
     @Published var isGameDisbanded = false
 
     let gameId: String
-    let isHost: Bool
+    /// Navigation fallback only; prefer `isHost` which reads live `game.hostId`.
+    private let navIsHost: Bool
     var currentUserId: String?
     private let firestoreManager: FirestoreManaging
     private let cloudFunctions: CloudFunctionsProtocol
@@ -28,6 +29,15 @@ final class LobbyViewModel: ObservableObject {
     var currentPlayer: Player? {
         guard let userId = currentUserId else { return nil }
         return players.first { $0.userId == userId }
+    }
+
+    /// True when the signed-in user is the live host (updates after host promotion).
+    var isHost: Bool {
+        guard let userId = currentUserId else { return navIsHost }
+        if let hostId = game?.hostId {
+            return hostId == userId
+        }
+        return navIsHost
     }
 
     var canStartGame: Bool {
@@ -52,7 +62,7 @@ final class LobbyViewModel: ObservableObject {
         cloudFunctions: CloudFunctionsProtocol = CloudFunctions()
     ) {
         self.gameId = gameId
-        self.isHost = isHost
+        self.navIsHost = isHost
         self.firestoreManager = firestoreManager
         self.cloudFunctions = cloudFunctions
         startListening()

@@ -13,6 +13,7 @@ interface UseLobbyReturn {
   isStartingGame: boolean;
   isGameDisbanded: boolean;
   isGameStarted: boolean;
+  isHost: boolean;
   canStartGame: boolean;
   minPlayers: number;
   startGame: () => Promise<void>;
@@ -29,7 +30,7 @@ interface UseLobbyReturn {
 
 export function useLobby(
   gameId: string,
-  isHost: boolean,
+  _navIsHost: boolean,
   currentUserId?: string | null,
 ): UseLobbyReturn {
   const [game, setGame] = useState<Game | null>(null);
@@ -62,6 +63,9 @@ export function useLobby(
 
   const isGameStarted = game?.state === 'in_progress';
 
+  // Always derive host from live game data so host promotion works.
+  const isHost = !!currentUserId && game?.host_id === currentUserId;
+
   const isTreacheryMode =
     game?.game_mode === 'treachery' || game?.game_mode === 'treachery_planechase';
   const minPlayers = isTreacheryMode ? MINIMUM_PLAYER_COUNT : 1;
@@ -69,7 +73,7 @@ export function useLobby(
   const canStartGame = isHost && players.length >= minPlayers;
 
   const startGame = useCallback(async () => {
-    if (!isHost || !game) return;
+    if (!game || !currentUserId || game.host_id !== currentUserId) return;
     setErrorMessage(null);
     setIsStartingGame(true);
 
@@ -81,7 +85,7 @@ export function useLobby(
       setErrorMessage(error instanceof Error ? error.message : 'Failed to start game.');
     }
     setIsStartingGame(false);
-  }, [isHost, game, gameId, players.length]);
+  }, [game, currentUserId, gameId, players.length]);
 
   const leaveGame = useCallback(
     async (_userId: string) => {
@@ -136,7 +140,7 @@ export function useLobby(
       gameMode?: string;
       maxTraitorRarity?: Rarity;
     }) => {
-      if (!isHost || !game) return;
+      if (!game || !currentUserId || game.host_id !== currentUserId) return;
       try {
         const fn = httpsCallable(functions, 'updateGameSettings');
         await fn({ gameId, ...settings });
@@ -144,7 +148,7 @@ export function useLobby(
         setErrorMessage(error instanceof Error ? error.message : 'Failed to update settings.');
       }
     },
-    [isHost, game, gameId],
+    [game, currentUserId, gameId],
   );
 
   return {
@@ -154,6 +158,7 @@ export function useLobby(
     isStartingGame,
     isGameDisbanded,
     isGameStarted,
+    isHost,
     canStartGame,
     minPlayers,
     startGame,

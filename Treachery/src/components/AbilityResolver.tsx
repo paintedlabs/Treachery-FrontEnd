@@ -246,7 +246,6 @@ function PuppetMasterSheet({
       </View>
       {swappable.map((p) => {
         const cardId = assignments[p.id];
-        const c = cardId ? getCard(cardId) : undefined;
         const wasSwapped = cardId !== p.identity_card_id;
         const isSel = firstSel === p.id;
         return (
@@ -266,12 +265,9 @@ function PuppetMasterSheet({
                   </View>
                 )}
               </View>
-              {c && (
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 }}>
-                  <View style={[styles.dot, { backgroundColor: ROLE_COLORS[c.role] }]} />
-                  <Text style={[styles.rowRole, { color: ROLE_COLORS[c.role] }]}>{c.name}</Text>
-                </View>
-              )}
+              <Text style={[styles.rowRole, { color: colors.textSecondary, marginTop: 2 }]}>
+                Identity hidden
+              </Text>
             </View>
             <Ionicons
               name={isSel ? 'swap-horizontal-outline' : 'swap-horizontal'}

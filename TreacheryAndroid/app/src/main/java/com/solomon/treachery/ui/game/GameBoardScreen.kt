@@ -76,7 +76,7 @@ fun GameBoardScreen(
                 TextButton(onClick = {
                     showForfeitDialog = false
                     viewModel.eliminateAndLeave()
-                    onNavigateToGameOver(viewModel.gameId)
+                    // Stay on board; isGameFinished effect navigates when appropriate.
                 }) { Text("Forfeit", color = MtgError) }
             },
             dismissButton = {

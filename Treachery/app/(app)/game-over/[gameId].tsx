@@ -15,10 +15,43 @@ export default function GameOverScreen() {
   const { currentUserId } = useAuth();
 
   const { isDesktop } = useResponsive();
-  const { game, players, winningTeam, identityCard } = useGameBoard(gameId!, currentUserId);
+  const { game, players, winningTeam, identityCard, isGameFinished } = useGameBoard(
+    gameId!,
+    currentUserId,
+  );
 
   if (players.length === 0) {
     return <LoadingScreen message="Loading results..." />;
+  }
+
+  // Mid-game deep links / premature navigation must not reveal hidden roles.
+  if (!isGameFinished) {
+    return (
+      <View style={[styles.container, isDesktop && styles.desktopContainer]}>
+        <View style={styles.spacer} />
+        <View style={styles.announcement}>
+          <Ionicons name="time-outline" size={56} color={colors.primary} />
+          <Text style={styles.gameOverText}>Game Still In Progress</Text>
+          <Text style={styles.sessionSummaryText}>
+            Results are available only after the game finishes.
+          </Text>
+        </View>
+        <View style={styles.spacer} />
+        <TouchableOpacity
+          style={styles.homeButton}
+          onPress={() =>
+            router.replace({
+              pathname: '/(app)/game/[gameId]',
+              params: { gameId: gameId! },
+            })
+          }
+          accessibilityLabel="Return to game"
+          accessibilityRole="button"
+        >
+          <Text style={styles.homeButtonText}>Return to Game</Text>
+        </TouchableOpacity>
+      </View>
+    );
   }
 
   const isTreacheryMode =

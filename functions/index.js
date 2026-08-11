@@ -189,7 +189,7 @@ function sanitizeCommanderKey(name) {
   if (typeof name !== "string") return null;
   const cleaned = name
     .trim()
-    .replace(/[.\[\]*/~\\]/g, "_")
+    .replace(/[.[\]*/~\\]/g, "_")
     .replace(/\s+/g, " ")
     .slice(0, 80);
   return cleaned.length > 0 ? cleaned : null;

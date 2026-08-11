@@ -212,8 +212,8 @@ struct GameBoardView: View {
                                 .multilineTextAlignment(.center)
 
                             Button("Leave Game") {
+                                // Spectators go home — game-over must not reveal identities mid-game.
                                 navigationPath.removeLast(navigationPath.count)
-                                navigationPath.append(AppDestination.gameOver(gameId: viewModel.gameId))
                             }
                             .foregroundStyle(Color.mtgError)
                             .padding(.top, 4)
@@ -285,8 +285,8 @@ struct GameBoardView: View {
             Button("Forfeit", role: .destructive) {
                 Task {
                     await viewModel.eliminateAndLeave()
-                    navigationPath.removeLast(navigationPath.count)
-                    navigationPath.append(AppDestination.gameOver(gameId: viewModel.gameId))
+                    // Stay on the board (or let isGameFinished navigate);
+                    // do not open game-over mid-session.
                 }
             }
             Button("Cancel", role: .cancel) {}

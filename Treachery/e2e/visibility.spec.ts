@@ -91,7 +91,7 @@ test.describe('The game-over reveal is unreachable mid-game', () => {
   // An eliminated player is a spectator, not a winner: the spectator bar's
   // "Leave Game" button routes straight to /game-over/, which reveals every
   // living player's role and card while the game is still in progress.
-  test.fixme('an eliminated spectator pressing Leave Game sees no identities', async ({ browser }) => {
+  test('an eliminated spectator pressing Leave Game sees no identities', async ({ browser }) => {
     const { players, gameId } = await setup(browser);
     const leader = playerWithRole(players, 'leader');
     const [assassinA] = playersWithRole(players, 'assassin');
@@ -110,7 +110,7 @@ test.describe('The game-over reveal is unreachable mid-game', () => {
   // FIXME: currently broken — see finding #2. Un-fixme when the bug is fixed.
   // Forfeiting navigates the forfeiter to /game-over/ unconditionally, so any
   // player can trade their own elimination for everyone else's identities.
-  test.fixme('a player who forfeits while the game continues sees no identities', async ({
+  test('a player who forfeits while the game continues sees no identities', async ({
     browser,
   }) => {
     const { players, gameId } = await setup(browser);
@@ -127,7 +127,7 @@ test.describe('The game-over reveal is unreachable mid-game', () => {
   // FIXME: currently broken — see finding #2. Un-fixme when the bug is fixed.
   // On web the route is just a URL. A living player can type
   // /game-over/<gameId> and read the whole table mid-game.
-  test.fixme('navigating directly to /game-over mid-game reveals nothing', async ({ browser }) => {
+  test('navigating directly to /game-over mid-game reveals nothing', async ({ browser }) => {
     const { players, gameId } = await setup(browser);
     const snoop: PlayerHandle = playersWithRole(players, 'assassin')[0];
 

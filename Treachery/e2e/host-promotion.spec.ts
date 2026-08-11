@@ -50,7 +50,7 @@ test.describe('Host leaves a lobby with players still in it', () => {
   // useLobby.startGame bails out on `if (!isHost) return`. The promoted host
   // has to leave and rejoin to unstick the lobby. isHost should be derived from
   // game.host_id === currentUserId.
-  test.fixme('the promoted host can start the game', async ({ browser }) => {
+  test('the promoted host can start the game', async ({ browser }) => {
     const { pages, userIds, gameId } = await setupLobby(browser, 3);
     const [hostPage, secondPage, thirdPage] = pages;
 

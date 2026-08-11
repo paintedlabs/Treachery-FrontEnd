@@ -197,13 +197,12 @@ function LobbyPlayerRow({
 }
 
 export default function LobbyScreen() {
-  const { gameId, isHost: isHostParam } = useLocalSearchParams<{
+  const { gameId } = useLocalSearchParams<{
     gameId: string;
-    isHost: string;
+    isHost?: string;
   }>();
   const router = useRouter();
   const { currentUserId } = useAuth();
-  const isHost = isHostParam === 'true';
 
   const { isDesktop } = useResponsive();
 
@@ -214,6 +213,7 @@ export default function LobbyScreen() {
     isStartingGame,
     isGameDisbanded,
     isGameStarted,
+    isHost,
     canStartGame,
     minPlayers,
     startGame,
@@ -221,7 +221,7 @@ export default function LobbyScreen() {
     updatePlayerColor,
     updateCommanderName,
     updateGameSettings,
-  } = useLobby(gameId!, isHost, currentUserId);
+  } = useLobby(gameId!, false, currentUserId);
 
   // On web, intercept browser back button — prevent accidental lobby exit
   useEffect(() => {
