@@ -1,7 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Timestamp } from 'firebase/firestore';
+import { httpsCallable } from 'firebase/functions';
 import { TreacheryUser, FriendRequest } from '@/models/types';
 import * as firestoreService from '@/services/firestore';
+import { functions } from '@/config/firebase';
 import { trackEvent } from '@/services/analytics';
 
 interface UseFriendsReturn {
@@ -97,9 +99,8 @@ export function useFriends(userId: string | null): UseFriendsReturn {
       setErrorMessage(null);
 
       try {
-        const updated: FriendRequest = { ...request, status: 'accepted' };
-        await firestoreService.updateFriendRequest(updated);
-        await firestoreService.addFriend(userId, request.from_user_id);
+        const acceptFn = httpsCallable(functions, 'acceptFriendRequest');
+        await acceptFn({ requestId: request.id });
         trackEvent('accept_friend_request');
         await loadData();
       } catch (error: unknown) {

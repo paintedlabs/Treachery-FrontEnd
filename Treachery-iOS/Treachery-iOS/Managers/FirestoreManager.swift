@@ -29,7 +29,29 @@ final class FirestoreManager: FirestoreManaging {
     // MARK: - Users
 
     func createUser(_ user: TreacheryUser) async throws {
-        try usersCollection.document(user.id).setData(from: user)
+        // Public profile only — PII lives under users/{uid}/private/data
+        var publicData: [String: Any] = [
+            "display_name": user.displayName,
+            "friend_ids": user.friendIds,
+            "created_at": Timestamp(date: user.createdAt),
+            "elo": user.elo,
+        ]
+        if let deckStats = user.deckStats {
+            publicData["deck_stats"] = deckStats.mapValues { stat -> [String: Any] in
+                ["elo": stat.elo, "wins": stat.wins, "losses": stat.losses, "games": stat.games]
+            }
+        }
+        try await usersCollection.document(user.id).setData(publicData)
+
+        var privateData: [String: Any] = [:]
+        if let email = user.email { privateData["email"] = email }
+        if let phone = user.phoneNumber { privateData["phone_number"] = phone }
+        if let fcm = user.fcmToken { privateData["fcm_token"] = fcm }
+        if !privateData.isEmpty {
+            try await usersCollection.document(user.id)
+                .collection("private").document("data")
+                .setData(privateData, merge: true)
+        }
     }
 
     func getUser(id: String) async throws -> TreacheryUser? {
@@ -85,20 +107,18 @@ final class FirestoreManager: FirestoreManaging {
     }
 
     func addFriend(userId: String, friendId: String) async throws {
+        // Mutual friendship is established via acceptFriendRequest callable only.
+        // Kept for protocol compatibility; prefer CloudFunctions.acceptFriendRequest.
         try await usersCollection.document(userId).updateData([
             "friend_ids": FieldValue.arrayUnion([friendId])
-        ])
-        try await usersCollection.document(friendId).updateData([
-            "friend_ids": FieldValue.arrayUnion([userId])
         ])
     }
 
     func removeFriend(userId: String, friendId: String) async throws {
+        // Preferred path is CloudFunctions.removeFriend (mutual). Owner can still
+        // drop the local edge if the callable is unavailable.
         try await usersCollection.document(userId).updateData([
             "friend_ids": FieldValue.arrayRemove([friendId])
-        ])
-        try await usersCollection.document(friendId).updateData([
-            "friend_ids": FieldValue.arrayRemove([userId])
         ])
     }
 

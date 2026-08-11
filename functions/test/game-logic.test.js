@@ -70,7 +70,12 @@ function shuffle(array) {
   return arr;
 }
 
-function checkWinConditions(players) {
+function checkWinConditions(players, gameMode) {
+  // Only Treachery-mode games have automatic team wins.
+  if (gameMode === "none" || gameMode === "planechase") {
+    return null;
+  }
+
   const alive = players.filter((p) => !p.is_eliminated);
 
   if (alive.length === 1 && alive[0].role === "traitor") {

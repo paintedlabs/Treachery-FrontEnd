@@ -10,6 +10,31 @@ class CloudFunctionsRepositoryImpl @Inject constructor(
     private val functions: FirebaseFunctions
 ) : CloudFunctionsRepository {
 
+    override suspend fun createGame(
+        gameMode: String,
+        maxPlayers: Int,
+        startingLife: Int,
+        maxTraitorRarity: String?,
+        useOwnDeck: Boolean,
+        displayName: String?
+    ): String {
+        val data = mutableMapOf<String, Any>(
+            "gameMode" to gameMode,
+            "maxPlayers" to maxPlayers,
+            "startingLife" to startingLife,
+            "useOwnDeck" to useOwnDeck
+        )
+        maxTraitorRarity?.let { data["maxTraitorRarity"] = it }
+        displayName?.let { data["displayName"] = it }
+        val result = functions.getHttpsCallable("createGame")
+            .call(data)
+            .await()
+        @Suppress("UNCHECKED_CAST")
+        val payload = result.getData() as? Map<String, Any?> ?: emptyMap()
+        return payload["gameId"] as? String
+            ?: throw IllegalStateException("Invalid createGame response")
+    }
+
     override suspend fun startGame(gameId: String) {
         functions.getHttpsCallable("startGame")
             .call(mapOf("gameId" to gameId))
@@ -92,6 +117,18 @@ class CloudFunctionsRepositoryImpl @Inject constructor(
         gameMode?.let { data["gameMode"] = it }
         functions.getHttpsCallable("updateGameSettings")
             .call(data)
+            .await()
+    }
+
+    override suspend fun acceptFriendRequest(requestId: String) {
+        functions.getHttpsCallable("acceptFriendRequest")
+            .call(mapOf("requestId" to requestId))
+            .await()
+    }
+
+    override suspend fun removeFriend(friendId: String) {
+        functions.getHttpsCallable("removeFriend")
+            .call(mapOf("friendId" to friendId))
             .await()
     }
 }

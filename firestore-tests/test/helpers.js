@@ -85,18 +85,25 @@ async function clearData() {
 
 // ─── Fixture factories ──────────────────────────────────────────────
 
-/** A realistic users/{uid} doc — note the PII fields finding #1 is about. */
+/** A realistic public users/{uid} doc — PII lives under private/data. */
 function userDoc(uid, overrides = {}) {
   return {
     uid,
     display_name: `Player ${uid}`,
-    email: `${uid}@example.com`,
-    phone_number: "+15555550123",
-    fcm_token: `fcm-token-${uid}`,
     friend_ids: [],
     elo_rating: 1200,
     games_played: 0,
     created_at: new Date("2026-01-01T00:00:00Z"),
+    ...overrides,
+  };
+}
+
+/** Owner-only private bag for email / phone / FCM. */
+function privateUserDoc(uid, overrides = {}) {
+  return {
+    email: `${uid}@example.com`,
+    phone_number: "+15555550123",
+    fcm_token: `fcm-token-${uid}`,
     ...overrides,
   };
 }
@@ -156,6 +163,7 @@ module.exports = {
   anonDb,
   clearData,
   userDoc,
+  privateUserDoc,
   gameDoc,
   playerDoc,
   friendRequestDoc,

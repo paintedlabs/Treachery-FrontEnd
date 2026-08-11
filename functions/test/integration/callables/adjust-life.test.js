@@ -259,7 +259,6 @@ describe('adjustLife — non-treachery modes must not auto-finish', () => {
   for (const mode of ['none', 'planechase']) {
     it(
       `a "${mode}" game keeps running when a player drops to 0 life`,
-      { skip: 'currently broken — see finding #B' },
       async () => {
         const users = await h.getUsers(4);
         const game = await h.seedGame({ users, gameMode: mode, startingLife: 40 });
@@ -299,7 +298,6 @@ describe('adjustLife — non-treachery modes must not auto-finish', () => {
   // has already flipped to "finished" behind their back.
   it(
     'the host can still end a Life Tracker game explicitly after an elimination',
-    { skip: 'currently broken — see finding #B' },
     async () => {
       const users = await h.getUsers(4);
       const game = await h.seedGame({ users, gameMode: 'none', startingLife: 40 });

@@ -24,6 +24,35 @@ struct PhenomenonResult {
 struct CloudFunctions: CloudFunctionsProtocol {
     private let functions = Functions.functions()
 
+    func createGame(
+        gameMode: String,
+        maxPlayers: Int,
+        startingLife: Int,
+        maxTraitorRarity: String? = nil,
+        useOwnDeck: Bool = false,
+        displayName: String? = nil
+    ) async throws -> String {
+        let callable = functions.httpsCallable("createGame")
+        var data: [String: Any] = [
+            "gameMode": gameMode,
+            "maxPlayers": maxPlayers,
+            "startingLife": startingLife,
+            "useOwnDeck": useOwnDeck,
+        ]
+        if let maxTraitorRarity { data["maxTraitorRarity"] = maxTraitorRarity }
+        if let displayName { data["displayName"] = displayName }
+        let result = try await callable.call(data)
+        let payload = result.data as? [String: Any] ?? [:]
+        guard let gameId = payload["gameId"] as? String, !gameId.isEmpty else {
+            throw NSError(
+                domain: "CloudFunctions",
+                code: -1,
+                userInfo: [NSLocalizedDescriptionKey: "Invalid createGame response"]
+            )
+        }
+        return gameId
+    }
+
     func joinGame(gameCode: String) async throws -> JoinGameResult {
         let callable = functions.httpsCallable("joinGame")
         let result = try await callable.call(["gameCode": gameCode])
@@ -149,5 +178,15 @@ struct CloudFunctions: CloudFunctionsProtocol {
         if let startingLife { data["startingLife"] = startingLife }
         if let gameMode { data["gameMode"] = gameMode }
         _ = try await callable.call(data)
+    }
+
+    func acceptFriendRequest(requestId: String) async throws {
+        let callable = functions.httpsCallable("acceptFriendRequest")
+        _ = try await callable.call(["requestId": requestId])
+    }
+
+    func removeFriend(friendId: String) async throws {
+        let callable = functions.httpsCallable("removeFriend")
+        _ = try await callable.call(["friendId": friendId])
     }
 }

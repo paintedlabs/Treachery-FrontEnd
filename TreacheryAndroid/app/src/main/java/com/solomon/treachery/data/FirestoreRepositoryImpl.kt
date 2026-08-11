@@ -21,8 +21,17 @@ class FirestoreRepositoryImpl @Inject constructor(
     override suspend fun createUser(user: TreacheryUser) {
         firestore.collection("users")
             .document(user.id)
-            .set(user.toMap())
+            .set(user.toPublicMap())
             .await()
+        val privateData = user.toPrivateMap()
+        if (privateData.isNotEmpty()) {
+            firestore.collection("users")
+                .document(user.id)
+                .collection("private")
+                .document("data")
+                .set(privateData)
+                .await()
+        }
     }
 
     override suspend fun getUser(id: String): TreacheryUser? {
@@ -34,7 +43,7 @@ class FirestoreRepositoryImpl @Inject constructor(
     override suspend fun updateUser(user: TreacheryUser) {
         firestore.collection("users")
             .document(user.id)
-            .set(user.toMap())
+            .set(user.toPublicMap())
             .await()
     }
 
@@ -78,19 +87,19 @@ class FirestoreRepositoryImpl @Inject constructor(
     }
 
     override suspend fun addFriend(userId: String, friendId: String) {
-        val usersRef = firestore.collection("users")
-        firestore.runBatch { batch ->
-            batch.update(usersRef.document(userId), "friend_ids", FieldValue.arrayUnion(friendId))
-            batch.update(usersRef.document(friendId), "friend_ids", FieldValue.arrayUnion(userId))
-        }.await()
+        // Mutual friendship is established via acceptFriendRequest callable.
+        firestore.collection("users")
+            .document(userId)
+            .update("friend_ids", FieldValue.arrayUnion(friendId))
+            .await()
     }
 
     override suspend fun removeFriend(userId: String, friendId: String) {
-        val usersRef = firestore.collection("users")
-        firestore.runBatch { batch ->
-            batch.update(usersRef.document(userId), "friend_ids", FieldValue.arrayRemove(friendId))
-            batch.update(usersRef.document(friendId), "friend_ids", FieldValue.arrayRemove(userId))
-        }.await()
+        // Preferred path is CloudFunctions.removeFriend (mutual).
+        firestore.collection("users")
+            .document(userId)
+            .update("friend_ids", FieldValue.arrayRemove(friendId))
+            .await()
     }
 
     override suspend fun getFriends(forUserId: String): List<TreacheryUser> {

@@ -198,7 +198,6 @@ describe('resolveMetamorph — stealing an eliminated identity', () => {
   // the game" guard, and the win-condition role tally).
   it(
     'leaves exactly one copy of every identity card in play',
-    { skip: 'currently broken — see finding #D' },
     async () => {
       const game = await gameWithTraitor('traitor_07');
       await game.traitor.call('unveilPlayer', { gameId: game.gameId });
@@ -226,7 +225,6 @@ describe('resolveMetamorph — stealing an eliminated identity', () => {
   // gate the function has and steals a card from beyond the grave.
   it(
     'cannot be used by an eliminated Metamorph',
-    { skip: 'currently broken — see finding #D' },
     async () => {
       const game = await gameWithTraitor('traitor_07');
       await game.traitor.call('unveilPlayer', { gameId: game.gameId });
@@ -391,7 +389,6 @@ describe('resolvePuppetMaster — redistribution', () => {
   // Puppet Master can conjure the other ~58 identities out of the box.
   it(
     'rejects assigning a card that is not currently in play',
-    { skip: 'currently broken — see finding #C' },
     async () => {
       const game = await unveiledPuppetMaster();
 
@@ -414,7 +411,6 @@ describe('resolvePuppetMaster — redistribution', () => {
   // and the game ends up with two Leaders.
   it(
     'rejects creating a second Leader',
-    { skip: 'currently broken — see finding #C' },
     async () => {
       const game = await unveiledPuppetMaster();
 
@@ -441,7 +437,6 @@ describe('resolvePuppetMaster — redistribution', () => {
   // on the next elimination check.
   it(
     'rejects turning the Leader into a non-Leader',
-    { skip: 'currently broken — see finding #C' },
     async () => {
       const game = await unveiledPuppetMaster();
 
@@ -464,7 +459,6 @@ describe('resolvePuppetMaster — redistribution', () => {
   // is_unveiled = true, so the only gate the function has is already satisfied.
   it(
     'cannot be used by an eliminated Puppet Master',
-    { skip: 'currently broken — see finding #C' },
     async () => {
       const game = await unveiledPuppetMaster();
       await eliminate(game, 'p3');
@@ -488,7 +482,6 @@ describe('resolvePuppetMaster — redistribution', () => {
   // it has been used, so it can be replayed for the rest of the game.
   it(
     'can only be resolved once',
-    { skip: 'currently broken — see finding #C' },
     async () => {
       const game = await unveiledPuppetMaster();
 
@@ -622,7 +615,6 @@ describe('resolveWearerOfMasks', () => {
   // into the strongest table-warping ability in the game.
   it(
     'copying traitor_09 must not grant Puppet Master powers',
-    { skip: 'currently broken — see finding #E' },
     async () => {
       const game = await unveiledWearer();
 

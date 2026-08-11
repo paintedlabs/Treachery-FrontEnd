@@ -85,9 +85,43 @@ class MockCloudFunctionsRepository : CloudFunctionsRepository {
         return joinGameResult
     }
 
+    val createGameCalls = mutableListOf<Map<String, Any?>>()
+    var createGameResult: String = "mock-created-game-id"
+    override suspend fun createGame(
+        gameMode: String,
+        maxPlayers: Int,
+        startingLife: Int,
+        maxTraitorRarity: String?,
+        useOwnDeck: Boolean,
+        displayName: String?
+    ): String {
+        throwIfNeeded()
+        createGameCalls.add(
+            mapOf(
+                "gameMode" to gameMode,
+                "maxPlayers" to maxPlayers,
+                "startingLife" to startingLife,
+                "useOwnDeck" to useOwnDeck
+            )
+        )
+        return createGameResult
+    }
+
     val updateGameSettingsCalls = mutableListOf<Map<String, Any?>>()
     override suspend fun updateGameSettings(gameId: String, maxPlayers: Int?, startingLife: Int?, gameMode: String?) {
         throwIfNeeded()
         updateGameSettingsCalls.add(mapOf("gameId" to gameId, "maxPlayers" to maxPlayers, "startingLife" to startingLife, "gameMode" to gameMode))
+    }
+
+    val acceptFriendRequestCalls = mutableListOf<String>()
+    override suspend fun acceptFriendRequest(requestId: String) {
+        throwIfNeeded()
+        acceptFriendRequestCalls.add(requestId)
+    }
+
+    val removeFriendCalls = mutableListOf<String>()
+    override suspend fun removeFriend(friendId: String) {
+        throwIfNeeded()
+        removeFriendCalls.add(friendId)
     }
 }

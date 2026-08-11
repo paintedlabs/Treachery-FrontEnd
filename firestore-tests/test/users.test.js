@@ -1,6 +1,6 @@
 /**
- * Rules under test: match /users/{userId}  (firestore.rules ~lines 9-20)
- * plus the onlyFriendIdsChanged() / onlyFcmTokenChanged() helpers.
+ * Rules under test: match /users/{userId}  (firestore.rules)
+ * plus the onlyFriendIdsChanged() helpers and private/ subcollection.
  */
 
 "use strict";
@@ -11,6 +11,7 @@ const {
   authedDb,
   anonDb,
   userDoc,
+  privateUserDoc,
   assertSucceeds,
   assertFails,
 } = require("./helpers");
@@ -26,6 +27,7 @@ describe("users/{userId}", () => {
     await seed(async (db) => {
       await setDoc(doc(db, "users", ALICE), userDoc(ALICE));
       await setDoc(doc(db, "users", BOB), userDoc(BOB, { friend_ids: [CAROL] }));
+      await setDoc(doc(db, "users", BOB, "private", "data"), privateUserDoc(BOB));
       await setDoc(doc(db, "users", MALLORY), userDoc(MALLORY));
     });
   });
@@ -42,15 +44,18 @@ describe("users/{userId}", () => {
       await assertFails(getDoc(doc(db, "users", ALICE)));
     });
 
-    // SKIP: currently vulnerable — see finding #1. Un-skip when firestore.rules is fixed.
-    it.skip("denies a signed-in user access to another user's PII (email / phone_number / fcm_token)", async () => {
+    it("denies a signed-in user access to another user's PII (email / phone_number / fcm_token)", async () => {
+      // Public profile remains readable (friends / search)
       const mallory = await authedDb(MALLORY);
-      await assertFails(getDoc(doc(mallory, "users", BOB)));
+      await assertSucceeds(getDoc(doc(mallory, "users", BOB)));
+
+      // Owner-only private bag is where PII lives
+      await assertFails(getDoc(doc(mallory, "users", BOB, "private", "data")));
 
       // The same hole is open to an anonymous guest account, which needs no
       // real identity at all.
       const guest = await authedDb("anon_guest_9f2c");
-      await assertFails(getDoc(doc(guest, "users", BOB)));
+      await assertFails(getDoc(doc(guest, "users", BOB, "private", "data")));
     });
   });
 
@@ -59,6 +64,21 @@ describe("users/{userId}", () => {
     it("lets a user create their own profile document", async () => {
       const db = await authedDb(DAVE);
       await assertSucceeds(setDoc(doc(db, "users", DAVE), userDoc(DAVE)));
+    });
+
+    it("lets a user write their own private PII bag", async () => {
+      const db = await authedDb(DAVE);
+      await assertSucceeds(setDoc(doc(db, "users", DAVE), userDoc(DAVE)));
+      await assertSucceeds(
+        setDoc(doc(db, "users", DAVE, "private", "data"), privateUserDoc(DAVE))
+      );
+    });
+
+    it("stops a user from creating a public profile that embeds PII", async () => {
+      const db = await authedDb(DAVE);
+      await assertFails(
+        setDoc(doc(db, "users", DAVE), userDoc(DAVE, { email: "dave@example.com" }))
+      );
     });
 
     it("stops a user from creating a profile under someone else's uid", async () => {
@@ -81,10 +101,13 @@ describe("users/{userId}", () => {
       );
     });
 
-    it("lets a user rotate their own fcm_token", async () => {
-      const db = await authedDb(ALICE);
+    it("lets a user rotate their own fcm_token on the private doc", async () => {
+      const db = await authedDb(BOB);
       await assertSucceeds(
-        updateDoc(doc(db, "users", ALICE), { fcm_token: "fcm-token-rotated" })
+        setDoc(
+          doc(db, "users", BOB, "private", "data"),
+          privateUserDoc(BOB, { fcm_token: "fcm-token-rotated" })
+        )
       );
     });
 
@@ -107,11 +130,14 @@ describe("users/{userId}", () => {
       await assertFails(
         updateDoc(doc(db, "users", BOB), { fcm_token: "attacker-device" })
       );
+      await assertFails(
+        setDoc(doc(db, "users", BOB, "private", "data"), {
+          fcm_token: "attacker-device",
+        })
+      );
     });
 
     it("stops a user from rewriting another user's friend_ids to a list that excludes them", async () => {
-      // The one guard onlyFriendIdsChanged() does apply: the caller must end up
-      // inside the new array. This locks that guard in place.
       const db = await authedDb(MALLORY);
       await assertFails(
         updateDoc(doc(db, "users", BOB), { friend_ids: ["user_someone_else"] })
@@ -133,12 +159,7 @@ describe("users/{userId}", () => {
       await assertFails(updateDoc(doc(db, "users", ALICE), { display_name: "x" }));
     });
 
-    // SKIP: residual gap after the friend_ids hardening — the wipe is now
-    // blocked, but a one-sided friendship can still be forced. Rules cannot
-    // verify an accepted friend_request (random doc ids, so no deterministic
-    // get() path), so closing this means moving accept/remove into a callable
-    // and denying cross-user writes entirely. Un-skip then.
-    it.skip("stops a user from forcing themselves into another user's friend_ids", async () => {
+    it("stops a user from forcing themselves into another user's friend_ids", async () => {
       const mallory = await authedDb(MALLORY);
       await assertFails(
         updateDoc(doc(mallory, "users", BOB), { friend_ids: [CAROL, MALLORY] })

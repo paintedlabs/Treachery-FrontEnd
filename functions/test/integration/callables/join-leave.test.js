@@ -185,7 +185,6 @@ describe('leaveGame', () => {
   // host promotion) non-deterministic.
   it(
     'keeps order_id unique after a middle player leaves and a new one joins',
-    { skip: 'currently broken — see finding #G' },
     async () => {
       const users = await h.getUsers(4);
       const game = await h.seedGame({ users: users.slice(0, 3), maxPlayers: 8 });

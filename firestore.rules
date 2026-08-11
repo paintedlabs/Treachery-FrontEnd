@@ -5,18 +5,38 @@ service cloud.firestore {
 
     // ============================================================
     // USERS
+    // Public profile fields only (display_name, friend_ids, elo, …).
+    // PII (email, phone_number, fcm_token) lives under private/data
+    // and is readable/writable only by the owner.
     // ============================================================
     match /users/{userId} {
+      // Public profiles are readable by any signed-in user (friends search).
+      // Sensitive fields must not be written here — see private/ below.
       allow read: if request.auth != null;
 
-      allow create: if request.auth != null && request.auth.uid == userId;
+      allow create: if request.auth != null
+        && request.auth.uid == userId
+        && !hasPiiFields(request.resource.data);
 
       allow update: if request.auth != null
-        && (request.auth.uid == userId
-            || onlyFriendIdsChanged(userId)
-            || onlyFcmTokenChanged(userId));
+        && request.auth.uid == userId
+        // Reject writes that touch PII keys with non-null values (legacy docs
+        // may still *contain* PII fields until scrubbed — those must not block
+        // unrelated profile updates).
+        && doesNotWritePii()
+        && (
+          onlyOwnNonFriendFields()
+          || onlyFriendIdsChanged()
+          || onlyRemovingLegacyPii()
+        );
 
       allow delete: if false;
+
+      // Owner-only private bag: email, phone_number, fcm_token
+      match /private/{docId} {
+        allow read, write: if request.auth != null
+          && request.auth.uid == userId;
+      }
     }
 
     // ============================================================
@@ -39,6 +59,8 @@ service cloud.firestore {
 
     // ============================================================
     // GAMES
+    // Preferred create path is the createGame callable (Admin).
+    // Client create is still allowed for older clients while waiting.
     // ============================================================
     match /games/{gameId} {
       allow read: if request.auth != null;
@@ -77,10 +99,14 @@ service cloud.firestore {
         allow read: if request.auth != null
           && request.auth.uid in get(/databases/$(database)/documents/games/$(gameId)).data.player_ids;
 
-        // Players can add themselves to a game
-        // Note: Swift Codable skips nil fields, so we check for absence OR null
+        // Seat yourself only while the lobby is open AND you are already
+        // listed on player_ids (host create or a prior joinGame / array append).
+        // Note: Swift Codable skips nil fields, so we check for absence OR null.
+        // Preferred create path is createGame / joinGame callables (Admin).
         allow create: if request.auth != null
           && request.resource.data.user_id == request.auth.uid
+          && get(/databases/$(database)/documents/games/$(gameId)).data.state == 'waiting'
+          && request.auth.uid in get(/databases/$(database)/documents/games/$(gameId)).data.player_ids
           && (!('role' in request.resource.data) || request.resource.data.role == null)
           && (!('identity_card_id' in request.resource.data) || request.resource.data.identity_card_id == null);
 
@@ -120,12 +146,6 @@ service cloud.firestore {
     // True only for a write that appends the CALLER to an open lobby's
     // player_ids, leaving every existing member in place.
     //
-    // The previous version checked only which keys changed plus "the caller
-    // ends up in the new array", which permitted any array whatsoever. That
-    // let a non-participant add themselves to an in_progress game and then
-    // read every player's secret role (player docs are gated on membership),
-    // overwrite player_ids to evict the whole table, or walk past max_players.
-    //
     // Joins normally go through the joinGame callable, which enforces all of
     // this in a transaction. This path is kept — rather than denied outright —
     // because older iOS/Android builds in the wild may still write directly,
@@ -148,40 +168,38 @@ service cloud.firestore {
         && after.size() <= cap;
     }
 
-    // Friendship is mutual, so accepting a request writes friend_ids on BOTH
-    // user docs — which means a user must be able to touch someone else's doc.
-    // The previous version allowed that whenever the caller ended up in the new
-    // array, without requiring the existing entries survive, so anyone could
-    // overwrite a victim's friend_ids with [attacker] and wipe their friends.
-    //
-    // Cross-user writes are now append-only and limited to the caller.
-    //
-    // Residual gap: this still permits forcing a one-sided friendship without
-    // an accepted request. Rules cannot check for one — friend_requests use
-    // random document ids, so there is no deterministic get() path. Closing
-    // that requires moving accept/remove into a callable, which would also fix
-    // removeFriend (its arrayRemove on the friend's doc cannot satisfy any
-    // version of this rule, since the caller is absent from the result).
-    function onlyFriendIdsChanged(userId) {
-      let before = resource.data.friend_ids;
-      let after = request.resource.data.friend_ids;
+    // Owners may edit their own friend_ids freely. Cross-user friend_ids
+    // writes are denied — accept/remove go through Cloud Functions.
+    function onlyFriendIdsChanged() {
       return request.resource.data.diff(resource.data).affectedKeys()
-               .hasOnly(['friend_ids'])
-        && (
-          // Owners edit their own list freely.
-          request.auth.uid == userId
-          // Anyone else may only append themselves, preserving what is there.
-          || (after.hasAll(before)
-              && after.size() == before.size() + 1
-              && !(request.auth.uid in before)
-              && request.auth.uid in after)
-        );
+               .hasOnly(['friend_ids']);
     }
 
-    function onlyFcmTokenChanged(userId) {
-      let affectedKeys = request.resource.data.diff(resource.data).affectedKeys();
-      return affectedKeys.hasOnly(['fcm_token'])
-        && request.auth.uid == userId;
+    function onlyOwnNonFriendFields() {
+      return !request.resource.data.diff(resource.data).affectedKeys()
+               .hasAny(['friend_ids']);
+    }
+
+    // Allow scrubbing legacy email/phone/fcm fields off the public doc.
+    function onlyRemovingLegacyPii() {
+      let keys = request.resource.data.diff(resource.data).affectedKeys();
+      return keys.hasOnly(['email', 'phone_number', 'fcm_token'])
+        && (!('email' in request.resource.data) || request.resource.data.email == null)
+        && (!('phone_number' in request.resource.data) || request.resource.data.phone_number == null)
+        && (!('fcm_token' in request.resource.data) || request.resource.data.fcm_token == null);
+    }
+
+    function hasPiiFields(data) {
+      return ('email' in data && data.email != null)
+        || ('phone_number' in data && data.phone_number != null)
+        || ('fcm_token' in data && data.fcm_token != null);
+    }
+
+    // True when this write does not set any public PII field to a non-null value.
+    function doesNotWritePii() {
+      let affected = request.resource.data.diff(resource.data).affectedKeys();
+      return (!affected.hasAny(['email', 'phone_number', 'fcm_token']))
+        || onlyRemovingLegacyPii();
     }
 
     // Returns true when only is_unveiled is changed (and only to true)

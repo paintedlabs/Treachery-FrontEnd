@@ -1,6 +1,14 @@
 import Foundation
 
 protocol CloudFunctionsProtocol {
+    func createGame(
+        gameMode: String,
+        maxPlayers: Int,
+        startingLife: Int,
+        maxTraitorRarity: String?,
+        useOwnDeck: Bool,
+        displayName: String?
+    ) async throws -> String
     func joinGame(gameCode: String) async throws -> JoinGameResult
     func startGame(gameId: String) async throws
     func adjustLife(gameId: String, playerId: String, amount: Int) async throws
@@ -16,4 +24,6 @@ protocol CloudFunctionsProtocol {
     func selectPlane(gameId: String, planeId: String) async throws
     func endGame(gameId: String, winnerUserIds: [String]?) async throws
     func updateGameSettings(gameId: String, maxPlayers: Int?, startingLife: Int?, gameMode: String?) async throws
+    func acceptFriendRequest(requestId: String) async throws
+    func removeFriend(friendId: String) async throws
 }

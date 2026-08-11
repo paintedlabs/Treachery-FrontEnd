@@ -25,6 +25,24 @@ data class TreacheryUser(
         "deck_stats" to deckStats?.mapValues { it.value.toMap() }
     )
 
+    /** Public profile fields only — PII is written under private/data. */
+    fun toPublicMap(): Map<String, Any?> = mapOf(
+        "id" to id,
+        "display_name" to displayName,
+        "friend_ids" to friendIds,
+        "created_at" to createdAt,
+        "elo" to elo,
+        "deck_stats" to deckStats?.mapValues { it.value.toMap() }
+    )
+
+    fun toPrivateMap(): Map<String, Any?> {
+        val data = mutableMapOf<String, Any?>()
+        email?.let { data["email"] = it }
+        phoneNumber?.let { data["phone_number"] = it }
+        fcmToken?.let { data["fcm_token"] = it }
+        return data
+    }
+
     companion object {
         fun fromMap(id: String, data: Map<String, Any?>): TreacheryUser = TreacheryUser(
             id = id,
