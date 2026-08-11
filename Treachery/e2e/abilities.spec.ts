@@ -32,8 +32,8 @@ test.describe('Traitor abilities', () => {
     const [assassinA, assassinB] = playersWithRole(players, 'assassin');
 
     // Eliminate one assassin first so the Metamorph has someone to steal from.
+    // Forfeit keeps the player on the board mid-game (no /game-over spoils).
     await forfeit(assassinA.page);
-    await expect(assassinA.page).toHaveURL(/\/game-over\//, { timeout: 15_000 });
 
     // Wait for the elimination to propagate to the traitor's Firestore view
     // before unveiling — otherwise the modal opens with an empty target list.
@@ -41,7 +41,7 @@ test.describe('Traitor abilities', () => {
       const docs = await fetchPlayerDocs(traitor.page, gameId);
       const a = docs.find((d) => d.user_id === assassinA.userId);
       expect(a?.is_eliminated).toBe(true);
-    }).toPass({ timeout: 10_000 });
+    }).toPass({ timeout: 15_000 });
 
     // Traitor unveils — AbilityResolver modal auto-opens.
     await unveilSelf(traitor.page);

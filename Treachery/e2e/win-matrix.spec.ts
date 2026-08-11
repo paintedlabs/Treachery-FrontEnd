@@ -5,6 +5,7 @@ import {
   playersWithRole,
   forfeit,
   expectWinner,
+  fetchPlayerDocs,
   ROLE_DISTRIBUTION,
   PlayerHandle,
   Role,
@@ -38,12 +39,23 @@ function buildLayout(count: number): Role[] {
   return layout;
 }
 
-async function forfeitInOrder(targets: PlayerHandle[]) {
+/**
+ * Forfeit each target in order. Mid-game forfeits stay on the board (no
+ * spoiler trip to /game-over); we wait for the server elimination instead so
+ * the next forfeit is sequenced correctly.
+ */
+async function forfeitInOrder(
+  targets: PlayerHandle[],
+  reader: PlayerHandle,
+  gameId: string,
+) {
   for (const player of targets) {
     await forfeit(player.page);
-    // Page navigates to /game-over/ after forfeit; wait for it before the next
-    // forfeit to keep ordering deterministic.
-    await expect(player.page).toHaveURL(/\/game-over\//, { timeout: 15_000 });
+    await expect(async () => {
+      const docs = await fetchPlayerDocs(reader.page, gameId);
+      const doc = docs.find((d) => d.user_id === player.userId);
+      expect(doc?.is_eliminated).toBe(true);
+    }).toPass({ timeout: 15_000 });
   }
 }
 
@@ -53,11 +65,12 @@ for (const count of PLAYER_COUNTS) {
     // share nothing. Playwright runs them sequentially (workers: 1).
 
     test('leader wins after eliminating all assassins and traitors', async ({ browser }) => {
-      const { players } = await setupSeededGame(browser, buildLayout(count));
+      const { players, gameId } = await setupSeededGame(browser, buildLayout(count));
+      const leader = playerWithRole(players, 'leader');
       const assassins = playersWithRole(players, 'assassin');
       const traitors = playersWithRole(players, 'traitor');
       // Leader (and any guardians) survive.
-      await forfeitInOrder([...assassins, ...traitors]);
+      await forfeitInOrder([...assassins, ...traitors], leader, gameId);
       await expectWinner(
         players.map((p) => p.page),
         'Leader',
@@ -65,10 +78,11 @@ for (const count of PLAYER_COUNTS) {
     });
 
     test('assassins win when the leader is eliminated', async ({ browser }) => {
-      const { players } = await setupSeededGame(browser, buildLayout(count));
+      const { players, gameId } = await setupSeededGame(browser, buildLayout(count));
       const leader = playerWithRole(players, 'leader');
       // ≥1 assassin alive at this point, so the assassin team wins immediately.
-      await forfeitInOrder([leader]);
+      // Reader can be the forfeiter; settle still reads Firestore offline after nav.
+      await forfeitInOrder([leader], leader, gameId);
       await expectWinner(
         players.map((p) => p.page),
         'Assassin',
@@ -76,7 +90,7 @@ for (const count of PLAYER_COUNTS) {
     });
 
     test('traitor wins as the last player standing', async ({ browser }) => {
-      const { players } = await setupSeededGame(browser, buildLayout(count));
+      const { players, gameId } = await setupSeededGame(browser, buildLayout(count));
       const assassins = playersWithRole(players, 'assassin');
       const guardians = playersWithRole(players, 'guardian');
       const leader = playerWithRole(players, 'leader');
@@ -91,7 +105,8 @@ for (const count of PLAYER_COUNTS) {
         leader,
         ...traitors.slice(0, -1),
       ];
-      await forfeitInOrder(order);
+      // Survivor traitor stays mounted until the final win; use them as reader.
+      await forfeitInOrder(order, traitors[traitors.length - 1], gameId);
       await expectWinner(
         players.map((p) => p.page),
         'Traitor',
