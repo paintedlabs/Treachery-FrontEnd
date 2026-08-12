@@ -73,6 +73,7 @@ functions/node_modules/
 # IDE
 .vscode/
 .idea/
+.claude/worktrees/
 *.swp
 *~
 
