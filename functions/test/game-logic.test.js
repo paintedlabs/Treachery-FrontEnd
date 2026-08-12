@@ -70,9 +70,19 @@ function shuffle(array) {
   return arr;
 }
 
+// Mirrors functions/index.js — allowlist, not denylist, so an unrecognised
+// mode string fails closed instead of auto-finishing the table.
+const TREACHERY_MODES = new Set(["treachery", "treachery_planechase"]);
+
+function isTreacheryMode(gameMode) {
+  // Legacy games predate game_mode and are all treachery.
+  return gameMode === undefined || gameMode === null ||
+    TREACHERY_MODES.has(gameMode);
+}
+
 function checkWinConditions(players, gameMode) {
   // Only Treachery-mode games have automatic team wins.
-  if (gameMode === "none" || gameMode === "planechase") {
+  if (!isTreacheryMode(gameMode)) {
     return null;
   }
 
@@ -355,6 +365,66 @@ suite("Win Conditions — Basic", () => {
       { role: "traitor" },
     ]);
     assert.strictEqual(checkWinConditions(players), null);
+  });
+});
+
+suite("Win Conditions — Game Mode Gate", () => {
+  // A Planechase / Life Tracker table: nobody is dealt a role. Before the
+  // gate, the all-null roster fell through to the
+  // `!leaderAlive && !assassinAlive && !traitorAlive` branch and returned
+  // "assassin", ending the game for everyone the moment one player hit 0.
+  const rolelessTable = () =>
+    makePlayers([
+      { role: null },
+      { role: null, eliminated: true },
+      { role: null },
+      { role: null },
+    ]);
+
+  for (const mode of ["none", "planechase"]) {
+    test(`${mode}: an eliminated player never finishes the game`, () => {
+      assert.strictEqual(checkWinConditions(rolelessTable(), mode), null);
+    });
+
+    test(`${mode}: a wiped-out table still never finishes the game`, () => {
+      const players = makePlayers([
+        { role: null, eliminated: true },
+        { role: null, eliminated: true },
+      ]);
+      assert.strictEqual(checkWinConditions(players, mode), null);
+    });
+  }
+
+  // Fail closed: an unrecognised mode must not auto-finish either. A denylist
+  // (`mode === "none" || mode === "planechase"`) would wrongly return
+  // "assassin" here.
+  test("an unrecognised mode does not finish the game", () => {
+    assert.strictEqual(checkWinConditions(rolelessTable(), "life_tracker"), null);
+  });
+
+  for (const mode of ["treachery", "treachery_planechase"]) {
+    test(`${mode}: win conditions are still evaluated`, () => {
+      const players = makePlayers([
+        { role: "leader", eliminated: true },
+        { role: "guardian" },
+        { role: "assassin" },
+        { role: "traitor", eliminated: true },
+      ]);
+      assert.strictEqual(checkWinConditions(players, mode), "assassin");
+    });
+  }
+
+  // Games created before game_mode existed are all treachery, so an absent
+  // mode must keep evaluating win conditions.
+  test("a legacy game with no game_mode still evaluates win conditions", () => {
+    const players = makePlayers([
+      { role: "leader" },
+      { role: "guardian" },
+      { role: "assassin", eliminated: true },
+      { role: "traitor", eliminated: true },
+    ]);
+    assert.strictEqual(checkWinConditions(players, undefined), "leader");
+    assert.strictEqual(checkWinConditions(players, null), "leader");
   });
 });
 

@@ -80,7 +80,7 @@ fun GameOverScreen(
                 verticalArrangement = Arrangement.Center
             ) {
                 Icon(Icons.Default.Schedule, contentDescription = null, tint = MtgGold, modifier = Modifier.size(56.dp))
-                Spacer(Modifier = Modifier.height(16.dp))
+                Spacer(Modifier.height(16.dp))
                 Text(
                     "Game Still In Progress",
                     color = MtgTextPrimary,
@@ -89,13 +89,13 @@ fun GameOverScreen(
                     fontFamily = FontFamily.Serif,
                     textAlign = TextAlign.Center
                 )
-                Spacer(Modifier = Modifier.height(8.dp))
+                Spacer(Modifier.height(8.dp))
                 Text(
                     "Results are available only after the game finishes.",
                     color = MtgTextSecondary,
                     textAlign = TextAlign.Center
                 )
-                Spacer(Modifier = Modifier.height(24.dp))
+                Spacer(Modifier.height(24.dp))
                 Button(onClick = onNavigateHome) {
                     Text("Return Home")
                 }
