@@ -96,8 +96,10 @@ fun GameOverScreen(
                     textAlign = TextAlign.Center
                 )
                 Spacer(Modifier.height(24.dp))
+                // The game-over route pops the board off the back stack, so home is the only
+                // destination reachable from here (web and iOS return to the board instead).
                 Button(onClick = onNavigateHome) {
-                    Text("Return Home")
+                    Text("Return to Home")
                 }
             }
         } else {

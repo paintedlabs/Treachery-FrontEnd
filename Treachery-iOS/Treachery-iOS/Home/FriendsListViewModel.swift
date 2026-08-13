@@ -23,11 +23,16 @@ final class FriendsListViewModel: ObservableObject {
 
     private var userId: String?
     private let firestoreManager: FirestoreManaging
+    private let cloudFunctions: CloudFunctionsProtocol
 
     // MARK: - Init
 
-    init(firestoreManager: FirestoreManaging = FirestoreManager()) {
+    init(
+        firestoreManager: FirestoreManaging = FirestoreManager(),
+        cloudFunctions: CloudFunctionsProtocol = CloudFunctions()
+    ) {
         self.firestoreManager = firestoreManager
+        self.cloudFunctions = cloudFunctions
     }
 
     // MARK: - Data Loading
@@ -95,7 +100,7 @@ final class FriendsListViewModel: ObservableObject {
         errorMessage = nil
 
         do {
-            try await CloudFunctions().acceptFriendRequest(requestId: request.id)
+            try await cloudFunctions.acceptFriendRequest(requestId: request.id)
             AnalyticsService.trackEvent("accept_friend_request")
 
             await loadData(userId: userId)

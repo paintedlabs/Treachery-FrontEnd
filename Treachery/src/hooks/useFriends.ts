@@ -18,6 +18,7 @@ interface UseFriendsReturn {
   sendRequest: (toUser: TreacheryUser) => Promise<void>;
   acceptRequest: (request: FriendRequest) => Promise<void>;
   declineRequest: (request: FriendRequest) => Promise<void>;
+  removeFriend: (friend: TreacheryUser) => Promise<void>;
   isFriend: (user: TreacheryUser) => boolean;
   refresh: () => Promise<void>;
 }
@@ -121,6 +122,24 @@ export function useFriends(userId: string | null): UseFriendsReturn {
     }
   }, []);
 
+  // No UI entry point yet — exposed alongside acceptRequest so whatever adds a
+  // "Remove friend" control gets the mutual (server-side) removal for free.
+  const removeFriend = useCallback(
+    async (friend: TreacheryUser) => {
+      if (!userId) return;
+      setErrorMessage(null);
+
+      try {
+        await firestoreService.removeFriend(friend.id);
+        trackEvent('remove_friend');
+        await loadData();
+      } catch (error: unknown) {
+        setErrorMessage(error instanceof Error ? error.message : 'Failed to remove friend.');
+      }
+    },
+    [userId, loadData],
+  );
+
   const isFriend = useCallback(
     (user: TreacheryUser) => friends.some((f) => f.id === user.id),
     [friends],
@@ -138,6 +157,7 @@ export function useFriends(userId: string | null): UseFriendsReturn {
     sendRequest,
     acceptRequest,
     declineRequest,
+    removeFriend,
     isFriend,
     refresh: loadData,
   };

@@ -28,8 +28,9 @@ final class FirestoreManager: FirestoreManaging {
 
     // MARK: - Users
 
-    func createUser(_ user: TreacheryUser) async throws {
-        // Public profile only — PII lives under users/{uid}/private/data
+    /// Allowlist of public profile fields — PII (email/phone_number/fcm_token)
+    /// lives under users/{uid}/private/data and must never reach the public doc.
+    private func publicUserData(_ user: TreacheryUser) -> [String: Any] {
         var publicData: [String: Any] = [
             "display_name": user.displayName,
             "friend_ids": user.friendIds,
@@ -41,7 +42,11 @@ final class FirestoreManager: FirestoreManaging {
                 ["elo": stat.elo, "wins": stat.wins, "losses": stat.losses, "games": stat.games]
             }
         }
-        try await usersCollection.document(user.id).setData(publicData)
+        return publicData
+    }
+
+    func createUser(_ user: TreacheryUser) async throws {
+        try await usersCollection.document(user.id).setData(publicUserData(user))
 
         var privateData: [String: Any] = [:]
         if let email = user.email { privateData["email"] = email }
@@ -63,7 +68,17 @@ final class FirestoreManager: FirestoreManaging {
     }
 
     func updateUser(_ user: TreacheryUser) async throws {
-        try usersCollection.document(user.id).setData(from: user, merge: true)
+        // Explicit field list rather than encoding the whole model: on a legacy
+        // doc that still holds PII, re-encoding echoes those values straight back
+        // onto the public doc. Rules allow it (an unchanged value is not in
+        // diff().affectedKeys(), so doesNotWritePii() passes) — which is exactly
+        // why the allowlist has to do the withholding.
+        //
+        // Deliberately not awaited: the completion handler for a write does not
+        // fire while the client is offline, so awaiting it would wedge the
+        // Profile and onboarding rename screens on their spinner until the
+        // network came back. The local write applies immediately regardless.
+        usersCollection.document(user.id).setData(publicUserData(user), merge: true, completion: nil)
     }
 
     func searchUsers(byDisplayName name: String) async throws -> [TreacheryUser] {

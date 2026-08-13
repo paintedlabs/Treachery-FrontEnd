@@ -12,11 +12,11 @@ import {
   limit,
   onSnapshot,
   arrayUnion,
-  arrayRemove,
   documentId,
   Unsubscribe,
 } from 'firebase/firestore';
-import { db } from '@/config/firebase';
+import { httpsCallable } from 'firebase/functions';
+import { db, functions } from '@/config/firebase';
 import { TreacheryUser, Game, Player, FriendRequest } from '@/models/types';
 
 // ── Collection references ──
@@ -109,11 +109,13 @@ export async function addFriend(userId: string, friendId: string): Promise<void>
   });
 }
 
-export async function removeFriend(userId: string, friendId: string): Promise<void> {
-  // Preferred path is removeFriend callable (mutual). Local edge only as fallback.
-  await updateDoc(doc(usersCol(), userId), {
-    friend_ids: arrayRemove(friendId),
-  });
+export async function removeFriend(friendId: string): Promise<void> {
+  // Must go through the callable: rules deny writing another user's doc, so a
+  // client-side remove would leave the friendship intact on their side. The
+  // caller's uid comes from the auth context server-side.
+  // No UI entry point calls this yet — wired now so the first one is mutual.
+  const removeFn = httpsCallable(functions, 'removeFriend');
+  await removeFn({ friendId });
 }
 
 export async function getFriends(userId: string): Promise<TreacheryUser[]> {

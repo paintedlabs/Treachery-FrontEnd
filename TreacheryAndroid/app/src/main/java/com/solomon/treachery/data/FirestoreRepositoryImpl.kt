@@ -87,7 +87,9 @@ class FirestoreRepositoryImpl @Inject constructor(
     }
 
     override suspend fun addFriend(userId: String, friendId: String) {
-        // Mutual friendship is established via acceptFriendRequest callable.
+        // Writes only the caller's own doc — rules forbid editing another user's friend_ids,
+        // so on its own this leaves a one-sided edge. Mutual adds go through the
+        // acceptFriendRequest callable; nothing in the app calls this directly.
         firestore.collection("users")
             .document(userId)
             .update("friend_ids", FieldValue.arrayUnion(friendId))
@@ -95,7 +97,8 @@ class FirestoreRepositoryImpl @Inject constructor(
     }
 
     override suspend fun removeFriend(userId: String, friendId: String) {
-        // Preferred path is CloudFunctions.removeFriend (mutual).
+        // Same one-sided caveat as addFriend: a mutual unfriend must go through
+        // CloudFunctionsRepository.removeFriend. No caller in the app today.
         firestore.collection("users")
             .document(userId)
             .update("friend_ids", FieldValue.arrayRemove(friendId))

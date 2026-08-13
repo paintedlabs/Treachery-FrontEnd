@@ -13,6 +13,7 @@ data class TreacheryUser(
     val elo: Int = 1500,
     val deckStats: Map<String, DeckStat>? = null
 ) {
+    /** Round-trips every field including PII — used by the model tests, never written to Firestore. */
     fun toMap(): Map<String, Any?> = mapOf(
         "id" to id,
         "display_name" to displayName,

@@ -453,11 +453,17 @@ final class GameBoardViewModel: ObservableObject {
         pendingAbilityResolution = nil
     }
 
+    /// Callable-backed traitors the server refuses to hand out as a copy —
+    /// mirrors BLOCKED_COPY_IDS in resolveWearerOfMasks (functions/index.js).
+    private static let blockedCopyCardIds = Set(ExecutableAbility.allCases.map(\.rawValue))
+
     /// Returns non-Leader cards not currently assigned to any player in this game.
     func cardsOutsideGame() -> [IdentityCard] {
         let usedIds = Set(players.compactMap(\.identityCardId))
         return cardDatabase.allCards.filter { card in
-            card.role != .leader && !usedIds.contains(card.id)
+            card.role != .leader
+                && !usedIds.contains(card.id)
+                && !Self.blockedCopyCardIds.contains(card.id)
         }
     }
 
