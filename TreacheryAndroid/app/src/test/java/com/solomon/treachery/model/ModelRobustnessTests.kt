@@ -32,6 +32,7 @@ class ModelRobustnessTests {
             assertNull(player.identityCardId)
             assertNull(player.playerColor)
             assertNull(player.commanderName)
+            assertFalse(player.abilityResolved)
         }
 
         @Test

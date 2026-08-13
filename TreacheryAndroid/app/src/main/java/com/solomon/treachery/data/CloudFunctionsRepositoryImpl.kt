@@ -59,6 +59,28 @@ class CloudFunctionsRepositoryImpl @Inject constructor(
             .await()
     }
 
+    override suspend fun resolveMetamorph(gameId: String, targetPlayerId: String) {
+        functions.getHttpsCallable("resolveMetamorph")
+            .call(mapOf("gameId" to gameId, "targetPlayerId" to targetPlayerId))
+            .await()
+    }
+
+    override suspend fun resolvePuppetMaster(gameId: String, redistributions: Map<String, String>) {
+        functions.getHttpsCallable("resolvePuppetMaster")
+            .call(mapOf("gameId" to gameId, "redistributions" to redistributions))
+            .await()
+    }
+
+    override suspend fun resolveWearerOfMasks(gameId: String, chosenCardId: String?) {
+        // Null chosenCardId means the player declined; the server returns early
+        // without burning the once-per-game ability_resolved flag.
+        val data = mutableMapOf<String, Any>("gameId" to gameId)
+        chosenCardId?.let { data["chosenCardId"] = it }
+        functions.getHttpsCallable("resolveWearerOfMasks")
+            .call(data)
+            .await()
+    }
+
     override suspend fun leaveGame(gameId: String) {
         functions.getHttpsCallable("leaveGame")
             .call(mapOf("gameId" to gameId))

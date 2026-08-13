@@ -16,6 +16,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -53,6 +54,23 @@ fun GameBoardScreen(
     var showEndGameConfirm by remember { mutableStateOf(false) }
     var showCardDetail by remember { mutableStateOf(false) }
     var showColorPicker by remember { mutableStateOf(false) }
+    // rememberSaveable: plain remember would re-run the auto-open below after
+    // any activity recreation (resize, process death), reopening a sheet the
+    // player already dismissed.
+    var showAbilityResolver by rememberSaveable { mutableStateOf(false) }
+    var hasAutoTriggeredAbility by rememberSaveable { mutableStateOf(false) }
+
+    // Recomputed on every players update since `players` is collected above
+    val resolvableAbility = viewModel.resolvableAbility
+
+    // Auto-open the resolver the first time the current player flips to unveiled
+    // while holding one of the three traitor cards that need a follow-up.
+    LaunchedEffect(resolvableAbility) {
+        if (resolvableAbility != null && !hasAutoTriggeredAbility) {
+            showAbilityResolver = true
+            hasAutoTriggeredAbility = true
+        }
+    }
 
     LaunchedEffect(Unit) {
         AnalyticsService.trackScreen("GameBoard")
@@ -138,6 +156,15 @@ fun GameBoardScreen(
         if (card != null && player != null) {
             IdentityCardSheet(card = card, player = player, onDismiss = { showCardDetail = false })
         }
+    }
+
+    // Traitor ability resolver (Metamorph / Puppet Master / Wearer of Masks)
+    if (showAbilityResolver && resolvableAbility != null) {
+        AbilityResolverSheet(
+            ability = resolvableAbility,
+            viewModel = viewModel,
+            onDismiss = { showAbilityResolver = false }
+        )
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
@@ -290,6 +317,16 @@ fun GameBoardScreen(
                         MtgPrimaryButton(
                             text = "Unveil Identity",
                             onClick = { showUnveilDialog = true },
+                            enabled = !isPending,
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                        )
+                    }
+
+                    // Activate ability button (unveiled traitor with an unresolved ability)
+                    if (viewModel.isTreacheryActive && resolvableAbility != null) {
+                        MtgPrimaryButton(
+                            text = "Activate Ability",
+                            onClick = { showAbilityResolver = true },
                             enabled = !isPending,
                             modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
                         )

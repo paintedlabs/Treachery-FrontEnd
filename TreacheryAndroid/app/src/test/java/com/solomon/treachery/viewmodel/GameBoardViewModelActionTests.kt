@@ -273,6 +273,117 @@ class GameBoardViewModelActionTests {
         }
     }
 
+    // ── Traitor abilities ──
+
+    @Nested
+    inner class ResolveAbilityTests {
+
+        private fun makeTraitorPlayers() = listOf(
+            Player(id = "p-1", orderId = 0, userId = "user-1", displayName = "Traitor",
+                role = Role.TRAITOR, identityCardId = "traitor_09", lifeTotal = 40,
+                isEliminated = false, isUnveiled = true, joinedAt = now),
+            Player(id = "p-2", orderId = 1, userId = "user-2", displayName = "Player 2",
+                role = Role.ASSASSIN, identityCardId = "card-2", lifeTotal = 35,
+                isEliminated = false, isUnveiled = false, joinedAt = now),
+            Player(id = "p-3", orderId = 2, userId = "user-3", displayName = "Player 3",
+                role = Role.GUARDIAN, identityCardId = "card-3", lifeTotal = 30,
+                isEliminated = false, isUnveiled = false, joinedAt = now),
+            Player(id = "p-4", orderId = 3, userId = "user-4", displayName = "Player 4",
+                role = Role.ASSASSIN, identityCardId = "card-4", lifeTotal = 25,
+                isEliminated = false, isUnveiled = false, joinedAt = now),
+        )
+
+        @Test
+        fun `resolveMetamorph sends gameId and targetPlayerId`() = runTest {
+            val vm = makeVM()
+            advanceUntilIdle()
+
+            vm.resolveMetamorph("p-3")
+            advanceUntilIdle()
+
+            assertEquals(1, cloudFunctions.resolveMetamorphCalls.size)
+            assertEquals("game-1" to "p-3", cloudFunctions.resolveMetamorphCalls.first())
+        }
+
+        @Test
+        fun `resolveMetamorph sets error on failure`() = runTest {
+            cloudFunctions.errorToThrow = RuntimeException("Failed")
+            val vm = makeVM()
+            advanceUntilIdle()
+
+            vm.resolveMetamorph("p-3")
+            advanceUntilIdle()
+
+            assertNotNull(vm.errorMessage.value)
+            assertFalse(vm.isPending.value)
+        }
+
+        @Test
+        fun `resolvePuppetMaster sends only real swaps`() = runTest {
+            val vm = makeVM()
+            firestore.playersFlowSource.value = makeTraitorPlayers()
+            advanceUntilIdle()
+
+            // p-2 keeps its card and gets filtered out; p-3 and p-4 swap
+            vm.resolvePuppetMaster(mapOf("p-2" to "card-2", "p-3" to "card-4", "p-4" to "card-3"))
+            advanceUntilIdle()
+
+            assertEquals(1, cloudFunctions.resolvePuppetMasterCalls.size)
+            val (gameId, redistributions) = cloudFunctions.resolvePuppetMasterCalls.first()
+            assertEquals("game-1", gameId)
+            assertEquals(mapOf("p-3" to "card-4", "p-4" to "card-3"), redistributions)
+        }
+
+        @Test
+        fun `resolvePuppetMaster with no changes does not call`() = runTest {
+            val vm = makeVM()
+            firestore.playersFlowSource.value = makeTraitorPlayers()
+            advanceUntilIdle()
+
+            vm.resolvePuppetMaster(mapOf("p-2" to "card-2", "p-3" to "card-3"))
+            advanceUntilIdle()
+
+            assertTrue(cloudFunctions.resolvePuppetMasterCalls.isEmpty())
+        }
+
+        @Test
+        fun `resolveWearerOfMasks sends chosen card`() = runTest {
+            val vm = makeVM()
+            advanceUntilIdle()
+
+            vm.resolveWearerOfMasks("guardian_04")
+            advanceUntilIdle()
+
+            assertEquals(1, cloudFunctions.resolveWearerOfMasksCalls.size)
+            assertEquals("game-1" to "guardian_04", cloudFunctions.resolveWearerOfMasksCalls.first())
+        }
+
+        @Test
+        fun `resolveWearerOfMasks skip sends null chosenCardId`() = runTest {
+            val vm = makeVM()
+            advanceUntilIdle()
+
+            vm.resolveWearerOfMasks(null)
+            advanceUntilIdle()
+
+            assertEquals(1, cloudFunctions.resolveWearerOfMasksCalls.size)
+            assertNull(cloudFunctions.resolveWearerOfMasksCalls.first().second)
+        }
+
+        @Test
+        fun `resolveWearerOfMasks sets error on failure`() = runTest {
+            cloudFunctions.errorToThrow = RuntimeException("Failed")
+            val vm = makeVM()
+            advanceUntilIdle()
+
+            vm.resolveWearerOfMasks("guardian_04")
+            advanceUntilIdle()
+
+            assertNotNull(vm.errorMessage.value)
+            assertFalse(vm.isPending.value)
+        }
+    }
+
     // ── Select Tunnel Plane ──
 
     @Nested

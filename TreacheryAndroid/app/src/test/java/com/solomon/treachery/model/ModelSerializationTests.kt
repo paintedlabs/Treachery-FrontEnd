@@ -161,6 +161,7 @@ class ModelSerializationTests {
                 joinedAt = now,
                 playerColor = "#e74c3c",
                 commanderName = "Atraxa",
+                abilityResolved = true,
             )
             val map = player.toMap()
             assertEquals("p-1", map["id"])
@@ -174,6 +175,7 @@ class ModelSerializationTests {
             assertEquals(true, map["is_unveiled"])
             assertEquals("#e74c3c", map["player_color"])
             assertEquals("Atraxa", map["commander_name"])
+            assertEquals(true, map["ability_resolved"])
         }
 
         @Test
@@ -190,6 +192,7 @@ class ModelSerializationTests {
                 "joined_at" to now,
                 "player_color" to "#3498db",
                 "commander_name" to "Kenrith",
+                "ability_resolved" to true,
             )
             val player = Player.fromMap("p-2", data)
             assertEquals("p-2", player.id)
@@ -203,6 +206,7 @@ class ModelSerializationTests {
             assertFalse(player.isUnveiled)
             assertEquals("#3498db", player.playerColor)
             assertEquals("Kenrith", player.commanderName)
+            assertTrue(player.abilityResolved)
         }
 
         @Test
@@ -221,6 +225,8 @@ class ModelSerializationTests {
             assertNull(player.identityCardId)
             assertNull(player.playerColor)
             assertNull(player.commanderName)
+            // ability_resolved is absent until a resolver writes it — absent means false
+            assertFalse(player.abilityResolved)
         }
 
         @Test
@@ -238,6 +244,7 @@ class ModelSerializationTests {
                 joinedAt = now,
                 playerColor = "#2ecc71",
                 commanderName = "Korvold",
+                abilityResolved = true,
             )
             val restored = Player.fromMap(original.id, original.toMap())
             assertEquals(original.id, restored.id)
@@ -251,6 +258,7 @@ class ModelSerializationTests {
             assertEquals(original.isUnveiled, restored.isUnveiled)
             assertEquals(original.playerColor, restored.playerColor)
             assertEquals(original.commanderName, restored.commanderName)
+            assertEquals(original.abilityResolved, restored.abilityResolved)
         }
     }
 

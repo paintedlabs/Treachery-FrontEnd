@@ -4,6 +4,7 @@ import androidx.lifecycle.SavedStateHandle
 import com.google.firebase.Timestamp
 import com.solomon.treachery.mocks.*
 import com.solomon.treachery.model.*
+import com.solomon.treachery.ui.game.ExecutableAbility
 import com.solomon.treachery.ui.game.GameBoardViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -423,6 +424,158 @@ class GameBoardViewModelTests {
             advanceUntilIdle()
 
             assertEquals(card, vm.currentIdentityCard())
+        }
+    }
+
+    // ── Traitor ability gating ──
+
+    @Nested
+    inner class AbilityGatingTests {
+
+        private fun abilityPlayer(
+            cardId: String = "traitor_07",
+            isUnveiled: Boolean = true,
+            isEliminated: Boolean = false,
+            abilityResolved: Boolean = false,
+        ) = Player(id = "p-1", orderId = 0, userId = "user-1", displayName = "Traitor",
+            role = Role.TRAITOR, identityCardId = cardId, lifeTotal = 40,
+            isEliminated = isEliminated, isUnveiled = isUnveiled, joinedAt = now,
+            abilityResolved = abilityResolved)
+
+        @Test
+        fun `unveiled holder of executable card is resolvable`() = runTest {
+            val vm = makeVM()
+            firestore.playersFlowSource.value = listOf(abilityPlayer(cardId = "traitor_07"))
+            advanceUntilIdle()
+
+            assertEquals(ExecutableAbility.METAMORPH, vm.resolvableAbility)
+        }
+
+        @Test
+        fun `absent ability_resolved field reads as resolvable`() = runTest {
+            // The server never writes ability_resolved until a resolver runs
+            val vm = makeVM()
+            firestore.playersFlowSource.value = listOf(
+                Player.fromMap("p-1", mapOf(
+                    "user_id" to "user-1",
+                    "display_name" to "Traitor",
+                    "role" to "traitor",
+                    "identity_card_id" to "traitor_09",
+                    "is_unveiled" to true,
+                    "joined_at" to now,
+                ))
+            )
+            advanceUntilIdle()
+
+            assertEquals(ExecutableAbility.PUPPET_MASTER, vm.resolvableAbility)
+        }
+
+        @Test
+        fun `resolved ability is not resolvable again`() = runTest {
+            val vm = makeVM()
+            firestore.playersFlowSource.value = listOf(abilityPlayer(abilityResolved = true))
+            advanceUntilIdle()
+
+            assertNull(vm.resolvableAbility)
+        }
+
+        @Test
+        fun `not resolvable before unveiling`() = runTest {
+            val vm = makeVM()
+            firestore.playersFlowSource.value = listOf(abilityPlayer(isUnveiled = false))
+            advanceUntilIdle()
+
+            assertNull(vm.resolvableAbility)
+        }
+
+        @Test
+        fun `eliminated player cannot resolve`() = runTest {
+            val vm = makeVM()
+            firestore.playersFlowSource.value = listOf(abilityPlayer(isEliminated = true))
+            advanceUntilIdle()
+
+            assertNull(vm.resolvableAbility)
+        }
+
+        @Test
+        fun `ordinary traitor card has no executable ability`() = runTest {
+            val vm = makeVM()
+            firestore.playersFlowSource.value = listOf(abilityPlayer(cardId = "traitor_01"))
+            advanceUntilIdle()
+
+            assertNull(vm.resolvableAbility)
+        }
+    }
+
+    // ── Cards outside the game ──
+
+    @Nested
+    inner class CardsOutsideGameTests {
+
+        private fun card(id: String, role: String) = IdentityCard(
+            id = id, cardNumber = 1, name = id, role = role, abilityText = "",
+            unveilCost = "0", rarity = "rare", hasUndercover = false,
+        )
+
+        @Test
+        fun `excludes leaders, in-play cards, and blocked copy traitors`() = runTest {
+            cardDb.cards = listOf(
+                card("leader_01", "leader"),
+                card("guardian_01", "guardian"),
+                card("assassin_01", "assassin"),
+                card("traitor_01", "traitor"),
+                card("traitor_07", "traitor"),
+                card("traitor_09", "traitor"),
+                card("traitor_13", "traitor"),
+            )
+
+            val vm = makeVM()
+            firestore.playersFlowSource.value = listOf(
+                Player(id = "p-1", orderId = 0, userId = "user-1", displayName = "In Play",
+                    role = Role.ASSASSIN, identityCardId = "assassin_01", lifeTotal = 40,
+                    isEliminated = false, isUnveiled = false, joinedAt = now),
+            )
+            advanceUntilIdle()
+
+            val outside = vm.cardsOutsideGame().map { it.id }
+            assertEquals(listOf("guardian_01", "traitor_01"), outside)
+        }
+    }
+
+    // ── Face-down card visibility ──
+
+    @Nested
+    inner class FaceDownVisibilityTests {
+
+        @Test
+        fun `unveiled but face-down role stays hidden`() = runTest {
+            val vm = makeVM()
+            vm.currentUserId = "user-1"
+            firestore.playersFlowSource.value = makePlayers().map {
+                if (it.userId == "user-4") it.copy(isFaceDown = true) else it
+            }
+            advanceUntilIdle()
+
+            val faceDown = vm.players.value.find { it.userId == "user-4" }!!
+            assertTrue(faceDown.isUnveiled)
+            assertFalse(vm.canSeeRole(faceDown))
+        }
+
+        @Test
+        fun `unveiled puppet master peeks at face-down cards`() = runTest {
+            val vm = makeVM()
+            vm.currentUserId = "user-1"
+            firestore.playersFlowSource.value = makePlayers().map {
+                when (it.userId) {
+                    "user-1" -> it.copy(role = Role.TRAITOR, identityCardId = "traitor_09", isUnveiled = true)
+                    "user-4" -> it.copy(isFaceDown = true)
+                    else -> it
+                }
+            }
+            advanceUntilIdle()
+
+            val faceDown = vm.players.value.find { it.userId == "user-4" }!!
+            assertTrue(vm.canSeeRole(faceDown))
         }
     }
 }

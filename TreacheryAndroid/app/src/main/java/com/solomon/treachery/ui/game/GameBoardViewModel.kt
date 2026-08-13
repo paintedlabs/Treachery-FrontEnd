@@ -282,15 +282,103 @@ class GameBoardViewModel @Inject constructor(
         }
     }
 
+    // ── Traitor ability resolution ──
+
+    // The current player's resolvable traitor ability, or null when none applies.
+    // ability_resolved is absent until a resolver writes it, so absent reads as
+    // "not resolved yet" (mirrors shouldShowAbilityResolver in AbilityResolver.tsx).
+    val resolvableAbility: ExecutableAbility?
+        get() {
+            val player = currentPlayer ?: return null
+            if (!player.isUnveiled || player.isEliminated || player.abilityResolved) return null
+            return ExecutableAbility.fromCardId(player.identityCardId)
+        }
+
+    // Callable-backed traitors the server refuses to hand out as a copy —
+    // mirrors BLOCKED_COPY_IDS in resolveWearerOfMasks (functions/index.js).
+    private val blockedCopyCardIds = ExecutableAbility.entries.map { it.cardId }.toSet()
+
+    // Non-Leader cards not currently assigned to any player in this game.
+    fun cardsOutsideGame(): List<IdentityCard> {
+        val usedIds = players.value.mapNotNull { it.identityCardId }.toSet()
+        return cardDatabase.allCards.filter { card ->
+            card.roleEnum != Role.LEADER && card.id !in usedIds && card.id !in blockedCopyCardIds
+        }
+    }
+
+    fun resolveMetamorph(targetPlayerId: String) {
+        if (_isPending.value) return
+        _errorMessage.value = null
+        _isPending.value = true
+
+        viewModelScope.launch {
+            try {
+                cloudFunctionsRepository.resolveMetamorph(gameId, targetPlayerId)
+                AnalyticsService.trackEvent("ability_metamorph", mapOf("target" to targetPlayerId))
+            } catch (e: Exception) {
+                _errorMessage.value = e.localizedMessage
+            }
+            _isPending.value = false
+        }
+    }
+
+    fun resolvePuppetMaster(redistributions: Map<String, String>) {
+        if (_isPending.value) return
+        // Only send real swaps — the server validates a permutation over the
+        // included players' current cards, so unchanged entries add nothing.
+        val changes = redistributions.filter { (playerId, newCardId) ->
+            players.value.find { it.id == playerId }?.identityCardId != newCardId
+        }
+        if (changes.isEmpty()) return
+        _errorMessage.value = null
+        _isPending.value = true
+
+        viewModelScope.launch {
+            try {
+                cloudFunctionsRepository.resolvePuppetMaster(gameId, changes)
+                AnalyticsService.trackEvent("ability_puppet_master", mapOf("swaps" to changes.size.toString()))
+            } catch (e: Exception) {
+                _errorMessage.value = e.localizedMessage
+            }
+            _isPending.value = false
+        }
+    }
+
+    fun resolveWearerOfMasks(chosenCardId: String?) {
+        if (_isPending.value) return
+        _errorMessage.value = null
+        _isPending.value = true
+
+        viewModelScope.launch {
+            try {
+                // Null chosenCardId is the Skip path — the server returns early
+                // without setting ability_resolved.
+                cloudFunctionsRepository.resolveWearerOfMasks(gameId, chosenCardId)
+                if (chosenCardId != null) {
+                    AnalyticsService.trackEvent("ability_wearer_of_masks", mapOf("chosen_card" to chosenCardId))
+                }
+            } catch (e: Exception) {
+                _errorMessage.value = e.localizedMessage
+            }
+            _isPending.value = false
+        }
+    }
+
     fun identityCard(player: Player): IdentityCard? {
         val cardId = player.identityCardId ?: return null
         return cardDatabase.card(cardId)
     }
 
     fun canSeeRole(player: Player): Boolean {
+        // You can always see your own role
         if (player.userId == currentUserId) return true
-        if (player.isUnveiled) return true
+        // Leaders are always face-up (visible to everyone)
         if (player.role == Role.LEADER) return true
+        // Unveiled but face-down cards are hidden (Puppet Master / Metamorph swap)
+        if (player.isUnveiled && !player.isFaceDown) return true
+        // Puppet Master can peek at all face-down cards
+        val me = currentPlayer
+        if (me?.identityCardId == ExecutableAbility.PUPPET_MASTER.cardId && me.isUnveiled) return true
         return false
     }
 }

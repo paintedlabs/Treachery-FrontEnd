@@ -13,6 +13,9 @@ interface CloudFunctionsRepository {
     suspend fun adjustLife(gameId: String, playerId: String, amount: Int)
     suspend fun eliminatePlayer(gameId: String)
     suspend fun unveilPlayer(gameId: String)
+    suspend fun resolveMetamorph(gameId: String, targetPlayerId: String)
+    suspend fun resolvePuppetMaster(gameId: String, redistributions: Map<String, String>)
+    suspend fun resolveWearerOfMasks(gameId: String, chosenCardId: String?)
     suspend fun leaveGame(gameId: String)
     suspend fun registerFcmToken(token: String)
     suspend fun rollPlanarDie(gameId: String): String

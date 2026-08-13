@@ -50,6 +50,24 @@ class MockCloudFunctionsRepository : CloudFunctionsRepository {
         leaveGameCalls.add(gameId)
     }
 
+    val resolveMetamorphCalls = mutableListOf<Pair<String, String>>()
+    override suspend fun resolveMetamorph(gameId: String, targetPlayerId: String) {
+        throwIfNeeded()
+        resolveMetamorphCalls.add(gameId to targetPlayerId)
+    }
+
+    val resolvePuppetMasterCalls = mutableListOf<Pair<String, Map<String, String>>>()
+    override suspend fun resolvePuppetMaster(gameId: String, redistributions: Map<String, String>) {
+        throwIfNeeded()
+        resolvePuppetMasterCalls.add(gameId to redistributions)
+    }
+
+    val resolveWearerOfMasksCalls = mutableListOf<Pair<String, String?>>()
+    override suspend fun resolveWearerOfMasks(gameId: String, chosenCardId: String?) {
+        throwIfNeeded()
+        resolveWearerOfMasksCalls.add(gameId to chosenCardId)
+    }
+
     override suspend fun registerFcmToken(token: String) {
         throwIfNeeded()
         registerFcmTokenCalls.add(token)
