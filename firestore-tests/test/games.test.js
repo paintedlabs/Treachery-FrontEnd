@@ -91,6 +91,43 @@ describe("games/{gameId}", () => {
       const db = await anonDb();
       await assertFails(setDoc(doc(db, "games", "game_anon"), gameDoc(OUTSIDER)));
     });
+
+    it("stops a user from injecting other uids into player_ids on create", async () => {
+      const db = await authedDb(OUTSIDER);
+      await assertFails(
+        setDoc(
+          doc(db, "games", "game_inject"),
+          gameDoc(OUTSIDER, { player_ids: [OUTSIDER, HOST] })
+        )
+      );
+    });
+
+    it("stops a user from creating a game with unbounded max_players", async () => {
+      const db = await authedDb(OUTSIDER);
+      await assertFails(
+        setDoc(doc(db, "games", "game_huge"), gameDoc(OUTSIDER, { max_players: 999 }))
+      );
+    });
+
+    it("stops a user from creating a game with unbounded starting_life", async () => {
+      const db = await authedDb(OUTSIDER);
+      await assertFails(
+        setDoc(
+          doc(db, "games", "game_tank"),
+          gameDoc(OUTSIDER, { starting_life: 99999 })
+        )
+      );
+    });
+
+    it("stops a user from creating a game with an invalid game_mode", async () => {
+      const db = await authedDb(OUTSIDER);
+      await assertFails(
+        setDoc(
+          doc(db, "games", "game_mode_bogus"),
+          gameDoc(OUTSIDER, { game_mode: "standard" })
+        )
+      );
+    });
   });
 
   // ─── update: host settings ───────────────────────────────────────
@@ -100,7 +137,7 @@ describe("games/{gameId}", () => {
       await assertSucceeds(
         updateDoc(doc(db, "games", WAITING), {
           max_players: 8,
-          starting_life: 60,
+          starting_life: 50,
           max_traitor_rarity: "rare",
         })
       );
@@ -144,6 +181,27 @@ describe("games/{gameId}", () => {
       const db = await authedDb(OUTSIDER);
       await assertFails(
         updateDoc(doc(db, "games", WAITING), { host_id: OUTSIDER })
+      );
+    });
+
+    it("stops the host from transferring host_id to another user", async () => {
+      const db = await authedDb(HOST);
+      await assertFails(
+        updateDoc(doc(db, "games", WAITING), { host_id: PLAYER })
+      );
+    });
+
+    it("stops the host from overwriting player_ids", async () => {
+      const db = await authedDb(HOST);
+      await assertFails(
+        updateDoc(doc(db, "games", WAITING), { player_ids: [HOST, OUTSIDER] })
+      );
+    });
+
+    it("stops the host from setting an unbounded starting_life", async () => {
+      const db = await authedDb(HOST);
+      await assertFails(
+        updateDoc(doc(db, "games", WAITING), { starting_life: 99999 })
       );
     });
   });
@@ -231,6 +289,11 @@ describe("games/{gameId}", () => {
     it("stops a signed-out client from deleting the lobby", async () => {
       const db = await anonDb();
       await assertFails(deleteDoc(doc(db, "games", WAITING)));
+    });
+
+    it("stops the host from deleting an in_progress game", async () => {
+      const db = await authedDb(HOST);
+      await assertFails(deleteDoc(doc(db, "games", IN_PROGRESS)));
     });
   });
 });

@@ -51,8 +51,16 @@ service cloud.firestore {
         && request.resource.data.from_user_id == request.auth.uid
         && request.resource.data.status == 'pending';
 
+      // Recipient may only flip pending → accepted/declined. from/to stay
+      // frozen so a client write can't re-attribute the request. Accept still
+      // goes through acceptFriendRequest for the friend_ids mutation; this
+      // path is kept for decline (and older accept UIs).
       allow update: if request.auth != null
-        && resource.data.to_user_id == request.auth.uid;
+        && resource.data.to_user_id == request.auth.uid
+        && request.resource.data.to_user_id == resource.data.to_user_id
+        && request.resource.data.from_user_id == resource.data.from_user_id
+        && resource.data.status == 'pending'
+        && request.resource.data.status in ['accepted', 'declined'];
 
       allow delete: if false;
     }
@@ -65,28 +73,31 @@ service cloud.firestore {
     match /games/{gameId} {
       allow read: if request.auth != null;
 
-      // Any authenticated user can create a game (they become the host)
+      // Any authenticated user can create a game (they become the host).
+      // Mirror createGame bounds so a direct write can't poison capacity,
+      // life, mode, or inject other uids into player_ids (which would grant
+      // them player-doc reads, including roles once the game starts).
       allow create: if request.auth != null
-        && request.resource.data.host_id == request.auth.uid
-        && request.resource.data.state == 'waiting';
+        && isValidClientGameCreate();
 
-      // Only the host can update the game while it's in 'waiting' state.
+      // Only the host can update lobby settings while waiting.
       // Game state transitions (waiting→in_progress, in_progress→finished)
       // and winning_team are handled exclusively by Cloud Functions
       // via the Admin SDK (bypasses these rules).
+      // host_id and player_ids are frozen here — joins use the append-self
+      // rule below; kicks/host transfer go through callables.
       allow update: if request.auth != null
-        && resource.data.host_id == request.auth.uid
-        && resource.data.state == 'waiting'
-        && request.resource.data.state == 'waiting'
-        && isOnlyAddingSelfToPlayerIds() == false;
+        && isHostLobbySettingsUpdate();
 
       // Players can add themselves to player_ids when joining
       allow update: if request.auth != null
         && isOnlyAddingSelfToPlayerIds();
 
-      // Only the host can delete the game (lobby disbandment)
+      // Only the host can disband a waiting lobby. Live games are not
+      // client-deletable (leaveGame / endGame use the Admin SDK).
       allow delete: if request.auth != null
-        && resource.data.host_id == request.auth.uid;
+        && resource.data.host_id == request.auth.uid
+        && resource.data.state == 'waiting';
 
       // ----------------------------------------------------------
       // PLAYERS (subcollection of games)
@@ -108,7 +119,9 @@ service cloud.firestore {
           && get(/databases/$(database)/documents/games/$(gameId)).data.state == 'waiting'
           && request.auth.uid in get(/databases/$(database)/documents/games/$(gameId)).data.player_ids
           && (!('role' in request.resource.data) || request.resource.data.role == null)
-          && (!('identity_card_id' in request.resource.data) || request.resource.data.identity_card_id == null);
+          && (!('identity_card_id' in request.resource.data) || request.resource.data.identity_card_id == null)
+          && (!('is_unveiled' in request.resource.data) || request.resource.data.is_unveiled == false)
+          && (!('is_eliminated' in request.resource.data) || request.resource.data.is_eliminated == false);
 
         // Players can ONLY update their own unveil status (true only).
         // Life, elimination, role assignment, and card assignment are
@@ -134,8 +147,11 @@ service cloud.firestore {
           && resource.data.user_id == request.auth.uid
           && onlyDisplayNameChanged();
 
-        // Players can remove themselves, or the host can remove anyone (lobby only)
+        // Players can leave, or the host can kick, only while the lobby is
+        // still waiting. Mid-game leave/kick goes through leaveGame so
+        // player_ids stays in sync with the subcollection.
         allow delete: if request.auth != null
+          && get(/databases/$(database)/documents/games/$(gameId)).data.state == 'waiting'
           && (resource.data.user_id == request.auth.uid
               || isGameHost(gameId));
       }
@@ -146,6 +162,49 @@ service cloud.firestore {
     // ============================================================
     function isGameHost(gameId) {
       return get(/databases/$(database)/documents/games/$(gameId)).data.host_id == request.auth.uid;
+    }
+
+    function isValidGameMode(mode) {
+      return mode in ['treachery', 'planechase', 'treachery_planechase', 'none'];
+    }
+
+    function isValidStartingLife(life) {
+      return life in [20, 25, 30, 40, 50];
+    }
+
+    function isValidTraitorRarity(rarity) {
+      return rarity in ['uncommon', 'rare', 'mythic', 'special'];
+    }
+
+    function isValidClientGameCreate() {
+      let d = request.resource.data;
+      return d.host_id == request.auth.uid
+        && d.state == 'waiting'
+        && d.player_ids.size() == 1
+        && d.player_ids[0] == request.auth.uid
+        && d.max_players is int
+        && d.max_players >= 2
+        && d.max_players <= 8
+        && isValidStartingLife(d.starting_life)
+        && isValidGameMode(d.game_mode)
+        && (!('max_traitor_rarity' in d) || isValidTraitorRarity(d.max_traitor_rarity));
+    }
+
+    function isHostLobbySettingsUpdate() {
+      let before = resource.data;
+      let after = request.resource.data;
+      let keys = after.diff(before).affectedKeys();
+      return before.host_id == request.auth.uid
+        && before.state == 'waiting'
+        && after.state == 'waiting'
+        && after.host_id == before.host_id
+        && after.player_ids == before.player_ids
+        && keys.hasOnly(['max_players', 'starting_life', 'game_mode', 'max_traitor_rarity', 'last_activity_at'])
+        && (!keys.hasAny(['max_players'])
+            || (after.max_players is int && after.max_players >= 2 && after.max_players <= 8))
+        && (!keys.hasAny(['starting_life']) || isValidStartingLife(after.starting_life))
+        && (!keys.hasAny(['game_mode']) || isValidGameMode(after.game_mode))
+        && (!keys.hasAny(['max_traitor_rarity']) || isValidTraitorRarity(after.max_traitor_rarity));
     }
 
     // True only for a write that appends the CALLER to an open lobby's

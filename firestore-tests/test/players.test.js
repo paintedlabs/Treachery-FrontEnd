@@ -165,6 +165,26 @@ describe("games/{gameId}/players/{playerId}", () => {
       );
     });
 
+    it("stops a player from pre-unveiling themselves on create", async () => {
+      const db = await authedDb(JOINER);
+      await assertFails(
+        setDoc(
+          doc(db, ...waitingPlayer(WAITING, "p_joiner")),
+          playerDoc(JOINER, { order_id: 2, is_unveiled: true })
+        )
+      );
+    });
+
+    it("stops a player from entering pre-eliminated on create", async () => {
+      const db = await authedDb(JOINER);
+      await assertFails(
+        setDoc(
+          doc(db, ...waitingPlayer(WAITING, "p_joiner")),
+          playerDoc(JOINER, { order_id: 2, is_eliminated: true })
+        )
+      );
+    });
+
     it("stops a signed-out client from creating a player doc", async () => {
       const db = await anonDb();
       await assertFails(
@@ -446,6 +466,20 @@ describe("games/{gameId}/players/{playerId}", () => {
     it("stops a signed-out client from deleting a player doc", async () => {
       const db = await anonDb();
       await assertFails(deleteDoc(doc(db, ...waitingPlayer(WAITING, P_PLAYER))));
+    });
+
+    it("stops a player from deleting their own doc mid-game", async () => {
+      const db = await authedDb(PLAYER);
+      await assertFails(
+        deleteDoc(doc(db, ...waitingPlayer(IN_PROGRESS, P_PLAYER)))
+      );
+    });
+
+    it("stops the host from kicking a player mid-game", async () => {
+      const db = await authedDb(HOST);
+      await assertFails(
+        deleteDoc(doc(db, ...waitingPlayer(IN_PROGRESS, P_PLAYER)))
+      );
     });
   });
 });

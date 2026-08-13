@@ -660,6 +660,8 @@ exports.startGame = onCall(callableOptions, async (request) => {
             role: assignment.role,
             identity_card_id: card.id,
             life_total: game.starting_life + (card.life_modifier || 0),
+            is_unveiled: false,
+            is_eliminated: false,
           });
         }
       } else {
@@ -696,6 +698,8 @@ exports.startGame = onCall(callableOptions, async (request) => {
             role: role,
             identity_card_id: card.id,
             life_total: game.starting_life + (card.life_modifier || 0),
+            is_unveiled: false,
+            is_eliminated: false,
           });
         }
       }
@@ -709,6 +713,8 @@ exports.startGame = onCall(callableOptions, async (request) => {
       for (let i = 0; i < players.length; i++) {
         tx.update(players[i].ref, {
           life_total: game.starting_life,
+          is_unveiled: false,
+          is_eliminated: false,
         });
       }
     }
