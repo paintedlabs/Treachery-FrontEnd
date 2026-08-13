@@ -92,8 +92,10 @@ enum Snapshot {
     // MARK: - Private Helpers
 
     private static func currentTestCase() -> XCTestCase? {
-        // XCTestCase.perform is called on the current test instance
-        guard let currentTestClass = NSClassFromString("XCTestProbe") else { return nil }
+        // XCTestCase.perform is called on the current test instance. The class
+        // must be typed as NSObject.Type: on bare AnyClass the perform(_:)
+        // overload is ambiguous and fails to compile for x86_64 simulators.
+        guard let currentTestClass = NSClassFromString("XCTestProbe") as? NSObject.Type else { return nil }
         let selector = NSSelectorFromString("currentTestCase")
         guard currentTestClass.responds(to: selector) else { return nil }
         return currentTestClass.perform(selector)?.takeUnretainedValue() as? XCTestCase
