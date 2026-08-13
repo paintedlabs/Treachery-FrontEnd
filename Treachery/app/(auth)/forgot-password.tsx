@@ -6,29 +6,35 @@ import {
   TouchableOpacity,
   StyleSheet,
   ActivityIndicator,
-  Alert,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { useAuth } from '@/hooks/useAuth';
 import { ErrorBanner } from '@/components/ErrorBanner';
+import { NoticeDialog } from '@/components/NoticeDialog';
 import { colors, spacing, fonts } from '@/constants/theme';
+import * as authService from '@/services/auth';
 
 export default function ForgotPasswordScreen() {
   const router = useRouter();
-  const { resetPassword, errorMessage, clearError } = useAuth();
   const [email, setEmail] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [showSentNotice, setShowSentNotice] = useState(false);
 
   const handleReset = async () => {
     if (!email.trim()) return;
-    clearError();
+    setErrorMessage(null);
     setIsLoading(true);
-    await resetPassword(email.trim());
-    setIsLoading(false);
-    if (!errorMessage) {
-      Alert.alert('Email Sent', 'Check your inbox for a password reset link.', [
-        { text: 'OK', onPress: () => router.back() },
-      ]);
+
+    try {
+      // Called directly rather than through useAuth so success/failure comes
+      // from this await — the hook reports errors via state we'd only read on
+      // the next render, which made a failed send report "Email Sent".
+      await authService.resetPassword(email.trim());
+      setShowSentNotice(true);
+    } catch (error: unknown) {
+      setErrorMessage(error instanceof Error ? error.message : 'Failed to send reset email.');
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -76,6 +82,17 @@ export default function ForgotPasswordScreen() {
       </TouchableOpacity>
 
       <View style={styles.spacer} />
+
+      <NoticeDialog
+        visible={showSentNotice}
+        title="Email Sent"
+        message="Check your inbox for a password reset link."
+        dismissAccessibilityLabel="Dismiss email sent notice"
+        onDismiss={() => {
+          setShowSentNotice(false);
+          router.back();
+        }}
+      />
     </View>
   );
 }

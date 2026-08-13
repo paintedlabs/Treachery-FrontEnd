@@ -5,7 +5,6 @@ import {
   TouchableOpacity,
   StyleSheet,
   FlatList,
-  Alert,
   Platform,
   Modal,
   ScrollView,
@@ -126,14 +125,9 @@ export default function GameBoardScreen() {
     }
   }, [isGameFinished, gameId, router]);
 
-  // Handle game unavailable
-  useEffect(() => {
-    if (isGameUnavailable) {
-      Alert.alert('Game Unavailable', 'This game is no longer available.', [
-        { text: 'OK', onPress: () => router.replace('/(app)') },
-      ]);
-    }
-  }, [isGameUnavailable, router]);
+  // No Alert.alert for the unavailable case: it is a silent no-op on
+  // react-native-web, and the full-screen fallback below already states it
+  // and offers Return to Home on every platform.
 
   // Which confirmation (if any) is showing. In-app ConfirmDialog instead of
   // window.confirm/Alert.alert: one themed code path on every platform, and
