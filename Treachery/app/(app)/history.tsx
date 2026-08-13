@@ -69,12 +69,18 @@ function GameHistoryRow({
   const myPlayer = players.find((p) => p.user_id === currentUserId);
   const myDealtRole = myPlayer ? dealtRole(myPlayer) : null;
   const myDealtCardId = myPlayer ? dealtIdentityCardId(myPlayer) : null;
+  // Win/loss must be decided from the CURRENT role, not the dealt one: that is
+  // what the server scored the game with (onGameFinished awards ELO from
+  // player.role), so after a Puppet Master swap the team you actually won with
+  // is the one you ended on. dealtRole is for display only — using it here
+  // showed "Defeat" on games the server had recorded as a win.
+  const myScoredRole = myPlayer?.role ?? null;
   const didWin = (() => {
-    if (!myDealtRole || !winningRole) return false;
+    if (!myScoredRole || !winningRole) return false;
     if (winningRole === 'leader') {
-      return myDealtRole === 'leader' || myDealtRole === 'guardian';
+      return myScoredRole === 'leader' || myScoredRole === 'guardian';
     }
-    return myDealtRole === winningRole;
+    return myScoredRole === winningRole;
   })();
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

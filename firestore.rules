@@ -176,6 +176,26 @@ service cloud.firestore {
       return rarity in ['uncommon', 'rare', 'mythic', 'special'];
     }
 
+    // Wider than isValidStartingLife on purpose — see isValidClientGameCreate.
+    function isLegacyStartingLife(life) {
+      return life in [20, 25, 30, 35, 40, 45, 50, 55, 60];
+    }
+
+    // These bounds must tolerate what SHIPPED builds actually emit, which is
+    // wider than what the createGame callable accepts. v1.1.0 — the current
+    // App Store and Play build — creates the game document directly (it
+    // predates the callable) with max_players 12 for non-treachery modes and
+    // any 20-60 life in steps of 5. Rules deploy independently of app
+    // releases, so validating against the callable's tighter bounds would
+    // return PERMISSION_DENIED on every installed binary the moment this file
+    // shipped, killing Planechase and Life Tracker creation outright.
+    //
+    // The security-relevant clauses are host_id / state / player_ids: they
+    // stop a hostile create from seating other uids (which would grant them
+    // player-doc reads, and roles once the game starts). The numeric bounds
+    // are hygiene, so they mirror real client output rather than current UI.
+    // New clients go through createGame, which still enforces 2-8 and
+    // {20,25,30,40,50}.
     function isValidClientGameCreate() {
       let d = request.resource.data;
       return d.host_id == request.auth.uid
@@ -184,8 +204,8 @@ service cloud.firestore {
         && d.player_ids[0] == request.auth.uid
         && d.max_players is int
         && d.max_players >= 2
-        && d.max_players <= 8
-        && isValidStartingLife(d.starting_life)
+        && d.max_players <= 12
+        && isLegacyStartingLife(d.starting_life)
         && isValidGameMode(d.game_mode)
         && (!('max_traitor_rarity' in d) || isValidTraitorRarity(d.max_traitor_rarity));
     }
