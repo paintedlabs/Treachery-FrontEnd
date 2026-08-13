@@ -124,7 +124,7 @@ function getRoleDistribution(playerCount) {
     7: { leaders: 1, guardians: 2, assassins: 3, traitors: 1 },
     8: { leaders: 1, guardians: 2, assassins: 3, traitors: 2 },
   };
-  return table[playerCount] || { leaders: 1, guardians: 0, assassins: 2, traitors: 1 };
+  return table[playerCount] || null;
 }
 
 // ── Shuffle (Fisher-Yates) ──
@@ -147,6 +147,28 @@ const TREACHERY_MODES = new Set(["treachery", "treachery_planechase"]);
 function isTreacheryMode(gameMode) {
   // Default missing mode to treachery for legacy games that used roles.
   return gameMode == null || TREACHERY_MODES.has(gameMode);
+}
+
+const PLANECHASE_MODES = new Set(["planechase", "treachery_planechase"]);
+
+function isPlanechaseMode(gameMode) {
+  return PLANECHASE_MODES.has(gameMode);
+}
+
+function assertSeatedInGame(game, uid) {
+  if (!(game.player_ids || []).includes(uid)) {
+    throw new HttpsError("permission-denied", "You are not in this game.");
+  }
+}
+
+function assertPlanechasePlay(game, uid) {
+  if (game.state !== "in_progress") {
+    throw new HttpsError("failed-precondition", "Game is not in progress.");
+  }
+  if (!isPlanechaseMode(game.game_mode)) {
+    throw new HttpsError("failed-precondition", "This game is not Planechase.");
+  }
+  assertSeatedInGame(game, uid);
 }
 
 function checkWinConditions(players, gameMode) {
@@ -598,6 +620,10 @@ exports.startGame = onCall(callableOptions, async (request) => {
     );
     const players = playersSnap.docs.map((d) => ({ ref: d.ref, ...d.data() }));
 
+    if (players.length > 8) {
+      throw new HttpsError("failed-precondition", "Games support at most 8 players.");
+    }
+
     if (includesTreachery) {
       // Validate minimum player count against role distribution
       if (players.length < 1) {
@@ -605,6 +631,9 @@ exports.startGame = onCall(callableOptions, async (request) => {
       }
 
       const dist = getRoleDistribution(players.length);
+      if (!dist) {
+        throw new HttpsError("failed-precondition", "Unsupported player count.");
+      }
 
       // Test-seed override: when running in the firebase emulator, accept an
       // explicit { user_id -> { role, identityCardId } } map so E2E tests can
@@ -1391,6 +1420,9 @@ exports.resolveWearerOfMasks = onCall(callableOptions, async (request) => {
     if (caller.identity_card_id !== "traitor_13") {
       throw new HttpsError("failed-precondition", "Your card is not The Wearer of Masks.");
     }
+    if (caller.original_identity_card_id && caller.original_identity_card_id !== "traitor_13") {
+      throw new HttpsError("failed-precondition", "Your card is not The Wearer of Masks.");
+    }
     if (!caller.is_unveiled) {
       throw new HttpsError("failed-precondition", "You must unveil first.");
     }
@@ -1458,11 +1490,7 @@ exports.rollPlanarDie = onCall(callableOptions, async (request) => {
     const gameSnap = await tx.get(gameRef);
     if (!gameSnap.exists) throw new HttpsError("not-found", "Game not found.");
     const game = gameSnap.data();
-
-    if (game.state !== "in_progress")
-      throw new HttpsError("failed-precondition", "Game is not in progress.");
-    if (!(game.player_ids || []).includes(uid))
-      throw new HttpsError("permission-denied", "You are not in this game.");
+    assertPlanechasePlay(game, uid);
 
     const planechase = game.planechase || {};
 
@@ -1616,9 +1644,7 @@ exports.resolvePhenomenon = onCall(callableOptions, async (request) => {
     const gameSnap = await tx.get(gameRef);
     if (!gameSnap.exists) throw new HttpsError("not-found", "Game not found.");
     const game = gameSnap.data();
-
-    if (game.state !== "in_progress")
-      throw new HttpsError("failed-precondition", "Game is not in progress.");
+    assertPlanechasePlay(game, uid);
 
     const planechase = game.planechase || {};
     if (planechase.use_own_deck)
@@ -1679,7 +1705,11 @@ exports.resolvePhenomenon = onCall(callableOptions, async (request) => {
         name: p.name,
       }));
 
-      // Do NOT update game state — wait for selectPlane call
+      tx.update(gameRef, {
+        "planechase.pending_plane_options": options.map((o) => o.id),
+        last_activity_at: FieldValue.serverTimestamp(),
+      });
+
       return { type: "choose", options };
     } else if (currentPlane.id === SPATIAL_MERGING_ID) {
       // Spatial Merging: pick 2 random non-phenomenon planes
@@ -1738,11 +1768,19 @@ exports.selectPlane = onCall(callableOptions, async (request) => {
     const gameSnap = await tx.get(gameRef);
     if (!gameSnap.exists) throw new HttpsError("not-found", "Game not found.");
     const game = gameSnap.data();
+    assertPlanechasePlay(game, uid);
 
-    if (game.state !== "in_progress")
-      throw new HttpsError("failed-precondition", "Game is not in progress.");
-    if (!(game.player_ids || []).includes(uid))
-      throw new HttpsError("permission-denied", "You are not in this game.");
+    const planechase = game.planechase || {};
+    if (planechase.use_own_deck) {
+      throw new HttpsError("failed-precondition", "Using own deck.");
+    }
+    if (planechase.current_plane_id !== INTERPLANAR_TUNNEL_ID) {
+      throw new HttpsError("failed-precondition", "No Interplanar Tunnel to resolve.");
+    }
+    const pending = planechase.pending_plane_options || [];
+    if (!pending.includes(planeId)) {
+      throw new HttpsError("invalid-argument", "Plane was not offered.");
+    }
 
     // Validate the chosen plane exists and is not a phenomenon
     const chosenPlane = PLANE_CARDS.find((p) => p.id === planeId);
@@ -1751,13 +1789,13 @@ exports.selectPlane = onCall(callableOptions, async (request) => {
     if (chosenPlane.is_phenomenon)
       throw new HttpsError("invalid-argument", "Cannot select a phenomenon.");
 
-    const planechase = game.planechase || {};
     let usedPlaneIds = planechase.used_plane_ids || [];
     usedPlaneIds = [...usedPlaneIds, planeId];
 
     tx.update(gameRef, {
       "planechase.current_plane_id": planeId,
       "planechase.used_plane_ids": usedPlaneIds,
+      "planechase.pending_plane_options": FieldValue.delete(),
       last_activity_at: FieldValue.serverTimestamp(),
     });
 
@@ -1794,7 +1832,12 @@ exports.endGame = onCall(callableOptions, async (request) => {
       last_activity_at: FieldValue.serverTimestamp(),
     };
     if (winnerUserIds && Array.isArray(winnerUserIds) && winnerUserIds.length > 0) {
-      update.winner_user_ids = winnerUserIds;
+      const seated = new Set(game.player_ids || []);
+      const unique = [...new Set(winnerUserIds)];
+      if (unique.some((id) => typeof id !== "string" || !seated.has(id))) {
+        throw new HttpsError("invalid-argument", "Winners must be players in this game.");
+      }
+      update.winner_user_ids = unique;
     }
     tx.update(gameRef, update);
 
@@ -1839,6 +1882,13 @@ exports.updateGameSettings = onCall(callableOptions, async (request) => {
     if (maxPlayers !== undefined) {
       const mp = parseIntegerArg(maxPlayers, { min: 2, max: 8 });
       if (mp === null) throw new HttpsError("invalid-argument", "Max players must be 2-8.");
+      const seated = (game.player_ids || []).length;
+      if (mp < seated) {
+        throw new HttpsError(
+          "failed-precondition",
+          "Cannot set max players below the current lobby size."
+        );
+      }
       update.max_players = mp;
     }
 
@@ -2157,7 +2207,7 @@ exports.onGameFinished = onDocumentUpdated("games/{gameId}", async (event) => {
   let winnerUserIds = [];
   let loserUserIds = [];
 
-  if (game.game_mode === "treachery" || game.game_mode === "treachery_planechase") {
+  if (isTreacheryMode(game.game_mode)) {
     // Treachery: use winning_team
     const winningTeam = game.winning_team;
     if (!winningTeam) return;

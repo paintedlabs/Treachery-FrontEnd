@@ -643,4 +643,16 @@ describe('resolveWearerOfMasks', () => {
       assert.equal(players[2].identity_card_id, 'assassin_02');
     }
   );
+
+  it('rejects a caller who was not originally The Wearer of Masks', async () => {
+    const game = await unveiledWearer();
+    await h.patchPlayer(game.gameId, 'p3', { original_identity_card_id: 'assassin_01' });
+    await h.expectHttpsError(
+      game.traitor.call('resolveWearerOfMasks', {
+        gameId: game.gameId,
+        chosenCardId: 'assassin_15',
+      }),
+      'failed-precondition'
+    );
+  });
 });

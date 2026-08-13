@@ -88,6 +88,17 @@ describe('updateGameSettings — maxPlayers', () => {
       assert.equal(g.max_players, 8);
     });
   }
+
+  it('rejects maxPlayers below the current lobby size', async () => {
+    const users = await h.getUsers(4);
+    const game = await h.seedGame({ users, maxPlayers: 8 });
+    await h.expectHttpsError(
+      game.host.call('updateGameSettings', { gameId: game.gameId, maxPlayers: 2 }),
+      'failed-precondition'
+    );
+    const g = await h.getGame(game.gameId);
+    assert.equal(g.max_players, 8);
+  });
 });
 
 describe('updateGameSettings — gameMode', () => {

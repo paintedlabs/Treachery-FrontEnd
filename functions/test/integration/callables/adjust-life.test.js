@@ -321,4 +321,23 @@ describe('adjustLife — non-treachery modes must not auto-finish', () => {
       assert.equal(g.winning_team, undefined);
     }
   );
+
+  it('rejects winnerUserIds that are not seated in the game', async () => {
+    const users = await h.getUsers(5);
+    const seated = users.slice(0, 4);
+    const outsider = users[4];
+    const game = await h.seedGame({ users: seated, gameMode: 'none', startingLife: 40 });
+    await game.host.call('startGame', { gameId: game.gameId });
+
+    await h.expectHttpsError(
+      game.host.call('endGame', {
+        gameId: game.gameId,
+        winnerUserIds: [outsider.uid],
+      }),
+      'invalid-argument'
+    );
+    const g = await h.getGame(game.gameId);
+    assert.equal(g.state, 'in_progress');
+    assert.equal(g.winner_user_ids, undefined);
+  });
 });
