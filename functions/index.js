@@ -183,6 +183,18 @@ function checkWinConditions(players, gameMode) {
   return null; // Game continues
 }
 
+/** Next living seat after `currentId` (order_id order). Unset current → first living. */
+function nextLivingPlayerId(seats, currentId) {
+  const alive = seats.filter((p) => !p.is_eliminated);
+  if (alive.length === 0) return null;
+  const currentIndex = seats.findIndex((p) => p.id === currentId);
+  for (let step = 1; step <= seats.length; step++) {
+    const candidate = seats[(currentIndex + step + seats.length) % seats.length];
+    if (!candidate.is_eliminated) return candidate.id;
+  }
+  return alive[0].id;
+}
+
 // Sanitize commander names before using them as Firestore map field keys.
 // Dots fragment nested paths; `/ ~ * [ ]` are illegal field-path characters.
 function sanitizeCommanderKey(name) {
@@ -790,29 +802,33 @@ exports.adjustLife = onCall(callableOptions, async (request) => {
     if (eliminated) playerUpdate.is_unveiled = true;
     tx.update(playerRef, playerUpdate);
 
-    tx.update(gameRef, {
+    const gameUpdate = {
       last_activity_at: FieldValue.serverTimestamp(),
-    });
+    };
 
     // If eliminated, check win conditions using the already-read players
     let winner = null;
     if (eliminated) {
-      const allPlayers = allPlayersSnap.docs.map((d) => {
+      const seats = allPlayersSnap.docs.map((d) => {
         const data = d.data();
         if (d.id === playerId) {
-          return { ...data, is_eliminated: true, life_total: 0 };
+          return { id: d.id, ...data, is_eliminated: true, life_total: 0 };
         }
-        return data;
+        return { id: d.id, ...data };
       });
 
-      winner = checkWinConditions(allPlayers, game.game_mode);
+      winner = checkWinConditions(seats, game.game_mode);
       if (winner) {
-        tx.update(gameRef, {
-          state: "finished",
-          winning_team: winner,
-        });
+        gameUpdate.state = "finished";
+        gameUpdate.winning_team = winner;
+      }
+      // Don't leave the turn marker pointing at a corpse.
+      if (game.active_player_id === playerId) {
+        gameUpdate.active_player_id = nextLivingPlayerId(seats, playerId);
       }
     }
+
+    tx.update(gameRef, gameUpdate);
 
     return { newLife, eliminated, winner };
   });
@@ -882,11 +898,6 @@ exports.eliminatePlayer = onCall(callableOptions, async (request) => {
       is_unveiled: true,
     });
 
-    // Update activity timestamp
-    tx.update(gameRef, {
-      last_activity_at: FieldValue.serverTimestamp(),
-    });
-
     // Check win conditions with updated state
     const updatedPlayers = allPlayers.map((p) => {
       if (p.id === callerPlayer.id) {
@@ -895,13 +906,18 @@ exports.eliminatePlayer = onCall(callableOptions, async (request) => {
       return p;
     });
 
+    const gameUpdate = {
+      last_activity_at: FieldValue.serverTimestamp(),
+    };
     const winner = checkWinConditions(updatedPlayers, game.game_mode);
     if (winner) {
-      tx.update(gameRef, {
-        state: "finished",
-        winning_team: winner,
-      });
+      gameUpdate.state = "finished";
+      gameUpdate.winning_team = winner;
     }
+    if (game.active_player_id === callerPlayer.id) {
+      gameUpdate.active_player_id = nextLivingPlayerId(updatedPlayers, callerPlayer.id);
+    }
+    tx.update(gameRef, gameUpdate);
 
     return { success: true };
   });
@@ -1932,37 +1948,14 @@ exports.advanceTurn = onCall(callableOptions, async (request) => {
       db.collection(`games/${gameId}/players`).orderBy("order_id")
     );
     const seats = playersSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
-    const alive = seats.filter((p) => !p.is_eliminated);
-
-    // Everyone eliminated: nothing sensible to advance to. Clear the marker
-    // rather than pointing at a dead seat.
-    if (alive.length === 0) {
-      tx.update(gameRef, {
-        active_player_id: null,
-        last_activity_at: FieldValue.serverTimestamp(),
-      });
-      return { activePlayerId: null };
-    }
-
-    // Walk forward from the current seat around the ring to the next living
-    // player. Starting from -1 when unset means an unset turn advances to the
-    // first seat rather than nowhere.
-    const currentIndex = seats.findIndex((p) => p.id === game.active_player_id);
-    let next = null;
-    for (let step = 1; step <= seats.length; step++) {
-      const candidate = seats[(currentIndex + step + seats.length) % seats.length];
-      if (!candidate.is_eliminated) {
-        next = candidate;
-        break;
-      }
-    }
+    const nextId = nextLivingPlayerId(seats, game.active_player_id);
 
     tx.update(gameRef, {
-      active_player_id: next.id,
+      active_player_id: nextId,
       last_activity_at: FieldValue.serverTimestamp(),
     });
 
-    return { activePlayerId: next.id };
+    return { activePlayerId: nextId };
   });
 });
 
@@ -1997,6 +1990,9 @@ exports.reorderSeats = onCall(callableOptions, async (request) => {
 
     if (!(game.player_ids || []).includes(uid)) {
       throw new HttpsError("permission-denied", "You are not in this game.");
+    }
+    if (game.state === "finished") {
+      throw new HttpsError("failed-precondition", "Game is already finished.");
     }
 
     const playersSnap = await tx.get(db.collection(`games/${gameId}/players`));

@@ -303,4 +303,57 @@ describe('reorderSeats', () => {
     });
     assert.equal((await h.getGame(game.gameId)).active_player_id, seats[1]);
   });
+
+  it('rejects a reorder after the game has finished', async () => {
+    const users = await h.getUsers(4);
+    const game = await startGameFor(users);
+    const seats = await seatIds(game.gameId);
+    await h.patchGame(game.gameId, { state: 'finished', winning_team: 'leader' });
+    await h.expectHttpsError(
+      users[0].call('reorderSeats', { gameId: game.gameId, orderedPlayerIds: seats }),
+      'failed-precondition'
+    );
+  });
+});
+
+describe('elimination advances a stale turn marker', () => {
+  it('forfeit of the active player hands the turn to the next living seat', async () => {
+    const users = await h.getUsers(4);
+    const game = await startGameFor(users);
+    const seats = await seatIds(game.gameId);
+
+    // Seat 0 is the leader (seatsFor layout). Forfeiting them would end the
+    // game. Put the turn on the first assassin and have them forfeit instead.
+    await users[0].call('setActivePlayer', { gameId: game.gameId, playerId: seats[1] });
+    await users[1].call('eliminatePlayer', { gameId: game.gameId });
+
+    const g = await h.getGame(game.gameId);
+    assert.equal(g.state, 'in_progress');
+    assert.equal(g.active_player_id, seats[2]);
+  });
+
+  it('life-to-zero of the active player also advances the turn', async () => {
+    const users = await h.getUsers(4);
+    const game = await startGameFor(users);
+    const seats = await seatIds(game.gameId);
+
+    await users[0].call('setActivePlayer', { gameId: game.gameId, playerId: seats[1] });
+    await users[0].call('adjustLife', { gameId: game.gameId, playerId: seats[1], amount: -40 });
+
+    const g = await h.getGame(game.gameId);
+    assert.equal(g.state, 'in_progress');
+    assert.equal(g.active_player_id, seats[2]);
+    assert.equal((await h.getPlayer(game.gameId, seats[1])).is_eliminated, true);
+  });
+
+  it('eliminating a non-active player leaves the marker alone', async () => {
+    const users = await h.getUsers(4);
+    const game = await startGameFor(users);
+    const seats = await seatIds(game.gameId);
+
+    await users[0].call('setActivePlayer', { gameId: game.gameId, playerId: seats[0] });
+    await users[2].call('eliminatePlayer', { gameId: game.gameId });
+
+    assert.equal((await h.getGame(game.gameId)).active_player_id, seats[0]);
+  });
 });
