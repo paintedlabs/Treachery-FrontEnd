@@ -50,6 +50,18 @@ final class GameBoardViewModel: ObservableObject {
         return players.first { $0.userId == userId }
     }
 
+    /// Unveiled traitor ability that has not been resolved yet.
+    /// Decline/Skip leaves `ability_resolved` unset on the server, so this
+    /// stays non-nil and the Action Bar can reopen the sheet.
+    var resolvableAbility: ExecutableAbility? {
+        guard let player = currentPlayer,
+              player.isUnveiled,
+              !player.isEliminated,
+              !player.abilityResolved,
+              let cardId = player.identityCardId else { return nil }
+        return ExecutableAbility(cardId: cardId)
+    }
+
     var currentIdentityCard: IdentityCard? {
         guard let cardId = currentPlayer?.identityCardId else { return nil }
         return cardDatabase.card(withId: cardId)
@@ -260,15 +272,25 @@ final class GameBoardViewModel: ObservableObject {
         isPending = false
     }
 
-    private func checkForAbilityTrigger(player: Player) {
-        guard let cardId = player.identityCardId,
-              let ability = ExecutableAbility(cardId: cardId) else { return }
+    func presentAbilityResolver() {
+        guard let player = currentPlayer, resolvableAbility != nil else { return }
+        pendingAbilityResolution = makeAbilityResolution(for: player)
+    }
 
-        let resolution: AbilityResolution
+    private func checkForAbilityTrigger(player: Player) {
+        guard !player.abilityResolved else { return }
+        guard ExecutableAbility(cardId: player.identityCardId ?? "") != nil else { return }
+        pendingAbilityResolution = makeAbilityResolution(for: player)
+    }
+
+    private func makeAbilityResolution(for player: Player) -> AbilityResolution? {
+        guard let cardId = player.identityCardId,
+              let ability = ExecutableAbility(cardId: cardId) else { return nil }
+
         switch ability {
         case .metamorph:
             let eliminated = players.filter { $0.isEliminated && $0.role != .leader && $0.userId != player.userId }
-            resolution = AbilityResolution(
+            return AbilityResolution(
                 abilityType: .metamorph,
                 actingPlayerId: player.id,
                 candidateCards: [],
@@ -276,21 +298,20 @@ final class GameBoardViewModel: ObservableObject {
             )
         case .puppetMaster:
             let otherAlive = players.filter { !$0.isEliminated && $0.userId != player.userId }
-            resolution = AbilityResolution(
+            return AbilityResolution(
                 abilityType: .puppetMaster,
                 actingPlayerId: player.id,
                 candidateCards: [],
                 candidatePlayers: otherAlive
             )
         case .wearerOfMasks:
-            resolution = AbilityResolution(
+            return AbilityResolution(
                 abilityType: .wearerOfMasks,
                 actingPlayerId: player.id,
                 candidateCards: [],
                 candidatePlayers: []
             )
         }
-        pendingAbilityResolution = resolution
     }
 
     // MARK: - Leave Game (via Cloud Function)

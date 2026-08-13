@@ -125,6 +125,7 @@ struct PlayerDecodingTests {
         #expect(player.lifeTotal == 40)
         #expect(player.isEliminated == false)
         #expect(player.isUnveiled == true)
+        #expect(player.abilityResolved == false)
     }
 
     @Test func decodesPlayerWithNilOptionals() throws {
@@ -145,6 +146,25 @@ struct PlayerDecodingTests {
         #expect(player.identityCardId == nil)
         #expect(player.playerColor == nil)
         #expect(player.commanderName == nil)
+        #expect(player.abilityResolved == false)
+    }
+
+    @Test func decodesAbilityResolvedTrue() throws {
+        let json = Data("""
+        {
+            "id": "p1",
+            "order_id": 0,
+            "user_id": "u1",
+            "display_name": "Bob",
+            "life_total": 40,
+            "is_eliminated": false,
+            "is_unveiled": true,
+            "joined_at": 1000000,
+            "ability_resolved": true
+        }
+        """.utf8)
+        let player = try decoder.decode(Player.self, from: json)
+        #expect(player.abilityResolved == true)
     }
 
     @Test func playerEquality() {

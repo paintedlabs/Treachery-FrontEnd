@@ -334,7 +334,9 @@ struct GameBoardView: View {
                 showWinnerSelection = false
             }
         }
-        .sheet(item: $viewModel.pendingAbilityResolution) { resolution in
+        .sheet(item: $viewModel.pendingAbilityResolution, onDismiss: {
+            viewModel.dismissAbility()
+        }) { resolution in
             switch resolution.abilityType {
             case .metamorph:
                 MetamorphAbilitySheet(

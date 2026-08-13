@@ -199,4 +199,62 @@ struct GameBoardViewModelTests {
         let vm = makeVM(game: game)
         #expect(vm.dieRollCost == 1)
     }
+
+    // MARK: - Traitor Ability Retry
+
+    private func abilityPlayer(
+        cardId: String = "traitor_07",
+        isUnveiled: Bool = true,
+        isEliminated: Bool = false,
+        abilityResolved: Bool = false
+    ) -> Player {
+        Player(
+            id: "p1", orderId: 1, userId: "u1", displayName: "Alice",
+            role: .traitor, identityCardId: cardId, lifeTotal: 40,
+            isEliminated: isEliminated, isUnveiled: isUnveiled, joinedAt: Date(),
+            abilityResolved: abilityResolved
+        )
+    }
+
+    @Test func resolvableAbilityWhenUnveiledMetamorph() {
+        let vm = makeVM(players: [abilityPlayer()])
+        #expect(vm.resolvableAbility == .metamorph)
+    }
+
+    @Test func resolvableAbilityWhenUnveiledPuppetMaster() {
+        let vm = makeVM(players: [abilityPlayer(cardId: "traitor_09")])
+        #expect(vm.resolvableAbility == .puppetMaster)
+    }
+
+    @Test func resolvableAbilityNilOnceResolved() {
+        let vm = makeVM(players: [abilityPlayer(abilityResolved: true)])
+        #expect(vm.resolvableAbility == nil)
+    }
+
+    @Test func resolvableAbilityNilWhenStillVeiled() {
+        let vm = makeVM(players: [abilityPlayer(isUnveiled: false)])
+        #expect(vm.resolvableAbility == nil)
+    }
+
+    @Test func resolvableAbilityNilWhenEliminated() {
+        let vm = makeVM(players: [abilityPlayer(isEliminated: true)])
+        #expect(vm.resolvableAbility == nil)
+    }
+
+    @Test func resolvableAbilityNilForNonAbilityCard() {
+        let vm = makeVM(players: [abilityPlayer(cardId: "assassin_01")])
+        #expect(vm.resolvableAbility == nil)
+    }
+
+    @Test func presentAbilityResolverOpensSheet() {
+        let vm = makeVM(players: [abilityPlayer()])
+        vm.presentAbilityResolver()
+        #expect(vm.pendingAbilityResolution?.abilityType == .metamorph)
+    }
+
+    @Test func presentAbilityResolverDoesNothingWhenResolved() {
+        let vm = makeVM(players: [abilityPlayer(abilityResolved: true)])
+        vm.presentAbilityResolver()
+        #expect(vm.pendingAbilityResolution == nil)
+    }
 }
