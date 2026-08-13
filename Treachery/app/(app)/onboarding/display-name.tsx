@@ -86,7 +86,7 @@ export default function DisplayNameScreen() {
         placeholderTextColor={colors.textTertiary}
         autoCapitalize="words"
         textContentType="name"
-        maxLength={30}
+        maxLength={40}
         editable={!isSaving}
         accessibilityLabel="Display name"
       />
