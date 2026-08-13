@@ -19,7 +19,7 @@ writes. Encoded in `firestore-tests/`.
 
 | Issue | Status |
 |---|---|
-| Every user doc world-readable: `email`, `phone_number`, `fcm_token` exposed to any signed-in user. Needs PII split into an owner-only subcollection — rules cannot withhold individual fields | **fixed** — public profile + `users/{uid}/private/data`; FCM via `registerFcmToken` |
+| Every user doc world-readable: `email`, `phone_number`, `fcm_token` exposed to any signed-in user. Needs PII split into an owner-only subcollection — rules cannot withhold individual fields | **open — schema fixed, data not migrated.** New writes go to `users/{uid}/private/data` on all three clients and FCM goes via `registerFcmToken`, but every pre-existing doc still holds its `email`/`phone_number`, and `firestore.rules:15` still lets any signed-in user read any `users/{uid}`. Closing it means running `functions/scripts/backfill-user-pii.js --apply` against each project. **Not yet run anywhere.** |
 | Non-participants can inject themselves into `player_ids` of an `in_progress` game, then read every player's hidden role/identity | **fixed — #97** |
 | `player_ids` can be overwritten wholesale (evict the whole table) | **fixed — #97** |
 | Join rule enforces no `max_players` capacity | **fixed — #97** |
@@ -53,14 +53,32 @@ Encoded in `Treachery/e2e/` (`test.fixme`) and `KNOWN_BROKEN_INVARIANTS`.
 | Planechase phenomena unreachable: `resolvePhenomenon` has no UI caller, so Interplanar Tunnel / Spatial Merging / Chaotic Aether park the table | **fixed** (web) — `PhenomenonOverlay`; native already had UI |
 | Puppet Master resolver sheet shows all players' hidden cards before redistribution | **fixed** — player names only until resolve |
 | `canSeeRole` is a dead prop in `PlayerRow` — the Puppet Master face-down peek never renders | **fixed** |
-| `Alert.alert` is a no-op on react-native-web: forgot-password confirmation and lobby "Copied!" never show; forgot-password also reads a stale error closure and reports success on failure | **open** |
+| `Alert.alert` is a no-op on react-native-web: forgot-password confirmation and lobby "Copied!" never show; forgot-password also reads a stale error closure and reports success on failure | **fixed** — `NoticeDialog`; the disbanded-lobby and unavailable-game alerts deleted as duplicates of their full-screen notices |
+
+## Cross-platform parity
+
+Found reviewing #108, which hardened the server ahead of the clients. Not
+test-encoded — no CI job builds Swift or Kotlin (see Repo hygiene).
+
+| Issue | Status |
+|---|---|
+| `resolveWearerOfMasks` rejects `traitor_07`/`09`/`13` but the pickers still offered them, so a legal-looking pick returned a raw server error | **fixed** — web and iOS filter the same three ids |
+| `ability_resolved` (the resolvers' once-per-game guard) was server-only, so Puppet Master's button stayed live after resolving | **fixed (web)** — iOS/Android have no equivalent gate, but Metamorph and Wearer self-heal there because their `identity_card_id` changes |
+| The `removeFriend` callable had no caller on any client, leaving every removal one-sided | **fixed at the service layer** — no client has friend-removal UI at all, so nothing reaches it yet |
+| iOS `updateUser` encoded the whole model, re-writing legacy PII back onto the public doc | **fixed** — public-field allowlist, matching web and Android |
+| **Android has no traitor-ability support whatsoever** — no `resolveMetamorph`/`resolvePuppetMaster`/`resolveWearerOfMasks` in `CloudFunctionsRepository`, no resolver UI. Treachery games are unplayable past an unveil on Android | **open** |
+| `maxTraitorRarity` is plumbed through both native clients but never sent (iOS passes `nil`, Android omits it), so the setting is web-only | **open** |
+| Both native lobbies fall back to the `navIsHost` nav param before the first game snapshot, so a demoted host briefly still sees host UI. Cosmetic — the server enforces host actions | **open** |
 
 ## Lower severity
 
 Not all individually test-encoded; from the audit report.
 
 - Profile win-rate deflated (divides by games with no recorded winner)
-- `max_players` mismatch: create screen writes 12 for non-treachery, settings/server cap at 8, bricking the stepper for those games (partially addressed: createGame callable caps at 8)
+- `max_players` mismatch: new games are capped at 8 everywhere now, but games
+  already stored with `max_players: 12` are still bricked in **both** stepper
+  directions — `+` is disabled at `>= 8` and `-` yields `Math.max(2, 11) = 11`,
+  which `updateGameSettings` rejects
 - Planar die cost displays the previous roller's count, not the caller's actual (often free) cost
 - Stale/deleted game link → infinite spinner with the web back button trapped
 - Client-side game-code generation is check-then-act racy; duplicate codes make one game unjoinable by code (**fixed** for createGame callable path)
@@ -74,8 +92,28 @@ Not all individually test-encoded; from the audit report.
 
 ## Repo hygiene
 
-- `functions/node_modules` is committed (~6.9k tracked files), inflating every
-  diff and causing spurious conflicts. Untrack with
-  `git rm -r --cached functions/node_modules` (safe: all workflows `npm ci`)
+- **CI never compiles iOS or Android.** `ci.yml` runs five jobs (web-app,
+  functions, functions-integration, firestore-rules, e2e) — no Swift, no
+  Kotlin, no SwiftLint. Native regressions are invisible until a push to `main`
+  triggers a deploy workflow; a Compose compile break shipped this way and was
+  only caught by review. This is the highest-value gap left in the pipeline
+- Client `games` create is still permitted by `firestore.rules:69-71` with an
+  arbitrary `code`/`max_players`/`game_mode`. The `createGame` callable is
+  preferred, not enforced, so the duplicate-join-code race survives for any
+  non-callable writer
+- `allocateUniqueJoinCode` is check-then-use rather than transactional, and
+  codes are never released — uniqueness is best-effort over 12 attempts
+- `registerFcmToken` will resurrect a deleted user doc (`set(..., {merge:true})`
+  creates the document when absent)
+- `AuthKey_*.p8` (an APNs auth key) sits untracked in the repo root. Ignored by
+  `*.p8`, so not leaked — but it is a live credential on disk
+- `GoogleService-Info.plist` is tracked despite matching `.gitignore`; left that
+  way deliberately because the iOS build needs it
+- Screenshot capture (`fastlane screenshots`) runs against **production**
+  Firebase via real guest auth — `--FASTLANE_SNAPSHOT` is passed but no app code
+  reads it. Making it repeatable means honouring that flag and pointing at
+  fixtures or the emulator
 - Lobby "Game Mode" chips clip off-screen at phone widths ("Treachery +
   Planechase" unreachable at 375px)
+- ~~`functions/node_modules` is committed~~ — **fixed**, untracked along with
+  `.DS_Store`, `xcuserdata` and the `.firebase` hosting cache
