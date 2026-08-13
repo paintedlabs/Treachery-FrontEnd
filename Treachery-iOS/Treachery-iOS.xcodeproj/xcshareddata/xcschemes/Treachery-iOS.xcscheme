@@ -51,6 +51,15 @@
                BlueprintName = "Treachery-iOSUITests"
                ReferencedContainer = "container:Treachery-iOS.xcodeproj">
             </BuildableReference>
+            <SkippedTests>
+               <!-- Screenshot capture signs in as a real guest against live
+                    Firebase, so it must not run on Cmd-U or in a plain
+                    `xcodebuild test`. `fastlane screenshots` passes
+                    -only-testing:, which overrides this skip. -->
+               <Test
+                  Identifier = "ScreenshotTests">
+               </Test>
+            </SkippedTests>
          </TestableReference>
       </Testables>
    </TestAction>

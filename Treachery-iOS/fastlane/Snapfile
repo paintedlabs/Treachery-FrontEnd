@@ -1,0 +1,41 @@
+# Snapfile — Fastlane screenshot configuration
+# Docs: https://docs.fastlane.tools/actions/snapshot/
+#
+# Run this through `fastlane screenshots`, not `fastlane snapshot` directly.
+# The project, scheme and test-class filter are passed by that lane so they
+# track the XCODEPROJ/SCHEME constants the other lanes use, and the lane carries
+# the warning about these tests hitting production Firebase.
+
+# Devices to capture (App Store requires specific display sizes)
+devices([
+  "iPhone 16 Pro Max",   # 6.9" — required for App Store
+  "iPhone 16 Pro",       # 6.3"
+  "iPhone 16",           # 6.1"
+  "iPad Pro 13-inch (M4)" # iPad — if you want iPad screenshots
+])
+
+# Languages / locales
+languages([
+  "en-US"
+])
+
+# Output
+output_directory("./fastlane/screenshots")
+clear_previous_screenshots(true)
+
+# Performance
+concurrent_simulators(true)
+stop_after_first_error(false)
+
+# Clean status bar (iOS 13+)
+override_status_bar(true)
+
+# SnapshotHelper.swift here is a trimmed local variant, not the file that
+# `fastlane snapshot update` writes, so it carries no SnapshotHelperVersion
+# marker and snapshot's freshness check would abort the run before building.
+skip_helper_version_check(true)
+
+# No launch_arguments on purpose: SnapshotHelper injects --FASTLANE_SNAPSHOT
+# itself and never reads snapshot-launch_arguments.txt, so anything set here
+# would silently do nothing. Nothing in the app reads that flag yet either —
+# see the warning in the Fastfile's screenshots lane.
