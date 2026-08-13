@@ -216,54 +216,15 @@ describe('startGame — non-treachery game modes', () => {
 });
 
 describe('startGame — player counts outside the distribution table', () => {
-  // SKIP: currently broken — see finding #F. Un-skip when functions/index.js is fixed.
-  //
-  // getRoleDistribution() falls back to the 4-player distribution (sum = 4) for
-  // any count it does not know, so a 9-player game assigns only 4 roles and the
-  // 5th player gets role `undefined`. That surfaces as an opaque
-  // `internal: Not enough identity cards for role: undefined`.
-  //
-  // Correct expectation: either a real 9-player distribution, or a clear
-  // client-facing error — never `internal`.
-  it(
-    'a 9-player game either deals a real distribution or fails with a clear error',
-    { skip: 'currently broken — see finding #F' },
-    async () => {
-      const users = await h.getUsers(9);
-      const game = await h.seedGame({ users, maxPlayers: 8 });
+  it('rejects a 9-player start with a clear client error', async () => {
+    const users = await h.getUsers(9);
+    const game = await h.seedGame({ users, maxPlayers: 8 });
 
-      let err = null;
-      try {
-        await game.host.call('startGame', { gameId: game.gameId });
-      } catch (e) {
-        err = e;
-      }
-
-      if (err) {
-        const code = String(err.code || '').replace(/^functions\//, '');
-        assert.ok(
-          ['failed-precondition', 'invalid-argument'].includes(code),
-          `expected a clear client error, got "${code}": ${err.message}`
-        );
-        const g = await h.getGame(game.gameId);
-        assert.equal(g.state, 'waiting', 'a failed start must roll back');
-        return;
-      }
-
-      const players = await h.getPlayers(game.gameId);
-      assert.equal(players.length, 9);
-      const counts = h.roleCounts(players);
-      assert.equal(
-        counts.leader + counts.guardian + counts.assassin + counts.traitor,
-        9,
-        'every player must receive a role'
-      );
-      assert.equal(counts.leader, 1, 'exactly one leader');
-      assert.equal(
-        new Set(players.map((p) => p.identity_card_id)).size,
-        9,
-        'identity cards must be unique'
-      );
-    }
-  );
+    await h.expectHttpsError(
+      game.host.call('startGame', { gameId: game.gameId }),
+      'failed-precondition'
+    );
+    const g = await h.getGame(game.gameId);
+    assert.equal(g.state, 'waiting', 'a failed start must roll back');
+  });
 });
