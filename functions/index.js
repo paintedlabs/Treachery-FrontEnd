@@ -195,6 +195,27 @@ function sanitizeCommanderKey(name) {
   return cleaned.length > 0 ? cleaned : null;
 }
 
+// ── Numeric Argument Validation ──
+// Callable payloads are untrusted. `Number("abc")` is NaN and every
+// comparison against NaN is false, so a bare `if (n < 2 || n > 8) throw`
+// lets NaN — and non-integers like 5.5 — straight through into Firestore.
+// Returns the coerced integer, or null when the value is not one (or falls
+// outside an optional inclusive range).
+
+function parseIntegerArg(value, { min, max } = {}) {
+  let num = value;
+  if (typeof num === "string") {
+    // Blank strings coerce to 0, which would silently pass a range check.
+    if (num.trim() === "") return null;
+    num = Number(num);
+  }
+  // Number.isInteger already rejects NaN and ±Infinity.
+  if (typeof num !== "number" || !Number.isInteger(num)) return null;
+  if (min !== undefined && num < min) return null;
+  if (max !== undefined && num > max) return null;
+  return num;
+}
+
 // Characters allowed in join codes (no ambiguous I/O/0/1)
 const CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 
@@ -225,14 +246,34 @@ function privateUserRef(uid) {
   return db.doc(`users/${uid}/private/data`);
 }
 
-async function getUserFcmToken(uid) {
-  const privateSnap = await privateUserRef(uid).get();
-  if (privateSnap.exists && privateSnap.data()?.fcm_token) {
-    return privateSnap.data().fcm_token;
-  }
+/**
+ * Resolves FCM tokens for several users at once, index-aligned with `uids`
+ * (null where the user has no token). Batched: one getAll for the private
+ * docs, plus a second only for the users whose token has not migrated yet.
+ * `uids` must be free of duplicates — getAll resolves responses by path.
+ */
+async function getUserFcmTokens(uids) {
+  if (uids.length === 0) return [];
+
+  const privateSnaps = await db.getAll(...uids.map((uid) => privateUserRef(uid)));
+  const tokens = privateSnaps.map((snap) =>
+    snap.exists ? snap.data()?.fcm_token || null : null
+  );
+
   // Legacy: token still living on the public user doc
-  const publicSnap = await db.doc(`users/${uid}`).get();
-  return publicSnap.exists ? publicSnap.data()?.fcm_token || null : null;
+  const legacyIndexes = tokens
+    .map((token, idx) => (token ? -1 : idx))
+    .filter((idx) => idx >= 0);
+  if (legacyIndexes.length > 0) {
+    const publicSnaps = await db.getAll(
+      ...legacyIndexes.map((idx) => db.doc(`users/${uids[idx]}`))
+    );
+    publicSnaps.forEach((snap, n) => {
+      tokens[legacyIndexes[n]] = snap.exists ? snap.data()?.fcm_token || null : null;
+    });
+  }
+
+  return tokens;
 }
 
 // ── FCM Notification Helper ──
@@ -243,21 +284,27 @@ async function getUserFcmToken(uid) {
  */
 async function notifyPlayers(gameId, excludeUserId, title, body) {
   try {
-    // Get player user IDs from the game
+    // Get player user IDs from the game. Deduped and blank-filtered because
+    // the batched read below needs distinct, well-formed document paths.
     const playersSnap = await db.collection(`games/${gameId}/players`).get();
-    const userIds = playersSnap.docs
-      .map((d) => d.data().user_id)
-      .filter((uid) => uid !== excludeUserId);
+    const userIds = [
+      ...new Set(
+        playersSnap.docs
+          .map((d) => d.data().user_id)
+          .filter((uid) => uid && uid !== excludeUserId)
+      ),
+    ];
 
     if (userIds.length === 0) return;
 
-    // Fetch FCM tokens from private (or legacy public) user data
+    // Fetch FCM tokens from private (or legacy public) user data.
+    // tokenEntries stays index-aligned with the tokens sent below, which the
+    // invalid-token cleanup relies on to map a failure back to its user.
+    const fcmTokens = await getUserFcmTokens(userIds);
     const tokenEntries = []; // { uid, token }
-    for (const uid of userIds) {
-      // eslint-disable-next-line no-await-in-loop
-      const fcmToken = await getUserFcmToken(uid);
-      if (fcmToken) tokenEntries.push({ uid, token: fcmToken });
-    }
+    userIds.forEach((uid, idx) => {
+      if (fcmTokens[idx]) tokenEntries.push({ uid, token: fcmTokens[idx] });
+    });
 
     if (tokenEntries.length === 0) return;
 
@@ -354,13 +401,14 @@ exports.createGame = onCall(callableOptions, async (request) => {
   const hasTreachery = gameMode === "treachery" || gameMode === "treachery_planechase";
   const hasPlanechase = gameMode === "planechase" || gameMode === "treachery_planechase";
   const defaultMax = 8;
-  const mp = maxPlayers !== undefined ? Number(maxPlayers) : defaultMax;
-  if (mp < 2 || mp > 8) {
+  const mp =
+    maxPlayers !== undefined ? parseIntegerArg(maxPlayers, { min: 2, max: 8 }) : defaultMax;
+  if (mp === null) {
     throw new HttpsError("invalid-argument", "Max players must be 2-8.");
   }
 
-  const sl = Number(startingLife);
-  if (![20, 25, 30, 40, 50].includes(sl)) {
+  const sl = parseIntegerArg(startingLife);
+  if (sl === null || ![20, 25, 30, 40, 50].includes(sl)) {
     throw new HttpsError("invalid-argument", "Invalid starting life value.");
   }
 
@@ -1763,14 +1811,14 @@ exports.updateGameSettings = onCall(callableOptions, async (request) => {
     const update = { last_activity_at: FieldValue.serverTimestamp() };
 
     if (maxPlayers !== undefined) {
-      const mp = Number(maxPlayers);
-      if (mp < 2 || mp > 8) throw new HttpsError("invalid-argument", "Max players must be 2-8.");
+      const mp = parseIntegerArg(maxPlayers, { min: 2, max: 8 });
+      if (mp === null) throw new HttpsError("invalid-argument", "Max players must be 2-8.");
       update.max_players = mp;
     }
 
     if (startingLife !== undefined) {
-      const sl = Number(startingLife);
-      if (![20, 25, 30, 40, 50].includes(sl)) {
+      const sl = parseIntegerArg(startingLife);
+      if (sl === null || ![20, 25, 30, 40, 50].includes(sl)) {
         throw new HttpsError("invalid-argument", "Invalid starting life value.");
       }
       update.starting_life = sl;
@@ -1793,11 +1841,11 @@ exports.updateGameSettings = onCall(callableOptions, async (request) => {
 
     tx.update(gameRef, update);
 
-    // If starting life changed, update all existing players' life totals
+    // If starting life changed, update all existing players' life totals.
+    // Reuse the already-validated value rather than re-coercing the argument.
     if (startingLife !== undefined && playersSnap) {
-      const sl = Number(startingLife);
       playersSnap.docs.forEach((doc) => {
-        tx.update(doc.ref, { life_total: sl });
+        tx.update(doc.ref, { life_total: update.starting_life });
       });
     }
 

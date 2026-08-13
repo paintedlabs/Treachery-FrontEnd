@@ -1629,6 +1629,115 @@ suite("Planechase — Chaos Ability Data Integrity", () => {
   });
 });
 
+// Mirrors the callable-argument validator in index.js. Callable payloads are
+// untrusted, so a value that is not an integer has to fail closed instead of
+// slipping past a range check that is false on both sides (NaN).
+function parseIntegerArg(value, { min, max } = {}) {
+  let num = value;
+  if (typeof num === "string") {
+    if (num.trim() === "") return null;
+    num = Number(num);
+  }
+  if (typeof num !== "number" || !Number.isInteger(num)) return null;
+  if (min !== undefined && num < min) return null;
+  if (max !== undefined && num > max) return null;
+  return num;
+}
+
+const STARTING_LIFE_VALUES = [20, 25, 30, 40, 50];
+
+suite("Callable Argument Validation — parseIntegerArg", () => {
+  test("accepts an in-range integer", () => {
+    assert.strictEqual(parseIntegerArg(6, { min: 2, max: 8 }), 6);
+  });
+
+  test("accepts both inclusive bounds", () => {
+    assert.strictEqual(parseIntegerArg(2, { min: 2, max: 8 }), 2);
+    assert.strictEqual(parseIntegerArg(8, { min: 2, max: 8 }), 8);
+  });
+
+  test("rejects values outside the range", () => {
+    for (const bad of [1, 9, 0, -3]) {
+      assert.strictEqual(
+        parseIntegerArg(bad, { min: 2, max: 8 }),
+        null,
+        `Expected ${bad} to be rejected`
+      );
+    }
+  });
+
+  test("REGRESSION: a non-numeric string no longer slips through as NaN", () => {
+    // The old check was `const mp = Number(maxPlayers); if (mp < 2 || mp > 8)`.
+    // Both comparisons are false for NaN, so max_players: NaN reached Firestore.
+    const legacy = Number("abc");
+    assert.ok(Number.isNaN(legacy), "Number('abc') is NaN");
+    assert.ok(!(legacy < 2) && !(legacy > 8), "NaN passes the old range check");
+    assert.strictEqual(parseIntegerArg("abc", { min: 2, max: 8 }), null);
+  });
+
+  test("rejects NaN and infinities", () => {
+    for (const bad of [NaN, Infinity, -Infinity]) {
+      assert.strictEqual(
+        parseIntegerArg(bad, { min: 2, max: 8 }),
+        null,
+        `Expected ${bad} to be rejected`
+      );
+    }
+  });
+
+  test("rejects non-integers inside the range", () => {
+    assert.strictEqual(parseIntegerArg(5.5, { min: 2, max: 8 }), null);
+    assert.strictEqual(parseIntegerArg("5.5", { min: 2, max: 8 }), null);
+  });
+
+  test("rejects non-numeric types", () => {
+    for (const bad of [null, undefined, true, false, {}, [], [6], () => 6]) {
+      assert.strictEqual(
+        parseIntegerArg(bad, { min: 2, max: 8 }),
+        null,
+        `Expected ${JSON.stringify(bad)} to be rejected`
+      );
+    }
+  });
+
+  test("rejects blank strings that would coerce to 0", () => {
+    assert.ok(Number("") === 0 && Number("   ") === 0, "blank strings coerce to 0");
+    assert.strictEqual(parseIntegerArg(""), null);
+    assert.strictEqual(parseIntegerArg("   "), null);
+  });
+
+  test("coerces a well-formed numeric string", () => {
+    assert.strictEqual(parseIntegerArg("6", { min: 2, max: 8 }), 6);
+    assert.strictEqual(parseIntegerArg(" 40 "), 40);
+  });
+
+  test("without a range, any integer is accepted", () => {
+    assert.strictEqual(parseIntegerArg(-20), -20);
+    assert.strictEqual(parseIntegerArg(0), 0);
+    assert.strictEqual(parseIntegerArg(1000), 1000);
+  });
+
+  test("startingLife allowlist accepts only the supported values", () => {
+    for (const life of STARTING_LIFE_VALUES) {
+      const sl = parseIntegerArg(life);
+      assert.ok(
+        sl !== null && STARTING_LIFE_VALUES.includes(sl),
+        `Expected ${life} to be accepted`
+      );
+    }
+  });
+
+  test("startingLife allowlist rejects NaN, floats, and unsupported values", () => {
+    for (const bad of ["abc", 40.5, 35, 0, -20, ""]) {
+      const sl = parseIntegerArg(bad);
+      assert.ok(
+        sl === null || !STARTING_LIFE_VALUES.includes(sl),
+        `Expected ${JSON.stringify(bad)} to be rejected as a starting life`
+      );
+    }
+  });
+});
+
 // ═════════════════════════════════════════════════════════════════
 // RESULTS
 // ═════════════════════════════════════════════════════════════════
