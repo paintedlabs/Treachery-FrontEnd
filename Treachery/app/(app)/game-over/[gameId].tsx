@@ -8,6 +8,8 @@ import { LoadingScreen } from '@/components/LoadingScreen';
 import { ROLE_COLORS, ROLE_DISPLAY_NAMES } from '@/constants/roles';
 import { colors, spacing, fonts, contentMaxWidths } from '@/constants/theme';
 import { useResponsive } from '@/hooks/useResponsive';
+import { getCard } from '@/services/cardDatabase';
+import { dealtRole, dealtIdentityCardId } from '@/models/types';
 
 export default function GameOverScreen() {
   const { gameId } = useLocalSearchParams<{ gameId: string }>();
@@ -15,7 +17,7 @@ export default function GameOverScreen() {
   const { currentUserId } = useAuth();
 
   const { isDesktop } = useResponsive();
-  const { game, players, winningTeam, identityCard, isGameFinished } = useGameBoard(
+  const { game, players, winningTeam, isGameFinished } = useGameBoard(
     gameId!,
     currentUserId,
   );
@@ -104,8 +106,10 @@ export default function GameOverScreen() {
       <View style={styles.playerList}>
         {players.map((player, index) => {
           if (isTreacheryMode) {
-            const card = identityCard(player);
-            const roleColor = player.role ? ROLE_COLORS[player.role] : colors.textSecondary;
+            const role = dealtRole(player);
+            const cardId = dealtIdentityCardId(player);
+            const card = cardId ? getCard(cardId) : undefined;
+            const roleColor = role ? ROLE_COLORS[role] : colors.textSecondary;
 
             const playerAccentColor = player.player_color || roleColor;
 
@@ -122,7 +126,7 @@ export default function GameOverScreen() {
                   </View>
                   <View style={styles.playerRight}>
                     <Text style={[styles.roleText, { color: roleColor }]}>
-                      {player.role ? ROLE_DISPLAY_NAMES[player.role] : 'Unknown'}
+                      {role ? ROLE_DISPLAY_NAMES[role] : 'Unknown'}
                     </Text>
                     {card && <Text style={styles.cardName}>{card.name}</Text>}
                   </View>

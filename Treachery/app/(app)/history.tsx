@@ -6,7 +6,7 @@ import { useGameHistory } from '@/hooks/useGameHistory';
 import { ErrorBanner } from '@/components/ErrorBanner';
 import { getCard } from '@/services/cardDatabase';
 import { ROLE_COLORS, ROLE_DISPLAY_NAMES } from '@/constants/roles';
-import { Game, Player, Role } from '@/models/types';
+import { Game, Player, Role, dealtRole, dealtIdentityCardId } from '@/models/types';
 import { colors, spacing, fonts, contentMaxWidths } from '@/constants/theme';
 import { useResponsive } from '@/hooks/useResponsive';
 
@@ -67,12 +67,14 @@ function GameHistoryRow({
 }) {
   const winningRole = game.winning_team as Role | null;
   const myPlayer = players.find((p) => p.user_id === currentUserId);
+  const myDealtRole = myPlayer ? dealtRole(myPlayer) : null;
+  const myDealtCardId = myPlayer ? dealtIdentityCardId(myPlayer) : null;
   const didWin = (() => {
-    if (!myPlayer?.role || !winningRole) return false;
+    if (!myDealtRole || !winningRole) return false;
     if (winningRole === 'leader') {
-      return myPlayer.role === 'leader' || myPlayer.role === 'guardian';
+      return myDealtRole === 'leader' || myDealtRole === 'guardian';
     }
-    return myPlayer.role === winningRole;
+    return myDealtRole === winningRole;
   })();
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -90,7 +92,7 @@ function GameHistoryRow({
   };
 
   // Use role color for the card border accent
-  const borderColor = myPlayer?.role ? ROLE_COLORS[myPlayer.role] + '60' : colors.border;
+  const borderColor = myDealtRole ? ROLE_COLORS[myDealtRole] + '60' : colors.border;
 
   return (
     <View style={[styles.gameCard, { borderColor }]}>
@@ -122,7 +124,8 @@ function GameHistoryRow({
           <View style={styles.gameDivider} />
           <View style={styles.playerGrid}>
             {players.map((player) => {
-              const roleColor = player.role ? ROLE_COLORS[player.role] : colors.textSecondary;
+              const role = dealtRole(player);
+              const roleColor = role ? ROLE_COLORS[role] : colors.textSecondary;
               return (
                 <View key={player.id} style={styles.gridPlayer}>
                   <View style={[styles.gridDot, { backgroundColor: roleColor }]} />
@@ -146,15 +149,15 @@ function GameHistoryRow({
       )}
 
       {/* My role */}
-      {myPlayer?.role && (
+      {myDealtRole && (
         <View style={styles.myRoleRow}>
           <Text style={styles.myRoleLabel}>Your role:</Text>
-          <Text style={[styles.myRoleValue, { color: ROLE_COLORS[myPlayer.role] }]}>
-            {ROLE_DISPLAY_NAMES[myPlayer.role]}
+          <Text style={[styles.myRoleValue, { color: ROLE_COLORS[myDealtRole] }]}>
+            {ROLE_DISPLAY_NAMES[myDealtRole]}
           </Text>
-          {myPlayer.identity_card_id && (
+          {myDealtCardId && (
             <Text style={styles.myCardName}>
-              ({getCard(myPlayer.identity_card_id)?.name ?? ''})
+              ({getCard(myDealtCardId)?.name ?? ''})
             </Text>
           )}
         </View>

@@ -64,6 +64,8 @@ export interface PlayerTileProps {
   isDropTarget?: boolean;
   /** 'tv' is a larger variant for a future spectator screen: bigger life number, no controls. */
   size?: 'normal' | 'tv';
+  /** Spectator / eliminated viewer: life buttons stay visible but do nothing. */
+  isDisabled?: boolean;
 }
 
 export function PlayerTile({
@@ -71,7 +73,7 @@ export function PlayerTile({
   isCurrentUser,
   isActiveTurn,
   canSeeRole,
-  isUnveiledOrLeader,
+  isUnveiledOrLeader: _isUnveiledOrLeader,
   onAdjustLife,
   onViewCard,
   onRename,
@@ -80,6 +82,7 @@ export function PlayerTile({
   isDragging,
   isDropTarget,
   size = 'normal',
+  isDisabled,
 }: PlayerTileProps) {
   const isTv = size === 'tv';
 
@@ -89,7 +92,7 @@ export function PlayerTile({
   const visibleRole = canSeeRole ? player.role : null;
   const roleColor = visibleRole ? ROLE_COLORS[visibleRole] : colors.textSecondary;
   const effectiveColor = player.player_color || playerColor;
-  const canInspectCard = isUnveiledOrLeader && !isCurrentUser && !isTv && !!onViewCard;
+  const canInspectCard = canSeeRole && !isCurrentUser && !isTv && !!onViewCard;
 
   // The tv variant is a read-only spectator screen — no editing your own seat on it.
   const showOwnControls = isCurrentUser && !isTv;
@@ -240,6 +243,7 @@ export function PlayerTile({
         {!player.is_eliminated && !isTv && (
           <Pressable
             onPress={() => onAdjustLife(-1)}
+            disabled={isDisabled}
             style={({ hovered, pressed }: WebPressableState) => [
               styles.lifeButton,
               hovered && styles.lifeButtonDecrHovered,
@@ -267,6 +271,7 @@ export function PlayerTile({
         {!player.is_eliminated && !isTv && (
           <Pressable
             onPress={() => onAdjustLife(1)}
+            disabled={isDisabled}
             style={({ hovered, pressed }: WebPressableState) => [
               styles.lifeButton,
               hovered && styles.lifeButtonIncrHovered,

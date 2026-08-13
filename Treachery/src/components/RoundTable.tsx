@@ -41,6 +41,8 @@ export interface RoundTableProps {
    * expressed in SHARED order (rotation is undone before this is called).
    */
   onReorder: (orderedPlayerIds: string[]) => void;
+  /** When false, seats stay put (eliminated spectators cannot restack the table). */
+  canReorder?: boolean;
   /** Renders one player's tile. `isDragging`/`isDropTarget` drive its visuals. */
   renderTile: (
     player: Player,
@@ -55,6 +57,7 @@ export function RoundTable({
   currentUserId,
   activePlayerId,
   onReorder,
+  canReorder = true,
   renderTile,
   center,
 }: RoundTableProps) {
@@ -116,7 +119,20 @@ export function RoundTable({
       </View>
 
       {size.width > 0 &&
-        seated.map((player, index) => (
+        seated.map((player, index) => {
+          const tile = renderTile(player, {
+            isActiveTurn: player.id === activePlayerId,
+            isDragging: draggingId === player.id,
+            isDropTarget: dropTargetId === player.id,
+          });
+          if (!canReorder) {
+            return (
+              <View key={player.id} style={[styles.seat, seatOrigin(index)]}>
+                {tile}
+              </View>
+            );
+          }
+          return (
           <DraggableSeat
             key={player.id}
             index={index}
@@ -175,13 +191,10 @@ export function RoundTable({
               onReorder(shared.map((p) => p.id));
             }}
           >
-            {renderTile(player, {
-              isActiveTurn: player.id === activePlayerId,
-              isDragging: draggingId === player.id,
-              isDropTarget: dropTargetId === player.id,
-            })}
+            {tile}
           </DraggableSeat>
-        ))}
+          );
+        })}
     </View>
   );
 }
