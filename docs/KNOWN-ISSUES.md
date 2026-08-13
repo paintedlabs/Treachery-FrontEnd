@@ -66,7 +66,7 @@ test-encoded — no CI job builds Swift or Kotlin (see Repo hygiene).
 | `ability_resolved` (the resolvers' once-per-game guard) was server-only, so Puppet Master's button stayed live after resolving | **fixed (web)** — iOS/Android have no equivalent gate, but Metamorph and Wearer self-heal there because their `identity_card_id` changes |
 | The `removeFriend` callable had no caller on any client, leaving every removal one-sided | **fixed at the service layer** — no client has friend-removal UI at all, so nothing reaches it yet |
 | iOS `updateUser` encoded the whole model, re-writing legacy PII back onto the public doc | **fixed** — public-field allowlist, matching web and Android |
-| **Android has no traitor-ability support whatsoever** — no `resolveMetamorph`/`resolvePuppetMaster`/`resolveWearerOfMasks` in `CloudFunctionsRepository`, no resolver UI. Treachery games are unplayable past an unveil on Android | **open** |
+| **Android has no traitor-ability support whatsoever** — no `resolveMetamorph`/`resolvePuppetMaster`/`resolveWearerOfMasks` in `CloudFunctionsRepository`, no resolver UI. Treachery games are unplayable past an unveil on Android | **fixed** — repository methods, `ability_resolved` gating, `AbilityResolverSheet` mirroring the iOS sheets; 211 unit tests green |
 | `maxTraitorRarity` is plumbed through both native clients but never sent (iOS passes `nil`, Android omits it), so the setting is web-only | **open** |
 | Both native lobbies fall back to the `navIsHost` nav param before the first game snapshot, so a demoted host briefly still sees host UI. Cosmetic — the server enforces host actions | **open** |
 
@@ -84,7 +84,14 @@ Not all individually test-encoded; from the audit report.
 - Client-side game-code generation is check-then-act racy; duplicate codes make one game unjoinable by code (**fixed** for createGame callable path)
 - New-user onboarding skippable via a `createUserDocumentIfNeeded` double-invocation race
 - `useConnectionStatus` watches only `navigator.onLine`, never Firestore sync state
-- Wearer of Masks X-cost unenforced server-side
+- Wearer of Masks X-cost unenforced server-side; the reveal is also drawn
+  client-side, so skip-and-reopen rerolls it (same on web — inherent to the
+  client-trust design)
+- `resolveWearerOfMasks` lacks the `original_identity_card_id` guard the other
+  two resolvers have: a Puppet Master redistribution can hand `traitor_13` to a
+  live player, who then unveils into a usable Wearer ability on every client.
+  Whether that is a rules bug or legitimate is undecided; if it's a bug, the
+  fix belongs server-side
 - Passwords trimmed before length validation
 - Duplicate friend requests after reload (sent-set is session-only)
 - N+1 sequential player fetches in history/profile
@@ -92,11 +99,10 @@ Not all individually test-encoded; from the audit report.
 
 ## Repo hygiene
 
-- **CI never compiles iOS or Android.** `ci.yml` runs five jobs (web-app,
-  functions, functions-integration, firestore-rules, e2e) — no Swift, no
-  Kotlin, no SwiftLint. Native regressions are invisible until a push to `main`
-  triggers a deploy workflow; a Compose compile break shipped this way and was
-  only caught by review. This is the highest-value gap left in the pipeline
+- ~~CI never compiles iOS or Android~~ — **fixed**: `ci-ios.yml`
+  (build-for-testing + mock-only unit tests, UITests excluded so nothing
+  touches live Firebase) and `ci-android.yml` (compile + unit tests), both
+  path-filtered on PRs to main
 - Client `games` create is still permitted by `firestore.rules:69-71` with an
   arbitrary `code`/`max_players`/`game_mode`. The `createGame` callable is
   preferred, not enforced, so the duplicate-join-code race survives for any
