@@ -110,13 +110,9 @@ struct PlayerRobustnessTests {
             "joined_at": 1000000
         }
         """.utf8)
-        // Role? with an unknown raw value should fail to decode,
-        // and since it's Optional via decodeIfPresent, it should be nil
-        // Note: decodeIfPresent actually throws for invalid values (not missing ones),
-        // so an unknown role string WILL throw. This documents that behavior.
-        #expect(throws: DecodingError.self) {
-            _ = try decoder.decode(Player.self, from: json)
-        }
+        let player = try decoder.decode(Player.self, from: json)
+        #expect(player.role == nil)
+        #expect(player.displayName == "Alice")
     }
 
     @Test func encodeThenDecodeRoundTrip() throws {

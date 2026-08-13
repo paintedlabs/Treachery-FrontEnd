@@ -40,6 +40,16 @@ struct ActionBar: View {
                 }
             }
 
+            if viewModel.resolvableAbility != nil {
+                Button("Activate Ability") {
+                    viewModel.presentAbilityResolver()
+                }
+                .buttonStyle(MtgPrimaryButtonStyle(isDisabled: viewModel.isPending))
+                .disabled(viewModel.isPending)
+                .padding(.horizontal)
+                .accessibilityLabel("Activate traitor ability")
+                .accessibilityHint("Opens the ability you unveiled. You can skip and come back later.")
+            }
         }
         .padding()
     }

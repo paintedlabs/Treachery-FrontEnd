@@ -22,6 +22,7 @@ struct Player: Codable, Identifiable, Equatable {
     var commanderName: String?
     var originalIdentityCardId: String?
     var isFaceDown: Bool
+    var abilityResolved: Bool
 
     enum CodingKeys: String, CodingKey {
         case id
@@ -38,6 +39,7 @@ struct Player: Codable, Identifiable, Equatable {
         case commanderName = "commander_name"
         case originalIdentityCardId = "original_identity_card_id"
         case isFaceDown = "is_face_down"
+        case abilityResolved = "ability_resolved"
     }
 
     // Custom decoder: uses decodeIfPresent for 'id' to handle documents
@@ -50,7 +52,14 @@ struct Player: Codable, Identifiable, Equatable {
         orderId = try container.decode(Int.self, forKey: .orderId)
         userId = try container.decode(String.self, forKey: .userId)
         displayName = try container.decode(String.self, forKey: .displayName)
-        role = try container.decodeIfPresent(Role.self, forKey: .role)
+        // Unknown role strings become nil instead of failing the whole player
+        // decode (Android's Role.fromValue() does the same). FirestoreManager
+        // uses try?, so a throw here would drop the player from the board.
+        if let rawRole = try container.decodeIfPresent(String.self, forKey: .role) {
+            role = Role(rawValue: rawRole)
+        } else {
+            role = nil
+        }
         identityCardId = try container.decodeIfPresent(String.self, forKey: .identityCardId)
         lifeTotal = try container.decode(Int.self, forKey: .lifeTotal)
         isEliminated = try container.decode(Bool.self, forKey: .isEliminated)
@@ -60,6 +69,7 @@ struct Player: Codable, Identifiable, Equatable {
         commanderName = try container.decodeIfPresent(String.self, forKey: .commanderName)
         originalIdentityCardId = try container.decodeIfPresent(String.self, forKey: .originalIdentityCardId)
         isFaceDown = try container.decodeIfPresent(Bool.self, forKey: .isFaceDown) ?? false
+        abilityResolved = try container.decodeIfPresent(Bool.self, forKey: .abilityResolved) ?? false
     }
 
     init(
@@ -76,7 +86,8 @@ struct Player: Codable, Identifiable, Equatable {
         playerColor: String? = nil,
         commanderName: String? = nil,
         originalIdentityCardId: String? = nil,
-        isFaceDown: Bool = false
+        isFaceDown: Bool = false,
+        abilityResolved: Bool = false
     ) {
         self.id = id
         self.orderId = orderId
@@ -92,5 +103,6 @@ struct Player: Codable, Identifiable, Equatable {
         self.commanderName = commanderName
         self.originalIdentityCardId = originalIdentityCardId
         self.isFaceDown = isFaceDown
+        self.abilityResolved = abilityResolved
     }
 }
