@@ -102,6 +102,26 @@ describe("friend_requests/{requestId}", () => {
         updateDoc(doc(db, "friend_requests", REQ), { status: "accepted" })
       );
     });
+
+    it("stops the recipient from rewriting from_user_id", async () => {
+      const db = await authedDb(BOB);
+      await assertFails(
+        updateDoc(doc(db, "friend_requests", REQ), {
+          status: "accepted",
+          from_user_id: MALLORY,
+        })
+      );
+    });
+
+    it("stops the recipient from rewriting to_user_id", async () => {
+      const db = await authedDb(BOB);
+      await assertFails(
+        updateDoc(doc(db, "friend_requests", REQ), {
+          status: "declined",
+          to_user_id: MALLORY,
+        })
+      );
+    });
   });
 
   describe("delete", () => {

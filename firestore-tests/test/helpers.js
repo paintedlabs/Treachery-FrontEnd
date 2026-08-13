@@ -115,7 +115,7 @@ function gameDoc(hostId, overrides = {}) {
     player_ids: [hostId],
     max_players: 6,
     starting_life: 40,
-    game_mode: "standard",
+    game_mode: "treachery",
     max_traitor_rarity: "mythic",
     join_code: "ABCD",
     created_at: new Date("2026-01-01T00:00:00Z"),
