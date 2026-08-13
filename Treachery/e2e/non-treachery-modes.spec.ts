@@ -55,13 +55,9 @@ for (const { mode, label } of MODES) {
       await expect(players[1].page.getByRole('button', { name: 'Forfeit' })).toHaveCount(0);
     });
 
-    // FIXME: currently broken — see finding #1. Un-fixme when the bug is fixed.
-    // adjustLife runs checkWinConditions for every mode. With no roles at all,
-    // checkWinConditions falls through to `!leaderAlive && !assassinAlive &&
-    // !traitorAlive → "assassin"`, so the first player to reach 0 life ends the
-    // game for the whole table. The win check must be gated on the game mode
-    // including treachery.
-    test.fixme(
+    // FIXED (#108): checkWinConditions now takes the game mode and returns null
+    // outside treachery modes, so a 0-life player no longer ends the table.
+    test(
       'a player hitting 0 life does not end the game for everyone else',
       async ({ browser }) => {
         const { gameId, players } = await setupNonTreacheryGame(browser, 4, mode, {

@@ -1,4 +1,4 @@
-//
+
 //  GameOverView.swift
 //  Treachery-iOS
 //
@@ -54,6 +54,35 @@ struct GameOverView: View {
                     Spacer()
                     MtgLoadingView(message: "Loading results...")
                     Spacer()
+                } else if !viewModel.isGameFinished {
+                    Spacer()
+                    VStack(spacing: 16) {
+                        Image(systemName: "clock")
+                            .font(.system(size: 56))
+                            .foregroundStyle(Color.mtgGold)
+                        Text("Game Still In Progress")
+                            .font(.system(size: 28, weight: .bold, design: .serif))
+                            .foregroundStyle(Color.mtgTextPrimary)
+                            .multilineTextAlignment(.center)
+                        Text("Results are available only after the game finishes.")
+                            .font(.subheadline)
+                            .foregroundStyle(Color.mtgTextSecondary)
+                            .multilineTextAlignment(.center)
+                    }
+                    .padding()
+                    Spacer()
+                    Button {
+                        if !navigationPath.isEmpty {
+                            navigationPath.removeLast()
+                        }
+                    } label: {
+                        Text("Return to Game")
+                            .fontWeight(.semibold)
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(MtgPrimaryButtonStyle())
+                    .padding(.horizontal, 32)
+                    .padding(.bottom, 32)
                 } else {
                     let isTreacheryMode = viewModel.game?.gameMode.includesTreachery ?? true
 

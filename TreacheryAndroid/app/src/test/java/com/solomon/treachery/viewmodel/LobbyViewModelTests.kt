@@ -89,7 +89,8 @@ class LobbyViewModelTests {
         @Test
         fun `non-host cannot start game`() = runTest {
             val vm = makeVM(isHost = false)
-            firestore.gameFlowSource.value = makeTreacheryGame()
+            // Live host comes from the game doc, so it must name someone else
+            firestore.gameFlowSource.value = makeTreacheryGame().copy(hostId = "user-2")
             firestore.playersFlowSource.value = makePlayers(4)
             advanceUntilIdle()
 
@@ -249,7 +250,8 @@ class LobbyViewModelTests {
         @Test
         fun `non-host startGame is no-op`() = runTest {
             val vm = makeVM(isHost = false)
-            firestore.gameFlowSource.value = makeTreacheryGame()
+            // Live host comes from the game doc, so it must name someone else
+            firestore.gameFlowSource.value = makeTreacheryGame().copy(hostId = "user-2")
             advanceUntilIdle()
 
             vm.startGame()

@@ -13,6 +13,7 @@ data class TreacheryUser(
     val elo: Int = 1500,
     val deckStats: Map<String, DeckStat>? = null
 ) {
+    /** Round-trips every field including PII — used by the model tests, never written to Firestore. */
     fun toMap(): Map<String, Any?> = mapOf(
         "id" to id,
         "display_name" to displayName,
@@ -24,6 +25,24 @@ data class TreacheryUser(
         "elo" to elo,
         "deck_stats" to deckStats?.mapValues { it.value.toMap() }
     )
+
+    /** Public profile fields only — PII is written under private/data. */
+    fun toPublicMap(): Map<String, Any?> = mapOf(
+        "id" to id,
+        "display_name" to displayName,
+        "friend_ids" to friendIds,
+        "created_at" to createdAt,
+        "elo" to elo,
+        "deck_stats" to deckStats?.mapValues { it.value.toMap() }
+    )
+
+    fun toPrivateMap(): Map<String, Any?> {
+        val data = mutableMapOf<String, Any?>()
+        email?.let { data["email"] = it }
+        phoneNumber?.let { data["phone_number"] = it }
+        fcmToken?.let { data["fcm_token"] = it }
+        return data
+    }
 
     companion object {
         fun fromMap(id: String, data: Map<String, Any?>): TreacheryUser = TreacheryUser(

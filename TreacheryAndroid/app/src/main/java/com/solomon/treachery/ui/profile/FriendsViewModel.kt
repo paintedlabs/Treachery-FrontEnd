@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.firebase.Timestamp
 import com.solomon.treachery.data.AnalyticsService
+import com.solomon.treachery.data.CloudFunctionsRepository
 import com.solomon.treachery.data.FirestoreRepository
 import com.solomon.treachery.model.*
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -16,7 +17,8 @@ import javax.inject.Inject
 
 @HiltViewModel
 class FriendsViewModel @Inject constructor(
-    private val firestoreRepository: FirestoreRepository
+    private val firestoreRepository: FirestoreRepository,
+    private val cloudFunctionsRepository: CloudFunctionsRepository
 ) : ViewModel() {
 
     private val _friends = MutableStateFlow<List<TreacheryUser>>(emptyList())
@@ -94,16 +96,7 @@ class FriendsViewModel @Inject constructor(
         viewModelScope.launch {
             _errorMessage.value = null
             try {
-                val updated = FriendRequest(
-                    id = request.id,
-                    fromUserId = request.fromUserId,
-                    fromDisplayName = request.fromDisplayName,
-                    toUserId = request.toUserId,
-                    status = FriendRequestStatus.ACCEPTED,
-                    createdAt = request.createdAt
-                )
-                firestoreRepository.updateFriendRequest(updated)
-                firestoreRepository.addFriend(userId, request.fromUserId)
+                cloudFunctionsRepository.acceptFriendRequest(request.id)
                 AnalyticsService.trackEvent("accept_friend_request")
                 loadData(userId)
             } catch (e: Exception) {

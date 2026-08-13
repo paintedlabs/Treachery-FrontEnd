@@ -5,7 +5,6 @@ import {
   TouchableOpacity,
   StyleSheet,
   FlatList,
-  Alert,
   Platform,
   Modal,
   ScrollView,
@@ -22,6 +21,7 @@ import { PlaneCardBanner } from '@/components/PlaneCardBanner';
 import { PlaneCardDetail } from '@/components/PlaneCardDetail';
 import { ChaoticAetherBanner } from '@/components/ChaoticAetherBanner';
 import { InterplanarTunnelPicker } from '@/components/InterplanarTunnelPicker';
+import { PhenomenonOverlay } from '@/components/PhenomenonOverlay';
 import { PlayerRow } from '@/components/PlayerRow';
 import { ErrorBanner } from '@/components/ErrorBanner';
 import { LoadingScreen } from '@/components/LoadingScreen';
@@ -67,6 +67,7 @@ export default function GameBoardScreen() {
     dieRollResult,
     isRollingDie,
     rollDie,
+    resolvePhenomenon,
     endGame,
   } = useGameBoard(gameId!, currentUserId);
 
@@ -124,21 +125,9 @@ export default function GameBoardScreen() {
     }
   }, [isGameFinished, gameId, router]);
 
-  // Handle game unavailable
-  useEffect(() => {
-    if (isGameUnavailable) {
-      Alert.alert('Game Unavailable', 'This game is no longer available.', [
-        { text: 'OK', onPress: () => router.replace('/(app)') },
-      ]);
-    }
-  }, [isGameUnavailable, router]);
-
-  const navigateToGameOver = () => {
-    router.replace({
-      pathname: '/(app)/game-over/[gameId]',
-      params: { gameId: gameId! },
-    });
-  };
+  // No Alert.alert for the unavailable case: it is a silent no-op on
+  // react-native-web, and the full-screen fallback below already states it
+  // and offers Return to Home on every platform.
 
   // Which confirmation (if any) is showing. In-app ConfirmDialog instead of
   // window.confirm/Alert.alert: one themed code path on every platform, and
@@ -159,8 +148,8 @@ export default function GameBoardScreen() {
         destructive: true,
         onConfirm: async () => {
           setPendingConfirm(null);
+          // Stay on the board; navigate only when the game actually finishes.
           await eliminateAndLeave();
-          navigateToGameOver();
         },
       };
     }
@@ -267,6 +256,17 @@ export default function GameBoardScreen() {
             )}
 
             {isPlanechaseActive && isChaoticAetherActive && <ChaoticAetherBanner />}
+
+            {isPlanechaseActive &&
+              !isOwnDeckMode &&
+              currentPlane?.is_phenomenon &&
+              !tunnelOptions && (
+                <PhenomenonOverlay
+                  plane={currentPlane}
+                  isPending={isPending}
+                  onResolve={resolvePhenomenon}
+                />
+              )}
 
             {/* Always-visible plane card image (rotated 90° clockwise) */}
             {isPlanechaseActive && !isOwnDeckMode && currentPlane?.image_uri && (
@@ -414,8 +414,8 @@ export default function GameBoardScreen() {
               </Text>
               <TouchableOpacity
                 style={styles.spectatorLeaveButton}
-                onPress={navigateToGameOver}
-                accessibilityLabel="Leave game"
+                onPress={() => router.replace('/(app)')}
+                accessibilityLabel="Leave game and return home"
                 accessibilityRole="button"
               >
                 <Text style={styles.spectatorLeaveText}>Leave Game</Text>

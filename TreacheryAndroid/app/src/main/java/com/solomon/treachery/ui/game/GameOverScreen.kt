@@ -70,6 +70,38 @@ fun GameOverScreen(
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator(color = MtgGold)
             }
+        } else if (game?.state != GameState.FINISHED) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .statusBarsPadding()
+                    .padding(16.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
+            ) {
+                Icon(Icons.Default.Schedule, contentDescription = null, tint = MtgGold, modifier = Modifier.size(56.dp))
+                Spacer(Modifier.height(16.dp))
+                Text(
+                    "Game Still In Progress",
+                    color = MtgTextPrimary,
+                    fontSize = 24.sp,
+                    fontWeight = FontWeight.Bold,
+                    fontFamily = FontFamily.Serif,
+                    textAlign = TextAlign.Center
+                )
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    "Results are available only after the game finishes.",
+                    color = MtgTextSecondary,
+                    textAlign = TextAlign.Center
+                )
+                Spacer(Modifier.height(24.dp))
+                // The game-over route pops the board off the back stack, so home is the only
+                // destination reachable from here (web and iOS return to the board instead).
+                Button(onClick = onNavigateHome) {
+                    Text("Return to Home")
+                }
+            }
         } else {
             Column(
                 modifier = Modifier

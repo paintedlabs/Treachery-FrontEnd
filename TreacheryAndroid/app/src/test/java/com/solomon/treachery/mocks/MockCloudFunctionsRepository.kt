@@ -50,6 +50,24 @@ class MockCloudFunctionsRepository : CloudFunctionsRepository {
         leaveGameCalls.add(gameId)
     }
 
+    val resolveMetamorphCalls = mutableListOf<Pair<String, String>>()
+    override suspend fun resolveMetamorph(gameId: String, targetPlayerId: String) {
+        throwIfNeeded()
+        resolveMetamorphCalls.add(gameId to targetPlayerId)
+    }
+
+    val resolvePuppetMasterCalls = mutableListOf<Pair<String, Map<String, String>>>()
+    override suspend fun resolvePuppetMaster(gameId: String, redistributions: Map<String, String>) {
+        throwIfNeeded()
+        resolvePuppetMasterCalls.add(gameId to redistributions)
+    }
+
+    val resolveWearerOfMasksCalls = mutableListOf<Pair<String, String?>>()
+    override suspend fun resolveWearerOfMasks(gameId: String, chosenCardId: String?) {
+        throwIfNeeded()
+        resolveWearerOfMasksCalls.add(gameId to chosenCardId)
+    }
+
     override suspend fun registerFcmToken(token: String) {
         throwIfNeeded()
         registerFcmTokenCalls.add(token)
@@ -85,9 +103,43 @@ class MockCloudFunctionsRepository : CloudFunctionsRepository {
         return joinGameResult
     }
 
+    val createGameCalls = mutableListOf<Map<String, Any?>>()
+    var createGameResult: String = "mock-created-game-id"
+    override suspend fun createGame(
+        gameMode: String,
+        maxPlayers: Int,
+        startingLife: Int,
+        maxTraitorRarity: String?,
+        useOwnDeck: Boolean,
+        displayName: String?
+    ): String {
+        throwIfNeeded()
+        createGameCalls.add(
+            mapOf(
+                "gameMode" to gameMode,
+                "maxPlayers" to maxPlayers,
+                "startingLife" to startingLife,
+                "useOwnDeck" to useOwnDeck
+            )
+        )
+        return createGameResult
+    }
+
     val updateGameSettingsCalls = mutableListOf<Map<String, Any?>>()
     override suspend fun updateGameSettings(gameId: String, maxPlayers: Int?, startingLife: Int?, gameMode: String?) {
         throwIfNeeded()
         updateGameSettingsCalls.add(mapOf("gameId" to gameId, "maxPlayers" to maxPlayers, "startingLife" to startingLife, "gameMode" to gameMode))
+    }
+
+    val acceptFriendRequestCalls = mutableListOf<String>()
+    override suspend fun acceptFriendRequest(requestId: String) {
+        throwIfNeeded()
+        acceptFriendRequestCalls.add(requestId)
+    }
+
+    val removeFriendCalls = mutableListOf<String>()
+    override suspend fun removeFriend(friendId: String) {
+        throwIfNeeded()
+        removeFriendCalls.add(friendId)
     }
 }

@@ -10,8 +10,10 @@ final class MockCloudFunctions: CloudFunctionsProtocol {
     )
 
     var joinGameResult = JoinGameResult(action: "joined", gameId: "mock-game-id")
+    var createGameResult = "mock-created-game-id"
 
     // Call tracking
+    var createGameCalls: [(gameMode: String, maxPlayers: Int, startingLife: Int)] = []
     var joinGameCalls: [String] = []
     var startGameCalls: [String] = []
     var adjustLifeCalls: [(gameId: String, playerId: String, amount: Int)] = []
@@ -19,6 +21,21 @@ final class MockCloudFunctions: CloudFunctionsProtocol {
     var unveilPlayerCalls: [String] = []
     var leaveGameCalls: [String] = []
     var endGameCalls: [(gameId: String, winnerUserIds: [String]?)] = []
+    var acceptFriendRequestCalls: [String] = []
+    var removeFriendCalls: [String] = []
+
+    func createGame(
+        gameMode: String,
+        maxPlayers: Int,
+        startingLife: Int,
+        maxTraitorRarity: String?,
+        useOwnDeck: Bool,
+        displayName: String?
+    ) async throws -> String {
+        if let error = errorToThrow { throw error }
+        createGameCalls.append((gameMode, maxPlayers, startingLife))
+        return createGameResult
+    }
 
     func joinGame(gameCode: String) async throws -> JoinGameResult {
         if let error = errorToThrow { throw error }
@@ -92,5 +109,19 @@ final class MockCloudFunctions: CloudFunctionsProtocol {
     func endGame(gameId: String, winnerUserIds: [String]?) async throws {
         if let error = errorToThrow { throw error }
         endGameCalls.append((gameId, winnerUserIds))
+    }
+
+    func updateGameSettings(gameId: String, maxPlayers: Int?, startingLife: Int?, gameMode: String?) async throws {
+        if let error = errorToThrow { throw error }
+    }
+
+    func acceptFriendRequest(requestId: String) async throws {
+        if let error = errorToThrow { throw error }
+        acceptFriendRequestCalls.append(requestId)
+    }
+
+    func removeFriend(friendId: String) async throws {
+        if let error = errorToThrow { throw error }
+        removeFriendCalls.append(friendId)
     }
 }

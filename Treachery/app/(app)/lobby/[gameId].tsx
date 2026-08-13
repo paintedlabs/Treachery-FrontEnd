@@ -8,7 +8,6 @@ import {
   StyleSheet,
   FlatList,
   ActivityIndicator,
-  Alert,
   Share,
   Platform,
   Animated,
@@ -19,6 +18,7 @@ import * as Clipboard from 'expo-clipboard';
 import { useAuth } from '@/hooks/useAuth';
 import { useLobby } from '@/hooks/useLobby';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
+import { NoticeDialog } from '@/components/NoticeDialog';
 import { ErrorBanner } from '@/components/ErrorBanner';
 import { LoadingScreen } from '@/components/LoadingScreen';
 import { ConnectionBanner } from '@/components/ConnectionBanner';
@@ -197,13 +197,12 @@ function LobbyPlayerRow({
 }
 
 export default function LobbyScreen() {
-  const { gameId, isHost: isHostParam } = useLocalSearchParams<{
+  const { gameId } = useLocalSearchParams<{
     gameId: string;
-    isHost: string;
+    isHost?: string;
   }>();
   const router = useRouter();
   const { currentUserId } = useAuth();
-  const isHost = isHostParam === 'true';
 
   const { isDesktop } = useResponsive();
 
@@ -214,6 +213,7 @@ export default function LobbyScreen() {
     isStartingGame,
     isGameDisbanded,
     isGameStarted,
+    isHost,
     canStartGame,
     minPlayers,
     startGame,
@@ -221,7 +221,7 @@ export default function LobbyScreen() {
     updatePlayerColor,
     updateCommanderName,
     updateGameSettings,
-  } = useLobby(gameId!, isHost, currentUserId);
+  } = useLobby(gameId!, false, currentUserId);
 
   // On web, intercept browser back button — prevent accidental lobby exit
   useEffect(() => {
@@ -247,20 +247,21 @@ export default function LobbyScreen() {
     }
   }, [isGameStarted, gameId, router]);
 
-  // Handle game disbanded
-  useEffect(() => {
-    if (isGameDisbanded && !isHost) {
-      Alert.alert('Game Disbanded', 'The host has left and the game was closed.', [
-        { text: 'OK', onPress: () => router.replace('/(app)') },
-      ]);
-    }
-  }, [isGameDisbanded, isHost, router]);
+  // Disbanded games render the full-screen notice below — no dialog needed
+  // (Alert.alert was a no-op on web and duplicated that screen elsewhere).
+
+  const [showCopiedNotice, setShowCopiedNotice] = useState(false);
+  // Bumped on every copy so the notice remounts and its auto-dismiss timer
+  // restarts. Without it, a second copy while the first notice is still up
+  // inherits the first one's countdown and flashes away early.
+  const [copiedNonce, setCopiedNonce] = useState(0);
 
   const handleShare = async () => {
     const message = `Join my Treachery game! Code: ${game?.code}`;
     if (Platform.OS === 'web') {
       await Clipboard.setStringAsync(game?.code ?? '');
-      Alert.alert('Copied!', 'Game code copied to clipboard.');
+      setCopiedNonce((n) => n + 1);
+      setShowCopiedNotice(true);
     } else {
       await Share.share({ message });
     }
@@ -541,6 +542,16 @@ export default function LobbyScreen() {
         destructive
         onConfirm={doLeave}
         onCancel={() => setShowLeaveConfirm(false)}
+      />
+
+      <NoticeDialog
+        key={copiedNonce}
+        visible={showCopiedNotice}
+        title="Copied!"
+        message="Game code copied to clipboard."
+        dismissAccessibilityLabel="Dismiss copied notice"
+        autoDismissMs={1800}
+        onDismiss={() => setShowCopiedNotice(false)}
       />
     </View>
   );

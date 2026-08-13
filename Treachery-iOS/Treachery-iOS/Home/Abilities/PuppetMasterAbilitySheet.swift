@@ -118,7 +118,6 @@ struct PuppetMasterAbilitySheet: View {
 
     private func playerSwapRow(_ player: Player) -> some View {
         let currentCardId = assignments[player.id]
-        let card = currentCardId.flatMap { viewModel.identityCard(withId: $0) }
         let originalCardId = players.first(where: { $0.id == player.id })?.identityCardId
         let wasSwapped = currentCardId != originalCardId
         let isFirstSelected = firstSelection == player.id
@@ -143,16 +142,9 @@ struct PuppetMasterAbilitySheet: View {
                         }
                     }
 
-                    if let card {
-                        HStack(spacing: 4) {
-                            Circle()
-                                .fill(card.role.color)
-                                .frame(width: 8, height: 8)
-                            Text(card.name)
-                                .font(.caption)
-                                .foregroundStyle(card.role.color)
-                        }
-                    }
+                    Text("Identity hidden")
+                        .font(.caption)
+                        .foregroundStyle(Color.mtgTextSecondary)
                 }
 
                 Spacer()

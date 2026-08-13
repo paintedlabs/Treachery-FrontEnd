@@ -19,17 +19,23 @@ final class CreateGameViewModel: ObservableObject {
     // MARK: - Computed Properties
 
     var maxPlayers: Int {
-        gameMode.includesTreachery ? 8 : 12
+        // Server caps at 8 for every mode (createGame callable).
+        8
     }
 
     // MARK: - Properties
 
     private let firestoreManager: FirestoreManaging
+    private let cloudFunctions: CloudFunctionsProtocol
 
     // MARK: - Init
 
-    init(firestoreManager: FirestoreManaging = FirestoreManager()) {
+    init(
+        firestoreManager: FirestoreManaging = FirestoreManager(),
+        cloudFunctions: CloudFunctionsProtocol = CloudFunctions()
+    ) {
         self.firestoreManager = firestoreManager
+        self.cloudFunctions = cloudFunctions
     }
 
     // MARK: - Game Creation
@@ -40,50 +46,22 @@ final class CreateGameViewModel: ObservableObject {
         errorMessage = nil
 
         do {
-            let code = try await generateUniqueCode()
-            let game = Game(
-                id: UUID().uuidString,
-                code: code,
-                hostId: userId,
-                state: .waiting,
-                gameMode: gameMode,
+            let user = try await firestoreManager.getUser(id: userId)
+            let gameId = try await cloudFunctions.createGame(
+                gameMode: gameMode.rawValue,
                 maxPlayers: maxPlayers,
                 startingLife: startingLife,
-                winningTeam: nil,
-                playerIds: [userId],
-                createdAt: Date(),
-                lastActivityAt: Date(),
-                planechase: gameMode.includesPlanechase ? PlanechaseState(
-                    useOwnDeck: useOwnDeck,
-                    currentPlaneId: nil,
-                    usedPlaneIds: [],
-                    lastDieRollerId: nil,
-                    dieRollCount: 0
-                ) : nil
+                maxTraitorRarity: nil,
+                useOwnDeck: useOwnDeck,
+                displayName: user?.displayName
             )
-            try await firestoreManager.createGame(game)
-
-            let user = try await firestoreManager.getUser(id: userId)
-            let player = Player(
-                id: UUID().uuidString,
-                orderId: 0,
-                userId: userId,
-                displayName: user?.displayName ?? "Host",
-                role: nil,
-                identityCardId: nil,
-                lifeTotal: startingLife,
-                isEliminated: false,
-                isUnveiled: false,
-                joinedAt: Date()
-            )
-            try await firestoreManager.addPlayer(player, toGame: game.id)
 
             AnalyticsService.trackEvent("create_game", params: [
                 "game_mode": gameMode.rawValue
             ])
 
             isCreating = false
-            return .lobby(gameId: game.id, isHost: true)
+            return .lobby(gameId: gameId, isHost: true)
         } catch {
             errorMessage = error.localizedDescription
             isCreating = false
@@ -97,17 +75,5 @@ final class CreateGameViewModel: ObservableObject {
         if !gameMode.includesPlanechase {
             useOwnDeck = false
         }
-    }
-
-    private func generateUniqueCode() async throws -> String {
-        let characters = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
-        for _ in 0..<10 {
-            let code = String((0..<4).map { _ in characters.randomElement()! })
-            let existing = try await firestoreManager.getGame(byCode: code)
-            if existing == nil {
-                return code
-            }
-        }
-        throw GameError.codeGenerationFailed
     }
 }

@@ -9,6 +9,10 @@ platform :ios do
 
   desc "Run unit tests"
   lane :test do
+    # ScreenshotTests sits in the same synchronized folder as the other UI tests,
+    # so it compiles into Treachery-iOSUITests automatically and the shared scheme
+    # already runs that target. It signs in for real against production Firebase,
+    # so keep it out of the ordinary test run — it belongs to :screenshots only.
     run_tests(
       project: XCODEPROJ,
       scheme: SCHEME,
@@ -16,7 +20,32 @@ platform :ios do
       code_coverage: true,
       result_bundle: true,
       output_directory: "./build/test_output",
+      skip_testing: ["Treachery-iOSUITests/ScreenshotTests"],
       clean: true
+    )
+  end
+
+  # ── Screenshots ──────────────────────────────────────────
+
+  desc "Capture App Store screenshots"
+  lane :screenshots do
+    # WARNING: these are real UI tests, not a rendering harness. Each one taps
+    # "Play as Guest", which creates a genuine anonymous auth user in PRODUCTION
+    # Firebase, and the captured screens show whatever live Firestore returns.
+    # Expect network access, real writes, and non-deterministic content.
+    #
+    # SnapshotHelper injects --FASTLANE_SNAPSHOT into the app's launch arguments,
+    # but no app code reads it. Making this offline and repeatable means having
+    # the app check that argument at startup and point FirebaseManager /
+    # FirestoreManager at seeded fixtures or the Firebase emulator instead.
+    #
+    # Remaining config (devices, languages, output) lives in fastlane/Snapfile.
+    capture_ios_screenshots(
+      project: XCODEPROJ,
+      scheme: SCHEME,
+      # The UI test target also holds Treachery_iOSUITests and PerformanceTests,
+      # so restrict the capture run to the screenshot class.
+      only_testing: ["Treachery-iOSUITests/ScreenshotTests"]
     )
   end
 

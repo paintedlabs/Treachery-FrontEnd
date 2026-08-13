@@ -139,8 +139,21 @@ function shuffle(array) {
 }
 
 // ── Win Condition Logic ──
+// Only Treachery-mode games have automatic team wins. Life Tracker /
+// Planechase-only (null roles) must never auto-finish via role heuristics.
 
-function checkWinConditions(players) {
+const TREACHERY_MODES = new Set(["treachery", "treachery_planechase"]);
+
+function isTreacheryMode(gameMode) {
+  // Default missing mode to treachery for legacy games that used roles.
+  return gameMode == null || TREACHERY_MODES.has(gameMode);
+}
+
+function checkWinConditions(players, gameMode) {
+  if (!isTreacheryMode(gameMode)) {
+    return null;
+  }
+
   const alive = players.filter((p) => !p.is_eliminated);
 
   // Traitor solo win: last player standing is a traitor
@@ -170,6 +183,99 @@ function checkWinConditions(players) {
   return null; // Game continues
 }
 
+// Sanitize commander names before using them as Firestore map field keys.
+// Dots fragment nested paths; `/ ~ * [ ]` are illegal field-path characters.
+function sanitizeCommanderKey(name) {
+  if (typeof name !== "string") return null;
+  const cleaned = name
+    .trim()
+    .replace(/[.[\]*/~\\]/g, "_")
+    .replace(/\s+/g, " ")
+    .slice(0, 80);
+  return cleaned.length > 0 ? cleaned : null;
+}
+
+// ── Numeric Argument Validation ──
+// Callable payloads are untrusted. `Number("abc")` is NaN and every
+// comparison against NaN is false, so a bare `if (n < 2 || n > 8) throw`
+// lets NaN — and non-integers like 5.5 — straight through into Firestore.
+// Returns the coerced integer, or null when the value is not one (or falls
+// outside an optional inclusive range).
+
+function parseIntegerArg(value, { min, max } = {}) {
+  let num = value;
+  if (typeof num === "string") {
+    // Blank strings coerce to 0, which would silently pass a range check.
+    if (num.trim() === "") return null;
+    num = Number(num);
+  }
+  // Number.isInteger already rejects NaN and ±Infinity.
+  if (typeof num !== "number" || !Number.isInteger(num)) return null;
+  if (min !== undefined && num < min) return null;
+  if (max !== undefined && num > max) return null;
+  return num;
+}
+
+// Characters allowed in join codes (no ambiguous I/O/0/1)
+const CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+
+function generateJoinCode() {
+  let code = "";
+  for (let i = 0; i < 4; i++) {
+    code += CODE_ALPHABET[Math.floor(Math.random() * CODE_ALPHABET.length)];
+  }
+  return code;
+}
+
+async function allocateUniqueJoinCode() {
+  for (let attempt = 0; attempt < 12; attempt++) {
+    const code = generateJoinCode();
+    // eslint-disable-next-line no-await-in-loop
+    const existing = await db
+      .collection("games")
+      .where("code", "==", code)
+      .limit(1)
+      .get();
+    if (existing.empty) return code;
+  }
+  throw new HttpsError("resource-exhausted", "Could not allocate a unique game code.");
+}
+
+/** Owner-only private profile path (email / phone / FCM). */
+function privateUserRef(uid) {
+  return db.doc(`users/${uid}/private/data`);
+}
+
+/**
+ * Resolves FCM tokens for several users at once, index-aligned with `uids`
+ * (null where the user has no token). Batched: one getAll for the private
+ * docs, plus a second only for the users whose token has not migrated yet.
+ * `uids` must be free of duplicates — getAll resolves responses by path.
+ */
+async function getUserFcmTokens(uids) {
+  if (uids.length === 0) return [];
+
+  const privateSnaps = await db.getAll(...uids.map((uid) => privateUserRef(uid)));
+  const tokens = privateSnaps.map((snap) =>
+    snap.exists ? snap.data()?.fcm_token || null : null
+  );
+
+  // Legacy: token still living on the public user doc
+  const legacyIndexes = tokens
+    .map((token, idx) => (token ? -1 : idx))
+    .filter((idx) => idx >= 0);
+  if (legacyIndexes.length > 0) {
+    const publicSnaps = await db.getAll(
+      ...legacyIndexes.map((idx) => db.doc(`users/${uids[idx]}`))
+    );
+    publicSnaps.forEach((snap, n) => {
+      tokens[legacyIndexes[n]] = snap.exists ? snap.data()?.fcm_token || null : null;
+    });
+  }
+
+  return tokens;
+}
+
 // ── FCM Notification Helper ──
 
 /**
@@ -178,31 +284,31 @@ function checkWinConditions(players) {
  */
 async function notifyPlayers(gameId, excludeUserId, title, body) {
   try {
-    // Get player user IDs from the game
+    // Get player user IDs from the game. Deduped and blank-filtered because
+    // the batched read below needs distinct, well-formed document paths.
     const playersSnap = await db.collection(`games/${gameId}/players`).get();
-    const userIds = playersSnap.docs
-      .map((d) => d.data().user_id)
-      .filter((uid) => uid !== excludeUserId);
+    const userIds = [
+      ...new Set(
+        playersSnap.docs
+          .map((d) => d.data().user_id)
+          .filter((uid) => uid && uid !== excludeUserId)
+      ),
+    ];
 
     if (userIds.length === 0) return;
 
-    // Fetch FCM tokens from user documents
-    const tokens = [];
-    // Firestore 'in' queries limited to 30
-    for (let i = 0; i < userIds.length; i += 30) {
-      const chunk = userIds.slice(i, i + 30);
-      const usersSnap = await db
-        .collection("users")
-        .where("__name__", "in", chunk)
-        .get();
-      for (const doc of usersSnap.docs) {
-        const fcmToken = doc.data().fcm_token;
-        if (fcmToken) tokens.push(fcmToken);
-      }
-    }
+    // Fetch FCM tokens from private (or legacy public) user data.
+    // tokenEntries stays index-aligned with the tokens sent below, which the
+    // invalid-token cleanup relies on to map a failure back to its user.
+    const fcmTokens = await getUserFcmTokens(userIds);
+    const tokenEntries = []; // { uid, token }
+    userIds.forEach((uid, idx) => {
+      if (fcmTokens[idx]) tokenEntries.push({ uid, token: fcmTokens[idx] });
+    });
 
-    if (tokens.length === 0) return;
+    if (tokenEntries.length === 0) return;
 
+    const tokens = tokenEntries.map((e) => e.token);
     const messaging = getMessaging();
     const response = await messaging.sendEachForMulticast({
       tokens,
@@ -215,32 +321,31 @@ async function notifyPlayers(gameId, excludeUserId, title, body) {
       },
     });
 
-    // Clean up invalid tokens
+    // Clean up invalid tokens on the user that produced them
     if (response.failureCount > 0) {
-      const invalidTokens = [];
+      const batch = db.batch();
+      let dirty = false;
       response.responses.forEach((resp, idx) => {
         if (
           resp.error &&
           (resp.error.code === "messaging/invalid-registration-token" ||
             resp.error.code === "messaging/registration-token-not-registered")
         ) {
-          invalidTokens.push(tokens[idx]);
+          const { uid } = tokenEntries[idx];
+          batch.set(
+            privateUserRef(uid),
+            { fcm_token: FieldValue.delete() },
+            { merge: true }
+          );
+          batch.set(
+            db.doc(`users/${uid}`),
+            { fcm_token: FieldValue.delete() },
+            { merge: true }
+          );
+          dirty = true;
         }
       });
-      // Remove invalid tokens from user docs
-      if (invalidTokens.length > 0) {
-        const batch = db.batch();
-        for (const token of invalidTokens) {
-          const usersWithToken = await db
-            .collection("users")
-            .where("fcm_token", "==", token)
-            .get();
-          usersWithToken.docs.forEach((doc) => {
-            batch.update(doc.ref, { fcm_token: FieldValue.delete() });
-          });
-        }
-        await batch.commit();
-      }
+      if (dirty) await batch.commit();
     }
   } catch (error) {
     // Non-fatal: notification failure shouldn't break game logic
@@ -262,8 +367,178 @@ exports.registerFcmToken = onCall(callableOptions, async (request) => {
     throw new HttpsError("invalid-argument", "token is required.");
   }
 
-  await db.doc(`users/${uid}`).update({ fcm_token: token });
+  // Store on owner-only private doc; strip any leftover public field.
+  await privateUserRef(uid).set({ fcm_token: token }, { merge: true });
+  await db.doc(`users/${uid}`).set({ fcm_token: FieldValue.delete() }, { merge: true });
 
+  return { success: true };
+});
+
+// ════════════════════════════════════════════════════════════════
+// CLOUD FUNCTION: createGame
+// Atomically allocates a unique join code, creates the lobby, and
+// seats the host as player 0. Replaces client-side create writes.
+// ════════════════════════════════════════════════════════════════
+
+exports.createGame = onCall(callableOptions, async (request) => {
+  const uid = request.auth?.uid;
+  if (!uid) throw new HttpsError("unauthenticated", "Must be signed in.");
+
+  const {
+    gameMode = "treachery",
+    maxPlayers,
+    startingLife = 40,
+    maxTraitorRarity,
+    useOwnDeck = false,
+    displayName,
+  } = request.data || {};
+
+  const validModes = ["treachery", "planechase", "treachery_planechase", "none"];
+  if (!validModes.includes(gameMode)) {
+    throw new HttpsError("invalid-argument", "Invalid game mode.");
+  }
+
+  const hasTreachery = gameMode === "treachery" || gameMode === "treachery_planechase";
+  const hasPlanechase = gameMode === "planechase" || gameMode === "treachery_planechase";
+  const defaultMax = 8;
+  const mp =
+    maxPlayers !== undefined ? parseIntegerArg(maxPlayers, { min: 2, max: 8 }) : defaultMax;
+  if (mp === null) {
+    throw new HttpsError("invalid-argument", "Max players must be 2-8.");
+  }
+
+  const sl = parseIntegerArg(startingLife);
+  if (sl === null || ![20, 25, 30, 40, 50].includes(sl)) {
+    throw new HttpsError("invalid-argument", "Invalid starting life value.");
+  }
+
+  if (maxTraitorRarity !== undefined && !isValidRarity(maxTraitorRarity)) {
+    throw new HttpsError("invalid-argument", "Invalid max traitor rarity.");
+  }
+
+  // Resolve display name from arg or user profile
+  let hostName = typeof displayName === "string" && displayName.trim() ? displayName.trim() : null;
+  if (!hostName) {
+    const userSnap = await db.doc(`users/${uid}`).get();
+    hostName = userSnap.exists ? userSnap.data().display_name || "Host" : "Host";
+  }
+
+  const code = await allocateUniqueJoinCode();
+  const gameRef = db.collection("games").doc();
+  const playerRef = gameRef.collection("players").doc();
+
+  const gameDoc = {
+    code,
+    host_id: uid,
+    state: "waiting",
+    max_players: mp,
+    starting_life: sl,
+    player_ids: [uid],
+    game_mode: gameMode,
+    created_at: FieldValue.serverTimestamp(),
+    last_activity_at: FieldValue.serverTimestamp(),
+  };
+  if (hasTreachery && maxTraitorRarity !== undefined) {
+    gameDoc.max_traitor_rarity = maxTraitorRarity;
+  }
+  if (hasPlanechase) {
+    gameDoc.planechase = {
+      use_own_deck: !!useOwnDeck,
+      current_plane_id: null,
+      used_plane_ids: [],
+      last_die_roller_id: null,
+      die_roll_count: 0,
+    };
+  }
+
+  const batch = db.batch();
+  batch.set(gameRef, gameDoc);
+  batch.set(playerRef, {
+    user_id: uid,
+    display_name: hostName,
+    order_id: 0,
+    role: null,
+    identity_card_id: null,
+    life_total: sl,
+    is_eliminated: false,
+    is_unveiled: false,
+    joined_at: FieldValue.serverTimestamp(),
+  });
+  await batch.commit();
+
+  return { gameId: gameRef.id, code };
+});
+
+// ════════════════════════════════════════════════════════════════
+// CLOUD FUNCTION: acceptFriendRequest
+// Recipient accepts a pending request; both friend_ids lists updated.
+// Cross-user friend_ids writes are intentionally denied by rules.
+// ════════════════════════════════════════════════════════════════
+
+exports.acceptFriendRequest = onCall(callableOptions, async (request) => {
+  const uid = request.auth?.uid;
+  if (!uid) throw new HttpsError("unauthenticated", "Must be signed in.");
+
+  const { requestId } = request.data || {};
+  if (!requestId || typeof requestId !== "string") {
+    throw new HttpsError("invalid-argument", "requestId is required.");
+  }
+
+  const requestRef = db.doc(`friend_requests/${requestId}`);
+
+  return db.runTransaction(async (tx) => {
+    const snap = await tx.get(requestRef);
+    if (!snap.exists) throw new HttpsError("not-found", "Friend request not found.");
+    const fr = snap.data();
+
+    if (fr.to_user_id !== uid) {
+      throw new HttpsError("permission-denied", "Only the recipient can accept.");
+    }
+    if (fr.status !== "pending") {
+      throw new HttpsError("failed-precondition", "Request is not pending.");
+    }
+
+    const fromId = fr.from_user_id;
+    const fromRef = db.doc(`users/${fromId}`);
+    const toRef = db.doc(`users/${uid}`);
+    const fromSnap = await tx.get(fromRef);
+    const toSnap = await tx.get(toRef);
+    if (!fromSnap.exists || !toSnap.exists) {
+      throw new HttpsError("not-found", "User profile not found.");
+    }
+
+    tx.update(requestRef, { status: "accepted" });
+    tx.update(fromRef, { friend_ids: FieldValue.arrayUnion(uid) });
+    tx.update(toRef, { friend_ids: FieldValue.arrayUnion(fromId) });
+    return { success: true };
+  });
+});
+
+// ════════════════════════════════════════════════════════════════
+// CLOUD FUNCTION: removeFriend
+// Mutual remove — both users' friend_ids lists.
+// ════════════════════════════════════════════════════════════════
+
+exports.removeFriend = onCall(callableOptions, async (request) => {
+  const uid = request.auth?.uid;
+  if (!uid) throw new HttpsError("unauthenticated", "Must be signed in.");
+
+  const { friendId } = request.data || {};
+  if (!friendId || typeof friendId !== "string") {
+    throw new HttpsError("invalid-argument", "friendId is required.");
+  }
+  if (friendId === uid) {
+    throw new HttpsError("invalid-argument", "Cannot remove yourself.");
+  }
+
+  const batch = db.batch();
+  batch.update(db.doc(`users/${uid}`), {
+    friend_ids: FieldValue.arrayRemove(friendId),
+  });
+  batch.update(db.doc(`users/${friendId}`), {
+    friend_ids: FieldValue.arrayRemove(uid),
+  });
+  await batch.commit();
   return { success: true };
 });
 
@@ -526,7 +801,7 @@ exports.adjustLife = onCall(callableOptions, async (request) => {
         return data;
       });
 
-      winner = checkWinConditions(allPlayers);
+      winner = checkWinConditions(allPlayers, game.game_mode);
       if (winner) {
         tx.update(gameRef, {
           state: "finished",
@@ -616,7 +891,7 @@ exports.eliminatePlayer = onCall(callableOptions, async (request) => {
       return p;
     });
 
-    const winner = checkWinConditions(updatedPlayers);
+    const winner = checkWinConditions(updatedPlayers, game.game_mode);
     if (winner) {
       tx.update(gameRef, {
         state: "finished",
@@ -767,16 +1042,25 @@ exports.leaveGame = onCall(callableOptions, async (request) => {
     // Remove from player_ids array
     const updatedPlayerIds = (game.player_ids || []).filter((id) => id !== uid);
 
+    // Renumber surviving seats 0..n-1 so the next join (order_id = length)
+    // never collides with an existing order_id.
+    const remainingPlayers = allPlayers
+      .filter((p) => p.user_id !== uid)
+      .sort((a, b) => (a.order_id ?? 0) - (b.order_id ?? 0));
+    remainingPlayers.forEach((p, index) => {
+      if (p.order_id !== index) {
+        tx.update(p.ref, { order_id: index });
+      }
+    });
+
     if (game.host_id === uid) {
       // Host is leaving
-      const remainingPlayers = allPlayers.filter((p) => p.user_id !== uid);
-
       if (remainingPlayers.length === 0) {
         // No one left — delete the game
         tx.delete(gameRef);
         return { action: "deleted" };
       } else {
-        // Promote the next player (first by order_id)
+        // Promote the next player (first by order_id after renumber)
         const newHost = remainingPlayers[0];
         tx.update(gameRef, {
           host_id: newHost.user_id,
@@ -884,8 +1168,18 @@ exports.resolveMetamorph = onCall(callableOptions, async (request) => {
     if (caller.identity_card_id !== "traitor_07") {
       throw new HttpsError("failed-precondition", "Your card is not The Metamorph.");
     }
+    // Must have been dealt The Metamorph originally (blocks Wearer-of-Masks escalation)
+    if (caller.original_identity_card_id && caller.original_identity_card_id !== "traitor_07") {
+      throw new HttpsError("failed-precondition", "Your card is not The Metamorph.");
+    }
     if (!caller.is_unveiled) {
       throw new HttpsError("failed-precondition", "You must unveil first.");
+    }
+    if (caller.is_eliminated) {
+      throw new HttpsError("failed-precondition", "Eliminated players cannot resolve abilities.");
+    }
+    if (caller.ability_resolved) {
+      throw new HttpsError("failed-precondition", "This ability has already been resolved.");
     }
     if (!target.is_eliminated) {
       throw new HttpsError("failed-precondition", "Target must be eliminated.");
@@ -893,23 +1187,33 @@ exports.resolveMetamorph = onCall(callableOptions, async (request) => {
     if (target.role === "leader") {
       throw new HttpsError("failed-precondition", "Cannot steal a Leader's card.");
     }
+    if (!target.identity_card_id) {
+      throw new HttpsError("failed-precondition", "Target has no identity to steal.");
+    }
 
-    const targetCard = _getCard(target.identity_card_id);
+    const stolenCardId = target.identity_card_id;
+    const stolenRole = target.role;
+    const targetCard = _getCard(stolenCardId);
     const isFaceDown = targetCard ? targetCard.role !== "leader" : true;
 
     // Role follows the stolen card. The Metamorph "gains control of that
     // player's identity card" — they become the stolen identity, with its
     // role. (Pre-validated above that target.role !== 'leader'.)
+    // Clear the card from the target so identities stay unique on the table.
     tx.update(caller.ref, {
       original_identity_card_id: caller.original_identity_card_id || caller.identity_card_id,
       original_role: caller.original_role || caller.role,
-      identity_card_id: target.identity_card_id,
-      role: target.role,
+      identity_card_id: stolenCardId,
+      role: stolenRole,
       is_face_down: isFaceDown,
+      ability_resolved: true,
+    });
+    tx.update(target.ref, {
+      identity_card_id: null,
     });
     tx.update(gameRef, { last_activity_at: FieldValue.serverTimestamp() });
 
-    return { success: true, newCardId: target.identity_card_id, isFaceDown };
+    return { success: true, newCardId: stolenCardId, isFaceDown };
   });
 });
 
@@ -944,17 +1248,34 @@ exports.resolvePuppetMaster = onCall(callableOptions, async (request) => {
     const caller = allPlayers.find((p) => p.user_id === uid);
 
     if (!caller) throw new HttpsError("not-found", "You are not in this game.");
+    // Must currently hold traitor_09 AND originally been dealt it (blocks Wearer escalation)
     if (caller.identity_card_id !== "traitor_09") {
+      throw new HttpsError("failed-precondition", "Your card is not The Puppet Master.");
+    }
+    if (caller.original_identity_card_id && caller.original_identity_card_id !== "traitor_09") {
       throw new HttpsError("failed-precondition", "Your card is not The Puppet Master.");
     }
     if (!caller.is_unveiled) {
       throw new HttpsError("failed-precondition", "You must unveil first.");
     }
+    if (caller.is_eliminated) {
+      throw new HttpsError("failed-precondition", "Eliminated players cannot resolve abilities.");
+    }
+    if (caller.ability_resolved) {
+      throw new HttpsError("failed-precondition", "This ability has already been resolved.");
+    }
 
-    // Validate: each player in redistributions must exist and not be the caller
-    // Each player must still end up with exactly one card
-    const assignedCards = new Set();
-    for (const [playerId, newCardId] of Object.entries(redistributions)) {
+    const targetIds = Object.keys(redistributions);
+    const assignedCardIds = Object.values(redistributions);
+
+    // Reject duplicate assignment early (existing clients/tests expect failed-precondition)
+    if (new Set(assignedCardIds).size !== assignedCardIds.length) {
+      throw new HttpsError("failed-precondition", "Each card can only be assigned to one player.");
+    }
+
+    // Validate each target player
+    const targets = [];
+    for (const playerId of targetIds) {
       const player = allPlayers.find((p) => p.id === playerId);
       if (!player) throw new HttpsError("not-found", `Player ${playerId} not found.`);
       if (player.id === caller.id) {
@@ -963,10 +1284,21 @@ exports.resolvePuppetMaster = onCall(callableOptions, async (request) => {
       if (player.is_eliminated) {
         throw new HttpsError("failed-precondition", `${player.display_name} is eliminated.`);
       }
-      if (assignedCards.has(newCardId)) {
-        throw new HttpsError("failed-precondition", "Each card can only be assigned to one player.");
-      }
-      assignedCards.add(newCardId);
+      targets.push(player);
+    }
+
+    // Must be a permutation of the identities those targets currently hold
+    // (no minting cards from the rest of the deck / no dropping cards)
+    const currentCards = targets.map((p) => p.identity_card_id).filter(Boolean).sort();
+    const sortedAssigned = [...assignedCardIds].sort();
+    if (
+      currentCards.length !== sortedAssigned.length ||
+      currentCards.some((c, i) => c !== sortedAssigned[i])
+    ) {
+      throw new HttpsError(
+        "invalid-argument",
+        "Redistributions must be a permutation of the selected players' current cards."
+      );
     }
 
     // Apply redistributions
@@ -992,6 +1324,7 @@ exports.resolvePuppetMaster = onCall(callableOptions, async (request) => {
       });
     }
 
+    tx.update(caller.ref, { ability_resolved: true });
     tx.update(gameRef, { last_activity_at: FieldValue.serverTimestamp() });
 
     return { success: true };
@@ -1035,6 +1368,12 @@ exports.resolveWearerOfMasks = onCall(callableOptions, async (request) => {
     if (!caller.is_unveiled) {
       throw new HttpsError("failed-precondition", "You must unveil first.");
     }
+    if (caller.is_eliminated) {
+      throw new HttpsError("failed-precondition", "Eliminated players cannot resolve abilities.");
+    }
+    if (caller.ability_resolved) {
+      throw new HttpsError("failed-precondition", "This ability has already been resolved.");
+    }
 
     // Validate the chosen card exists and is not a Leader
     const chosenCard = _getCard(chosenCardId);
@@ -1043,6 +1382,19 @@ exports.resolveWearerOfMasks = onCall(callableOptions, async (request) => {
     }
     if (chosenCard.role === "leader") {
       throw new HttpsError("failed-precondition", "Cannot choose a Leader card.");
+    }
+    // Callable-backed specialty traitors must not be copyable — becoming
+    // traitor_09 would unlock resolvePuppetMaster, etc.
+    const BLOCKED_COPY_IDS = new Set([
+      "traitor_07", // Metamorph
+      "traitor_09", // Puppet Master
+      "traitor_13", // Wearer of Masks
+    ]);
+    if (BLOCKED_COPY_IDS.has(chosenCardId)) {
+      throw new HttpsError(
+        "failed-precondition",
+        "Cannot copy a special-ability Traitor identity."
+      );
     }
 
     // Validate the card is not currently in use by any player
@@ -1055,6 +1407,7 @@ exports.resolveWearerOfMasks = onCall(callableOptions, async (request) => {
     tx.update(caller.ref, {
       original_identity_card_id: caller.original_identity_card_id || caller.identity_card_id,
       identity_card_id: chosenCardId,
+      ability_resolved: true,
     });
     tx.update(gameRef, { last_activity_at: FieldValue.serverTimestamp() });
 
@@ -1449,17 +1802,23 @@ exports.updateGameSettings = onCall(callableOptions, async (request) => {
       throw new HttpsError("failed-precondition", "Cannot change settings after game starts.");
     }
 
+    // All reads must precede all writes inside a Firestore transaction.
+    let playersSnap = null;
+    if (startingLife !== undefined) {
+      playersSnap = await tx.get(db.collection(`games/${gameId}/players`));
+    }
+
     const update = { last_activity_at: FieldValue.serverTimestamp() };
 
     if (maxPlayers !== undefined) {
-      const mp = Number(maxPlayers);
-      if (mp < 2 || mp > 8) throw new HttpsError("invalid-argument", "Max players must be 2-8.");
+      const mp = parseIntegerArg(maxPlayers, { min: 2, max: 8 });
+      if (mp === null) throw new HttpsError("invalid-argument", "Max players must be 2-8.");
       update.max_players = mp;
     }
 
     if (startingLife !== undefined) {
-      const sl = Number(startingLife);
-      if (![20, 25, 30, 40, 50].includes(sl)) {
+      const sl = parseIntegerArg(startingLife);
+      if (sl === null || ![20, 25, 30, 40, 50].includes(sl)) {
         throw new HttpsError("invalid-argument", "Invalid starting life value.");
       }
       update.starting_life = sl;
@@ -1482,11 +1841,11 @@ exports.updateGameSettings = onCall(callableOptions, async (request) => {
 
     tx.update(gameRef, update);
 
-    // If starting life changed, update all existing players' life totals
-    if (startingLife !== undefined) {
-      const playersSnap = await tx.get(db.collection(`games/${gameId}/players`));
+    // If starting life changed, update all existing players' life totals.
+    // Reuse the already-validated value rather than re-coercing the argument.
+    if (startingLife !== undefined && playersSnap) {
       playersSnap.docs.forEach((doc) => {
-        tx.update(doc.ref, { life_total: Number(startingLife) });
+        tx.update(doc.ref, { life_total: update.starting_life });
       });
     }
 
@@ -1643,11 +2002,12 @@ exports.onGameFinished = onDocumentUpdated("games/{gameId}", async (event) => {
 
   if (winnerUserIds.length === 0 || loserUserIds.length === 0) return;
 
-  // Build a map of userId -> commanderName for deck stats
+  // Build a map of userId -> sanitized commanderName for deck stats
   const playerCommanders = {};
   for (const p of players) {
-    if (p.commander_name) {
-      playerCommanders[p.user_id] = p.commander_name;
+    const key = sanitizeCommanderKey(p.commander_name);
+    if (key) {
+      playerCommanders[p.user_id] = key;
     }
   }
 

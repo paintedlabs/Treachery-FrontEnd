@@ -9,17 +9,16 @@ import {
   ScrollView,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Timestamp } from 'firebase/firestore';
+import { httpsCallable } from 'firebase/functions';
 import { useAuth } from '@/hooks/useAuth';
 import { ErrorBanner } from '@/components/ErrorBanner';
-import * as firestoreService from '@/services/firestore';
+import { functions } from '@/config/firebase';
 import {
-  CODE_CHARACTERS,
   DEFAULT_MAX_TRAITOR_RARITY,
   RARITY_DISPLAY_NAMES,
   TRAITOR_RARITY_OPTIONS,
 } from '@/constants/roles';
-import { Game, GameMode, Player, Rarity } from '@/models/types';
+import { GameMode, Rarity } from '@/models/types';
 import { trackEvent } from '@/services/analytics';
 import { colors, spacing, fontSize, contentMaxWidths } from '@/constants/theme';
 import { useResponsive } from '@/hooks/useResponsive';
@@ -39,14 +38,6 @@ function includesPlanechase(mode: GameMode): boolean {
   return mode === 'planechase' || mode === 'treachery_planechase';
 }
 
-function generateId(): string {
-  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
-    const r = (Math.random() * 16) | 0;
-    const v = c === 'x' ? r : (r & 0x3) | 0x8;
-    return v.toString(16);
-  });
-}
-
 export default function CreateGameScreen() {
   const router = useRouter();
   const { currentUserId } = useAuth();
@@ -61,25 +52,13 @@ export default function CreateGameScreen() {
   const hasTreachery = includesTreachery(gameMode);
   const hasPlanechase = includesPlanechase(gameMode);
 
-  // Max players is determined by game mode — no user input needed.
-  const maxPlayers = hasTreachery ? 8 : 12;
+  // Server-side createGame caps max_players at 8 for every mode.
+  const maxPlayers = 8;
 
   const handleModeChange = (mode: GameMode) => {
     setGameMode(mode);
     // Reset own deck when planechase is disabled
     if (!includesPlanechase(mode)) setUseOwnDeck(false);
-  };
-
-  const generateUniqueCode = async (): Promise<string> => {
-    for (let i = 0; i < 10; i++) {
-      let code = '';
-      for (let j = 0; j < 4; j++) {
-        code += CODE_CHARACTERS[Math.floor(Math.random() * CODE_CHARACTERS.length)];
-      }
-      const existing = await firestoreService.getGameByCode(code);
-      if (!existing) return code;
-    }
-    throw new Error('Could not generate a unique game code. Please try again.');
   };
 
   const handleCreate = async () => {
@@ -88,53 +67,25 @@ export default function CreateGameScreen() {
     setErrorMessage(null);
 
     try {
-      const code = await generateUniqueCode();
-      const gameId = generateId();
+      const createGameFn = httpsCallable<
+        {
+          gameMode: GameMode;
+          maxPlayers: number;
+          startingLife: number;
+          maxTraitorRarity?: Rarity;
+          useOwnDeck: boolean;
+        },
+        { gameId: string; code: string }
+      >(functions, 'createGame');
 
-      const game: Game = {
-        id: gameId,
-        code,
-        host_id: currentUserId,
-        state: 'waiting',
-        max_players: maxPlayers,
-        starting_life: startingLife,
-        winning_team: null,
-        player_ids: [currentUserId],
-        created_at: Timestamp.now(),
-        last_activity_at: Timestamp.now(),
-        game_mode: gameMode,
-        ...(hasTreachery ? { max_traitor_rarity: maxTraitorRarity } : {}),
-        ...(hasPlanechase
-          ? {
-              planechase: {
-                use_own_deck: useOwnDeck,
-                current_plane_id: null,
-                used_plane_ids: [],
-                last_die_roller_id: null,
-                die_roll_count: 0,
-              },
-            }
-          : {}),
-      } as Game;
-      await firestoreService.createGame(game);
-
-      // Add host as first player
-      const user = await firestoreService.getUser(currentUserId);
-      const player: Player = {
-        id: generateId(),
-        order_id: 0,
-        user_id: currentUserId,
-        display_name: user?.display_name ?? 'Host',
-        role: null,
-        identity_card_id: null,
-        life_total: startingLife,
-        is_eliminated: false,
-        is_unveiled: false,
-        joined_at: Timestamp.now(),
-        player_color: null,
-        commander_name: null,
-      };
-      await firestoreService.addPlayer(player, gameId);
+      const result = await createGameFn({
+        gameMode,
+        maxPlayers,
+        startingLife,
+        useOwnDeck,
+        ...(hasTreachery ? { maxTraitorRarity } : {}),
+      });
+      const gameId = result.data.gameId;
 
       trackEvent('create_game', { game_mode: gameMode });
 

@@ -23,27 +23,32 @@ import { cardOrNull, WEARER_OF_MASKS } from './cards';
 
 export const KNOWN_BROKEN_INVARIANTS = {
   /**
-   * FIXME: currently broken — see finding #1. Flip to `false` when the bug is fixed.
+   * FIXED (#108) — enforced again.
    *
-   * adjustLife/eliminatePlayer run checkWinConditions for EVERY game mode.
+   * Was: adjustLife/eliminatePlayer ran checkWinConditions for EVERY game mode.
    * In planechase / 'none' (Life Tracker) games nobody has a role, so
-   * checkWinConditions hits its `!leaderAlive && !assassinAlive &&
-   * !traitorAlive` branch and returns "assassin" — the first player to hit 0
-   * life instantly ends the game for everyone. The win check needs to be
-   * gated on the game mode including treachery.
+   * checkWinConditions hit its `!leaderAlive && !assassinAlive &&
+   * !traitorAlive` branch and returned "assassin" — the first player to hit 0
+   * life instantly ended the game for everyone.
+   *
+   * checkWinConditions now takes the game mode and returns null outside
+   * treachery modes (functions/index.js: checkWinConditions / isTreacheryMode).
    */
-  nonTreacheryGameNeverAutoFinishes: true,
+  nonTreacheryGameNeverAutoFinishes: false,
 
   /**
-   * FIXME: currently broken — see finding #5. Flip to `false` when the bug is fixed.
+   * FIXED (#108) — enforced again.
    *
-   * resolveMetamorph moves the eliminated target's identity_card_id onto the
-   * caller but never clears it from the target, so after a steal two player
-   * docs hold the same card. The game-over screen then renders the same
-   * identity twice, and any future Metamorph/Wearer-of-Masks "is this card
-   * already in the game" check sees a phantom copy.
+   * Was: resolveMetamorph moved the eliminated target's identity_card_id onto
+   * the caller but never cleared it from the target, so after a steal two
+   * player docs held the same card. The game-over screen then rendered the
+   * same identity twice, and any future Metamorph/Wearer-of-Masks "is this
+   * card already in the game" check saw a phantom copy.
+   *
+   * resolveMetamorph now clears the target's identity_card_id in the same
+   * transaction (functions/index.js: resolveMetamorph).
    */
-  identityCardsAreUnique: true,
+  identityCardsAreUnique: false,
 } as const;
 
 // ════════════════════════════════════════════════════════════════

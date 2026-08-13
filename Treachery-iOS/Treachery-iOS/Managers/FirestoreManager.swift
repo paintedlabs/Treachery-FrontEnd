@@ -28,8 +28,35 @@ final class FirestoreManager: FirestoreManaging {
 
     // MARK: - Users
 
+    /// Allowlist of public profile fields — PII (email/phone_number/fcm_token)
+    /// lives under users/{uid}/private/data and must never reach the public doc.
+    private func publicUserData(_ user: TreacheryUser) -> [String: Any] {
+        var publicData: [String: Any] = [
+            "display_name": user.displayName,
+            "friend_ids": user.friendIds,
+            "created_at": Timestamp(date: user.createdAt),
+            "elo": user.elo,
+        ]
+        if let deckStats = user.deckStats {
+            publicData["deck_stats"] = deckStats.mapValues { stat -> [String: Any] in
+                ["elo": stat.elo, "wins": stat.wins, "losses": stat.losses, "games": stat.games]
+            }
+        }
+        return publicData
+    }
+
     func createUser(_ user: TreacheryUser) async throws {
-        try usersCollection.document(user.id).setData(from: user)
+        try await usersCollection.document(user.id).setData(publicUserData(user))
+
+        var privateData: [String: Any] = [:]
+        if let email = user.email { privateData["email"] = email }
+        if let phone = user.phoneNumber { privateData["phone_number"] = phone }
+        if let fcm = user.fcmToken { privateData["fcm_token"] = fcm }
+        if !privateData.isEmpty {
+            try await usersCollection.document(user.id)
+                .collection("private").document("data")
+                .setData(privateData, merge: true)
+        }
     }
 
     func getUser(id: String) async throws -> TreacheryUser? {
@@ -41,7 +68,17 @@ final class FirestoreManager: FirestoreManaging {
     }
 
     func updateUser(_ user: TreacheryUser) async throws {
-        try usersCollection.document(user.id).setData(from: user, merge: true)
+        // Explicit field list rather than encoding the whole model: on a legacy
+        // doc that still holds PII, re-encoding echoes those values straight back
+        // onto the public doc. Rules allow it (an unchanged value is not in
+        // diff().affectedKeys(), so doesNotWritePii() passes) — which is exactly
+        // why the allowlist has to do the withholding.
+        //
+        // Deliberately not awaited: the completion handler for a write does not
+        // fire while the client is offline, so awaiting it would wedge the
+        // Profile and onboarding rename screens on their spinner until the
+        // network came back. The local write applies immediately regardless.
+        usersCollection.document(user.id).setData(publicUserData(user), merge: true, completion: nil)
     }
 
     func searchUsers(byDisplayName name: String) async throws -> [TreacheryUser] {
@@ -85,20 +122,18 @@ final class FirestoreManager: FirestoreManaging {
     }
 
     func addFriend(userId: String, friendId: String) async throws {
+        // Mutual friendship is established via acceptFriendRequest callable only.
+        // Kept for protocol compatibility; prefer CloudFunctions.acceptFriendRequest.
         try await usersCollection.document(userId).updateData([
             "friend_ids": FieldValue.arrayUnion([friendId])
-        ])
-        try await usersCollection.document(friendId).updateData([
-            "friend_ids": FieldValue.arrayUnion([userId])
         ])
     }
 
     func removeFriend(userId: String, friendId: String) async throws {
+        // Preferred path is CloudFunctions.removeFriend (mutual). Owner can still
+        // drop the local edge if the callable is unavailable.
         try await usersCollection.document(userId).updateData([
             "friend_ids": FieldValue.arrayRemove([friendId])
-        ])
-        try await usersCollection.document(friendId).updateData([
-            "friend_ids": FieldValue.arrayRemove([userId])
         ])
     }
 

@@ -50,13 +50,21 @@ test.describe('Concealed identities stay concealed', () => {
     const traitor = playerWithRole(players, 'traitor');
 
     for (const viewer of players) {
-      // The Leader is public by the rules; nobody else is — not even to
-      // themselves on the roster (their own card lives in the header instead).
+      // Leader is public to everyone. Non-leaders only see their *own* role
+      // on the roster (plus identity card in the header) — never each other.
       await expect(roleButton(viewer.page, 'Leader')).toHaveCount(1);
-      await expect(roleButton(viewer.page, 'Assassin')).toHaveCount(0);
-      await expect(roleButton(viewer.page, 'Guardian')).toHaveCount(0);
-      await expect(roleButton(viewer.page, 'Traitor')).toHaveCount(0);
-      await expect(viewer.page.getByText('Role Hidden')).toHaveCount(LAYOUT.length - 1);
+      await expect(roleButton(viewer.page, 'Assassin')).toHaveCount(
+        viewer.role === 'assassin' ? 1 : 0,
+      );
+      await expect(roleButton(viewer.page, 'Guardian')).toHaveCount(
+        viewer.role === 'guardian' ? 1 : 0,
+      );
+      await expect(roleButton(viewer.page, 'Traitor')).toHaveCount(
+        viewer.role === 'traitor' ? 1 : 0,
+      );
+      // Non-leaders for this viewer minus self (if viewer is non-leader).
+      const hiddenCount = LAYOUT.length - 1 - (viewer.role === 'leader' ? 0 : 1);
+      await expect(viewer.page.getByText('Role Hidden')).toHaveCount(hiddenCount);
     }
 
     // The traitor's *card* is likewise invisible to the other three boards.
@@ -68,17 +76,20 @@ test.describe('Concealed identities stay concealed', () => {
     await unveilSelf(traitor.page);
     for (const viewer of players) {
       await expect(roleButton(viewer.page, 'Traitor')).toHaveCount(1);
-      await expect(roleButton(viewer.page, 'Assassin')).toHaveCount(0);
-      await expect(viewer.page.getByText('Role Hidden')).toHaveCount(LAYOUT.length - 2);
+      // Assassins still only see themselves (not the other assassin).
+      await expect(roleButton(viewer.page, 'Assassin')).toHaveCount(
+        viewer.role === 'assassin' ? 1 : 0,
+      );
+      // Two assassins still hidden for non-assassins; one for an assassin viewer.
+      const hiddenCount = viewer.role === 'assassin' ? 1 : 2;
+      await expect(viewer.page.getByText('Role Hidden')).toHaveCount(hiddenCount);
     }
   });
 });
 
 test.describe('The game-over reveal is unreachable mid-game', () => {
-  // The game-over screen renders every player's role and identity card with no
-  // check on game.state, and three different routes reach it while the game is
-  // still in progress. Each of the three tests below is the same leak from a
-  // different direction.
+  // Full identity reveal is gated on game.state === finished. Each route
+  // below used to leak; assert none of them hand over roles mid-game.
 
   async function setup(browser: Browser) {
     return setupSeededGame(browser, LAYOUT, {
@@ -87,11 +98,8 @@ test.describe('The game-over reveal is unreachable mid-game', () => {
     });
   }
 
-  // FIXME: currently broken — see finding #2. Un-fixme when the bug is fixed.
-  // An eliminated player is a spectator, not a winner: the spectator bar's
-  // "Leave Game" button routes straight to /game-over/, which reveals every
-  // living player's role and card while the game is still in progress.
-  test.fixme('an eliminated spectator pressing Leave Game sees no identities', async ({ browser }) => {
+  // Spectator "Leave game" returns home — never mid-game game-over reveal.
+  test('an eliminated spectator pressing Leave Game sees no identities', async ({ browser }) => {
     const { players, gameId } = await setup(browser);
     const leader = playerWithRole(players, 'leader');
     const [assassinA] = playersWithRole(players, 'assassin');
@@ -107,36 +115,34 @@ test.describe('The game-over reveal is unreachable mid-game', () => {
     await expectNoTraitorLeak(assassinA.page);
   });
 
-  // FIXME: currently broken — see finding #2. Un-fixme when the bug is fixed.
-  // Forfeiting navigates the forfeiter to /game-over/ unconditionally, so any
-  // player can trade their own elimination for everyone else's identities.
-  test.fixme('a player who forfeits while the game continues sees no identities', async ({
+  // Forfeit stays on the board as spectator until the game actually ends.
+  test('a player who forfeits while the game continues sees no identities', async ({
     browser,
   }) => {
     const { players, gameId } = await setup(browser);
     const [assassinA] = playersWithRole(players, 'assassin');
 
     await forfeit(assassinA.page);
-    await expect(assassinA.page).toHaveURL(/\/game-over\//, { timeout: 15_000 });
+    await expect(assassinA.page).toHaveURL(/\/game\//, { timeout: 15_000 });
+    await expect(assassinA.page.getByRole('button', { name: 'Leave game' })).toBeVisible({
+      timeout: 15_000,
+    });
 
     // Leader + one assassin + traitor are still alive, so nobody has won.
     expect((await fetchGameDoc(players[0].page, gameId))?.state).toBe('in_progress');
     await expectNoTraitorLeak(assassinA.page);
   });
 
-  // FIXME: currently broken — see finding #2. Un-fixme when the bug is fixed.
-  // On web the route is just a URL. A living player can type
-  // /game-over/<gameId> and read the whole table mid-game.
-  test.fixme('navigating directly to /game-over mid-game reveals nothing', async ({ browser }) => {
+  // Deep link mid-game shows a hold screen, not the identity table.
+  test('navigating directly to /game-over mid-game reveals nothing', async ({ browser }) => {
     const { players, gameId } = await setup(browser);
     const snoop: PlayerHandle = playersWithRole(players, 'assassin')[0];
 
     expect((await fetchGameDoc(snoop.page, gameId))?.state).toBe('in_progress');
     await snoop.page.goto(`/game-over/${gameId}`);
-    // Wait for the app to finish booting without prescribing which screen it
-    // settles on — bouncing back to the board is a perfectly good fix. Every
-    // candidate screen lists the players, so this is a neutral "rendered" gate.
-    await expect(snoop.page.getByText('Player 1').first()).toBeVisible({ timeout: 20_000 });
+    await expect(snoop.page.getByText('Game Still In Progress')).toBeVisible({
+      timeout: 20_000,
+    });
 
     await expectNoTraitorLeak(snoop.page);
   });

@@ -22,8 +22,8 @@ interface PlayerRowProps {
 export function PlayerRow({
   player,
   isCurrentUser,
-  canSeeRole: _canSeeRole,
-  isUnveiledOrLeader,
+  canSeeRole,
+  isUnveiledOrLeader: _isUnveiledOrLeader,
   onAdjustLife,
   onViewCard,
   isDisabled,
@@ -32,7 +32,10 @@ export function PlayerRow({
 }: PlayerRowProps) {
   const roleColor = player.role ? ROLE_COLORS[player.role] : colors.textSecondary;
   const effectiveColor = player.player_color || playerColor;
-  const isPublicRole = player.role && ((player.is_unveiled && !player.is_face_down) || player.role === 'leader');
+  const isPublicRole =
+    !!player.role && ((player.is_unveiled && !player.is_face_down) || player.role === 'leader');
+  // canSeeRole includes Puppet Master face-down peeks; isPublicRole is table-public only.
+  const showRole = !!player.role && (canSeeRole || isPublicRole);
   const accentColor = effectiveColor || (isPublicRole ? roleColor : null);
 
   const [showColorPicker, setShowColorPicker] = useState(false);
@@ -104,15 +107,15 @@ export function PlayerRow({
             <Text style={styles.commanderName}>{player.commander_name}</Text>
           ) : null}
 
-          {isPublicRole ? (
+          {showRole ? (
             <Pressable
-              onPress={isUnveiledOrLeader && !isCurrentUser ? onViewCard : undefined}
+              onPress={canSeeRole && !isCurrentUser ? onViewCard : undefined}
               style={({ hovered }: WebPressableState) => [
                 styles.roleRow,
-                hovered && isUnveiledOrLeader && !isCurrentUser && styles.roleRowHovered,
+                hovered && canSeeRole && !isCurrentUser && styles.roleRowHovered,
               ]}
-              disabled={!isUnveiledOrLeader || isCurrentUser}
-              accessibilityLabel={`${player.role ? ROLE_DISPLAY_NAMES[player.role] : 'Unknown'} role${isUnveiledOrLeader && !isCurrentUser ? ', view card' : ''}`}
+              disabled={!canSeeRole || isCurrentUser}
+              accessibilityLabel={`${player.role ? ROLE_DISPLAY_NAMES[player.role] : 'Unknown'} role${canSeeRole && !isCurrentUser ? ', view card' : ''}`}
               accessibilityRole="button"
             >
               <View style={[styles.roleDot, { backgroundColor: roleColor }]} />
@@ -122,7 +125,7 @@ export function PlayerRow({
               {player.is_unveiled && player.role !== 'leader' && !isCurrentUser && (
                 <Text style={styles.unveiledText}>(Unveiled)</Text>
               )}
-              {isUnveiledOrLeader && !isCurrentUser && (
+              {canSeeRole && !isCurrentUser && (
                 <Ionicons name="information-circle-outline" size={12} color={roleColor} />
               )}
             </Pressable>

@@ -50,7 +50,7 @@ test.describe('Two players adjusting the same target', () => {
   // returns without calling adjustLife, so the second player's damage is lost.
   // The pending delta should be tracked per in-flight request instead of being
   // cleared by any incoming snapshot.
-  test.fixme('near-simultaneous adjustments from different players both land', async ({
+  test('near-simultaneous adjustments from different players both land', async ({
     browser,
   }) => {
     const { players, gameId } = await setupSeededGame(browser, LAYOUT, {
@@ -71,7 +71,7 @@ test.describe('Two players adjusting the same target', () => {
   // FIXME: currently broken — see finding #4. Un-fixme when the bug is fixed.
   // Same root cause, with multi-tap bursts: whichever client's flush lands
   // second loses its entire accumulated delta, not just one point.
-  test.fixme('overlapping multi-tap bursts from different players both land', async ({
+  test('overlapping multi-tap bursts from different players both land', async ({
     browser,
   }) => {
     const { players, gameId } = await setupSeededGame(browser, LAYOUT, {

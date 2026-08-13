@@ -68,8 +68,11 @@ export function useGameBoard(gameId: string, currentUserId: string | null): UseG
     });
 
     const unsubPlayers = firestoreService.listenToPlayers(gameId, (newPlayers) => {
-      // Clear optimistic deltas for players whose server life has changed
-      // (meaning the server has processed our update)
+      // Reconcile optimistic display with the server total.
+      // IMPORTANT: never zero lifeDeltasRef while this client still has
+      // un-flushed taps queued (debounce timer or non-zero ref) — a peer's
+      // flush also moves server life for the same player and must not wipe
+      // our pending batch before we send it.
       setServerPlayers((prevServer) => {
         setLifeDeltas((prev) => {
           if (Object.keys(prev).length === 0) return prev;
@@ -78,11 +81,22 @@ export function useGameBoard(gameId: string, currentUserId: string | null): UseG
           for (const id of Object.keys(next)) {
             const oldLife = prevServer.find((s) => s.id === id)?.life_total;
             const newLife = newPlayers.find((s) => s.id === id)?.life_total;
-            if (oldLife !== undefined && newLife !== undefined && oldLife !== newLife) {
-              delete next[id];
-              lifeDeltasRef.current[id] = 0;
-              changed = true;
+            if (oldLife === undefined || newLife === undefined || oldLife === newLife) {
+              continue;
             }
+            const unflushed = lifeDeltasRef.current[id] || 0;
+            if (unflushed !== 0 || debounceTimersRef.current[id]) {
+              // Keep only the still-local pending amount as the optimistic delta.
+              if (next[id] !== unflushed) {
+                next[id] = unflushed;
+                changed = true;
+              }
+              continue;
+            }
+            // Our own flush completed (ref already 0) — drop optimistic overlay.
+            delete next[id];
+            lifeDeltasRef.current[id] = 0;
+            changed = true;
           }
           return changed ? next : prev;
         });

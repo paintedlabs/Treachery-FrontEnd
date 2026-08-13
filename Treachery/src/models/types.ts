@@ -87,6 +87,10 @@ export interface Player {
   commander_name: string | null;
   original_identity_card_id?: string | null;
   is_face_down?: boolean;
+  // Once-per-game guard written by the traitor ability resolvers in
+  // functions/index.js. Never initialized on the player doc, so absent
+  // means the ability has not been used yet.
+  ability_resolved?: boolean;
 }
 
 export interface IdentityCard {

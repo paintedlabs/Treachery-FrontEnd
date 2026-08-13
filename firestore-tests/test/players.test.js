@@ -172,8 +172,7 @@ describe("games/{gameId}/players/{playerId}", () => {
       );
     });
 
-    // SKIP: currently vulnerable — see finding #4. Un-skip when firestore.rules is fixed.
-    it.skip("stops a non-member from creating a player doc in somebody else's in_progress game", async () => {
+    it("stops a non-member from creating a player doc in somebody else's in_progress game", async () => {
       const db = await authedDb(OUTSIDER);
       await assertFails(
         setDoc(

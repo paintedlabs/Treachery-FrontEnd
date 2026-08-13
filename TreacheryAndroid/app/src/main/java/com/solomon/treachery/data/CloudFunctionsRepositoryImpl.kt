@@ -10,6 +10,31 @@ class CloudFunctionsRepositoryImpl @Inject constructor(
     private val functions: FirebaseFunctions
 ) : CloudFunctionsRepository {
 
+    override suspend fun createGame(
+        gameMode: String,
+        maxPlayers: Int,
+        startingLife: Int,
+        maxTraitorRarity: String?,
+        useOwnDeck: Boolean,
+        displayName: String?
+    ): String {
+        val data = mutableMapOf<String, Any>(
+            "gameMode" to gameMode,
+            "maxPlayers" to maxPlayers,
+            "startingLife" to startingLife,
+            "useOwnDeck" to useOwnDeck
+        )
+        maxTraitorRarity?.let { data["maxTraitorRarity"] = it }
+        displayName?.let { data["displayName"] = it }
+        val result = functions.getHttpsCallable("createGame")
+            .call(data)
+            .await()
+        @Suppress("UNCHECKED_CAST")
+        val payload = result.getData() as? Map<String, Any?> ?: emptyMap()
+        return payload["gameId"] as? String
+            ?: throw IllegalStateException("Invalid createGame response")
+    }
+
     override suspend fun startGame(gameId: String) {
         functions.getHttpsCallable("startGame")
             .call(mapOf("gameId" to gameId))
@@ -31,6 +56,28 @@ class CloudFunctionsRepositoryImpl @Inject constructor(
     override suspend fun unveilPlayer(gameId: String) {
         functions.getHttpsCallable("unveilPlayer")
             .call(mapOf("gameId" to gameId))
+            .await()
+    }
+
+    override suspend fun resolveMetamorph(gameId: String, targetPlayerId: String) {
+        functions.getHttpsCallable("resolveMetamorph")
+            .call(mapOf("gameId" to gameId, "targetPlayerId" to targetPlayerId))
+            .await()
+    }
+
+    override suspend fun resolvePuppetMaster(gameId: String, redistributions: Map<String, String>) {
+        functions.getHttpsCallable("resolvePuppetMaster")
+            .call(mapOf("gameId" to gameId, "redistributions" to redistributions))
+            .await()
+    }
+
+    override suspend fun resolveWearerOfMasks(gameId: String, chosenCardId: String?) {
+        // Null chosenCardId means the player declined; the server returns early
+        // without burning the once-per-game ability_resolved flag.
+        val data = mutableMapOf<String, Any>("gameId" to gameId)
+        chosenCardId?.let { data["chosenCardId"] = it }
+        functions.getHttpsCallable("resolveWearerOfMasks")
+            .call(data)
             .await()
     }
 
@@ -92,6 +139,18 @@ class CloudFunctionsRepositoryImpl @Inject constructor(
         gameMode?.let { data["gameMode"] = it }
         functions.getHttpsCallable("updateGameSettings")
             .call(data)
+            .await()
+    }
+
+    override suspend fun acceptFriendRequest(requestId: String) {
+        functions.getHttpsCallable("acceptFriendRequest")
+            .call(mapOf("requestId" to requestId))
+            .await()
+    }
+
+    override suspend fun removeFriend(friendId: String) {
+        functions.getHttpsCallable("removeFriend")
+            .call(mapOf("friendId" to friendId))
             .await()
     }
 }

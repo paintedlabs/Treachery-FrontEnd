@@ -1,0 +1,86 @@
+name: CI (iOS)
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "Treachery-iOS/**"
+      # Self-trigger: a PR that only edits this workflow should still run it.
+      - ".github/workflows/ci-ios.yml"
+
+concurrency:
+  group: ci-ios-${{ github.head_ref }}
+  cancel-in-progress: true
+
+# GoogleService-Info.plist is tracked, so the build needs no secret
+# injection — this workflow references no secrets and runs on fork PRs.
+jobs:
+  # ── iOS App ──────────────────────────────────────────
+  ios-app:
+    name: iOS App
+    runs-on: macos-15
+    timeout-minutes: 40
+    defaults:
+      run:
+        working-directory: Treachery-iOS
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select latest Xcode
+        run: |
+          LATEST_XCODE=$(ls -d /Applications/Xcode*.app 2>/dev/null | sort -V | tail -1)
+          echo "Using $LATEST_XCODE"
+          sudo xcode-select -s "$LATEST_XCODE/Contents/Developer"
+
+      # Package.resolved is gitignored, so key on the pbxproj (it pins the
+      # Firebase version requirement). Without this cache, Firebase SPM
+      # resolution alone takes several minutes per run.
+      - name: Cache Swift packages
+        uses: actions/cache@v4
+        with:
+          path: Treachery-iOS/SourcePackages
+          key: spm-${{ runner.os }}-${{ hashFiles('Treachery-iOS/Treachery-iOS.xcodeproj/project.pbxproj') }}
+          restore-keys: spm-${{ runner.os }}-
+
+      # The compile gate: builds the app and both test bundles without
+      # signing or a booted simulator.
+      - name: Build for testing
+        run: |
+          xcodebuild build-for-testing \
+            -project Treachery-iOS.xcodeproj \
+            -scheme Treachery-iOS \
+            -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath DerivedData \
+            -clonedSourcePackagesDirPath SourcePackages \
+            CODE_SIGNING_ALLOWED=NO
+
+      # Treachery-iOSTests is entirely mock-based (FirestoreManaging /
+      # CloudFunctions protocol mocks, no Firebase imports), so it is safe
+      # to run here. The scheme's TestAction also includes
+      # Treachery-iOSUITests, which launches the app against LIVE production
+      # Firebase — -only-testing keeps that bundle out.
+      - name: Run unit tests
+        run: |
+          UDID=$(xcrun simctl list devices available iPhone | grep -m1 -oE '[0-9A-F-]{36}')
+          if [ -z "$UDID" ]; then
+            echo "No available iPhone simulator on this image:" >&2
+            xcrun simctl list devices available >&2
+            exit 1
+          fi
+          echo "Using simulator $UDID"
+          xcodebuild test-without-building \
+            -project Treachery-iOS.xcodeproj \
+            -scheme Treachery-iOS \
+            -destination "id=$UDID" \
+            -derivedDataPath DerivedData \
+            -only-testing:Treachery-iOSTests \
+            -resultBundlePath TestResults.xcresult
+
+      - name: Upload test results
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-test-results-${{ github.run_id }}
+          path: Treachery-iOS/TestResults.xcresult
+          retention-days: 7
+          if-no-files-found: ignore

@@ -136,7 +136,6 @@ describe('updateGameSettings — startingLife', () => {
   for (const life of [20, 25, 30, 50]) {
     it(
       `sets starting_life to ${life} and re-bases every player's life_total`,
-      { skip: 'currently broken — see finding #A' },
       async () => {
         const users = await h.getUsers(3);
         const game = await h.seedGame({ users, startingLife: 40 });
@@ -166,7 +165,6 @@ describe('updateGameSettings — startingLife', () => {
   // BOTH changes.
   it(
     'persists every setting co-submitted with startingLife',
-    { skip: 'currently broken — see finding #A' },
     async () => {
       const users = await h.getUsers(3);
       const game = await h.seedGame({
@@ -200,7 +198,6 @@ describe('updateGameSettings — startingLife', () => {
   // The re-based starting life must be what startGame deals out.
   it(
     'a startingLife change is reflected in the life totals startGame deals',
-    { skip: 'currently broken — see finding #A' },
     async () => {
       const users = await h.getUsers(4);
       const game = await h.seedGame({ users, startingLife: 40 });

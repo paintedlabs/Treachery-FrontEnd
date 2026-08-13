@@ -20,6 +20,15 @@ const METAMORPH_CARD_ID = 'traitor_07';
 const PUPPET_MASTER_CARD_ID = 'traitor_09';
 const WEARER_OF_MASKS_CARD_ID = 'traitor_13';
 
+// Mirrors BLOCKED_COPY_IDS in resolveWearerOfMasks (functions/index.js) — the
+// server rejects these so a copy can't unlock another callable-backed ability.
+// Keep in sync with that guard.
+const UNCOPYABLE_CARD_IDS = new Set([
+  METAMORPH_CARD_ID,
+  PUPPET_MASTER_CARD_ID,
+  WEARER_OF_MASKS_CARD_ID,
+]);
+
 type AbilityKind = 'metamorph' | 'puppetMaster' | 'wearerOfMasks';
 
 function abilityFor(card: IdentityCard | undefined | null): AbilityKind | null {
@@ -32,6 +41,9 @@ function abilityFor(card: IdentityCard | undefined | null): AbilityKind | null {
 
 export function shouldShowAbilityResolver(player: Player | undefined | null): boolean {
   if (!player || !player.is_unveiled || !player.identity_card_id) return false;
+  // Once-per-game: the resolvers reject a second call. The field is absent
+  // until one of them writes it, so undefined means "not resolved yet".
+  if (player.ability_resolved) return false;
   return abilityFor(getCard(player.identity_card_id)) !== null;
 }
 
@@ -246,7 +258,6 @@ function PuppetMasterSheet({
       </View>
       {swappable.map((p) => {
         const cardId = assignments[p.id];
-        const c = cardId ? getCard(cardId) : undefined;
         const wasSwapped = cardId !== p.identity_card_id;
         const isSel = firstSel === p.id;
         return (
@@ -266,12 +277,9 @@ function PuppetMasterSheet({
                   </View>
                 )}
               </View>
-              {c && (
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 }}>
-                  <View style={[styles.dot, { backgroundColor: ROLE_COLORS[c.role] }]} />
-                  <Text style={[styles.rowRole, { color: ROLE_COLORS[c.role] }]}>{c.name}</Text>
-                </View>
-              )}
+              <Text style={[styles.rowRole, { color: colors.textSecondary, marginTop: 2 }]}>
+                Identity hidden
+              </Text>
             </View>
             <Ionicons
               name={isSel ? 'swap-horizontal-outline' : 'swap-horizontal'}
@@ -327,7 +335,9 @@ function WearerOfMasksSheet({
   const usedIds = new Set(players.map((p) => p.identity_card_id).filter(Boolean));
 
   const doReveal = () => {
-    const available = getAllCards().filter((c) => c.role !== 'leader' && !usedIds.has(c.id));
+    const available = getAllCards().filter(
+      (c) => c.role !== 'leader' && !usedIds.has(c.id) && !UNCOPYABLE_CARD_IDS.has(c.id),
+    );
     const shuffled = [...available].sort(() => Math.random() - 0.5);
     setRevealed(shuffled.slice(0, Math.min(xValue, shuffled.length)));
     setHasRevealed(true);

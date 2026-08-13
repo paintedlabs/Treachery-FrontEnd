@@ -12,11 +12,11 @@ import {
   limit,
   onSnapshot,
   arrayUnion,
-  arrayRemove,
   documentId,
   Unsubscribe,
 } from 'firebase/firestore';
-import { db } from '@/config/firebase';
+import { httpsCallable } from 'firebase/functions';
+import { db, functions } from '@/config/firebase';
 import { TreacheryUser, Game, Player, FriendRequest } from '@/models/types';
 
 // ── Collection references ──
@@ -29,7 +29,24 @@ const friendRequestsCol = () => collection(db, 'friend_requests');
 // ── Users ──
 
 export async function createUser(user: TreacheryUser): Promise<void> {
-  await setDoc(doc(usersCol(), user.id), user);
+  // Public profile only — PII goes under users/{id}/private/data
+  await setDoc(doc(usersCol(), user.id), {
+    id: user.id,
+    display_name: user.display_name,
+    friend_ids: user.friend_ids ?? [],
+    created_at: user.created_at,
+    ...(user.elo !== undefined ? { elo: user.elo } : {}),
+    ...(user.deck_stats ? { deck_stats: user.deck_stats } : {}),
+  });
+
+  const privateData: Record<string, string> = {};
+  if (user.email) privateData.email = user.email;
+  if (user.phone_number) privateData.phone_number = user.phone_number;
+  const fcm = (user as TreacheryUser & { fcm_token?: string | null }).fcm_token;
+  if (fcm) privateData.fcm_token = fcm;
+  if (Object.keys(privateData).length > 0) {
+    await setDoc(doc(usersCol(), user.id, 'private', 'data'), privateData, { merge: true });
+  }
 }
 
 export async function getUser(id: string): Promise<TreacheryUser | null> {
@@ -39,7 +56,18 @@ export async function getUser(id: string): Promise<TreacheryUser | null> {
 }
 
 export async function updateUser(user: TreacheryUser): Promise<void> {
-  await setDoc(doc(usersCol(), user.id), user, { merge: true });
+  await setDoc(
+    doc(usersCol(), user.id),
+    {
+      id: user.id,
+      display_name: user.display_name,
+      friend_ids: user.friend_ids ?? [],
+      created_at: user.created_at,
+      ...(user.elo !== undefined ? { elo: user.elo } : {}),
+      ...(user.deck_stats ? { deck_stats: user.deck_stats } : {}),
+    },
+    { merge: true },
+  );
 }
 
 export async function searchUsers(name: string): Promise<TreacheryUser[]> {
@@ -75,21 +103,19 @@ export async function updateFriendRequest(request: FriendRequest): Promise<void>
 }
 
 export async function addFriend(userId: string, friendId: string): Promise<void> {
+  // Mutual friendship is established via acceptFriendRequest callable.
   await updateDoc(doc(usersCol(), userId), {
     friend_ids: arrayUnion(friendId),
   });
-  await updateDoc(doc(usersCol(), friendId), {
-    friend_ids: arrayUnion(userId),
-  });
 }
 
-export async function removeFriend(userId: string, friendId: string): Promise<void> {
-  await updateDoc(doc(usersCol(), userId), {
-    friend_ids: arrayRemove(friendId),
-  });
-  await updateDoc(doc(usersCol(), friendId), {
-    friend_ids: arrayRemove(userId),
-  });
+export async function removeFriend(friendId: string): Promise<void> {
+  // Must go through the callable: rules deny writing another user's doc, so a
+  // client-side remove would leave the friendship intact on their side. The
+  // caller's uid comes from the auth context server-side.
+  // No UI entry point calls this yet — wired now so the first one is mutual.
+  const removeFn = httpsCallable(functions, 'removeFriend');
+  await removeFn({ friendId });
 }
 
 export async function getFriends(userId: string): Promise<TreacheryUser[]> {
