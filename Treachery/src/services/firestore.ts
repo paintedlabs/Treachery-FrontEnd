@@ -271,3 +271,16 @@ export async function updateCommanderName(
   await updateDoc(ref, { commander_name: name && name.trim() ? name.trim() : null });
 }
 
+export async function updatePlayerDisplayName(
+  gameId: string,
+  playerId: string,
+  name: string,
+): Promise<void> {
+  const ref = doc(db, 'games', gameId, 'players', playerId);
+  await updateDoc(ref, { display_name: name });
+}
+
+export async function updateUserDisplayName(userId: string, name: string): Promise<void> {
+  await updateDoc(doc(db, 'users', userId), { display_name: name });
+}
+

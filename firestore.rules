@@ -129,6 +129,11 @@ service cloud.firestore {
           && resource.data.user_id == request.auth.uid
           && onlyCommanderNameChanged();
 
+        // Players can rename themselves mid-game
+        allow update: if request.auth != null
+          && resource.data.user_id == request.auth.uid
+          && onlyDisplayNameChanged();
+
         // Players can remove themselves, or the host can remove anyone (lobby only)
         allow delete: if request.auth != null
           && (resource.data.user_id == request.auth.uid
@@ -217,6 +222,17 @@ service cloud.firestore {
     function onlyCommanderNameChanged() {
       let affectedKeys = request.resource.data.diff(resource.data).affectedKeys();
       return affectedKeys.hasOnly(['commander_name']);
+    }
+
+    // Self-rename during a game: display_name only, non-empty, and bounded to
+    // the same 40 chars the clients enforce. The user-doc half of a rename is
+    // covered by the users update rule (owners edit their own doc freely).
+    function onlyDisplayNameChanged() {
+      let affectedKeys = request.resource.data.diff(resource.data).affectedKeys();
+      return affectedKeys.hasOnly(['display_name'])
+        && request.resource.data.display_name is string
+        && request.resource.data.display_name.size() > 0
+        && request.resource.data.display_name.size() <= 40;
     }
   }
 }

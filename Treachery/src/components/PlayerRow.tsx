@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { View, Text, TouchableOpacity, Pressable, PressableStateCallbackType, ScrollView, StyleSheet, Animated } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, Pressable, PressableStateCallbackType, ScrollView, StyleSheet, Animated } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Player } from '@/models/types';
 import { ROLE_COLORS, ROLE_DISPLAY_NAMES } from '@/constants/roles';
@@ -17,6 +17,8 @@ interface PlayerRowProps {
   isDisabled?: boolean;
   onColorChange?: (color: string | null) => void;
   playerColor?: string | null;
+  /** When provided (own row only), the name gets an edit affordance. */
+  onRename?: (name: string) => void;
 }
 
 export function PlayerRow({
@@ -29,6 +31,7 @@ export function PlayerRow({
   isDisabled,
   onColorChange,
   playerColor,
+  onRename,
 }: PlayerRowProps) {
   const roleColor = player.role ? ROLE_COLORS[player.role] : colors.textSecondary;
   const effectiveColor = player.player_color || playerColor;
@@ -39,7 +42,19 @@ export function PlayerRow({
   const accentColor = effectiveColor || (isPublicRole ? roleColor : null);
 
   const [showColorPicker, setShowColorPicker] = useState(false);
+  const [isEditingName, setIsEditingName] = useState(false);
+  const [nameDraft, setNameDraft] = useState(player.display_name);
   const pickerHeight = useRef(new Animated.Value(0)).current;
+
+  const submitRename = () => {
+    setIsEditingName(false);
+    const trimmed = nameDraft.trim();
+    if (trimmed && trimmed !== player.display_name) {
+      onRename?.(trimmed);
+    } else {
+      setNameDraft(player.display_name);
+    }
+  };
 
   useEffect(() => {
     Animated.timing(pickerHeight, {
@@ -83,15 +98,42 @@ export function PlayerRow({
                 />
               </TouchableOpacity>
             )}
-            <Text
-              style={[
-                styles.name,
-                isCurrentUser && styles.nameBold,
-                player.is_eliminated && styles.nameEliminated,
-              ]}
-            >
-              {player.display_name}
-            </Text>
+            {isEditingName ? (
+              <TextInput
+                style={[styles.name, styles.nameBold, styles.nameInput]}
+                value={nameDraft}
+                onChangeText={setNameDraft}
+                onBlur={submitRename}
+                onSubmitEditing={submitRename}
+                autoFocus
+                maxLength={40}
+                returnKeyType="done"
+                accessibilityLabel="Your name"
+              />
+            ) : (
+              <Text
+                style={[
+                  styles.name,
+                  isCurrentUser && styles.nameBold,
+                  player.is_eliminated && styles.nameEliminated,
+                ]}
+              >
+                {player.display_name}
+              </Text>
+            )}
+            {isCurrentUser && onRename && !isEditingName && (
+              <TouchableOpacity
+                onPress={() => {
+                  setNameDraft(player.display_name);
+                  setIsEditingName(true);
+                }}
+                accessibilityLabel="Edit your name"
+                accessibilityRole="button"
+                hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+              >
+                <Ionicons name="pencil" size={13} color={colors.textSecondary} />
+              </TouchableOpacity>
+            )}
             {isCurrentUser && (
               <View style={styles.youBadge}>
                 <Text style={styles.youText}>You</Text>
@@ -260,6 +302,12 @@ const styles = StyleSheet.create({
   nameEliminated: {
     textDecorationLine: 'line-through',
     color: colors.textSecondary,
+  },
+  nameInput: {
+    // Match the Text metrics so the row doesn't jump while editing.
+    padding: 0,
+    margin: 0,
+    minWidth: 120,
   },
   youBadge: {
     backgroundColor: 'rgba(201, 168, 76, 0.2)',

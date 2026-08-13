@@ -304,6 +304,63 @@ describe("games/{gameId}/players/{playerId}", () => {
         })
       );
     });
+
+    // ── in-game rename (onlyDisplayNameChanged) ──────────────────
+
+    it("lets a player rename themselves", async () => {
+      const db = await authedDb(PLAYER);
+      await assertSucceeds(
+        updateDoc(doc(db, ...waitingPlayer(WAITING, P_PLAYER)), {
+          display_name: "Krenko, Mob Boss",
+        })
+      );
+    });
+
+    it("stops a player from renaming somebody else", async () => {
+      const db = await authedDb(PLAYER);
+      await assertFails(
+        updateDoc(doc(db, ...waitingPlayer(WAITING, P_HOST)), {
+          display_name: "Not Your Name",
+        })
+      );
+    });
+
+    it("rejects a rename that also changes life_total", async () => {
+      const db = await authedDb(PLAYER);
+      await assertFails(
+        updateDoc(doc(db, ...waitingPlayer(WAITING, P_PLAYER)), {
+          display_name: "Sneaky",
+          life_total: 999,
+        })
+      );
+    });
+
+    it("rejects an empty display_name", async () => {
+      const db = await authedDb(PLAYER);
+      await assertFails(
+        updateDoc(doc(db, ...waitingPlayer(WAITING, P_PLAYER)), {
+          display_name: "",
+        })
+      );
+    });
+
+    it("rejects a display_name over 40 characters", async () => {
+      const db = await authedDb(PLAYER);
+      await assertFails(
+        updateDoc(doc(db, ...waitingPlayer(WAITING, P_PLAYER)), {
+          display_name: "X".repeat(41),
+        })
+      );
+    });
+
+    it("rejects a non-string display_name", async () => {
+      const db = await authedDb(PLAYER);
+      await assertFails(
+        updateDoc(doc(db, ...waitingPlayer(WAITING, P_PLAYER)), {
+          display_name: 42,
+        })
+      );
+    });
   });
 
   describe("update (game state stays server-side)", () => {
