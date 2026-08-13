@@ -90,11 +90,23 @@ export interface Player {
   player_color: string | null;
   commander_name: string | null;
   original_identity_card_id?: string | null;
+  // Dealt role before Puppet Master / Wearer swaps. Absent until a swap.
+  original_role?: Role | null;
   is_face_down?: boolean;
   // Once-per-game guard written by the traitor ability resolvers in
   // functions/index.js. Never initialized on the player doc, so absent
   // means the ability has not been used yet.
   ability_resolved?: boolean;
+}
+
+/** Role this player was dealt, ignoring mid-game identity swaps. */
+export function dealtRole(player: Player): Role | null {
+  return player.original_role ?? player.role;
+}
+
+/** Identity card this player was dealt, ignoring mid-game identity swaps. */
+export function dealtIdentityCardId(player: Player): string | null {
+  return player.original_identity_card_id ?? player.identity_card_id;
 }
 
 export interface IdentityCard {

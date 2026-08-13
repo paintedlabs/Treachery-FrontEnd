@@ -220,6 +220,9 @@ export default function GameBoardScreen() {
   }
 
   const inspectedCard = inspectedPlayer ? identityCard(inspectedPlayer) : undefined;
+  const isEliminatedSpectator = !!currentPlayer?.is_eliminated;
+  const showPhenomenonResolver =
+    isPlanechaseActive && !isOwnDeckMode && !!currentPlane?.is_phenomenon && !tunnelOptions;
 
   return (
     <View style={styles.container}>
@@ -263,10 +266,7 @@ export default function GameBoardScreen() {
 
             {isPlanechaseActive && isChaoticAetherActive && <ChaoticAetherBanner />}
 
-            {isPlanechaseActive &&
-              !isOwnDeckMode &&
-              currentPlane?.is_phenomenon &&
-              !tunnelOptions && (
+            {showPhenomenonResolver && currentPlane && (
                 <PhenomenonOverlay
                   plane={currentPlane}
                   isPending={isPending}
@@ -274,8 +274,10 @@ export default function GameBoardScreen() {
                 />
               )}
 
-            {/* Always-visible plane card image (rotated 90° clockwise) */}
-            {isPlanechaseActive && !isOwnDeckMode && currentPlane?.image_uri && (
+            {/* Always-visible plane card image (rotated 90° clockwise).
+                Hidden while a phenomenon is waiting to resolve so the overlay
+                is not stacked under a second copy of the same card. */}
+            {isPlanechaseActive && !isOwnDeckMode && currentPlane?.image_uri && !showPhenomenonResolver && (
               <TouchableOpacity
                 style={styles.sidebarImageContainer}
                 onPress={() => setShowPlaneDetail(true)}
@@ -379,6 +381,14 @@ export default function GameBoardScreen() {
           {/* Mobile-only: chaotic aether */}
           {!isDesktop && isPlanechaseActive && isChaoticAetherActive && <ChaoticAetherBanner />}
 
+          {!isDesktop && showPhenomenonResolver && currentPlane && (
+            <PhenomenonOverlay
+              plane={currentPlane}
+              isPending={isPending}
+              onResolve={resolvePhenomenon}
+            />
+          )}
+
           {/* Ornate divider */}
           <View style={styles.ornateDividerRow}>
             <View style={styles.ornateLine} />
@@ -394,18 +404,22 @@ export default function GameBoardScreen() {
               currentUserId={currentUserId}
               activePlayerId={activePlayerId}
               onReorder={reorderSeats}
+              canReorder={!isEliminatedSpectator}
               center={
                 <>
                   <TouchableOpacity
-                    style={styles.turnButton}
+                    style={[styles.turnButton, isEliminatedSpectator && styles.buttonDisabled]}
                     onPress={advanceTurn}
+                    disabled={isEliminatedSpectator}
                     accessibilityLabel="Next turn"
                     accessibilityRole="button"
                   >
                     <Ionicons name="play-forward" size={16} color="#0d0b1a" />
                     <Text style={styles.turnButtonText}>Next Turn</Text>
                   </TouchableOpacity>
-                  <Text style={styles.tableHint}>Drag a player onto another seat to swap</Text>
+                  {!isEliminatedSpectator && (
+                    <Text style={styles.tableHint}>Drag a player onto another seat to swap</Text>
+                  )}
                 </>
               }
               renderTile={(item, state) => (
@@ -422,6 +436,7 @@ export default function GameBoardScreen() {
                   playerColor={item.player_color}
                   isDragging={state.isDragging}
                   isDropTarget={state.isDropTarget}
+                  isDisabled={isEliminatedSpectator}
                 />
               )}
             />
@@ -437,7 +452,7 @@ export default function GameBoardScreen() {
                   isUnveiledOrLeader={item.is_unveiled || item.role === 'leader'}
                   onAdjustLife={(amount) => adjustLife(item.id, amount)}
                   onViewCard={() => setInspectedPlayer(item)}
-                  isDisabled={false}
+                  isDisabled={isEliminatedSpectator}
                   onColorChange={item.user_id === currentUserId ? updatePlayerColor : undefined}
                   playerColor={item.player_color}
                   onRename={item.user_id === currentUserId ? renameCurrentPlayer : undefined}
@@ -549,7 +564,7 @@ export default function GameBoardScreen() {
       )}
 
       {/* Inspected player card modal */}
-      {inspectedCard && inspectedPlayer && (
+      {inspectedCard && inspectedPlayer && canSeeRole(inspectedPlayer) && (
         <IdentityCardDetail
           card={inspectedCard}
           player={inspectedPlayer}
