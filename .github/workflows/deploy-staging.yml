@@ -13,7 +13,13 @@ on:
 
 concurrency:
   group: deploy-staging
-  cancel-in-progress: true
+  # Queue, never abort. Cancelling mid-`firebase deploy` kills the Cloud Build
+  # jobs it has in flight, and a later run then reports every function as
+  # "Failed to update" with CANCELLED builds — which is how four merges in
+  # quick succession took staging down. A half-cancelled functions deploy can
+  # also leave the project on a mix of old and new code. Matches
+  # deploy-web-production and deploy-playstore.
+  cancel-in-progress: false
 
 jobs:
   deploy:

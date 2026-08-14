@@ -9,7 +9,10 @@ on:
 
 concurrency:
   group: deploy-testflight
-  cancel-in-progress: true
+  # Queue rather than abort: a cancelled run can still have uploaded a build to
+  # App Store Connect, and killing one mid-upload burns the build number for
+  # everyone. Matches deploy-appstore.
+  cancel-in-progress: false
 
 jobs:
   deploy:

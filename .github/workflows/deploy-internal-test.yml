@@ -9,7 +9,10 @@ on:
 
 concurrency:
   group: deploy-android-internal
-  cancel-in-progress: true
+  # Queue rather than abort: a cancelled run can still have uploaded a bundle
+  # to the Play track, so aborting mid-flight makes the track's contents
+  # ambiguous. Matches deploy-playstore.
+  cancel-in-progress: false
 
 jobs:
   test:
