@@ -752,6 +752,16 @@ exports.startGame = onCall(callableOptions, async (request) => {
     const gameUpdate = {
       state: "in_progress",
       last_activity_at: FieldValue.serverTimestamp(),
+      // Reconcile player_ids to the players actually being dealt in. The
+      // append-self rules path lets any signed-in user add their uid to a
+      // waiting game's player_ids WITHOUT creating a player doc — invisible
+      // to every lobby UI (they all render the subcollection). player_ids
+      // gates player-doc reads, so an unreconciled ghost uid would read every
+      // role and identity card the moment they exist. Rebuilding the array
+      // from the seated players evicts ghosts at exactly the point the data
+      // becomes sensitive, while legitimate legacy direct-joins survive
+      // (they create a player doc alongside the array append).
+      player_ids: [...new Set(players.map((p) => p.user_id).filter(Boolean))],
       // Turn starts on the first seat. Optional field — clients that don't
       // know about turns ignore it, and a game doc without it simply has no
       // active player highlighted.
