@@ -39,13 +39,9 @@ class LobbyViewModel @Inject constructor(
     private val _isGameDisbanded = MutableStateFlow(false)
     val isGameDisbanded: StateFlow<Boolean> = _isGameDisbanded.asStateFlow()
 
-    // The Game model does not surface max_traitor_rarity yet, so track the
-    // host's selection locally, seeded from what this session last sent the
-    // server (falling back to the server default of allowing every traitor).
-    private val _maxTraitorRarity = MutableStateFlow(
-        cloudFunctionsRepository.lastKnownMaxTraitorRarity(gameId)
-            ?.let { Rarity.fromValue(it) } ?: Rarity.SPECIAL
-    )
+    // Seeded from the live game snapshot in startListening() — absent on the
+    // doc means the server default of allowing every traitor.
+    private val _maxTraitorRarity = MutableStateFlow(Rarity.SPECIAL)
     val maxTraitorRarity: StateFlow<Rarity> = _maxTraitorRarity.asStateFlow()
 
     var currentUserId: String? = null
@@ -90,6 +86,9 @@ class LobbyViewModel @Inject constructor(
                     _isGameDisbanded.value = true
                 }
                 _game.value = game
+                if (game != null) {
+                    _maxTraitorRarity.value = game.maxTraitorRarity ?: Rarity.SPECIAL
+                }
                 hasReceivedFirstSnapshot = true
             }
         }
@@ -157,11 +156,8 @@ class LobbyViewModel @Inject constructor(
         viewModelScope.launch {
             try {
                 cloudFunctionsRepository.updateGameSettings(gameId, maxPlayers, startingLife, gameMode, maxTraitorRarity)
-                // The game doc flow echoes the other settings back, but rarity
-                // is tracked locally (see _maxTraitorRarity above).
-                maxTraitorRarity?.let { value ->
-                    Rarity.fromValue(value)?.let { _maxTraitorRarity.value = it }
-                }
+                // The game doc flow echoes every setting back, rarity included
+                // — no local tracking needed.
             } catch (e: Exception) {
                 _errorMessage.value = e.localizedMessage
             }

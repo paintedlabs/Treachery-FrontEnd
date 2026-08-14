@@ -136,8 +136,10 @@ struct GameBoardView: View {
                         if let plane = viewModel.currentPlane {
                             PlaneCardBanner(plane: plane, secondaryPlane: viewModel.secondaryPlane)
 
-                            // Phenomenon overlay when current plane is a phenomenon
-                            if plane.isPhenomenon {
+                            // Phenomenon overlay when current plane is a phenomenon.
+                            // Eliminated spectators keep the banner but not the
+                            // resolver — the server rejects their resolve anyway.
+                            if plane.isPhenomenon && viewModel.currentPlayer?.isEliminated != true {
                                 PhenomenonOverlay(plane: plane, viewModel: viewModel)
                             }
                         }

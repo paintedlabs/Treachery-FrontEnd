@@ -113,7 +113,6 @@ export async function removeFriend(friendId: string): Promise<void> {
   // Must go through the callable: rules deny writing another user's doc, so a
   // client-side remove would leave the friendship intact on their side. The
   // caller's uid comes from the auth context server-side.
-  // No UI entry point calls this yet — wired now so the first one is mutual.
   const removeFn = httpsCallable(functions, 'removeFriend');
   await removeFn({ friendId });
 }

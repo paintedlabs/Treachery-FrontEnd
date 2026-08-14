@@ -122,8 +122,7 @@ export function useFriends(userId: string | null): UseFriendsReturn {
     }
   }, []);
 
-  // No UI entry point yet — exposed alongside acceptRequest so whatever adds a
-  // "Remove friend" control gets the mutual (server-side) removal for free.
+  // Mutual (server-side) removal — the friends screen's remove control.
   const removeFriend = useCallback(
     async (friend: TreacheryUser) => {
       if (!userId) return;

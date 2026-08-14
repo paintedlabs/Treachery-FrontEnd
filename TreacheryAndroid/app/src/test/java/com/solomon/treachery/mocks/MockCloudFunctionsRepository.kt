@@ -123,7 +123,6 @@ class MockCloudFunctionsRepository : CloudFunctionsRepository {
                 "useOwnDeck" to useOwnDeck
             )
         )
-        maxTraitorRarity?.let { lastKnownTraitorRarities[createGameResult] = it }
         return createGameResult
     }
 
@@ -131,11 +130,8 @@ class MockCloudFunctionsRepository : CloudFunctionsRepository {
     override suspend fun updateGameSettings(gameId: String, maxPlayers: Int?, startingLife: Int?, gameMode: String?, maxTraitorRarity: String?) {
         throwIfNeeded()
         updateGameSettingsCalls.add(mapOf("gameId" to gameId, "maxPlayers" to maxPlayers, "startingLife" to startingLife, "gameMode" to gameMode, "maxTraitorRarity" to maxTraitorRarity))
-        maxTraitorRarity?.let { lastKnownTraitorRarities[gameId] = it }
     }
 
-    val lastKnownTraitorRarities = mutableMapOf<String, String>()
-    override fun lastKnownMaxTraitorRarity(gameId: String): String? = lastKnownTraitorRarities[gameId]
 
     val acceptFriendRequestCalls = mutableListOf<String>()
     override suspend fun acceptFriendRequest(requestId: String) {

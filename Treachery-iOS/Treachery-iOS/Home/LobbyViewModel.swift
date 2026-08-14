@@ -15,9 +15,9 @@ final class LobbyViewModel: ObservableObject {
     @Published var errorMessage: String?
     @Published var isStartingGame = false
     @Published var isGameDisbanded = false
-    /// Host's selected max traitor rarity. The Game model does not decode
-    /// max_traitor_rarity yet, so mirror the server default ("special") and
-    /// track the host's confirmed changes locally for the settings UI.
+    /// Host's selected max traitor rarity. Seeded from the live game snapshot
+    /// (absent on the doc means the server default, "special") so a lobby
+    /// opened after creation shows the real value, not a hardcoded default.
     @Published var maxTraitorRarity: Rarity = .special
 
     let gameId: String
@@ -88,6 +88,9 @@ final class LobbyViewModel: ObservableObject {
                     self.isGameDisbanded = true
                 }
                 self.game = game
+                if let game {
+                    self.maxTraitorRarity = game.maxTraitorRarity ?? .special
+                }
                 self.hasReceivedFirstSnapshot = true
             }
         }

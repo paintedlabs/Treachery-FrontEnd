@@ -46,10 +46,11 @@ fun FriendsListScreen(
     friendPendingRemoval?.let { friend ->
         AlertDialog(
             onDismissRequest = { friendPendingRemoval = null },
-            title = { Text("Remove Friend?", color = MtgTextPrimary) },
+            title = { Text("Remove Friend", color = MtgTextPrimary) },
             text = {
                 Text(
-                    "This removes ${friend.displayName} from your friends list and removes you from theirs.",
+                    // Same copy as web and iOS.
+                    "Remove ${friend.displayName} from your friends? You will be removed from their friends list too.",
                     color = MtgTextSecondary
                 )
             },

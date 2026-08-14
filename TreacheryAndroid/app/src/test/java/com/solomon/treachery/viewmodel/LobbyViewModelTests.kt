@@ -324,13 +324,22 @@ class LobbyViewModelTests {
         }
 
         @Test
-        fun `updateGameSettings success updates local maxTraitorRarity`() = runTest {
+        fun `updateGameSettings rarity lands when the game snapshot echoes it`() = runTest {
             val vm = makeVM(isHost = true)
             firestore.gameFlowSource.value = makeTreacheryGame()
             advanceUntilIdle()
 
             assertEquals(Rarity.SPECIAL, vm.maxTraitorRarity.value)
             vm.updateGameSettings(maxTraitorRarity = "uncommon")
+            advanceUntilIdle()
+
+            // Snapshot-driven: the VM waits for the game doc to echo the new
+            // value rather than tracking the write locally.
+            assertEquals(Rarity.SPECIAL, vm.maxTraitorRarity.value)
+            assertEquals("uncommon", cloudFunctions.updateGameSettingsCalls.last()["maxTraitorRarity"])
+
+            firestore.gameFlowSource.value =
+                makeTreacheryGame().copy(maxTraitorRarity = Rarity.UNCOMMON)
             advanceUntilIdle()
 
             assertEquals(Rarity.UNCOMMON, vm.maxTraitorRarity.value)
@@ -351,12 +360,21 @@ class LobbyViewModelTests {
         }
 
         @Test
-        fun `maxTraitorRarity seeds from the repository session cache`() = runTest {
-            cloudFunctions.lastKnownTraitorRarities["game-1"] = "mythic"
+        fun `maxTraitorRarity seeds from the game snapshot`() = runTest {
             val vm = makeVM(isHost = true)
+            firestore.gameFlowSource.value = makeTreacheryGame().copy(maxTraitorRarity = Rarity.MYTHIC)
             advanceUntilIdle()
 
             assertEquals(Rarity.MYTHIC, vm.maxTraitorRarity.value)
+        }
+
+        @Test
+        fun `maxTraitorRarity defaults to special when absent from the snapshot`() = runTest {
+            val vm = makeVM(isHost = true)
+            firestore.gameFlowSource.value = makeTreacheryGame()
+            advanceUntilIdle()
+
+            assertEquals(Rarity.SPECIAL, vm.maxTraitorRarity.value)
         }
 
         @Test

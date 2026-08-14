@@ -15,7 +15,9 @@ data class Game(
     val createdAt: Timestamp = Timestamp.now(),
     val lastActivityAt: Timestamp? = null,
     val planechase: PlanechaseState? = null,
-    val winnerUserIds: List<String> = emptyList()
+    val winnerUserIds: List<String> = emptyList(),
+    // Absent on the doc means the server default (special = every traitor).
+    val maxTraitorRarity: Rarity? = null
 ) {
     fun toMap(): Map<String, Any?> = mapOf(
         "id" to id,
@@ -30,7 +32,8 @@ data class Game(
         "created_at" to createdAt,
         "last_activity_at" to lastActivityAt,
         "planechase" to planechase?.toMap(),
-        "winner_user_ids" to winnerUserIds
+        "winner_user_ids" to winnerUserIds,
+        "max_traitor_rarity" to maxTraitorRarity?.value
     )
 
     companion object {
@@ -50,7 +53,9 @@ data class Game(
                 @Suppress("UNCHECKED_CAST")
                 PlanechaseState.fromMap(it as Map<String, Any?>)
             },
-            winnerUserIds = (data["winner_user_ids"] as? List<*>)?.filterIsInstance<String>() ?: emptyList()
+            winnerUserIds = (data["winner_user_ids"] as? List<*>)?.filterIsInstance<String>() ?: emptyList(),
+            // Unknown strings degrade to null rather than dropping the doc.
+            maxTraitorRarity = (data["max_traitor_rarity"] as? String)?.let { Rarity.fromValue(it) }
         )
     }
 }

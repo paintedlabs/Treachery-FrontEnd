@@ -27,6 +27,7 @@ struct Game: Codable, Identifiable, Hashable {
     var lastActivityAt: Date?
     var planechase: PlanechaseState?
     var winnerUserIds: [String]
+    var maxTraitorRarity: Rarity?
 
     enum CodingKeys: String, CodingKey {
         case id
@@ -42,6 +43,7 @@ struct Game: Codable, Identifiable, Hashable {
         case lastActivityAt = "last_activity_at"
         case planechase
         case winnerUserIds = "winner_user_ids"
+        case maxTraitorRarity = "max_traitor_rarity"
     }
 
     // Custom decoder: defaults playerIds to [] for documents created before
@@ -61,6 +63,9 @@ struct Game: Codable, Identifiable, Hashable {
         lastActivityAt = try container.decodeIfPresent(Date.self, forKey: .lastActivityAt)
         planechase = try container.decodeIfPresent(PlanechaseState.self, forKey: .planechase)
         winnerUserIds = try container.decodeIfPresent([String].self, forKey: .winnerUserIds) ?? []
+        // try? so an unrecognised rarity string degrades to nil instead of
+        // dropping the whole game document (same treatment as Player.role).
+        maxTraitorRarity = try? container.decodeIfPresent(Rarity.self, forKey: .maxTraitorRarity)
     }
 
     init(
@@ -76,7 +81,8 @@ struct Game: Codable, Identifiable, Hashable {
         createdAt: Date,
         lastActivityAt: Date? = nil,
         planechase: PlanechaseState? = nil,
-        winnerUserIds: [String] = []
+        winnerUserIds: [String] = [],
+        maxTraitorRarity: Rarity? = nil
     ) {
         self.id = id
         self.code = code
@@ -91,6 +97,7 @@ struct Game: Codable, Identifiable, Hashable {
         self.lastActivityAt = lastActivityAt
         self.planechase = planechase
         self.winnerUserIds = winnerUserIds
+        self.maxTraitorRarity = maxTraitorRarity
     }
 }
 

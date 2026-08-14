@@ -1801,6 +1801,9 @@ exports.selectPlane = onCall(callableOptions, async (request) => {
     if (!gameSnap.exists) throw new HttpsError("not-found", "Game not found.");
     const game = gameSnap.data();
     assertPlanechasePlay(game, uid);
+    // Same guard as rollPlanarDie/resolvePhenomenon. No deadlock risk for a
+    // pending Tunnel: any alive seated player can complete the selection.
+    await assertCallerNotEliminated(tx, gameId, uid);
 
     const planechase = game.planechase || {};
     if (planechase.use_own_deck) {
