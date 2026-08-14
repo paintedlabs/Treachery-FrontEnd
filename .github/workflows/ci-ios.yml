@@ -70,9 +70,13 @@ jobs:
       # Config lives at the repo root (.swiftlint.yml) with repo-relative
       # included paths, so lint runs from the root. Non-strict: errors fail,
       # warnings don't — the codebase is warning-clean enough to keep useful.
+      # The macos runner images stopped preinstalling swiftlint, so install
+      # the bottle first (~30s).
       - name: SwiftLint
         working-directory: .
-        run: swiftlint lint --quiet --reporter github-actions-logging
+        run: |
+          command -v swiftlint >/dev/null || brew install -q swiftlint
+          swiftlint lint --quiet --reporter github-actions-logging
 
       # Package.resolved is gitignored, so key on the pbxproj (it pins the
       # Firebase version requirement). Without this cache, Firebase SPM
