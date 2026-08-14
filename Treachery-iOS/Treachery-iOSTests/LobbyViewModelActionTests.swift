@@ -131,6 +131,51 @@ struct LobbyViewModelActionTests {
         #expect(mockFS.updateCommanderNameCalls.first?.name == nil)
     }
 
+    // MARK: - updateGameSettings
+
+    @Test func updateGameSettingsPassesMaxTraitorRarity() async {
+        let (mockFS, mockCF) = makeMockSetup(players: makePlayers(count: 4))
+        let vm = LobbyViewModel(
+            gameId: "game1", isHost: true,
+            firestoreManager: mockFS, cloudFunctions: mockCF
+        )
+        await yieldToMainActor()
+        vm.currentUserId = "host1"
+        await vm.updateGameSettings(maxTraitorRarity: "rare")
+        #expect(mockCF.updateGameSettingsCalls.count == 1)
+        #expect(mockCF.updateGameSettingsCalls.first?.gameId == "game1")
+        #expect(mockCF.updateGameSettingsCalls.first?.maxTraitorRarity == "rare")
+        // Confirmed change is mirrored locally for the settings UI
+        #expect(vm.maxTraitorRarity == .rare)
+    }
+
+    @Test func updateGameSettingsDoesNothingWhenNotHost() async {
+        let (mockFS, mockCF) = makeMockSetup(players: makePlayers(count: 4))
+        let vm = LobbyViewModel(
+            gameId: "game1", isHost: false,
+            firestoreManager: mockFS, cloudFunctions: mockCF
+        )
+        await yieldToMainActor()
+        vm.currentUserId = "u0"
+        await vm.updateGameSettings(maxTraitorRarity: "rare")
+        #expect(mockCF.updateGameSettingsCalls.isEmpty)
+        #expect(vm.maxTraitorRarity == .special)
+    }
+
+    @Test func updateGameSettingsKeepsLocalRarityOnFailure() async {
+        let (mockFS, mockCF) = makeMockSetup(players: makePlayers(count: 4))
+        mockCF.errorToThrow = NSError(domain: "test", code: 1, userInfo: [NSLocalizedDescriptionKey: "settings failed"])
+        let vm = LobbyViewModel(
+            gameId: "game1", isHost: true,
+            firestoreManager: mockFS, cloudFunctions: mockCF
+        )
+        await yieldToMainActor()
+        vm.currentUserId = "host1"
+        await vm.updateGameSettings(maxTraitorRarity: "rare")
+        #expect(vm.maxTraitorRarity == .special)
+        #expect(vm.errorMessage == "settings failed")
+    }
+
     // MARK: - Game Disbanding
 
     @Test func startGameDoesNothingWhenNotHost() async {

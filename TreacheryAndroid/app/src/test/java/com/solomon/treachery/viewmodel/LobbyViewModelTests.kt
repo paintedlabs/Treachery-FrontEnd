@@ -311,6 +311,55 @@ class LobbyViewModelTests {
         }
 
         @Test
+        fun `updateGameSettings passes maxTraitorRarity to cloud function`() = runTest {
+            val vm = makeVM(isHost = true)
+            firestore.gameFlowSource.value = makeTreacheryGame()
+            advanceUntilIdle()
+
+            vm.updateGameSettings(maxTraitorRarity = "rare")
+            advanceUntilIdle()
+
+            assertEquals(1, cloudFunctions.updateGameSettingsCalls.size)
+            assertEquals("rare", cloudFunctions.updateGameSettingsCalls.first()["maxTraitorRarity"])
+        }
+
+        @Test
+        fun `updateGameSettings success updates local maxTraitorRarity`() = runTest {
+            val vm = makeVM(isHost = true)
+            firestore.gameFlowSource.value = makeTreacheryGame()
+            advanceUntilIdle()
+
+            assertEquals(Rarity.SPECIAL, vm.maxTraitorRarity.value)
+            vm.updateGameSettings(maxTraitorRarity = "uncommon")
+            advanceUntilIdle()
+
+            assertEquals(Rarity.UNCOMMON, vm.maxTraitorRarity.value)
+        }
+
+        @Test
+        fun `updateGameSettings failure keeps local maxTraitorRarity`() = runTest {
+            cloudFunctions.errorToThrow = RuntimeException("Server error")
+            val vm = makeVM(isHost = true)
+            firestore.gameFlowSource.value = makeTreacheryGame()
+            advanceUntilIdle()
+
+            vm.updateGameSettings(maxTraitorRarity = "uncommon")
+            advanceUntilIdle()
+
+            assertEquals(Rarity.SPECIAL, vm.maxTraitorRarity.value)
+            assertNotNull(vm.errorMessage.value)
+        }
+
+        @Test
+        fun `maxTraitorRarity seeds from the repository session cache`() = runTest {
+            cloudFunctions.lastKnownTraitorRarities["game-1"] = "mythic"
+            val vm = makeVM(isHost = true)
+            advanceUntilIdle()
+
+            assertEquals(Rarity.MYTHIC, vm.maxTraitorRarity.value)
+        }
+
+        @Test
         fun `updateCommanderName calls firestore`() = runTest {
             val vm = makeVM()
             vm.currentUserId = "u-0"

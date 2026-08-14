@@ -16,7 +16,7 @@ export default function AppLayout() {
         contentStyle: { backgroundColor: colors.background },
       }}
     >
-      <Stack.Screen name="index" options={{ title: 'Home', headerShown: false }} />
+      <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
       <Stack.Screen name="create-game" options={{ title: 'Create Game' }} />
       <Stack.Screen name="join-game" options={{ title: 'Join Game' }} />
       <Stack.Screen name="lobby/[gameId]" options={{ title: 'Lobby', headerBackVisible: false }} />
@@ -33,9 +33,6 @@ export default function AppLayout() {
         name="onboarding/welcome"
         options={{ title: 'Welcome', headerShown: false }}
       />
-      <Stack.Screen name="profile" options={{ title: 'Profile' }} />
-      <Stack.Screen name="friends" options={{ title: 'Friends' }} />
-      <Stack.Screen name="history" options={{ title: 'Game History' }} />
     </Stack>
   );
 }

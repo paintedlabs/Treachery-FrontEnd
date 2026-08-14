@@ -114,4 +114,33 @@ describe('unveilPlayer', () => {
       'unauthenticated'
     );
   });
+
+  it('clears a face-down flag left by a Puppet Master swap', async () => {
+    const users = await h.getUsers(4);
+    const game = await h.seedStartedGame({
+      users,
+      seats: [
+        { role: 'leader', card: 'leader_01' },
+        { role: 'assassin', card: 'assassin_01' },
+        { role: 'assassin', card: 'assassin_02' },
+        { role: 'traitor', card: 'traitor_09' },
+      ],
+    });
+    await users[3].call('unveilPlayer', { gameId: game.gameId });
+    await users[3].call('resolvePuppetMaster', {
+      gameId: game.gameId,
+      redistributions: { p1: 'assassin_02', p2: 'assassin_01' },
+    });
+
+    let p = await h.getPlayer(game.gameId, 'p1');
+    assert.equal(p.is_face_down, true, 'the swapped-in card starts face-down');
+
+    const res = await users[1].call('unveilPlayer', { gameId: game.gameId });
+    assert.deepEqual(res, { success: true });
+
+    p = await h.getPlayer(game.gameId, 'p1');
+    assert.equal(p.is_unveiled, true);
+    assert.equal(p.is_face_down, false, 'unveiling must reveal the CURRENT card');
+    assert.equal(p.identity_card_id, 'assassin_02');
+  });
 });

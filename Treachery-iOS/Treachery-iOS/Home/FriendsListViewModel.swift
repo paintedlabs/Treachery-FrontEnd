@@ -128,6 +128,18 @@ final class FriendsListViewModel: ObservableObject {
         }
     }
 
+    func removeFriend(_ friend: TreacheryUser) async {
+        errorMessage = nil
+
+        do {
+            try await cloudFunctions.removeFriend(friendId: friend.id)
+            AnalyticsService.trackEvent("remove_friend")
+            friends.removeAll { $0.id == friend.id }
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
     // MARK: - Helpers
 
     func isFriend(_ user: TreacheryUser) -> Bool {

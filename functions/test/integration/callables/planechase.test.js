@@ -52,6 +52,33 @@ describe('planechase callables — authz', () => {
       'permission-denied'
     );
   });
+
+  it('rejects rollPlanarDie from an eliminated player', async () => {
+    const { game } = await startedPlanechase();
+    await h.patchPlayer(game.gameId, 'p1', { is_eliminated: true, life_total: 0 });
+    await h.expectHttpsError(
+      game.users[1].call('rollPlanarDie', { gameId: game.gameId }),
+      'failed-precondition'
+    );
+    const g = await h.getGame(game.gameId);
+    assert.equal(g.planechase.last_die_result, undefined, 'the die was never rolled');
+  });
+
+  it('rejects resolvePhenomenon from an eliminated player', async () => {
+    const { game } = await startedPlanechase();
+    // Interplanar Tunnel satisfies every other precondition, so the
+    // failed-precondition below can only be the eliminated-caller guard.
+    await h.patchGame(game.gameId, {
+      'planechase.current_plane_id': INTERPLANAR_TUNNEL_ID,
+    });
+    await h.patchPlayer(game.gameId, 'p1', { is_eliminated: true, life_total: 0 });
+    await h.expectHttpsError(
+      game.users[1].call('resolvePhenomenon', { gameId: game.gameId }),
+      'failed-precondition'
+    );
+    const g = await h.getGame(game.gameId);
+    assert.equal(g.planechase.pending_plane_options, undefined, 'no tunnel options were offered');
+  });
 });
 
 describe('selectPlane', () => {

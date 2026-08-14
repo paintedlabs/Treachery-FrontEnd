@@ -13,7 +13,7 @@ final class MockCloudFunctions: CloudFunctionsProtocol {
     var createGameResult = "mock-created-game-id"
 
     // Call tracking
-    var createGameCalls: [(gameMode: String, maxPlayers: Int, startingLife: Int)] = []
+    var createGameCalls: [(gameMode: String, maxPlayers: Int, startingLife: Int, maxTraitorRarity: String?)] = []
     var joinGameCalls: [String] = []
     var startGameCalls: [String] = []
     var adjustLifeCalls: [(gameId: String, playerId: String, amount: Int)] = []
@@ -33,7 +33,7 @@ final class MockCloudFunctions: CloudFunctionsProtocol {
         displayName: String?
     ) async throws -> String {
         if let error = errorToThrow { throw error }
-        createGameCalls.append((gameMode, maxPlayers, startingLife))
+        createGameCalls.append((gameMode, maxPlayers, startingLife, maxTraitorRarity))
         return createGameResult
     }
 
@@ -111,8 +111,22 @@ final class MockCloudFunctions: CloudFunctionsProtocol {
         endGameCalls.append((gameId, winnerUserIds))
     }
 
-    func updateGameSettings(gameId: String, maxPlayers: Int?, startingLife: Int?, gameMode: String?) async throws {
+    struct UpdateGameSettingsCall {
+        let gameId: String
+        let maxPlayers: Int?
+        let startingLife: Int?
+        let gameMode: String?
+        let maxTraitorRarity: String?
+    }
+
+    var updateGameSettingsCalls: [UpdateGameSettingsCall] = []
+
+    func updateGameSettings(gameId: String, maxPlayers: Int?, startingLife: Int?, gameMode: String?, maxTraitorRarity: String?) async throws {
         if let error = errorToThrow { throw error }
+        updateGameSettingsCalls.append(UpdateGameSettingsCall(
+            gameId: gameId, maxPlayers: maxPlayers, startingLife: startingLife,
+            gameMode: gameMode, maxTraitorRarity: maxTraitorRarity
+        ))
     }
 
     func acceptFriendRequest(requestId: String) async throws {

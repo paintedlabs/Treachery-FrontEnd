@@ -171,6 +171,24 @@ function assertPlanechasePlay(game, uid) {
   assertSeatedInGame(game, uid);
 }
 
+/**
+ * Rejects eliminated callers. assertSeatedInGame only proves membership via
+ * player_ids (eliminated players stay seated so they can spectate); the
+ * is_eliminated flag lives on the caller's player doc, hence the extra
+ * transaction read. Mirrors the caller guard on the traitor ability resolvers.
+ */
+async function assertCallerNotEliminated(tx, gameId, uid) {
+  const seatSnap = await tx.get(
+    db.collection(`games/${gameId}/players`).where("user_id", "==", uid).limit(1)
+  );
+  if (seatSnap.empty) {
+    throw new HttpsError("not-found", "You are not in this game.");
+  }
+  if (seatSnap.docs[0].data().is_eliminated) {
+    throw new HttpsError("failed-precondition", "Eliminated players cannot take Planechase actions.");
+  }
+}
+
 function checkWinConditions(players, gameMode) {
   if (!isTreacheryMode(gameMode)) {
     return null;
@@ -1190,7 +1208,9 @@ exports.unveilPlayer = onCall(callableOptions, async (request) => {
       throw new HttpsError("failed-precondition", "Leader is always visible.");
     }
 
-    tx.update(playerDoc.ref, { is_unveiled: true });
+    // Clear is_face_down too: a Puppet Master / Metamorph swap turns the
+    // card face-down, and unveiling reveals whatever the player NOW holds.
+    tx.update(playerDoc.ref, { is_unveiled: true, is_face_down: false });
     tx.update(gameRef, { last_activity_at: FieldValue.serverTimestamp() });
 
     return { success: true };
@@ -1501,6 +1521,7 @@ exports.rollPlanarDie = onCall(callableOptions, async (request) => {
     if (!gameSnap.exists) throw new HttpsError("not-found", "Game not found.");
     const game = gameSnap.data();
     assertPlanechasePlay(game, uid);
+    await assertCallerNotEliminated(tx, gameId, uid);
 
     const planechase = game.planechase || {};
 
@@ -1655,6 +1676,7 @@ exports.resolvePhenomenon = onCall(callableOptions, async (request) => {
     if (!gameSnap.exists) throw new HttpsError("not-found", "Game not found.");
     const game = gameSnap.data();
     assertPlanechasePlay(game, uid);
+    await assertCallerNotEliminated(tx, gameId, uid);
 
     const planechase = game.planechase || {};
     if (planechase.use_own_deck)

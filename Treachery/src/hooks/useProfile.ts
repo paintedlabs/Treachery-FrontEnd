@@ -59,6 +59,8 @@ export function useProfile(userId: string | null): UseProfileReturn {
         roleBreakdown[myPlayer.role] = (roleBreakdown[myPlayer.role] ?? 0) + 1;
 
         if (game.winning_team) {
+          // Scored from the CURRENT role, not the dealt one — same as
+          // history.tsx's didWin: onGameFinished awards ELO from player.role.
           const winRole = game.winning_team as Role;
           const didWin =
             winRole === 'leader'
@@ -69,8 +71,13 @@ export function useProfile(userId: string | null): UseProfileReturn {
         }
       }
 
+      // Win rate over games with a recorded outcome only (wins + losses):
+      // winning_team is null for non-treachery or aborted games, and counting
+      // those in the denominator deflated the percentage.
       const totalGames = games.length;
-      const winRateText = totalGames > 0 ? `${Math.round((wins / totalGames) * 100)}%` : '—';
+      const decidedGames = wins + losses;
+      const winRateText =
+        decidedGames > 0 ? `${Math.round((wins / decidedGames) * 100)}%` : '—';
 
       setGameStats({ totalGames, wins, losses, roleBreakdown, winRateText });
     } catch (error: unknown) {

@@ -119,17 +119,23 @@ class MockCloudFunctionsRepository : CloudFunctionsRepository {
                 "gameMode" to gameMode,
                 "maxPlayers" to maxPlayers,
                 "startingLife" to startingLife,
+                "maxTraitorRarity" to maxTraitorRarity,
                 "useOwnDeck" to useOwnDeck
             )
         )
+        maxTraitorRarity?.let { lastKnownTraitorRarities[createGameResult] = it }
         return createGameResult
     }
 
     val updateGameSettingsCalls = mutableListOf<Map<String, Any?>>()
-    override suspend fun updateGameSettings(gameId: String, maxPlayers: Int?, startingLife: Int?, gameMode: String?) {
+    override suspend fun updateGameSettings(gameId: String, maxPlayers: Int?, startingLife: Int?, gameMode: String?, maxTraitorRarity: String?) {
         throwIfNeeded()
-        updateGameSettingsCalls.add(mapOf("gameId" to gameId, "maxPlayers" to maxPlayers, "startingLife" to startingLife, "gameMode" to gameMode))
+        updateGameSettingsCalls.add(mapOf("gameId" to gameId, "maxPlayers" to maxPlayers, "startingLife" to startingLife, "gameMode" to gameMode, "maxTraitorRarity" to maxTraitorRarity))
+        maxTraitorRarity?.let { lastKnownTraitorRarities[gameId] = it }
     }
+
+    val lastKnownTraitorRarities = mutableMapOf<String, String>()
+    override fun lastKnownMaxTraitorRarity(gameId: String): String? = lastKnownTraitorRarities[gameId]
 
     val acceptFriendRequestCalls = mutableListOf<String>()
     override suspend fun acceptFriendRequest(requestId: String) {

@@ -147,7 +147,7 @@ export default function ProfileScreen() {
 
             <TouchableOpacity
               style={styles.historyLink}
-              onPress={() => router.push('/(app)/history')}
+              onPress={() => router.push('/(app)/(tabs)/history')}
               accessibilityLabel="View game history"
               accessibilityRole="link"
             >
@@ -199,7 +199,7 @@ export default function ProfileScreen() {
         <View style={styles.section}>
           <TouchableOpacity
             style={styles.card}
-            onPress={() => router.push('/(app)/friends')}
+            onPress={() => router.push('/(app)/(tabs)/friends')}
             accessibilityLabel={`Friends: ${user.friend_ids?.length ?? 0}`}
             accessibilityRole="link"
           >

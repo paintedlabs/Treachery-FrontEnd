@@ -186,7 +186,9 @@ struct LobbyView: View {
                         Spacer()
                         HStack(spacing: 12) {
                             Button {
-                                let newVal = max(2, game.maxPlayers - 1)
+                                // Clamp to 8 so legacy games stored with a
+                                // higher max don't send server-rejected values.
+                                let newVal = max(2, min(8, game.maxPlayers - 1))
                                 Task { await viewModel.updateGameSettings(maxPlayers: newVal) }
                             } label: {
                                 Image(systemName: "minus.circle")
@@ -258,6 +260,34 @@ struct LobbyView: View {
                                 Image(systemName: "chevron.up.chevron.down")
                                     .foregroundStyle(Color.mtgGold)
                                     .font(.caption2)
+                            }
+                        }
+                    }
+
+                    // Max Traitor Rarity — only meaningful in treachery modes
+                    if game.gameMode.includesTreachery {
+                        Rectangle().fill(Color.mtgDivider).frame(height: 1)
+
+                        HStack {
+                            Text("Max Traitor Rarity")
+                                .foregroundStyle(Color.mtgTextSecondary)
+                                .font(.subheadline)
+                            Spacer()
+                            Menu {
+                                ForEach(Rarity.allCases) { rarity in
+                                    Button(rarity.displayName) {
+                                        Task { await viewModel.updateGameSettings(maxTraitorRarity: rarity.rawValue) }
+                                    }
+                                }
+                            } label: {
+                                HStack(spacing: 4) {
+                                    Text(viewModel.maxTraitorRarity.displayName)
+                                        .foregroundStyle(Color.mtgTextPrimary)
+                                        .fontWeight(.semibold)
+                                    Image(systemName: "chevron.up.chevron.down")
+                                        .foregroundStyle(Color.mtgGold)
+                                        .font(.caption2)
+                                }
                             }
                         }
                     }

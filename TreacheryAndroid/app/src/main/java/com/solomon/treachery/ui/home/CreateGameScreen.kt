@@ -29,6 +29,7 @@ fun CreateGameScreen(
     var gameMode by remember { mutableStateOf(GameMode.TREACHERY) }
     var useOwnDeck by remember { mutableStateOf(false) }
     var startingLife by remember { mutableIntStateOf(40) }
+    var maxTraitorRarity by remember { mutableStateOf(Rarity.SPECIAL) }
 
     val isCreating by viewModel.isCreating.collectAsState()
     val errorMessage by viewModel.errorMessage.collectAsState()
@@ -82,6 +83,37 @@ fun CreateGameScreen(
                             Text(mode.displayName, fontSize = 12.sp)
                         }
                     }
+                }
+            }
+
+            // Max traitor rarity selector for treachery modes
+            if (gameMode.includesTreachery) {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    MtgSectionHeader("Max Traitor Rarity")
+                    SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                        Rarity.entries.forEachIndexed { index, rarity ->
+                            SegmentedButton(
+                                selected = maxTraitorRarity == rarity,
+                                onClick = { maxTraitorRarity = rarity },
+                                shape = SegmentedButtonDefaults.itemShape(index = index, count = Rarity.entries.size),
+                                colors = SegmentedButtonDefaults.colors(
+                                    activeContainerColor = MtgGold,
+                                    activeContentColor = MtgBackground,
+                                    inactiveContainerColor = MtgSurface,
+                                    inactiveContentColor = MtgTextSecondary,
+                                    activeBorderColor = MtgGold,
+                                    inactiveBorderColor = MtgDivider
+                                )
+                            ) {
+                                Text(rarity.displayName, fontSize = 12.sp)
+                            }
+                        }
+                    }
+                    Text(
+                        "Traitor identities up to this rarity can appear in the random pool.",
+                        color = MtgTextSecondary,
+                        fontSize = 12.sp
+                    )
                 }
             }
 
@@ -140,7 +172,7 @@ fun CreateGameScreen(
                 text = if (isCreating) "Creating..." else "Create Game",
                 onClick = {
                     val userId = currentUserId ?: return@MtgPrimaryButton
-                    viewModel.createGame(userId, gameMode, startingLife, useOwnDeck) { gameId ->
+                    viewModel.createGame(userId, gameMode, startingLife, maxTraitorRarity, useOwnDeck) { gameId ->
                         onNavigateToLobby(gameId, true)
                     }
                 },

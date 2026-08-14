@@ -10,6 +10,11 @@ class CloudFunctionsRepositoryImpl @Inject constructor(
     private val functions: FirebaseFunctions
 ) : CloudFunctionsRepository {
 
+    // Rarity values sent this session, keyed by game id (see interface note).
+    private val sentTraitorRarities = mutableMapOf<String, String>()
+
+    override fun lastKnownMaxTraitorRarity(gameId: String): String? = sentTraitorRarities[gameId]
+
     override suspend fun createGame(
         gameMode: String,
         maxPlayers: Int,
@@ -31,8 +36,10 @@ class CloudFunctionsRepositoryImpl @Inject constructor(
             .await()
         @Suppress("UNCHECKED_CAST")
         val payload = result.getData() as? Map<String, Any?> ?: emptyMap()
-        return payload["gameId"] as? String
+        val gameId = payload["gameId"] as? String
             ?: throw IllegalStateException("Invalid createGame response")
+        maxTraitorRarity?.let { sentTraitorRarities[gameId] = it }
+        return gameId
     }
 
     override suspend fun startGame(gameId: String) {
@@ -132,14 +139,16 @@ class CloudFunctionsRepositoryImpl @Inject constructor(
             .await()
     }
 
-    override suspend fun updateGameSettings(gameId: String, maxPlayers: Int?, startingLife: Int?, gameMode: String?) {
+    override suspend fun updateGameSettings(gameId: String, maxPlayers: Int?, startingLife: Int?, gameMode: String?, maxTraitorRarity: String?) {
         val data = mutableMapOf<String, Any>("gameId" to gameId)
         maxPlayers?.let { data["maxPlayers"] = it }
         startingLife?.let { data["startingLife"] = it }
         gameMode?.let { data["gameMode"] = it }
+        maxTraitorRarity?.let { data["maxTraitorRarity"] = it }
         functions.getHttpsCallable("updateGameSettings")
             .call(data)
             .await()
+        maxTraitorRarity?.let { sentTraitorRarities[gameId] = it }
     }
 
     override suspend fun acceptFriendRequest(requestId: String) {

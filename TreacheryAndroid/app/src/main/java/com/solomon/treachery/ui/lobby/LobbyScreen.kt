@@ -54,6 +54,7 @@ fun LobbyScreen(
     val errorMessage by viewModel.errorMessage.collectAsState()
     val isStartingGame by viewModel.isStartingGame.collectAsState()
     val isGameDisbanded by viewModel.isGameDisbanded.collectAsState()
+    val maxTraitorRarity by viewModel.maxTraitorRarity.collectAsState()
 
     var isLeaving by remember { mutableStateOf(false) }
     var showHostLeftAlert by remember { mutableStateOf(false) }
@@ -153,9 +154,11 @@ fun LobbyScreen(
                                 maxPlayers = g.maxPlayers,
                                 startingLife = g.startingLife,
                                 gameMode = g.gameMode,
+                                maxTraitorRarity = maxTraitorRarity,
                                 onMaxPlayersChange = { viewModel.updateGameSettings(maxPlayers = it) },
                                 onStartingLifeChange = { viewModel.updateGameSettings(startingLife = it) },
                                 onGameModeChange = { viewModel.updateGameSettings(gameMode = it.value) },
+                                onMaxTraitorRarityChange = { viewModel.updateGameSettings(maxTraitorRarity = it.value) },
                                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
                             )
                         }
@@ -491,13 +494,16 @@ private fun GameSettingsCard(
     maxPlayers: Int,
     startingLife: Int,
     gameMode: com.solomon.treachery.model.GameMode,
+    maxTraitorRarity: com.solomon.treachery.model.Rarity,
     onMaxPlayersChange: (Int) -> Unit,
     onStartingLifeChange: (Int) -> Unit,
     onGameModeChange: (com.solomon.treachery.model.GameMode) -> Unit,
+    onMaxTraitorRarityChange: (com.solomon.treachery.model.Rarity) -> Unit,
     modifier: Modifier = Modifier
 ) {
     var showLifeMenu by remember { mutableStateOf(false) }
     var showModeMenu by remember { mutableStateOf(false) }
+    var showRarityMenu by remember { mutableStateOf(false) }
 
     MtgCardFrame(modifier = modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -508,7 +514,9 @@ private fun GameSettingsCard(
                 Text("Max Players", color = MtgTextSecondary, fontSize = 14.sp)
                 Spacer(Modifier.weight(1f))
                 IconButton(
-                    onClick = { if (maxPlayers > 2) onMaxPlayersChange(maxPlayers - 1) },
+                    // Legacy games could store values above 8; clamp so a
+                    // single decrement lands back inside the valid range.
+                    onClick = { if (maxPlayers > 2) onMaxPlayersChange((maxPlayers - 1).coerceIn(2, 8)) },
                     enabled = maxPlayers > 2,
                     modifier = Modifier.size(32.dp)
                 ) {
@@ -563,6 +571,30 @@ private fun GameSettingsCard(
                                 text = { Text(mode.displayName) },
                                 onClick = { onGameModeChange(mode); showModeMenu = false }
                             )
+                        }
+                    }
+                }
+            }
+
+            // Max Traitor Rarity — only meaningful in treachery modes
+            if (gameMode.includesTreachery) {
+                HorizontalDivider(color = MtgDivider)
+
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("Max Traitor Rarity", color = MtgTextSecondary, fontSize = 14.sp)
+                    Spacer(Modifier.weight(1f))
+                    Box {
+                        TextButton(onClick = { showRarityMenu = true }) {
+                            Text(maxTraitorRarity.displayName, color = MtgTextPrimary, fontWeight = FontWeight.SemiBold)
+                            Icon(Icons.Default.UnfoldMore, null, tint = MtgGold, modifier = Modifier.size(16.dp))
+                        }
+                        DropdownMenu(expanded = showRarityMenu, onDismissRequest = { showRarityMenu = false }) {
+                            com.solomon.treachery.model.Rarity.entries.forEach { rarity ->
+                                DropdownMenuItem(
+                                    text = { Text(rarity.displayName) },
+                                    onClick = { onMaxTraitorRarityChange(rarity); showRarityMenu = false }
+                                )
+                            }
                         }
                     }
                 }

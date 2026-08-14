@@ -23,7 +23,10 @@ interface CloudFunctionsRepository {
     suspend fun selectPlane(gameId: String, planeId: String)
     suspend fun joinGame(gameCode: String): Map<String, Any?>
     suspend fun endGame(gameId: String, winnerUserIds: List<String>?)
-    suspend fun updateGameSettings(gameId: String, maxPlayers: Int?, startingLife: Int?, gameMode: String?)
+    suspend fun updateGameSettings(gameId: String, maxPlayers: Int?, startingLife: Int?, gameMode: String?, maxTraitorRarity: String? = null)
+    // The Game model does not surface max_traitor_rarity yet, so the lobby
+    // seeds its selector from the last value this session sent for the game.
+    fun lastKnownMaxTraitorRarity(gameId: String): String?
     suspend fun acceptFriendRequest(requestId: String)
     suspend fun removeFriend(friendId: String)
 }

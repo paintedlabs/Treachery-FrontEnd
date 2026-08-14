@@ -29,6 +29,7 @@ class CreateGameViewModel @Inject constructor(
         userId: String,
         gameMode: GameMode,
         startingLife: Int,
+        maxTraitorRarity: Rarity,
         useOwnDeck: Boolean,
         onSuccess: (gameId: String) -> Unit
     ) {
@@ -44,6 +45,8 @@ class CreateGameViewModel @Inject constructor(
                     gameMode = gameMode.value,
                     maxPlayers = maxPlayers,
                     startingLife = startingLife,
+                    // Rarity only applies to treachery modes; omit it otherwise.
+                    maxTraitorRarity = if (gameMode.includesTreachery) maxTraitorRarity.value else null,
                     useOwnDeck = useOwnDeck,
                     displayName = user?.displayName
                 )
