@@ -1,12 +1,16 @@
 name: CI (iOS)
 
+# Always triggers (no paths filter): "iOS App" is a REQUIRED status check,
+# and a required check whose workflow never runs wedges the PR on
+# "Expected". The cheap ubuntu `changes` job detects whether iOS code
+# actually changed; when it didn't, the macOS job is skipped — a skipped
+# job satisfies required checks, and no macOS minutes are spent.
 on:
   pull_request:
     branches: [main]
-    paths:
-      - "Treachery-iOS/**"
-      # Self-trigger: a PR that only edits this workflow should still run it.
-      - ".github/workflows/ci-ios.yml"
+
+permissions:
+  contents: read
 
 concurrency:
   group: ci-ios-${{ github.head_ref }}
@@ -15,9 +19,40 @@ concurrency:
 # GoogleService-Info.plist is tracked, so the build needs no secret
 # injection — this workflow references no secrets and runs on fork PRs.
 jobs:
+  changes:
+    name: Detect iOS changes
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      ios: ${{ steps.filter.outputs.changed }}
+    steps:
+      # fetch-depth 2: the pull_request checkout is the test merge commit;
+      # depth 2 brings in both parents, and HEAD^1 is the base branch tip,
+      # so `git diff HEAD^1 HEAD` is exactly the PR's net effect.
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+      - id: filter
+        name: Diff against base
+        run: |
+          # Fail open: if the diff can't be computed, run the build rather
+          # than silently skipping a required gate.
+          if ! FILES=$(git diff --name-only HEAD^1 HEAD); then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            echo "diff failed — running the full job" >&2
+            exit 0
+          fi
+          if echo "$FILES" | grep -qE '^(Treachery-iOS/|\.swiftlint\.yml|\.github/workflows/ci-ios\.yml)'; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          fi
+
   # ── iOS App ──────────────────────────────────────────
   ios-app:
     name: iOS App
+    needs: changes
+    if: needs.changes.outputs.ios == 'true'
     runs-on: macos-15
     timeout-minutes: 40
     defaults:
@@ -31,6 +66,17 @@ jobs:
           LATEST_XCODE=$(ls -d /Applications/Xcode*.app 2>/dev/null | sort -V | tail -1)
           echo "Using $LATEST_XCODE"
           sudo xcode-select -s "$LATEST_XCODE/Contents/Developer"
+
+      # Config lives at the repo root (.swiftlint.yml) with repo-relative
+      # included paths, so lint runs from the root. Non-strict: errors fail,
+      # warnings don't — the codebase is warning-clean enough to keep useful.
+      # The macos runner images stopped preinstalling swiftlint, so install
+      # the bottle first (~30s).
+      - name: SwiftLint
+        working-directory: .
+        run: |
+          command -v swiftlint >/dev/null || brew install -q swiftlint
+          swiftlint lint --quiet --reporter github-actions-logging
 
       # Package.resolved is gitignored, so key on the pbxproj (it pins the
       # Firebase version requirement). Without this cache, Firebase SPM

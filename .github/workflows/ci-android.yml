@@ -1,21 +1,56 @@
 name: CI (Android)
 
+# Always triggers (no paths filter): "Android App" is a REQUIRED status
+# check, and a required check whose workflow never runs wedges the PR on
+# "Expected". The cheap `changes` job below detects whether Android code
+# actually changed; when it didn't, the build job is skipped — and a
+# skipped job satisfies required checks.
 on:
   pull_request:
     branches: [main]
-    paths:
-      - "TreacheryAndroid/**"
-      # Self-trigger: a PR that only edits this workflow should still run it.
-      - ".github/workflows/ci-android.yml"
+
+permissions:
+  contents: read
 
 concurrency:
   group: ci-android-${{ github.head_ref }}
   cancel-in-progress: true
 
 jobs:
+  changes:
+    name: Detect Android changes
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      android: ${{ steps.filter.outputs.changed }}
+    steps:
+      # fetch-depth 2: the pull_request checkout is the test merge commit;
+      # depth 2 brings in both parents, and HEAD^1 is the base branch tip,
+      # so `git diff HEAD^1 HEAD` is exactly the PR's net effect.
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+      - id: filter
+        name: Diff against base
+        run: |
+          # Fail open: if the diff can't be computed, run the build rather
+          # than silently skipping a required gate.
+          if ! FILES=$(git diff --name-only HEAD^1 HEAD); then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            echo "diff failed — running the full job" >&2
+            exit 0
+          fi
+          if echo "$FILES" | grep -qE '^(TreacheryAndroid/|\.github/workflows/ci-android\.yml)'; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          fi
+
   # ── Android App ──────────────────────────────────────
   android-app:
     name: Android App
+    needs: changes
+    if: needs.changes.outputs.android == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     defaults:
@@ -45,8 +80,8 @@ jobs:
 
       # testDebugUnitTest already implies both compiles; they are listed
       # explicitly so the log shows exactly which gate failed.
-      - name: Compile and run unit tests
-        run: ./gradlew :app:compileDebugKotlin :app:compileDebugUnitTestKotlin testDebugUnitTest --no-daemon
+      - name: Compile, lint, and run unit tests
+        run: ./gradlew :app:compileDebugKotlin :app:compileDebugUnitTestKotlin :app:lintDebug testDebugUnitTest --no-daemon
 
       - name: Upload test reports
         if: failure()
@@ -54,7 +89,7 @@ jobs:
         with:
           name: android-test-reports-${{ github.run_id }}
           path: |
-            TreacheryAndroid/app/build/reports/tests/
+            TreacheryAndroid/app/build/reports/
             TreacheryAndroid/app/build/test-results/
           retention-days: 7
           if-no-files-found: ignore
