@@ -124,3 +124,39 @@ test('a tap on the life buttons is not treated as a drag', async ({ browser }) =
   // ...and the seating did not move.
   expect((await seatOrder(host.page, gameId)).join(',')).toBe(before.join(','));
 });
+
+// Regression: a press that slides a few pixels (trackpad twitch, touch) used
+// to cross DraggableSeat's 6px slop, capture the pointer away from the
+// Pressable, and silently eat the tap — no error, no life change, perceived
+// as lag. handlePointerDown now refuses to arm a drag from a button.
+test('a sloppy press on a life button still registers', async ({ browser }) => {
+  const { players, gameId, host } = await setupSeededGame(browser, [
+    'leader',
+    'assassin',
+    'assassin',
+    'traitor',
+  ]);
+  const before = await seatOrder(host.page, gameId);
+  const target = players[2];
+
+  const plus = host.page.getByRole('button', { name: `Increase ${target.name} life` });
+  const box = await plus.boundingBox();
+  if (!box) throw new Error('life button not visible');
+
+  // Press, slide 8px (past the 6px drag slop), release — on the button.
+  await host.page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await host.page.mouse.down();
+  await host.page.mouse.move(box.x + box.width / 2 + 8, box.y + box.height / 2 + 3, { steps: 4 });
+  await host.page.mouse.up();
+
+  // The tap must land...
+  await expect
+    .poll(async () => {
+      const docs = await fetchPlayerDocs(host.page, gameId);
+      return docs.find((d) => d.user_id === target.userId)?.life_total;
+    }, { timeout: 10_000 })
+    .toBeGreaterThan(40);
+
+  // ...without the slide being read as a seat drag.
+  expect((await seatOrder(host.page, gameId)).join(',')).toBe(before.join(','));
+});
