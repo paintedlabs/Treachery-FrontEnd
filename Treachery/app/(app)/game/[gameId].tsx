@@ -221,8 +221,14 @@ export default function GameBoardScreen() {
 
   const inspectedCard = inspectedPlayer ? identityCard(inspectedPlayer) : undefined;
   const isEliminatedSpectator = !!currentPlayer?.is_eliminated;
+  // Spectators see the phenomenon card art instead of the resolver — the
+  // server rejects their resolvePhenomenon anyway (failed-precondition).
   const showPhenomenonResolver =
-    isPlanechaseActive && !isOwnDeckMode && !!currentPlane?.is_phenomenon && !tunnelOptions;
+    isPlanechaseActive &&
+    !isOwnDeckMode &&
+    !!currentPlane?.is_phenomenon &&
+    !tunnelOptions &&
+    !isEliminatedSpectator;
 
   return (
     <View style={styles.container}>

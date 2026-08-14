@@ -167,39 +167,6 @@ export default function HomeScreen() {
       >
         <Text style={styles.testflightLinkText}>Download the iOS App (TestFlight)</Text>
       </TouchableOpacity>
-
-      {/* Bottom navigation */}
-      <View style={styles.bottomNav}>
-        <TouchableOpacity
-          style={styles.navItem}
-          onPress={() => router.push('/(app)/history')}
-          accessibilityLabel="History"
-          accessibilityRole="button"
-        >
-          <Ionicons name="time" size={24} color={colors.textSecondary} />
-          <Text style={styles.navLabel}>History</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={styles.navItem}
-          onPress={() => router.push('/(app)/friends')}
-          accessibilityLabel="Friends"
-          accessibilityRole="button"
-        >
-          <Ionicons name="people" size={24} color={colors.textSecondary} />
-          <Text style={styles.navLabel}>Friends</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={styles.navItem}
-          onPress={() => router.push('/(app)/profile')}
-          accessibilityLabel="Profile"
-          accessibilityRole="button"
-        >
-          <Ionicons name="person-circle" size={24} color={colors.textSecondary} />
-          <Text style={styles.navLabel}>Profile</Text>
-        </TouchableOpacity>
-      </View>
     </View>
   );
 }
@@ -313,22 +280,9 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
   },
-  bottomNav: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: 36,
-    paddingBottom: spacing.lg,
-  },
-  navItem: {
-    alignItems: 'center',
-    gap: 4,
-  },
-  navLabel: {
-    color: colors.textSecondary,
-    fontSize: 12,
-  },
   testflightLink: {
     alignItems: 'center',
+    paddingBottom: spacing.lg,
   },
   testflightLinkText: {
     color: colors.textTertiary,

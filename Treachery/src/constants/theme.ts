@@ -7,7 +7,7 @@ export const colors = {
   primaryBright: '#e4c96a',
   text: '#ede6d6',
   textSecondary: '#8b8698',
-  textTertiary: '#5a5468',
+  textTertiary: '#807a90', // 4.73:1 on background — clears WCAG AA (4.5:1) while dimmer than textSecondary
   border: '#3d3552',
   borderAccent: '#c9a84c',
   error: '#c43c3c',

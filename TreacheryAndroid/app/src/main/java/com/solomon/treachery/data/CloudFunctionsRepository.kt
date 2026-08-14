@@ -23,7 +23,7 @@ interface CloudFunctionsRepository {
     suspend fun selectPlane(gameId: String, planeId: String)
     suspend fun joinGame(gameCode: String): Map<String, Any?>
     suspend fun endGame(gameId: String, winnerUserIds: List<String>?)
-    suspend fun updateGameSettings(gameId: String, maxPlayers: Int?, startingLife: Int?, gameMode: String?)
+    suspend fun updateGameSettings(gameId: String, maxPlayers: Int?, startingLife: Int?, gameMode: String?, maxTraitorRarity: String? = null)
     suspend fun acceptFriendRequest(requestId: String)
     suspend fun removeFriend(friendId: String)
 }

@@ -15,6 +15,10 @@ final class LobbyViewModel: ObservableObject {
     @Published var errorMessage: String?
     @Published var isStartingGame = false
     @Published var isGameDisbanded = false
+    /// Host's selected max traitor rarity. Seeded from the live game snapshot
+    /// (absent on the doc means the server default, "special") so a lobby
+    /// opened after creation shows the real value, not a hardcoded default.
+    @Published var maxTraitorRarity: Rarity = .special
 
     let gameId: String
     /// Navigation fallback only; prefer `isHost` which reads live `game.hostId`.
@@ -84,6 +88,9 @@ final class LobbyViewModel: ObservableObject {
                     self.isGameDisbanded = true
                 }
                 self.game = game
+                if let game {
+                    self.maxTraitorRarity = game.maxTraitorRarity ?? .special
+                }
                 self.hasReceivedFirstSnapshot = true
             }
         }
@@ -152,10 +159,16 @@ final class LobbyViewModel: ObservableObject {
         }
     }
 
-    func updateGameSettings(maxPlayers: Int? = nil, startingLife: Int? = nil, gameMode: String? = nil) async {
+    func updateGameSettings(maxPlayers: Int? = nil, startingLife: Int? = nil, gameMode: String? = nil, maxTraitorRarity: String? = nil) async {
         guard isHost else { return }
         do {
-            try await cloudFunctions.updateGameSettings(gameId: gameId, maxPlayers: maxPlayers, startingLife: startingLife, gameMode: gameMode)
+            try await cloudFunctions.updateGameSettings(
+                gameId: gameId, maxPlayers: maxPlayers, startingLife: startingLife,
+                gameMode: gameMode, maxTraitorRarity: maxTraitorRarity
+            )
+            if let maxTraitorRarity, let rarity = Rarity(rawValue: maxTraitorRarity) {
+                self.maxTraitorRarity = rarity
+            }
         } catch {
             errorMessage = error.localizedDescription
         }

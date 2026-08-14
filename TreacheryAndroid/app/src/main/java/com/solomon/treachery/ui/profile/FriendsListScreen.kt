@@ -16,6 +16,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.solomon.treachery.data.AnalyticsService
+import com.solomon.treachery.model.TreacheryUser
 import com.solomon.treachery.ui.theme.*
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -34,10 +35,36 @@ fun FriendsListScreen(
     val sentRequestUserIds by viewModel.sentRequestUserIds.collectAsState()
 
     var searchText by remember { mutableStateOf("") }
+    var friendPendingRemoval by remember { mutableStateOf<TreacheryUser?>(null) }
 
     LaunchedEffect(Unit) {
         AnalyticsService.trackScreen("Friends")
         currentUserId?.let { viewModel.loadData(it) }
+    }
+
+    // Remove friend confirmation
+    friendPendingRemoval?.let { friend ->
+        AlertDialog(
+            onDismissRequest = { friendPendingRemoval = null },
+            title = { Text("Remove Friend", color = MtgTextPrimary) },
+            text = {
+                Text(
+                    // Same copy as web and iOS.
+                    "Remove ${friend.displayName} from your friends? You will be removed from their friends list too.",
+                    color = MtgTextSecondary
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    friendPendingRemoval = null
+                    viewModel.removeFriend(friend)
+                }) { Text("Remove", color = MtgError) }
+            },
+            dismissButton = {
+                TextButton(onClick = { friendPendingRemoval = null }) { Text("Cancel", color = MtgGold) }
+            },
+            containerColor = MtgSurface
+        )
     }
 
     Scaffold(
@@ -270,14 +297,25 @@ fun FriendsListScreen(
                         )
                     } else {
                         friends.forEachIndexed { index, friend ->
-                            Text(
-                                friend.displayName,
-                                color = MtgTextPrimary,
-                                modifier = Modifier.padding(
-                                    horizontal = 16.dp,
-                                    vertical = 10.dp
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 16.dp, vertical = 2.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    friend.displayName,
+                                    color = MtgTextPrimary,
+                                    modifier = Modifier.weight(1f)
                                 )
-                            )
+                                TextButton(onClick = { friendPendingRemoval = friend }) {
+                                    Text(
+                                        "Remove",
+                                        fontSize = 12.sp,
+                                        color = MtgError
+                                    )
+                                }
+                            }
                             if (index < friends.lastIndex) {
                                 HorizontalDivider(
                                     color = MtgDivider,

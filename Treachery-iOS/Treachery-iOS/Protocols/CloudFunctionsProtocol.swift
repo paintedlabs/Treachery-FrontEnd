@@ -23,7 +23,7 @@ protocol CloudFunctionsProtocol {
     func resolvePhenomenon(gameId: String) async throws -> PhenomenonResult
     func selectPlane(gameId: String, planeId: String) async throws
     func endGame(gameId: String, winnerUserIds: [String]?) async throws
-    func updateGameSettings(gameId: String, maxPlayers: Int?, startingLife: Int?, gameMode: String?) async throws
+    func updateGameSettings(gameId: String, maxPlayers: Int?, startingLife: Int?, gameMode: String?, maxTraitorRarity: String?) async throws
     func acceptFriendRequest(requestId: String) async throws
     func removeFriend(friendId: String) async throws
 }

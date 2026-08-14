@@ -13,6 +13,8 @@ final class CreateGameViewModel: ObservableObject {
     @Published var gameMode: GameMode = .treachery
     @Published var useOwnDeck = false
     @Published var startingLife = 40
+    /// "special" (all traitors) is the server default, matching web.
+    @Published var maxTraitorRarity: Rarity = .special
     @Published var isCreating = false
     @Published var errorMessage: String?
 
@@ -51,7 +53,7 @@ final class CreateGameViewModel: ObservableObject {
                 gameMode: gameMode.rawValue,
                 maxPlayers: maxPlayers,
                 startingLife: startingLife,
-                maxTraitorRarity: nil,
+                maxTraitorRarity: gameMode.includesTreachery ? maxTraitorRarity.rawValue : nil,
                 useOwnDeck: useOwnDeck,
                 displayName: user?.displayName
             )

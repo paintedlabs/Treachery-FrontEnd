@@ -10,7 +10,9 @@ import {
 } from 'react-native';
 import { useAuth } from '@/hooks/useAuth';
 import { useFriends } from '@/hooks/useFriends';
+import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { ErrorBanner } from '@/components/ErrorBanner';
+import { TreacheryUser } from '@/models/types';
 import { colors, spacing, fonts, contentMaxWidths } from '@/constants/theme';
 import { useResponsive } from '@/hooks/useResponsive';
 
@@ -29,15 +31,25 @@ export default function FriendsScreen() {
     sendRequest,
     acceptRequest,
     declineRequest,
+    removeFriend,
     isFriend,
   } = useFriends(currentUserId);
 
   const [searchText, setSearchText] = useState('');
+  // In-app ConfirmDialog instead of window.confirm/Alert.alert — one themed
+  // code path on every platform (same pattern as the leave-lobby confirm).
+  const [friendToRemove, setFriendToRemove] = useState<TreacheryUser | null>(null);
 
   const handleSearch = () => {
     if (searchText.trim()) {
       searchUsers(searchText);
     }
+  };
+
+  const doRemove = async () => {
+    if (!friendToRemove) return;
+    setFriendToRemove(null);
+    await removeFriend(friendToRemove);
   };
 
   return (
@@ -153,6 +165,14 @@ export default function FriendsScreen() {
                   </Text>
                 </View>
                 <Text style={styles.friendName}>{item.display_name}</Text>
+                <TouchableOpacity
+                  style={styles.removeButton}
+                  onPress={() => setFriendToRemove(item)}
+                  accessibilityLabel={`Remove ${item.display_name} from friends`}
+                  accessibilityRole="button"
+                >
+                  <Text style={styles.removeButtonText}>Remove</Text>
+                </TouchableOpacity>
               </View>
             )}
             style={styles.list}
@@ -161,6 +181,17 @@ export default function FriendsScreen() {
       </View>
 
       {errorMessage && <ErrorBanner message={errorMessage} />}
+
+      <ConfirmDialog
+        visible={friendToRemove !== null}
+        title="Remove Friend"
+        message={`Remove ${friendToRemove?.display_name ?? 'this player'} from your friends? You will be removed from their friends list too.`}
+        confirmLabel="Remove"
+        confirmAccessibilityLabel="Confirm remove friend"
+        destructive
+        onConfirm={doRemove}
+        onCancel={() => setFriendToRemove(null)}
+      />
     </View>
   );
 }
@@ -334,5 +365,18 @@ const styles = StyleSheet.create({
   friendName: {
     color: colors.text,
     fontSize: 16,
+    flex: 1,
+  },
+  removeButton: {
+    borderWidth: 1,
+    borderColor: 'rgba(196, 60, 60, 0.3)',
+    borderRadius: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+  },
+  removeButtonText: {
+    color: colors.destructive,
+    fontSize: 12,
+    fontWeight: '600',
   },
 });

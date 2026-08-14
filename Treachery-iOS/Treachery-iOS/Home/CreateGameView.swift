@@ -39,6 +39,27 @@ struct CreateGameView: View {
                             .padding(.horizontal)
                     }
 
+                    // Max traitor rarity selector — only meaningful in treachery modes
+                    if viewModel.gameMode.includesTreachery {
+                        VStack(spacing: 8) {
+                            MtgSectionHeader(title: "Max Traitor Rarity")
+                                .frame(maxWidth: .infinity, alignment: .leading)
+
+                            Picker("Max Traitor Rarity", selection: $viewModel.maxTraitorRarity) {
+                                ForEach(Rarity.allCases) { rarity in
+                                    Text(rarity.displayName).tag(rarity)
+                                }
+                            }
+                            .pickerStyle(.segmented)
+
+                            Text("Traitor identities up to this rarity can appear in the random pool.")
+                                .font(.caption)
+                                .foregroundStyle(Color.mtgTextSecondary)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+                        .padding(.horizontal)
+                    }
+
                     // Game settings card
                     VStack(spacing: 20) {
                         MtgSectionHeader(title: "Game Settings")

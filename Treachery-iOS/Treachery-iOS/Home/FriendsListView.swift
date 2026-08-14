@@ -10,6 +10,7 @@ import SwiftUI
 struct FriendsListView: View {
     @EnvironmentObject var authViewModel: AuthViewModel
     @StateObject private var viewModel = FriendsListViewModel()
+    @State private var friendToRemove: TreacheryUser?
 
     var body: some View {
         ZStack {
@@ -174,6 +175,18 @@ struct FriendsListView: View {
                                     Text(friend.displayName)
                                         .foregroundStyle(Color.mtgTextPrimary)
                                     Spacer()
+                                    Button("Remove") {
+                                        friendToRemove = friend
+                                    }
+                                    .font(.caption)
+                                    .foregroundStyle(Color.mtgError)
+                                    .padding(.horizontal, 12)
+                                    .padding(.vertical, 4)
+                                    .overlay(
+                                        Capsule()
+                                            .stroke(Color.mtgDivider, lineWidth: 1)
+                                    )
+                                    .accessibilityLabel("Remove \(friend.displayName) from friends")
                                 }
                                 .padding(.horizontal, 16)
                                 .padding(.vertical, 10)
@@ -199,6 +212,22 @@ struct FriendsListView: View {
         }
         .navigationBarTitleDisplayMode(.inline)
         .toolbarColorScheme(.dark, for: .navigationBar)
+        .confirmationDialog(
+            "Remove Friend?",
+            isPresented: Binding(
+                get: { friendToRemove != nil },
+                set: { if !$0 { friendToRemove = nil } }
+            ),
+            titleVisibility: .visible,
+            presenting: friendToRemove
+        ) { friend in
+            Button("Remove", role: .destructive) {
+                Task { await viewModel.removeFriend(friend) }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: { friend in
+            Text("Remove \(friend.displayName) from your friends? You will be removed from their friends list too.")
+        }
         .onAppear { AnalyticsService.trackScreen("Friends") }
         .task {
             guard let userId = authViewModel.currentUserId else { return }

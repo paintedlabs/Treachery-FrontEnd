@@ -31,8 +31,9 @@ class CloudFunctionsRepositoryImpl @Inject constructor(
             .await()
         @Suppress("UNCHECKED_CAST")
         val payload = result.getData() as? Map<String, Any?> ?: emptyMap()
-        return payload["gameId"] as? String
+        val gameId = payload["gameId"] as? String
             ?: throw IllegalStateException("Invalid createGame response")
+        return gameId
     }
 
     override suspend fun startGame(gameId: String) {
@@ -132,11 +133,12 @@ class CloudFunctionsRepositoryImpl @Inject constructor(
             .await()
     }
 
-    override suspend fun updateGameSettings(gameId: String, maxPlayers: Int?, startingLife: Int?, gameMode: String?) {
+    override suspend fun updateGameSettings(gameId: String, maxPlayers: Int?, startingLife: Int?, gameMode: String?, maxTraitorRarity: String?) {
         val data = mutableMapOf<String, Any>("gameId" to gameId)
         maxPlayers?.let { data["maxPlayers"] = it }
         startingLife?.let { data["startingLife"] = it }
         gameMode?.let { data["gameMode"] = it }
+        maxTraitorRarity?.let { data["maxTraitorRarity"] = it }
         functions.getHttpsCallable("updateGameSettings")
             .call(data)
             .await()

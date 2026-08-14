@@ -363,7 +363,14 @@ export default function LobbyScreen() {
             <Text style={styles.settingsLabel}>Max Players</Text>
             <View style={styles.settingsStepper}>
               <TouchableOpacity
-                onPress={() => updateGameSettings({ maxPlayers: Math.max(2, game.max_players - 1) })}
+                // Legacy games could be stored with max_players > 8 (the server now
+                // caps at 8), so clamp the decrement into the valid range — from any
+                // value above 8, '-' goes straight to 8 instead of a rejected 11.
+                onPress={() =>
+                  updateGameSettings({
+                    maxPlayers: Math.min(8, Math.max(2, game.max_players - 1)),
+                  })
+                }
                 disabled={game.max_players <= 2}
                 accessibilityLabel="Decrease max players"
               >

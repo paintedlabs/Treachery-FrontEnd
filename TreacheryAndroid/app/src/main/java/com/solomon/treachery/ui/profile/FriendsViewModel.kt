@@ -125,5 +125,18 @@ class FriendsViewModel @Inject constructor(
         }
     }
 
+    fun removeFriend(friend: TreacheryUser) {
+        viewModelScope.launch {
+            _errorMessage.value = null
+            try {
+                cloudFunctionsRepository.removeFriend(friend.id)
+                AnalyticsService.trackEvent("remove_friend")
+                _friends.value = _friends.value.filter { it.id != friend.id }
+            } catch (e: Exception) {
+                _errorMessage.value = e.localizedMessage
+            }
+        }
+    }
+
     fun isFriend(userId: String): Boolean = friends.value.any { it.id == userId }
 }

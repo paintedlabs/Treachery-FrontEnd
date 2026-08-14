@@ -231,7 +231,9 @@ fun GameBoardScreen(
                             if (showPlaneDetail) {
                                 PlaneCardDetailSheet(plane = plane, onDismiss = { showPlaneDetail = false })
                             }
-                            if (plane.isPhenomenon) {
+                            // Eliminated spectators keep the banner but not the
+                            // resolver — the server rejects their resolve anyway.
+                            if (plane.isPhenomenon && viewModel.currentPlayer?.isEliminated != true) {
                                 PhenomenonOverlay(
                                     plane = plane,
                                     isPending = isPending,
