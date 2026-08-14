@@ -66,21 +66,18 @@ test-encoded — no CI job builds Swift or Kotlin (see Repo hygiene).
 |---|---|
 | `resolveWearerOfMasks` rejects `traitor_07`/`09`/`13` but the pickers still offered them, so a legal-looking pick returned a raw server error | **fixed** — web and iOS filter the same three ids |
 | `ability_resolved` (the resolvers' once-per-game guard) was server-only, so Puppet Master's button stayed live after resolving | **fixed (web)** — iOS/Android have no equivalent gate, but Metamorph and Wearer self-heal there because their `identity_card_id` changes |
-| The `removeFriend` callable had no caller on any client, leaving every removal one-sided | **fixed at the service layer** — no client has friend-removal UI at all, so nothing reaches it yet |
+| The `removeFriend` callable had no caller on any client, leaving every removal one-sided | **fixed** — confirmation-gated remove control on all three clients through the mutual callable |
 | iOS `updateUser` encoded the whole model, re-writing legacy PII back onto the public doc | **fixed** — public-field allowlist, matching web and Android |
 | **Android has no traitor-ability support whatsoever** — no `resolveMetamorph`/`resolvePuppetMaster`/`resolveWearerOfMasks` in `CloudFunctionsRepository`, no resolver UI. Treachery games are unplayable past an unveil on Android | **fixed** — repository methods, `ability_resolved` gating, `AbilityResolverSheet` mirroring the iOS sheets; 211 unit tests green |
-| `maxTraitorRarity` is plumbed through both native clients but never sent (iOS passes `nil`, Android omits it), so the setting is web-only | **open** |
+| `maxTraitorRarity` is plumbed through both native clients but never sent (iOS passes `nil`, Android omits it), so the setting is web-only | **fixed** — create + lobby pickers on iOS/Android; both `Game` models decode `max_traitor_rarity` and the lobby seeds from the live snapshot |
 | Both native lobbies fall back to the `navIsHost` nav param before the first game snapshot, so a demoted host briefly still sees host UI. Cosmetic — the server enforces host actions | **open** |
 
 ## Lower severity
 
 Not all individually test-encoded; from the audit report.
 
-- Profile win-rate deflated (divides by games with no recorded winner)
-- `max_players` mismatch: new games are capped at 8 everywhere now, but games
-  already stored with `max_players: 12` are still bricked in **both** stepper
-  directions — `+` is disabled at `>= 8` and `-` yields `Math.max(2, 11) = 11`,
-  which `updateGameSettings` rejects
+- ~~Profile win-rate deflated~~ — **fixed**: divides by games with a recorded outcome
+- ~~Legacy 12-player lobbies bricked~~ — **fixed**: the stepper decrement clamps into the valid range on all three clients
 - Planar die cost displays the previous roller's count, not the caller's actual (often free) cost
 - Stale/deleted game link → infinite spinner with the web back button trapped
 - Client-side game-code generation is check-then-act racy; duplicate codes make one game unjoinable by code (**fixed** for createGame callable path)
@@ -90,10 +87,10 @@ Not all individually test-encoded; from the audit report.
   client-side, so skip-and-reopen rerolls it (same on web — inherent to the
   client-trust design)
 - `resolveWearerOfMasks` lacks the `original_identity_card_id` guard the other
-  two resolvers have: a Puppet Master redistribution can hand `traitor_13` to a
-  live player, who then unveils into a usable Wearer ability on every client.
-  Whether that is a rules bug or legitimate is undecided; if it's a bug, the
-  fix belongs server-side
+  two resolvers have (closed by #110's guard) — remaining rules question: a
+  player who unveiled BEFORE a Puppet Master swap stays face-down permanently
+  (the "Already unveiled." guard precedes the is_face_down clearing). Needs a
+  product decision on whether re-revealing should be allowed
 - Passwords trimmed before length validation
 - Duplicate friend requests after reload (sent-set is session-only)
 - N+1 sequential player fetches in history/profile
