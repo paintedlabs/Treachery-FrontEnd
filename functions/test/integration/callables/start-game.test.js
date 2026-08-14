@@ -228,3 +228,41 @@ describe('startGame — player counts outside the distribution table', () => {
     assert.equal(g.state, 'waiting', 'a failed start must roll back');
   });
 });
+
+describe('startGame — player_ids reconciliation (ghost spectators)', () => {
+  // The append-self rules path lets any signed-in user add their uid to a
+  // waiting game's player_ids without creating a player doc. player_ids gates
+  // player-doc reads, so an unreconciled ghost would read every role and
+  // identity card the moment the deal writes them. startGame must rebuild the
+  // array from the players actually seated.
+  it('evicts a player_ids entry that has no seated player doc', async () => {
+    const users = await h.getUsers(5);
+    const seated = users.slice(0, 4);
+    const ghost = users[4];
+
+    // Seed the exact post-attack state: ghost uid in the array, no player doc.
+    const game = await h.seedGame({
+      users: seated,
+      gameFields: { player_ids: [...seated.map((u) => u.uid), ghost.uid] },
+    });
+
+    const res = await game.host.call('startGame', { gameId: game.gameId });
+    assert.deepEqual(res, { success: true });
+
+    const g = await h.getGame(game.gameId);
+    assert.deepEqual(
+      [...g.player_ids].sort(),
+      seated.map((u) => u.uid).sort(),
+      'player_ids must contain exactly the seated players after the deal'
+    );
+    assert.ok(!g.player_ids.includes(ghost.uid), 'ghost uid must be evicted');
+
+    // The seated players all made it through untouched — a legitimate legacy
+    // direct-join (array append + player doc create) must survive reconcile.
+    const players = await h.getPlayers(game.gameId);
+    assert.equal(players.length, 4);
+    for (const p of players) {
+      assert.ok(g.player_ids.includes(p.user_id), `${p.user_id} must keep list membership`);
+    }
+  });
+});
