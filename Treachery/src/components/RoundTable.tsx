@@ -237,6 +237,16 @@ function DraggableSeat({
   const moved = useRef(false);
 
   const handlePointerDown = (e: PointerEventLike) => {
+    // Never arm a drag from an interactive child. A press on +/- that slides
+    // a few pixels (trackpad twitch, touch) would otherwise cross the slop
+    // threshold, capture the pointer away from the Pressable, and silently
+    // eat the tap — the life number just doesn't change, which players read
+    // as lag. Drag-reorder starts only from the tile's non-button surface.
+    // (react-native-web renders Pressable as role="button" in the DOM.)
+    const el = e.target as Element | null;
+    if (typeof el?.closest === 'function' && el.closest('[role="button"]')) {
+      return;
+    }
     // Record the origin but do NOT capture the pointer yet. Capturing here
     // redirects every later pointer event to this tile, so the +/- buttons
     // inside it never receive their pointerup and never fire a click.
@@ -304,6 +314,7 @@ function DraggableSeat({
 /** Minimal shape of the pointer events react-native-web forwards. */
 interface PointerEventLike {
   currentTarget: unknown;
+  target: unknown;
   nativeEvent: { clientX: number; clientY: number; pointerId: number };
 }
 
