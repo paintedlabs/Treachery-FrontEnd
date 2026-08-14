@@ -128,6 +128,35 @@ describe("games/{gameId}", () => {
         )
       );
     });
+
+    // Rules ship independently of app releases, so the create bounds have to
+    // accept what the CURRENT App Store / Play build writes, not what today's
+    // UI offers. v1.1.0 creates the game doc directly (it predates the
+    // createGame callable) with max_players 12 for non-treachery modes and any
+    // 20-60 life in steps of 5. Tightening these to the callable's bounds
+    // returned PERMISSION_DENIED on every installed binary and killed
+    // Planechase / Life Tracker creation outright.
+    it("still lets a shipped v1.1.0 build create a 12-player non-treachery game", async () => {
+      const db = await authedDb(OUTSIDER);
+      await assertSucceeds(
+        setDoc(
+          doc(db, "games", "game_legacy_cap"),
+          gameDoc(OUTSIDER, { game_mode: "planechase", max_players: 12 })
+        )
+      );
+    });
+
+    for (const life of [35, 45, 55, 60]) {
+      it(`still lets a shipped v1.1.0 build create a game with ${life} starting life`, async () => {
+        const db = await authedDb(OUTSIDER);
+        await assertSucceeds(
+          setDoc(
+            doc(db, "games", `game_legacy_life_${life}`),
+            gameDoc(OUTSIDER, { starting_life: life })
+          )
+        );
+      });
+    }
   });
 
   // ─── update: host settings ───────────────────────────────────────
