@@ -18,6 +18,6 @@
   },
   "devDependencies": {
     "eslint": "^8.57.0",
-    "firebase": "^12.16.0"
+    "firebase": "^12.18.0"
   }
 }
