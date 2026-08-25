@@ -47,3 +47,11 @@ jobs:
         run: npx firebase-tools deploy --only hosting:production,functions,firestore:rules,firestore:indexes
         env:
           FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
+
+      # See deploy-staging.yml — catches a deploy that succeeded but left a
+      # callable unreachable (missing Cloud Run invoker binding), which
+      # surfaces in the browser as a misleading CORS error.
+      - name: Smoke-test callables
+        run: ./scripts/smoke-callables.sh "$FIREBASE_PROJECT_ID" https://treachery.games
+        env:
+          FIREBASE_PROJECT_ID: ${{ secrets.FIREBASE_PROJECT_ID }}

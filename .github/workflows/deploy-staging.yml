@@ -59,3 +59,12 @@ jobs:
         run: npx firebase-tools deploy --only hosting:staging,functions,firestore:rules,firestore:indexes
         env:
           FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
+
+      # Guards the failure mode that CI cannot see: the code is fine and the
+      # deploy "succeeded", but a Cloud Run service is missing its public
+      # invoker binding, so browsers get a 403 HTML page and report it as a
+      # CORS error. Preflight only — never invokes a function body.
+      - name: Smoke-test callables
+        run: ./scripts/smoke-callables.sh "$FIREBASE_PROJECT_ID" https://treachery-staging.web.app
+        env:
+          FIREBASE_PROJECT_ID: ${{ secrets.FIREBASE_PROJECT_ID }}
