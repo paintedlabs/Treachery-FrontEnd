@@ -9,6 +9,10 @@ on:
       - "firebase.json"
       - "firestore.rules"
       - "firestore.indexes.json"
+      # Self-trigger so a change to the smoke check (or this workflow)
+      # is actually exercised by a deploy instead of shipping untested.
+      - "scripts/smoke-callables.sh"
+      - ".github/workflows/deploy-staging.yml"
   workflow_dispatch:
 
 concurrency:
