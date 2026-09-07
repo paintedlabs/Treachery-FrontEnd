@@ -17,11 +17,6 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   icon: "./assets/icon.png",
   userInterfaceStyle: "dark",
   scheme: "treachery",
-  splash: {
-    image: "./assets/splash-icon.png",
-    resizeMode: "contain",
-    backgroundColor: "#0d0b1a",
-  },
   ios: {
     supportsTablet: true,
     bundleIdentifier: "com.PaintedLabs.Treachery",
@@ -39,5 +34,20 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     favicon: "./assets/favicon.png",
     bundler: "metro",
   },
-  plugins: ["expo-router", "expo-sharing"],
+  // SDK 57 dropped the top-level `splash` key; native splash config now lives
+  // in the expo-splash-screen plugin. expo-status-bar also ships a plugin as of
+  // SDK 57 and `expo install --fix` asks for it to be registered here.
+  plugins: [
+    "expo-router",
+    "expo-sharing",
+    "expo-status-bar",
+    [
+      "expo-splash-screen",
+      {
+        image: "./assets/splash-icon.png",
+        resizeMode: "contain",
+        backgroundColor: "#0d0b1a",
+      },
+    ],
+  ],
 });

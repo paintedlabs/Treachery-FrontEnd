@@ -3,7 +3,7 @@ import { Animated, LayoutChangeEvent, StyleSheet, View } from 'react-native';
 import { Player } from '@/models/types';
 import { TILE_HEIGHT, TILE_WIDTH } from '@/components/PlayerTile';
 import { rotateToLocalFirst, seatPositions } from '@/components/seatPositions';
-import { colors } from '@/constants/theme';
+import { absoluteFillObject, colors } from '@/constants/theme';
 
 /**
  * The desktop "Round Table" board: player tiles arranged around a central
@@ -325,7 +325,7 @@ const styles = StyleSheet.create({
     minHeight: 560,
   },
   tableSurface: {
-    ...StyleSheet.absoluteFillObject,
+    ...absoluteFillObject,
     margin: 90,
     borderRadius: 9999,
     backgroundColor: colors.surface,
