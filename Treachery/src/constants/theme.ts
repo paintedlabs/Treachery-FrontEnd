@@ -66,3 +66,17 @@ export const PLAYER_COLORS = [
   { name: 'Rose', hex: '#ec4899' },
   { name: 'Silver', hex: '#95a5a6' },
 ];
+
+/**
+ * Plain-object equivalent of the `StyleSheet.absoluteFillObject` that React
+ * Native removed in 0.86 (Expo SDK 57). `StyleSheet.absoluteFill` still exists
+ * but is a registered style, so it can only be passed to a `style` prop — it
+ * cannot be spread into a `StyleSheet.create` entry. Spread this instead.
+ */
+export const absoluteFillObject = {
+  position: 'absolute',
+  top: 0,
+  left: 0,
+  right: 0,
+  bottom: 0,
+} as const;

@@ -5,7 +5,7 @@ import { Timestamp } from 'firebase/firestore';
 import { Player, IdentityCard } from '@/models/types';
 import { getAllCards, getCard } from '@/services/cardDatabase';
 import { ROLE_COLORS, ROLE_DISPLAY_NAMES } from '@/constants/roles';
-import { colors, spacing, fonts } from '@/constants/theme';
+import { absoluteFillObject, colors, spacing, fonts } from '@/constants/theme';
 
 type AbilityType = 'metamorph' | 'puppetMaster' | 'wearerOfMasks';
 
@@ -567,7 +567,7 @@ const styles = StyleSheet.create({
   secondaryBtnText: { color: colors.primary, fontSize: 14, fontWeight: '600' },
   logLine: { color: colors.textSecondary, fontSize: 11, fontFamily: 'monospace' },
   overlay: {
-    ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.7)',
+    ...absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.7)',
     justifyContent: 'flex-end',
   },
   sheetScroll: {
