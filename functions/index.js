@@ -282,7 +282,7 @@ function generateJoinCode() {
 async function allocateUniqueJoinCode() {
   for (let attempt = 0; attempt < 12; attempt++) {
     const code = generateJoinCode();
-    // eslint-disable-next-line no-await-in-loop
+    // Deliberate sequential await (no-await-in-loop).
     const existing = await db
       .collection("games")
       .where("code", "==", code)

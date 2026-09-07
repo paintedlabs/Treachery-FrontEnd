@@ -1062,6 +1062,7 @@ suite("Life Adjustment Edge Cases", () => {
     const eliminated = newLife <= 0;
     if (eliminated) newLife = 0;
 
+    assert.strictEqual(newLife, 0);
     assert.strictEqual(eliminated, true);
   });
 
