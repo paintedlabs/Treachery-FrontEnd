@@ -120,7 +120,7 @@ async function createUser(label) {
 /** Returns (creating on first use) `n` reusable signed-in test users. */
 async function getUsers(n) {
   while (userPool.length < n) {
-    // eslint-disable-next-line no-await-in-loop
+    // Deliberate sequential await (no-await-in-loop).
     userPool.push(await createUser(`Player ${userPool.length + 1}`));
   }
   return userPool.slice(0, n);

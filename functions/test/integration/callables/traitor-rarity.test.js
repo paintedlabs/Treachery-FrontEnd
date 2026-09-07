@@ -29,15 +29,15 @@ async function drawTraitors(rounds, { maxTraitorRarity } = {}) {
 
   for (let start = 0; start < rounds; start += CHUNK) {
     const size = Math.min(CHUNK, rounds - start);
-    // eslint-disable-next-line no-await-in-loop
+    // Deliberate sequential await (no-await-in-loop).
     const games = await Promise.all(
       Array.from({ length: size }, () => h.seedGame({ users, maxTraitorRarity }))
     );
-    // eslint-disable-next-line no-await-in-loop
+    // Deliberate sequential await (no-await-in-loop).
     await Promise.all(
       games.map((g) => g.host.call('startGame', { gameId: g.gameId }))
     );
-    // eslint-disable-next-line no-await-in-loop
+    // Deliberate sequential await (no-await-in-loop).
     const rosters = await Promise.all(games.map((g) => h.getPlayers(g.gameId)));
     for (const players of rosters) {
       const traitors = players.filter((p) => p.role === 'traitor');
