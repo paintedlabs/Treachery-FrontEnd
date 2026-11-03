@@ -140,12 +140,10 @@ describe('updateGameSettings — startingLife', () => {
     });
   }
 
-  // SKIP: currently broken — see finding #A. Un-skip when functions/index.js is fixed.
-  //
-  // index.js ~1483 writes with `tx.update(gameRef, update)` and then reads the
-  // players subcollection at ~1487. Firestore transactions require every read
-  // to precede every write, so the SDK throws and the whole transaction is
-  // rolled back: passing startingLife ALWAYS fails with `internal`.
+  // Every value the create screens offer except the seeded 40, so each case
+  // really changes the life total. These also guard the transaction's order:
+  // it used to read the players after writing the game, which Firestore
+  // forbids, so every startingLife change failed with `internal`.
   for (const life of [20, 25, 30, 35, 45, 50, 55, 60]) {
     it(
       `sets starting_life to ${life} and re-bases every player's life_total`,
@@ -171,11 +169,8 @@ describe('updateGameSettings — startingLife', () => {
     );
   }
 
-  // SKIP: currently broken — see finding #A. Un-skip when functions/index.js is fixed.
-  //
-  // Because the transaction throws, any setting co-submitted with startingLife
-  // is rolled back too — a host changing life + max players in one save loses
-  // BOTH changes.
+  // Any setting co-submitted with startingLife must persist too: a host who
+  // changes life and other settings in one save keeps every change.
   it(
     'persists every setting co-submitted with startingLife',
     async () => {
@@ -206,8 +201,6 @@ describe('updateGameSettings — startingLife', () => {
     }
   );
 
-  // SKIP: currently broken — see finding #A. Un-skip when functions/index.js is fixed.
-  //
   // The re-based starting life must be what startGame deals out.
   it(
     'a startingLife change is reflected in the life totals startGame deals',
