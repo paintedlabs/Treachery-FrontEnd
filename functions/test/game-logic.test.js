@@ -1,7 +1,7 @@
 /**
  * Treachery Cloud Functions — Integration & Edge Case Tests
  *
- * Tests the pure game logic extracted from index.js:
+ * Tests the pure game logic that the Cloud Functions run:
  *   - Role distribution
  *   - Win condition checking
  *   - Planechase deck mechanics
@@ -13,101 +13,28 @@
 
 const assert = require("assert");
 
-// ─── Extract logic from index.js ────────────────────────────────
-// We re-implement the pure functions here to test them in isolation.
-// In a production setup, these would be extracted to a shared module.
+// ─── Production logic under test ────────────────────────────────
+// Imported from the PURE modules under src/: no firebase-admin, no
+// initializeApp, no credentials. This file used to carry hand-written copies
+// of these functions and the copies drifted from production, so always test
+// the real implementation rather than a re-implementation.
 
-const CARDS = require("../identityCards.json");
-const PLANE_CARDS = require("../planeCards.json");
-
-const CHAOTIC_AETHER_ID = "6dc67a65-31bf-4535-9e02-8f6d6ecefde5";
-const INTERPLANAR_TUNNEL_ID = "7812174b-2dc1-43e8-b98f-639905e20ab7";
-const SPATIAL_MERGING_ID = "aa166578-b13b-4adb-a78e-d5183e987112";
-
-function getCardsForRole(role) {
-  return CARDS.filter((c) => c.role === role);
-}
-
-// Mirrors the traitor rarity cap in index.js
-const RARITY_ORDER = { uncommon: 1, rare: 2, mythic: 3, special: 4 };
-
-function isValidRarity(value) {
-  return (
-    typeof value === "string" &&
-    Object.prototype.hasOwnProperty.call(RARITY_ORDER, value)
-  );
-}
-
-function getTraitorPool(maxRarity) {
-  const traitors = getCardsForRole("traitor");
-  if (!isValidRarity(maxRarity)) return traitors;
-  const cap = RARITY_ORDER[maxRarity];
-  return traitors.filter((c) => RARITY_ORDER[c.rarity] <= cap);
-}
-
-function getRoleDistribution(playerCount) {
-  const table = {
-    1: { leaders: 1, guardians: 0, assassins: 0, traitors: 0 },
-    2: { leaders: 1, guardians: 0, assassins: 1, traitors: 0 },
-    3: { leaders: 1, guardians: 0, assassins: 1, traitors: 1 },
-    4: { leaders: 1, guardians: 0, assassins: 2, traitors: 1 },
-    5: { leaders: 1, guardians: 1, assassins: 2, traitors: 1 },
-    6: { leaders: 1, guardians: 1, assassins: 3, traitors: 1 },
-    7: { leaders: 1, guardians: 2, assassins: 3, traitors: 1 },
-    8: { leaders: 1, guardians: 2, assassins: 3, traitors: 2 },
-  };
-  return (
-    table[playerCount] || { leaders: 1, guardians: 0, assassins: 2, traitors: 1 }
-  );
-}
-
-function shuffle(array) {
-  const arr = [...array];
-  for (let i = arr.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [arr[i], arr[j]] = [arr[j], arr[i]];
-  }
-  return arr;
-}
-
-// Mirrors functions/index.js — allowlist, not denylist, so an unrecognised
-// mode string fails closed instead of auto-finishing the table.
-const TREACHERY_MODES = new Set(["treachery", "treachery_planechase"]);
-
-function isTreacheryMode(gameMode) {
-  // Legacy games predate game_mode and are all treachery.
-  return gameMode === undefined || gameMode === null ||
-    TREACHERY_MODES.has(gameMode);
-}
-
-function checkWinConditions(players, gameMode) {
-  // Only Treachery-mode games have automatic team wins.
-  if (!isTreacheryMode(gameMode)) {
-    return null;
-  }
-
-  const alive = players.filter((p) => !p.is_eliminated);
-
-  if (alive.length === 1 && alive[0].role === "traitor") {
-    return "traitor";
-  }
-
-  const leaderAlive = alive.some((p) => p.role === "leader");
-  const assassinAlive = alive.some((p) => p.role === "assassin");
-  const traitorAlive = alive.some((p) => p.role === "traitor");
-
-  if (!leaderAlive && assassinAlive) {
-    return "assassin";
-  }
-  if (leaderAlive && !assassinAlive && !traitorAlive) {
-    return "leader";
-  }
-  if (!leaderAlive && !assassinAlive && !traitorAlive) {
-    return "assassin";
-  }
-
-  return null;
-}
+const {
+  CARDS,
+  PLANE_CARDS,
+  getCardsForRole,
+  getTraitorPool,
+  parseChaosAbility,
+  categorizeChaosAbility,
+} = require("../src/cards");
+const {
+  RARITY_ORDER,
+  CHAOTIC_AETHER_ID,
+  INTERPLANAR_TUNNEL_ID,
+  SPATIAL_MERGING_ID,
+} = require("../src/config");
+const { getRoleDistribution, shuffle, checkWinConditions } = require("../src/rules");
+const { isValidRarity, parseIntegerArg } = require("../src/validation");
 
 // ─── Test Helpers ────────────────────────────────────────────────
 
@@ -204,24 +131,33 @@ suite("Role Distribution", () => {
     );
   });
 
-  test("fallback for unsupported player counts (9+) defaults to 4-player dist", () => {
-    const dist = getRoleDistribution(9);
-    // Falls back to default, which is 4-player distribution (sum=4, NOT 9)
-    const sum =
-      dist.leaders + dist.guardians + dist.assassins + dist.traitors;
-    assert.strictEqual(sum, 4, `Expected fallback sum of 4, got ${sum}`);
+  test("unsupported player counts (0, 9+) get no distribution, not a 4-player fallback", () => {
+    // Production returns null and startGame turns that into failed-precondition
+    // "Unsupported player count." The hand-copied getRoleDistribution this file
+    // used to carry still returned a 4-player fallback (sum=4, NOT 9) after
+    // production dropped it in d7adcfe, so this test asserted the old bug.
+    for (const count of [0, 9, 10]) {
+      assert.strictEqual(
+        getRoleDistribution(count),
+        null,
+        `Expected no distribution for ${count} players`
+      );
+    }
   });
 
-  test("BUG: fallback distribution does not match player count for 9+ players", () => {
-    // This is a discovered bug: if somehow 9 players join (race condition),
-    // startGame uses getRoleDistribution(9) which returns sum=4,
-    // so only 4 out of 9 players get roles assigned.
-    const dist = getRoleDistribution(9);
-    const sum = dist.leaders + dist.guardians + dist.assassins + dist.traitors;
-    assert.notStrictEqual(
-      sum,
-      9,
-      "Fallback correctly does NOT cover all 9 players — this is a bug if 9 players join"
+  test("FIXED BUG: a distribution always covers exactly its player count", () => {
+    // The original bug: if 9 players joined (race condition), the fallback
+    // dealt only 4 roles and left 5 players without one. Every count now gets
+    // either a distribution whose roles sum to the player count, or none.
+    for (let count = 1; count <= 8; count++) {
+      const dist = getRoleDistribution(count);
+      const sum = dist.leaders + dist.guardians + dist.assassins + dist.traitors;
+      assert.strictEqual(sum, count, `Expected ${count} roles for ${count} players, got ${sum}`);
+    }
+    assert.strictEqual(
+      getRoleDistribution(9),
+      null,
+      "9 players must get no distribution rather than a partial one"
     );
   });
 
@@ -1168,87 +1104,12 @@ suite("Game Mode Validation", () => {
 // Chaos Ability Parsing
 // ═════════════════════════════════════════════════════════════════
 
-// This parser extracts chaos ability text from plane card oracle_text.
-// It handles the 3 formats found in the data:
+// parseChaosAbility (src/cards.js) extracts chaos ability text from plane card
+// oracle_text. It handles the 3 formats found in the data:
 //   1. "Whenever chaos ensues, <effect>"   (172 planes)
 //   2. "When chaos ensues, <effect>"        (5 planes — Bad Wolf Bay, Pompeii, TARDIS Bay, Temple of Atropos, No Way Out)
 //   3. "Chaos: <effect>"                    (4 planes — Bicycle Rack, Shrinking Plane, Stroopwafel Cafe, The Food Court, Windmill Farm)
 // Two planes have NO chaos ability: Ghirapur Grand Prix, sAnS mERcY
-
-function parseChaosAbility(oracleText) {
-  if (!oracleText) return null;
-
-  // Pattern 1: "Whenever chaos ensues, <effect>" or "Whenever Chaos ensues, <effect>"
-  const wheneverMatch = oracleText.match(/Whenever [Cc]haos ensues,\s*([\s\S]*?)(?:\n(?!.*chaos)|$)/i);
-  if (wheneverMatch) {
-    return wheneverMatch[1].trim();
-  }
-
-  // Pattern 2: "When chaos ensues, <effect>" (no "ever")
-  const whenMatch = oracleText.match(/When chaos ensues,\s*([\s\S]*?)(?:\n(?!.*chaos)|$)/i);
-  if (whenMatch) {
-    return whenMatch[1].trim();
-  }
-
-  // Pattern 3: "Chaos: <effect>"
-  const colonMatch = oracleText.match(/Chaos:\s*([\s\S]*?)(?:\n|$)/i);
-  if (colonMatch) {
-    return colonMatch[1].trim();
-  }
-
-  // Special case: chaos ensues is referenced but not as a trigger (e.g., No Way Out)
-  // "chaos ensues instead" — this plane redirects planeswalk to chaos, not a direct ability
-  if (/chaos ensues/i.test(oracleText)) {
-    // Extract the sentence containing "chaos ensues"
-    const lines = oracleText.split("\n");
-    const chaosLine = lines.find(l => /chaos ensues/i.test(l));
-    return chaosLine ? chaosLine.trim() : null;
-  }
-
-  return null;
-}
-
-// Categorize a chaos ability for game-mechanical purposes
-function categorizeChaosAbility(abilityText) {
-  if (!abilityText) return "none";
-
-  const lower = abilityText.toLowerCase();
-
-  // Damage effects
-  if (/deals?\s+\d+\s+damage/i.test(lower) || /loses?\s+\d+\s+life/i.test(lower)) {
-    return "damage";
-  }
-  // Life gain
-  if (/gains?\s+\d*\s*life/i.test(lower) || /gain\s+(three|two|one|\d+)\s+life/i.test(lower)) {
-    return "life_gain";
-  }
-  // Card draw
-  if (/draw/i.test(lower)) {
-    return "draw";
-  }
-  // Creature destruction/removal
-  if (/destroy/i.test(lower) || /exile/i.test(lower)) {
-    return "removal";
-  }
-  // Token creation
-  if (/create/i.test(lower) && /token/i.test(lower)) {
-    return "tokens";
-  }
-  // Counter manipulation
-  if (/counter/i.test(lower)) {
-    return "counters";
-  }
-  // Planeswalk trigger
-  if (/planeswalk/i.test(lower)) {
-    return "planeswalk";
-  }
-  // Discard
-  if (/discard/i.test(lower)) {
-    return "discard";
-  }
-
-  return "other";
-}
 
 suite("Planechase — Chaos Ability Parsing", () => {
   const regularPlanes = PLANE_CARDS.filter(p => !p.is_phenomenon);
@@ -1630,21 +1491,13 @@ suite("Planechase — Chaos Ability Data Integrity", () => {
   });
 });
 
-// Mirrors the callable-argument validator in index.js. Callable payloads are
-// untrusted, so a value that is not an integer has to fail closed instead of
-// slipping past a range check that is false on both sides (NaN).
-function parseIntegerArg(value, { min, max } = {}) {
-  let num = value;
-  if (typeof num === "string") {
-    if (num.trim() === "") return null;
-    num = Number(num);
-  }
-  if (typeof num !== "number" || !Number.isInteger(num)) return null;
-  if (min !== undefined && num < min) return null;
-  if (max !== undefined && num > max) return null;
-  return num;
-}
-
+// parseIntegerArg (src/validation.js) guards untrusted callable payloads: a
+// value that is not an integer has to fail closed instead of slipping past a
+// range check that is false on both sides (NaN).
+//
+// Still a local copy: production has no named constant for this allowlist; it
+// is written inline in createGame and updateGameSettings
+// (src/callables/lobby.js).
 const STARTING_LIFE_VALUES = [20, 25, 30, 40, 50];
 
 suite("Callable Argument Validation — parseIntegerArg", () => {
