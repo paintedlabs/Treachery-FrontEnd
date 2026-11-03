@@ -142,11 +142,10 @@ final class AuthViewModel: ObservableObject {
 
     // MARK: - Sign Out
 
+    /// The Sign Out button's action. A failure is reported through `errorMessage`.
     func signOut() {
-        errorMessage = nil
         do {
-            try firebaseManager.signOut()
-            AnalyticsService.trackEvent("sign_out")
+            try endSession()
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -194,5 +193,19 @@ final class AuthViewModel: ObservableObject {
             print("Failed to create user document: \(error)")
             return false
         }
+    }
+}
+
+// MARK: - SessionEnding
+
+extension AuthViewModel: SessionEnding {
+    /// Signs out like the Sign Out button, but throws on failure instead of
+    /// setting `errorMessage`, for callers that must handle it themselves
+    /// (after account deletion, the Profile screen keeps the user on a
+    /// blocking screen until sign-out succeeds).
+    func endSession() throws {
+        errorMessage = nil
+        try firebaseManager.signOut()
+        AnalyticsService.trackEvent("sign_out")
     }
 }

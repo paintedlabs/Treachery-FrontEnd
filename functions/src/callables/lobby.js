@@ -432,6 +432,99 @@ exports.joinGame = onCall(callableOptions, async (request) => {
 });
 
 // ════════════════════════════════════════════════════════════════
+// SHARED: leaveWaitingGame
+// The leave-lobby transaction body, shared by leaveGame and
+// deleteAccount (callables/account.js) so seat removal, seat
+// renumbering and host hand-off have exactly one implementation.
+// ════════════════════════════════════════════════════════════════
+
+/**
+ * Removes `uid` from the waiting lobby `gameId` inside transaction `tx`:
+ * deletes their player doc, renumbers the surviving seats, drops them from
+ * player_ids, and promotes the next seat to host (or deletes the game when
+ * nobody is left). Resolves to leaveGame's response: { action: "left" },
+ * { action: "promoted", newHostId } or { action: "deleted" }. Throws
+ * not-found when the game or the caller's seat is missing, and
+ * failed-precondition when the game is no longer waiting.
+ *
+ * With `requireSeat: false` (deleteAccount), a caller who is on player_ids
+ * or is the host but holds no seat leaves the same way, minus the seat
+ * delete, instead of getting not-found. That way a seatless host still
+ * hands the lobby on rather than leaving host_id on an account nobody can
+ * start it from. not-found then means the lobby holds nothing of theirs.
+ */
+async function leaveWaitingGame(tx, gameId, uid, { requireSeat = true } = {}) {
+  const gameRef = db.doc(`games/${gameId}`);
+  const gameSnap = await tx.get(gameRef);
+
+  if (!gameSnap.exists) throw new HttpsError("not-found", "Game not found.");
+  const game = gameSnap.data();
+
+  if (game.state !== "waiting") {
+    throw new HttpsError("failed-precondition", "Can only leave a game in the waiting state.");
+  }
+
+  // Find the caller's player doc
+  const playersSnap = await tx.get(
+    db.collection(`games/${gameId}/players`).orderBy("order_id")
+  );
+  const allPlayers = playersSnap.docs.map((d) => ({ ref: d.ref, id: d.id, ...d.data() }));
+  const callerPlayer = allPlayers.find((p) => p.user_id === uid);
+
+  if (!callerPlayer) {
+    const isMember = game.host_id === uid || (game.player_ids || []).includes(uid);
+    if (requireSeat || !isMember) {
+      throw new HttpsError("not-found", "You are not in this game.");
+    }
+  }
+
+  // Remove the player doc
+  if (callerPlayer) tx.delete(callerPlayer.ref);
+
+  // Remove from player_ids array
+  const updatedPlayerIds = (game.player_ids || []).filter((id) => id !== uid);
+
+  // Renumber surviving seats 0..n-1 so the next join (order_id = length)
+  // never collides with an existing order_id.
+  const remainingPlayers = allPlayers
+    .filter((p) => p.user_id !== uid)
+    .sort((a, b) => (a.order_id ?? 0) - (b.order_id ?? 0));
+  remainingPlayers.forEach((p, index) => {
+    if (p.order_id !== index) {
+      tx.update(p.ref, { order_id: index });
+    }
+  });
+
+  if (game.host_id === uid) {
+    // Host is leaving
+    if (remainingPlayers.length === 0) {
+      // No one left — delete the game
+      tx.delete(gameRef);
+      return { action: "deleted" };
+    } else {
+      // Promote the next player (first by order_id after renumber)
+      const newHost = remainingPlayers[0];
+      tx.update(gameRef, {
+        host_id: newHost.user_id,
+        player_ids: updatedPlayerIds,
+        last_activity_at: FieldValue.serverTimestamp(),
+      });
+      return { action: "promoted", newHostId: newHost.user_id };
+    }
+  } else {
+    // Non-host leaving — just update player_ids
+    tx.update(gameRef, {
+      player_ids: updatedPlayerIds,
+      last_activity_at: FieldValue.serverTimestamp(),
+    });
+    return { action: "left" };
+  }
+}
+
+// Not a deployed function: index.js lists every deployed name explicitly.
+exports.leaveWaitingGame = leaveWaitingGame;
+
+// ════════════════════════════════════════════════════════════════
 // CLOUD FUNCTION: leaveGame
 // Removes the calling player from a waiting lobby. If host
 // leaves, promotes the next player to host instead of deleting.
@@ -444,70 +537,7 @@ exports.leaveGame = onCall(callableOptions, async (request) => {
   const { gameId } = request.data;
   if (!gameId) throw new HttpsError("invalid-argument", "gameId is required.");
 
-  return db.runTransaction(async (tx) => {
-    const gameRef = db.doc(`games/${gameId}`);
-    const gameSnap = await tx.get(gameRef);
-
-    if (!gameSnap.exists) throw new HttpsError("not-found", "Game not found.");
-    const game = gameSnap.data();
-
-    if (game.state !== "waiting") {
-      throw new HttpsError("failed-precondition", "Can only leave a game in the waiting state.");
-    }
-
-    // Find the caller's player doc
-    const playersSnap = await tx.get(
-      db.collection(`games/${gameId}/players`).orderBy("order_id")
-    );
-    const allPlayers = playersSnap.docs.map((d) => ({ ref: d.ref, id: d.id, ...d.data() }));
-    const callerPlayer = allPlayers.find((p) => p.user_id === uid);
-
-    if (!callerPlayer) {
-      throw new HttpsError("not-found", "You are not in this game.");
-    }
-
-    // Remove the player doc
-    tx.delete(callerPlayer.ref);
-
-    // Remove from player_ids array
-    const updatedPlayerIds = (game.player_ids || []).filter((id) => id !== uid);
-
-    // Renumber surviving seats 0..n-1 so the next join (order_id = length)
-    // never collides with an existing order_id.
-    const remainingPlayers = allPlayers
-      .filter((p) => p.user_id !== uid)
-      .sort((a, b) => (a.order_id ?? 0) - (b.order_id ?? 0));
-    remainingPlayers.forEach((p, index) => {
-      if (p.order_id !== index) {
-        tx.update(p.ref, { order_id: index });
-      }
-    });
-
-    if (game.host_id === uid) {
-      // Host is leaving
-      if (remainingPlayers.length === 0) {
-        // No one left — delete the game
-        tx.delete(gameRef);
-        return { action: "deleted" };
-      } else {
-        // Promote the next player (first by order_id after renumber)
-        const newHost = remainingPlayers[0];
-        tx.update(gameRef, {
-          host_id: newHost.user_id,
-          player_ids: updatedPlayerIds,
-          last_activity_at: FieldValue.serverTimestamp(),
-        });
-        return { action: "promoted", newHostId: newHost.user_id };
-      }
-    } else {
-      // Non-host leaving — just update player_ids
-      tx.update(gameRef, {
-        player_ids: updatedPlayerIds,
-        last_activity_at: FieldValue.serverTimestamp(),
-      });
-      return { action: "left" };
-    }
-  });
+  return db.runTransaction((tx) => leaveWaitingGame(tx, gameId, uid));
 });
 
 // ════════════════════════════════════════════════════════════════

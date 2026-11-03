@@ -3,8 +3,21 @@
 
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const { callableOptions } = require("../config");
-const { db, FieldValue } = require("../firebase");
+const { db, FieldValue, getAuth } = require("../firebase");
 const { privateUserRef } = require("../notifications");
+
+/**
+ * True only when Auth confirms `uid` has no account. Any other lookup
+ * failure is not proof, so the caller carries on as if the account exists.
+ */
+async function isDeletedAccount(uid) {
+  try {
+    await getAuth().getUser(uid);
+    return false;
+  } catch (error) {
+    return error?.code === "auth/user-not-found";
+  }
+}
 
 // ════════════════════════════════════════════════════════════════
 // CLOUD FUNCTION: registerFcmToken
@@ -18,6 +31,16 @@ exports.registerFcmToken = onCall(callableOptions, async (request) => {
   const { token } = request.data;
   if (!token || typeof token !== "string") {
     throw new HttpsError("invalid-argument", "token is required.");
+  }
+
+  // An ID token stays valid for up to an hour after deleteAccount removes
+  // its account. The writes below would then recreate the deleted profile
+  // and store this device's token under it, and nothing would ever clean
+  // that up. Only a missing profile costs the Auth lookup, and a new
+  // account whose profile is not written yet still registers.
+  const profileSnap = await db.doc(`users/${uid}`).get();
+  if (!profileSnap.exists && (await isDeletedAccount(uid))) {
+    throw new HttpsError("unauthenticated", "This account has been deleted.");
   }
 
   // Store on owner-only private doc; strip any leftover public field.
