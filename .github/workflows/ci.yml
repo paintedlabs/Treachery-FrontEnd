@@ -61,12 +61,19 @@ jobs:
       - run: npm run lint
       # The unit suite was previously not run in CI at all — it gated nothing.
       - run: npm test
+      # The post-deploy smoke check derives its callable list from the deploy
+      # manifest, and it only runs after a real deploy. Exercise the
+      # derivation here so a change that breaks it fails review, not the
+      # next staging or production deploy.
+      - name: Smoke-check callable list resolves
+        run: ../scripts/smoke-callables.sh --list
 
   # ── Cloud Functions integration ──────────────────────
-  # Drives the REAL exported callables in functions/index.js against the
-  # emulator with genuinely authenticated users. The unit suite above only
-  # exercises re-implementations of the logic copied into the test file,
-  # so it cannot catch a bug in the shipped functions themselves.
+  # Drives the REAL exported callables (wired in functions/index.js,
+  # implemented in functions/src/callables/) against the emulator with
+  # genuinely authenticated users. The unit suite above imports the pure
+  # helpers directly, but logic inside a callable body (the ELO update, the
+  # die roll, the life clamp) is only exercised here.
   functions-integration:
     name: Cloud Functions (integration)
     runs-on: ubuntu-latest

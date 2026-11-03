@@ -15,18 +15,36 @@
 # a function body, so it is side-effect free and needs no credentials.
 #
 # Usage: scripts/smoke-callables.sh <project-id> <origin> [region]
+#        scripts/smoke-callables.sh --list   (print the callables; no network)
+#
+# Needs functions/node_modules (`npm ci` in functions/), which every caller
+# already installs because `firebase deploy` needs it too. CI runs --list on
+# every pull request, so a change that breaks the derivation fails review
+# instead of failing the next deploy.
 set -euo pipefail
 
-PROJECT="${1:?usage: smoke-callables.sh <project-id> <origin> [region]}"
-ORIGIN="${2:?usage: smoke-callables.sh <project-id> <origin> [region]}"
-REGION="${3:-us-central1}"
+LIST_ONLY=0
+if [ "${1:-}" = "--list" ]; then
+  LIST_ONLY=1
+else
+  PROJECT="${1:?usage: smoke-callables.sh <project-id> <origin> [region]}"
+  ORIGIN="${2:?usage: smoke-callables.sh <project-id> <origin> [region]}"
+  REGION="${3:-us-central1}"
+fi
 
-SOURCE_FILE="$(dirname "$0")/../functions/index.js"
+FUNCTIONS_DIR="$(cd "$(dirname "$0")/../functions" && pwd)"
 
-# Derive the list from source so a new callable is covered automatically and
-# this can't rot into a stale hardcoded list. Only `onCall` exports are
-# public; onSchedule/onDocument* triggers are correctly NOT publicly
-# invokable and would fail this check by design.
+# Derive the list from the deploy manifest so a new callable is covered
+# automatically and this can't rot into a stale hardcoded list. Loading
+# functions/index.js is how firebase-tools itself discovers what to deploy:
+# every export carries an __endpoint, and only callableTrigger endpoints are
+# public. onSchedule/onDocument* triggers are correctly NOT publicly
+# invokable and would fail this check by design. Reading the manifest rather
+# than grepping source means it does not matter which file defines a
+# callable or how its export line is written; a source grep for
+# `exports.X = onCall` silently matched nothing once the callables moved
+# into functions/src/. Loading index.js runs initializeApp(), which makes no
+# network call; GCLOUD_PROJECT only satisfies the Admin SDK's project lookup.
 # while-read rather than mapfile: mapfile is bash 4+, and stock macOS ships
 # bash 3.2, so a developer running this locally would just get "command not
 # found".
@@ -34,14 +52,23 @@ CALLABLES=()
 while IFS= read -r fn; do
   [ -n "$fn" ] && CALLABLES+=("$fn")
 done < <(
-  grep -oE '^exports\.[A-Za-z0-9_]+[[:space:]]*=[[:space:]]*onCall' "$SOURCE_FILE" \
-    | sed -E 's/^exports\.//; s/[[:space:]]*=[[:space:]]*onCall$//' \
-    | sort -u
+  cd "$FUNCTIONS_DIR" && GCLOUD_PROJECT="${PROJECT:-smoke-list}" node -e '
+    const exported = require("./index.js");
+    for (const [name, fn] of Object.entries(exported)) {
+      if (fn && fn.__endpoint && fn.__endpoint.callableTrigger) console.log(name);
+    }
+  ' | sort -u
 )
 
 if [ "${#CALLABLES[@]}" -eq 0 ]; then
-  echo "FAIL: found no onCall exports in $SOURCE_FILE — is the parse broken?" >&2
+  echo "FAIL: found no callable endpoints in $FUNCTIONS_DIR/index.js." >&2
+  echo "Run 'npm ci' in functions/ and check that index.js loads." >&2
   exit 1
+fi
+
+if [ "$LIST_ONLY" -eq 1 ]; then
+  printf '%s\n' "${CALLABLES[@]}"
+  exit 0
 fi
 
 echo "Smoke-testing ${#CALLABLES[@]} callables in $PROJECT ($REGION) from origin $ORIGIN"
