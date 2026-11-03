@@ -5,11 +5,17 @@
 //  Created by Luke Solomon on 3/14/26.
 //
 
+import Accessibility
 import SwiftUI
 
 struct ProfileView: View {
     @EnvironmentObject var authViewModel: AuthViewModel
-    @StateObject private var viewModel = ProfileViewModel()
+    @StateObject private var viewModel: ProfileViewModel
+
+    /// `viewModel` is built once, the first time this view is installed.
+    init(viewModel: @autoclosure @escaping () -> ProfileViewModel) {
+        _viewModel = StateObject(wrappedValue: viewModel())
+    }
 
     var body: some View {
         ZStack {
@@ -234,10 +240,31 @@ struct ProfileView: View {
                     .frame(maxWidth: .infinity)
                     .mtgCardFrame(borderColor: Color.mtgError.opacity(0.5))
                     .accessibilityLabel("Sign out of your account")
+                    .disabled(isAccountDeletionUnderway)
+
+                    // Delete account: last, and set apart from the routine actions
+                    DeleteAccountSection(
+                        isEnabled: viewModel.canRequestAccountDeletion,
+                        failureMessage: accountDeletionFailure?.message
+                    ) {
+                        viewModel.requestAccountDeletion()
+                    }
+                    .padding(.top, 16)
                 }
                 .padding()
             }
+            .accessibilityHidden(isAccountDeletionUnderway)
         }
+        .overlay {
+            if isAccountDeletionUnderway {
+                AccountDeletionOverlay(state: viewModel.accountDeletionState) {
+                    viewModel.retrySignOut()
+                }
+            }
+        }
+        // No other tab while the account is being deleted: a lobby created
+        // or a friend added meanwhile would outlive the account.
+        .toolbarVisibility(isAccountDeletionUnderway ? .hidden : .automatic, for: .tabBar)
         .navigationBarTitleDisplayMode(.inline)
         .toolbarColorScheme(.dark, for: .navigationBar)
         .onAppear { AnalyticsService.trackScreen("Profile") }
@@ -248,20 +275,244 @@ struct ProfileView: View {
                         Task { await viewModel.saveName() }
                     }
                     .foregroundStyle(Color.mtgGold)
-                    .disabled(viewModel.editedName.isEmpty || viewModel.isSaving)
+                    .disabled(viewModel.editedName.isEmpty || viewModel.isSaving || isAccountDeletionUnderway)
                 } else {
                     Button("Edit") {
                         viewModel.startEditing()
                     }
                     .foregroundStyle(Color.mtgGold)
-                    .disabled(viewModel.user == nil)
+                    .disabled(viewModel.user == nil || isAccountDeletionUnderway)
                 }
             }
+        }
+        .confirmationDialog(
+            "Delete Account?",
+            isPresented: isConfirmingAccountDeletion,
+            titleVisibility: .visible
+        ) {
+            Button("Delete Account", role: .destructive) {
+                Task { await viewModel.deleteAccount() }
+            }
+            Button("Cancel", role: .cancel) {
+                viewModel.cancelAccountDeletion()
+            }
+        } message: {
+            Text("""
+                This permanently deletes your account, including your profile, friends list and stats. \
+                Your name in past games will be replaced with \u{201C}Deleted player\u{201D}. \
+                This cannot be undone.
+                """)
+        }
+        // Only for `.failed`: once the server has deleted the account, the
+        // overlay above takes over and offers nothing but signing out.
+        .alert(
+            "Couldn't Delete Account",
+            isPresented: isShowingAccountDeletionFailure,
+            presenting: accountDeletionFailure
+        ) { failure in
+            if failure.isRetryable {
+                Button("Try Again", role: .destructive) {
+                    Task { await viewModel.deleteAccount() }
+                }
+                Button("Cancel", role: .cancel) {
+                    viewModel.cancelAccountDeletion()
+                }
+            } else {
+                Button("OK", role: .cancel) {
+                    viewModel.cancelAccountDeletion()
+                }
+            }
+        } message: { failure in
+            // Verbatim: for an in-progress game this is the server's own sentence.
+            Text(verbatim: failure.message)
         }
         .task {
             guard let userId = authViewModel.currentUserId else { return }
             await viewModel.loadData(userId: userId)
         }
+    }
+
+    // MARK: - Account Deletion
+
+    private var isAccountDeletionUnderway: Bool {
+        viewModel.accountDeletionState.isUnderway
+    }
+
+    /// Drives the confirmation from the view model's state. Dismissal only
+    /// cancels; it never interrupts a deletion already in flight.
+    private var isConfirmingAccountDeletion: Binding<Bool> {
+        Binding(
+            get: { viewModel.accountDeletionState == .confirming },
+            set: { isPresented in
+                if !isPresented { viewModel.cancelAccountDeletion() }
+            }
+        )
+    }
+
+    private var accountDeletionFailure: (message: String, isRetryable: Bool)? {
+        guard case let .failed(message, isRetryable) = viewModel.accountDeletionState else { return nil }
+        return (message, isRetryable)
+    }
+
+    private var isShowingAccountDeletionFailure: Binding<Bool> {
+        Binding(
+            get: { accountDeletionFailure != nil },
+            set: { isPresented in
+                if !isPresented { viewModel.cancelAccountDeletion() }
+            }
+        )
+    }
+}
+
+// MARK: - Delete Account Section
+
+/// The account-deletion entry point: destructive and visually distinct from
+/// Sign Out. Below it is a line on what deletion removes or, after a failed
+/// attempt, why it failed. The alert says that too, but this line stays on
+/// screen even if the alert never appears (a fast failure can arrive while
+/// the confirmation is still dismissing).
+///
+/// A red fill with white text rather than the red-on-surface text Sign Out
+/// uses: `mtgError` text on `mtgSurface` measures about 3.4:1, below the
+/// 4.5:1 text minimum; white on `mtgError` is about 5.2:1.
+private struct DeleteAccountSection: View {
+    let isEnabled: Bool
+    let failureMessage: String?
+    let action: () -> Void
+
+    var body: some View {
+        VStack(spacing: 8) {
+            Button(role: .destructive, action: action) {
+                Text("Delete Account")
+                    .fontWeight(.semibold)
+                    .multilineTextAlignment(.center)
+                    .foregroundStyle(.white)
+                    .frame(maxWidth: .infinity, minHeight: 44)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 6)
+                    .background(Color.mtgError, in: RoundedRectangle(cornerRadius: 12))
+                    .contentShape(RoundedRectangle(cornerRadius: 12))
+            }
+            .disabled(!isEnabled)
+            .opacity(isEnabled ? 1 : 0.7)
+            .accessibilityHint("Asks you to confirm before anything is deleted.")
+
+            if let failureMessage {
+                Label {
+                    // Verbatim: for an in-progress game this is the server's own sentence.
+                    Text(verbatim: failureMessage)
+                } icon: {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .foregroundStyle(Color.mtgError)
+                }
+                .font(.footnote)
+                .foregroundStyle(Color.mtgTextPrimary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .accessibilityElement(children: .combine)
+            } else {
+                Text("Permanently deletes your account, profile, friends list and stats.")
+                    .font(.footnote)
+                    .foregroundStyle(Color.mtgTextSecondary)
+                    .multilineTextAlignment(.center)
+                    .frame(maxWidth: .infinity)
+            }
+        }
+    }
+}
+
+// MARK: - Account Deletion Overlay
+
+/// Covers the Profile screen from the moment a deletion is confirmed until
+/// the signed-out screen replaces it, so nothing else can be started while
+/// the request runs. If the account is gone but this device could not sign
+/// out, it stays up with signing out as the only way forward.
+///
+/// Drawn in place rather than presented, so it can't be swiped away or lost
+/// to a presentation that is still dismissing.
+private struct AccountDeletionOverlay: View {
+    let state: AccountDeletionState
+    let retrySignOut: () -> Void
+
+    var body: some View {
+        ZStack {
+            Color.mtgBackground.opacity(0.92)
+                .ignoresSafeArea()
+            ViewThatFits(in: .vertical) {
+                card
+                ScrollView { card }
+            }
+        }
+        // Swallows every touch meant for the screen underneath.
+        .contentShape(Rectangle())
+        .accessibilityElement(children: .contain)
+        .accessibilityAddTraits(.isModal)
+        .onAppear { announce(state) }
+        .onChange(of: state) { _, newState in announce(newState) }
+    }
+
+    private var card: some View {
+        VStack(spacing: 16) {
+            if state == .signOutFailed {
+                signOutFailedContent
+            } else {
+                progressContent
+            }
+        }
+        .padding(24)
+        .frame(maxWidth: 420)
+        .mtgCardFrame()
+        .padding(24)
+    }
+
+    private var progressContent: some View {
+        VStack(spacing: 16) {
+            ProgressView()
+                .controlSize(.large)
+                .tint(Color.mtgGold)
+            Text(state == .deleted ? "Signing Out\u{2026}" : "Deleting Your Account\u{2026}")
+                .font(.headline)
+                .foregroundStyle(Color.mtgTextPrimary)
+                .multilineTextAlignment(.center)
+        }
+        .accessibilityElement(children: .combine)
+    }
+
+    @ViewBuilder private var signOutFailedContent: some View {
+        Image(systemName: "exclamationmark.triangle.fill")
+            .font(.largeTitle)
+            .foregroundStyle(Color.mtgError)
+            .accessibilityHidden(true)
+        Text("Couldn't Finish Signing Out")
+            .font(.headline)
+            .foregroundStyle(Color.mtgTextPrimary)
+            .multilineTextAlignment(.center)
+            .accessibilityAddTraits(.isHeader)
+        Text("Your account was deleted, but this device is still signed in to it. Sign out to finish.")
+            .font(.body)
+            .foregroundStyle(Color.mtgTextSecondary)
+            .multilineTextAlignment(.center)
+            .fixedSize(horizontal: false, vertical: true)
+        Button("Sign Out", action: retrySignOut)
+            .buttonStyle(MtgPrimaryButtonStyle())
+            .accessibilityHint("Signs this device out of the deleted account.")
+    }
+
+    /// VoiceOver focus doesn't follow an overlay drawn in place, so say what
+    /// happened. `.deleted` needs nothing: the signed-out screen follows at once.
+    private func announce(_ state: AccountDeletionState) {
+        let announcement: String
+        switch state {
+        case .deleting:
+            announcement = String(localized: "Deleting your account", comment: "VoiceOver announcement while the account is being deleted")
+        case .signOutFailed:
+            announcement = String(
+                localized: "Couldn't finish signing out. Your account was deleted, but this device is still signed in to it.",
+                comment: "VoiceOver announcement when the account was deleted but this device couldn't sign out"
+            )
+        case .idle, .confirming, .deleted, .failed:
+            return
+        }
+        AccessibilityNotification.Announcement(announcement).post()
     }
 }
 
@@ -310,9 +561,10 @@ private struct ProfileRow<Content: View>: View {
 
 #if DEBUG
 #Preview {
+    let authViewModel = AuthViewModel()
     NavigationStack {
-        ProfileView()
+        ProfileView(viewModel: ProfileViewModel(session: authViewModel))
     }
-    .environmentObject(AuthViewModel())
+    .environmentObject(authViewModel)
 }
 #endif

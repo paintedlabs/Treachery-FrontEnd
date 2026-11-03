@@ -21,6 +21,21 @@ struct PhenomenonResult {
     let secondaryPlaneId: String? // For Spatial Merging
 }
 
+/// The `deleteAccount` failures the app tells apart. Every other failure
+/// (network, server) propagates unchanged and is treated as retryable.
+enum AccountDeletionError: Error, Equatable {
+    /// The server refused because the user is in a game that is still in
+    /// progress. `message` is the server's sentence telling them they can delete
+    /// the account once that game ends; show it verbatim.
+    case inProgressGame(message: String)
+    /// The request ran out of time, on the server or on the way there. The
+    /// server may have finished anyway; deletion is idempotent, so retrying
+    /// completes it either way.
+    case timedOut
+    /// The server answered with something other than `{ success: true }`.
+    case unexpectedResponse
+}
+
 struct CloudFunctions: CloudFunctionsProtocol {
     private let functions = Functions.functions()
 
@@ -189,5 +204,52 @@ struct CloudFunctions: CloudFunctionsProtocol {
     func removeFriend(friendId: String) async throws {
         let callable = functions.httpsCallable("removeFriend")
         _ = try await callable.call(["friendId": friendId])
+    }
+
+    // MARK: - Account
+
+    func deleteAccount() async throws {
+        // The SDK's default 70 s timeout is kept on purpose: it outlasts the
+        // function's own 60 s default, so the app normally hears the server's
+        // outcome instead of giving up while the server is still working.
+        let callable = functions.httpsCallable("deleteAccount")
+        let result: HTTPSCallableResult
+        do {
+            // No arguments: send `{}`, as the contract specifies, rather than null.
+            result = try await callable.call([String: Any]())
+        } catch {
+            throw AccountDeletionError(callableError: error) ?? error
+        }
+        try Self.validateDeleteAccountResponse(result.data)
+    }
+
+    /// Accepts only an explicit `{ success: true }`, the one answer that means
+    /// the account is gone, and throws `AccountDeletionError.unexpectedResponse`
+    /// for anything else. The caller signs out on success, which must never
+    /// happen for an account that still exists.
+    static func validateDeleteAccountResponse(_ data: Any?) throws {
+        guard let payload = data as? [String: Any], payload["success"] as? Bool == true else {
+            throw AccountDeletionError.unexpectedResponse
+        }
+    }
+}
+
+extension AccountDeletionError {
+    /// Recognizes the callable errors the app tells apart: the server's
+    /// refusal during a live game (`failed-precondition`, whose localized
+    /// description is the server's message) and a timeout
+    /// (`deadline-exceeded`, which the SDK also reports when the request
+    /// itself times out). Returns nil for any other error.
+    init?(callableError error: Error) {
+        let nsError = error as NSError
+        guard nsError.domain == FunctionsErrorDomain else { return nil }
+        switch FunctionsErrorCode(rawValue: nsError.code) {
+        case .failedPrecondition:
+            self = .inProgressGame(message: nsError.localizedDescription)
+        case .deadlineExceeded:
+            self = .timedOut
+        default:
+            return nil
+        }
     }
 }
