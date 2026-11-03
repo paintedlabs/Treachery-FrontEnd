@@ -148,7 +148,10 @@ describe("games/{gameId}", () => {
       );
     });
 
-    for (const life of [35, 45, 55, 60]) {
+    // All nine values v1.1.0 offers. The create path shares isValidStartingLife
+    // with the host-update path; listing every value here keeps the create
+    // bounds pinned on their own if the two are ever split again.
+    for (const life of [20, 25, 30, 35, 40, 45, 50, 55, 60]) {
       it(`still lets a shipped v1.1.0 build create a game with ${life} starting life`, async () => {
         const db = await authedDb(OUTSIDER);
         await assertSucceeds(
@@ -250,6 +253,8 @@ describe("games/{gameId}", () => {
 
     // updateGameSettings accepts every value the create screens offer (20 to
     // 60 in steps of 5), and a host's direct lobby write takes the same set.
+    // 40 is left out: the fixture already holds it, so writing it would
+    // change no key and never reach isValidStartingLife.
     for (const life of [20, 25, 30, 35, 45, 50, 55, 60]) {
       it(`lets the host set starting_life to ${life}`, async () => {
         const db = await authedDb(HOST);
