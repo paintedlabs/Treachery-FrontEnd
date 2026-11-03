@@ -90,3 +90,6 @@ TreacheryAndroid/.idea/
 TreacheryAndroid/captures/
 TreacheryAndroid/app/google-services.json
 TreacheryAndroid/.cxx/
+
+# graphify knowledge graph output (regenerable)
+graphify-out/
