@@ -125,14 +125,16 @@ describe('updateGameSettings — gameMode', () => {
 });
 
 describe('updateGameSettings — startingLife', () => {
-  for (const bad of [35, 0, 41, -20]) {
-    it(`rejects the unsupported value ${bad}`, async () => {
+  for (const bad of [0, 15, 41, 65, -20, 40.5, 'abc']) {
+    it(`rejects the unsupported value ${JSON.stringify(bad)}`, async () => {
       const users = await h.getUsers(3);
       const game = await h.seedGame({ users, startingLife: 40 });
-      await h.expectHttpsError(
+      const err = await h.expectHttpsError(
         game.host.call('updateGameSettings', { gameId: game.gameId, startingLife: bad }),
         'invalid-argument'
       );
+      // The client SDK appends the HTTP status, e.g. "... [400]".
+      assert.match(err.message, /^Invalid starting life value\./);
       const g = await h.getGame(game.gameId);
       assert.equal(g.starting_life, 40);
     });
@@ -144,7 +146,7 @@ describe('updateGameSettings — startingLife', () => {
   // players subcollection at ~1487. Firestore transactions require every read
   // to precede every write, so the SDK throws and the whole transaction is
   // rolled back: passing startingLife ALWAYS fails with `internal`.
-  for (const life of [20, 25, 30, 50]) {
+  for (const life of [20, 25, 30, 35, 45, 50, 55, 60]) {
     it(
       `sets starting_life to ${life} and re-bases every player's life_total`,
       async () => {

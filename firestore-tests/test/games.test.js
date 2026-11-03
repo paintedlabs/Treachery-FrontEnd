@@ -135,7 +135,9 @@ describe("games/{gameId}", () => {
     // createGame callable) with max_players 12 for non-treachery modes and any
     // 20-60 life in steps of 5. Tightening these to the callable's bounds
     // returned PERMISSION_DENIED on every installed binary and killed
-    // Planechase / Life Tracker creation outright.
+    // Planechase / Life Tracker creation outright. createGame has since been
+    // widened to the same 20-60 life set, so only max_players is still wider
+    // here than the callable.
     it("still lets a shipped v1.1.0 build create a 12-player non-treachery game", async () => {
       const db = await authedDb(OUTSIDER);
       await assertSucceeds(
@@ -153,6 +155,18 @@ describe("games/{gameId}", () => {
           setDoc(
             doc(db, "games", `game_legacy_life_${life}`),
             gameDoc(OUTSIDER, { starting_life: life })
+          )
+        );
+      });
+    }
+
+    for (const bad of [0, 15, 41, 65, -20, 40.5, "40"]) {
+      it(`stops a user from creating a game with ${JSON.stringify(bad)} starting life`, async () => {
+        const db = await authedDb(OUTSIDER);
+        await assertFails(
+          setDoc(
+            doc(db, "games", "game_bad_life"),
+            gameDoc(OUTSIDER, { starting_life: bad })
           )
         );
       });
@@ -233,6 +247,26 @@ describe("games/{gameId}", () => {
         updateDoc(doc(db, "games", WAITING), { starting_life: 99999 })
       );
     });
+
+    // updateGameSettings accepts every value the create screens offer (20 to
+    // 60 in steps of 5), and a host's direct lobby write takes the same set.
+    for (const life of [20, 25, 30, 35, 45, 50, 55, 60]) {
+      it(`lets the host set starting_life to ${life}`, async () => {
+        const db = await authedDb(HOST);
+        await assertSucceeds(
+          updateDoc(doc(db, "games", WAITING), { starting_life: life })
+        );
+      });
+    }
+
+    for (const bad of [0, 15, 41, 65, -20, 40.5, "40"]) {
+      it(`stops the host from setting starting_life to ${JSON.stringify(bad)}`, async () => {
+        const db = await authedDb(HOST);
+        await assertFails(
+          updateDoc(doc(db, "games", WAITING), { starting_life: bad })
+        );
+      });
+    }
   });
 
   // ─── update: joining ─────────────────────────────────────────────

@@ -34,7 +34,7 @@ const {
   SPATIAL_MERGING_ID,
 } = require("../src/config");
 const { getRoleDistribution, shuffle, checkWinConditions } = require("../src/rules");
-const { isValidRarity, parseIntegerArg } = require("../src/validation");
+const { isValidRarity, parseIntegerArg, parseStartingLife } = require("../src/validation");
 
 // ─── Test Helpers ────────────────────────────────────────────────
 
@@ -1494,11 +1494,6 @@ suite("Planechase — Chaos Ability Data Integrity", () => {
 // parseIntegerArg (src/validation.js) guards untrusted callable payloads: a
 // value that is not an integer has to fail closed instead of slipping past a
 // range check that is false on both sides (NaN).
-//
-// Still a local copy: production has no named constant for this allowlist; it
-// is written inline in createGame and updateGameSettings
-// (src/callables/lobby.js).
-const STARTING_LIFE_VALUES = [20, 25, 30, 40, 50];
 
 suite("Callable Argument Validation — parseIntegerArg", () => {
   test("accepts an in-range integer", () => {
@@ -1570,25 +1565,55 @@ suite("Callable Argument Validation — parseIntegerArg", () => {
     assert.strictEqual(parseIntegerArg(0), 0);
     assert.strictEqual(parseIntegerArg(1000), 1000);
   });
+});
 
-  test("startingLife allowlist accepts only the supported values", () => {
+// parseStartingLife (src/validation.js) is the one starting-life check that
+// createGame and updateGameSettings share. This table is the SPEC, kept as a
+// literal rather than read from production: every value the create screens
+// (iOS, web, Android) offer, 20 to 60 in steps of 5.
+const STARTING_LIFE_VALUES = [20, 25, 30, 35, 40, 45, 50, 55, 60];
+
+suite("Callable Argument Validation — parseStartingLife", () => {
+  test("REGRESSION: accepts every value the create screens offer, including 35, 45, 55 and 60", () => {
+    // The callables used to accept only {20, 25, 30, 40, 50}, so creating a
+    // game at 35, 45, 55 or 60 failed on every client.
     for (const life of STARTING_LIFE_VALUES) {
-      const sl = parseIntegerArg(life);
-      assert.ok(
-        sl !== null && STARTING_LIFE_VALUES.includes(sl),
-        `Expected ${life} to be accepted`
+      assert.strictEqual(parseStartingLife(life), life, `Expected ${life} to be accepted`);
+    }
+  });
+
+  test("rejects every other integer from -100 to 200", () => {
+    for (let n = -100; n <= 200; n++) {
+      if (STARTING_LIFE_VALUES.includes(n)) continue;
+      assert.strictEqual(parseStartingLife(n), null, `Expected ${n} to be rejected`);
+    }
+  });
+
+  test("rejects non-integers, NaN and infinities", () => {
+    for (const bad of [40.5, 42.5, "40.5", NaN, Infinity, -Infinity]) {
+      assert.strictEqual(
+        parseStartingLife(bad),
+        null,
+        `Expected ${JSON.stringify(bad)} to be rejected`
       );
     }
   });
 
-  test("startingLife allowlist rejects NaN, floats, and unsupported values", () => {
-    for (const bad of ["abc", 40.5, 35, 0, -20, ""]) {
-      const sl = parseIntegerArg(bad);
-      assert.ok(
-        sl === null || !STARTING_LIFE_VALUES.includes(sl),
-        `Expected ${JSON.stringify(bad)} to be rejected as a starting life`
+  test("rejects non-numeric types and blank strings", () => {
+    for (const bad of [null, undefined, true, false, {}, [], [40], "abc", "", "   "]) {
+      assert.strictEqual(
+        parseStartingLife(bad),
+        null,
+        `Expected ${JSON.stringify(bad)} to be rejected`
       );
     }
+  });
+
+  test("coerces a well-formed numeric string, like parseIntegerArg", () => {
+    assert.strictEqual(parseStartingLife("45"), 45);
+    assert.strictEqual(parseStartingLife(" 60 "), 60);
+    assert.strictEqual(parseStartingLife("41"), null);
+    assert.strictEqual(parseStartingLife("65"), null);
   });
 });
 
