@@ -202,10 +202,14 @@ exports.onGameFinished = onDocumentUpdated("games/{gameId}", async (event) => {
     eloChanges[loserId] = Math.round(eloChanges[loserId] / winnerUserIds.length);
   }
 
-  // Update user docs atomically
+  // Update user docs atomically. Players without a profile (a deleted
+  // account) still count as opponents above but get no write here:
+  // batch.update on a missing doc fails the whole batch, which would cancel
+  // the ELO update for every other player in the game.
+  const usersWithProfiles = allUserIds.filter((uid) => userDocs[uid]);
   const batch = db.batch();
 
-  for (const uid of allUserIds) {
+  for (const uid of usersWithProfiles) {
     const userRef = db.doc(`users/${uid}`);
     const currentElo = (userDocs[uid]?.elo) || 1500;
     const newElo = Math.max(0, currentElo + eloChanges[uid]);
@@ -233,5 +237,5 @@ exports.onGameFinished = onDocumentUpdated("games/{gameId}", async (event) => {
   }
 
   await batch.commit();
-  console.log(`onGameFinished: Updated ELO for ${allUserIds.length} players in game ${gameId}`);
+  console.log(`onGameFinished: Updated ELO for ${usersWithProfiles.length} players in game ${gameId}`);
 });

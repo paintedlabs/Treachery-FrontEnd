@@ -21,6 +21,7 @@ const assert = require('node:assert/strict');
 const crypto = require('node:crypto');
 
 const { initializeApp: initAdminApp } = require('firebase-admin/app');
+const { getAuth: getAdminAuth } = require('firebase-admin/auth');
 const { getFirestore, FieldValue } = require('firebase-admin/firestore');
 
 const { initializeApp: initClientApp, deleteApp } = require('firebase/app');
@@ -47,6 +48,11 @@ const FUNCTIONS_HOST = process.env.INTEGRATION_FUNCTIONS_HOST || '127.0.0.1';
 
 if (!process.env.FIRESTORE_EMULATOR_HOST) {
   process.env.FIRESTORE_EMULATOR_HOST = '127.0.0.1:8288';
+}
+// The Admin Auth client behind getAuthUser() reads this; unset, it would call
+// production Auth instead of the emulator.
+if (!process.env.FIREBASE_AUTH_EMULATOR_HOST) {
+  process.env.FIREBASE_AUTH_EMULATOR_HOST = '127.0.0.1:9299';
 }
 
 initAdminApp({ projectId: PROJECT_ID });
@@ -250,6 +256,16 @@ function patchGame(gameId, patch) {
   return db.doc(`games/${gameId}`).update(patch);
 }
 
+/** The Firebase Auth account for `uid`, or null when there is none. */
+async function getAuthUser(uid) {
+  try {
+    return await getAdminAuth().getUser(uid);
+  } catch (e) {
+    if (e.code === 'auth/user-not-found') return null;
+    throw e;
+  }
+}
+
 // ── Assertions ──────────────────────────────────────────────────
 
 /**
@@ -321,6 +337,7 @@ module.exports = {
   getPlayer,
   patchPlayer,
   patchGame,
+  getAuthUser,
   expectHttpsError,
   roleCounts,
   shutdown,
