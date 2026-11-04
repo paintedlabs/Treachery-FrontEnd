@@ -90,6 +90,13 @@ struct GameBoardView: View {
             // Taps still waiting out their debounce would go with the board.
             viewModel.sendPendingLifeChanges()
         }
+        .onChange(of: viewModel.errorMessage) { _, message in
+            // An action that fails (a roll, a forfeit, an ability) says so in
+            // the controls pinned below the players, away from where the
+            // player is looking or VoiceOver is reading: read it out.
+            guard let message else { return }
+            AccessibilityNotification.Announcement(message).post()
+        }
         .onChange(of: viewModel.lifeChangeFailures) { old, new in
             // A failed change can put a total back with no other sign, and
             // the banner is away from the rows: read out each new one.
