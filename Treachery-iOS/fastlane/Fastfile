@@ -208,7 +208,10 @@ platform :ios do
       force: true,
       precheck_include_in_app_purchases: false,
       submission_information: {
-        add_id_info_uses_idfa: false
+        add_id_info_uses_idfa: false,
+        # The app only uses OS and Firebase TLS, which is exempt. Same answer as
+        # INFOPLIST_KEY_ITSAppUsesNonExemptEncryption in the target settings.
+        export_compliance_uses_encryption: false
       }
     )
   end
