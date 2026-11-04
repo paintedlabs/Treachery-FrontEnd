@@ -28,7 +28,7 @@ ios-test:
 	cd Treachery-iOS && xcodebuild test \
 		-project Treachery-iOS.xcodeproj \
 		-scheme Treachery-iOS \
-		-destination 'platform=iOS Simulator,name=iPhone 16,OS=latest' \
+		-destination 'platform=iOS Simulator,name=iPhone 17,OS=latest' \
 		-only-testing:Treachery-iOSTests \
 		-enableCodeCoverage YES \
 		CODE_SIGNING_ALLOWED=NO \
@@ -41,7 +41,7 @@ ios-build:
 	cd Treachery-iOS && xcodebuild build \
 		-project Treachery-iOS.xcodeproj \
 		-scheme Treachery-iOS \
-		-destination 'platform=iOS Simulator,name=iPhone 16,OS=latest' \
+		-destination 'platform=iOS Simulator,name=iPhone 17,OS=latest' \
 		CODE_SIGNING_ALLOWED=NO \
 		| xcpretty --color && exit $${PIPESTATUS[0]}
 

@@ -8,11 +8,13 @@
 
 # Devices to capture (App Store requires specific display sizes). The app is
 # iPhone-only (TARGETED_DEVICE_FAMILY = 1), so App Store Connect needs no iPad
-# screenshots.
+# screenshots. Each name must be a simulator the installed Xcode has
+# (`xcrun simctl list devices available`): snapshot stops before building on
+# a name it can't find.
 devices([
-  "iPhone 16 Pro Max",   # 6.9" — required for App Store
-  "iPhone 16 Pro",       # 6.3"
-  "iPhone 16"            # 6.1"
+  "iPhone 17 Pro Max",   # 6.9" — required for App Store
+  "iPhone 17 Pro",       # 6.3"
+  "iPhone 17e"           # 6.1"
 ])
 
 # Languages / locales

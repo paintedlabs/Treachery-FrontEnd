@@ -22,7 +22,7 @@ platform :ios do
     run_tests(
       project: XCODEPROJ,
       scheme: SCHEME,
-      devices: ["iPhone 16"],
+      devices: ["iPhone 17"],
       code_coverage: true,
       result_bundle: true,
       output_directory: "./build/test_output",
