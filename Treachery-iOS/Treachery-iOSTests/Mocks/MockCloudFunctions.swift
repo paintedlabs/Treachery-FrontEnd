@@ -19,6 +19,11 @@ final class MockCloudFunctions: CloudFunctionsProtocol {
     /// so a test can act while one is in flight.
     var startGameGate: CallGate?
     var leaveGameGate: CallGate?
+    var adjustLifeGate: CallGate?
+
+    /// What adjustLife answers with as the server's new total. Read when the
+    /// call returns, so a test can set it while the call is held.
+    var adjustLifeNewLife: Int?
 
     // Call tracking
     var createGameCalls: [(gameMode: String, maxPlayers: Int, startingLife: Int, maxTraitorRarity: String?)] = []
@@ -60,9 +65,15 @@ final class MockCloudFunctions: CloudFunctionsProtocol {
         startGameCalls.append(gameId)
     }
 
-    func adjustLife(gameId: String, playerId: String, amount: Int) async throws {
+    /// On the main actor, where the tests read the call log: the board sends
+    /// each player's changes separately, so calls can overlap and would
+    /// otherwise append to it from several threads at once.
+    @MainActor
+    func adjustLife(gameId: String, playerId: String, amount: Int) async throws -> Int? {
+        if let adjustLifeGate { await adjustLifeGate.hold() }
         if let error = errorToThrow { throw error }
         adjustLifeCalls.append((gameId, playerId, amount))
+        return adjustLifeNewLife
     }
 
     func eliminatePlayer(gameId: String) async throws {

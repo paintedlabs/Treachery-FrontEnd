@@ -282,6 +282,10 @@ struct GameBoardView: View {
         .onAppear {
             viewModel.currentUserId = authViewModel.currentUserId
         }
+        .onDisappear {
+            // Taps still waiting out their debounce would go with the board.
+            viewModel.sendPendingLifeChanges()
+        }
         .onChange(of: viewModel.isGameFinished) { _, finished in
             if finished {
                 navigationPath.append(AppDestination.gameOver(gameId: viewModel.gameId))

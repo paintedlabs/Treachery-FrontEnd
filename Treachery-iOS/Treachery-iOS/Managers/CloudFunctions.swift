@@ -134,13 +134,16 @@ struct CloudFunctions: CloudFunctionsProtocol {
         }
     }
 
-    func adjustLife(gameId: String, playerId: String, amount: Int) async throws {
+    /// Returns the `newLife` adjustLife answers with. A response without it
+    /// still means the change was applied, so it isn't treated as a failure.
+    func adjustLife(gameId: String, playerId: String, amount: Int) async throws -> Int? {
         let callable = functions.httpsCallable("adjustLife")
-        _ = try await callable.call([
+        let result = try await callable.call([
             "gameId": gameId,
             "playerId": playerId,
             "amount": amount,
         ])
+        return (result.data as? [String: Any])?["newLife"] as? Int
     }
 
     func eliminatePlayer(gameId: String) async throws {

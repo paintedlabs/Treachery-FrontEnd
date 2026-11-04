@@ -29,9 +29,18 @@ final class GameBoardViewModel: ObservableObject {
 
     // MARK: - Optimistic Life Tracking
 
-    private var lifeDeltas: [String: Int] = [:]
-    private var debounceTimers: [String: Task<Void, Never>] = [:]
+    /// This device's life changes the server hasn't confirmed yet. `players`
+    /// is `serverPlayers` with these laid over it.
+    private var lifeLedger = LifeLedger()
+    /// Per player: the debounce running since their latest tap. Visible to
+    /// tests, which await it rather than sleep.
+    private(set) var lifeChangeDebounces: [String: Task<Void, Never>] = [:]
+    /// Per player: the adjustLife call under way. Visible to tests, which
+    /// await it rather than sleep.
+    private(set) var lifeChangeSends: [String: Task<Void, Never>] = [:]
     private var serverPlayers: [Player] = []
+    /// Times the debounce.
+    private let clock: any Clock<Duration>
 
     // MARK: - Properties
 
@@ -138,7 +147,8 @@ final class GameBoardViewModel: ObservableObject {
         firestoreManager: FirestoreManaging = FirestoreManager(),
         cloudFunctions: CloudFunctionsProtocol = CloudFunctions(),
         cardDatabase: CardLookupProviding = CardDatabase.shared,
-        planeDatabase: PlaneLookupProviding = PlaneDatabase.shared
+        planeDatabase: PlaneLookupProviding = PlaneDatabase.shared,
+        clock: any Clock<Duration> = ContinuousClock()
     ) {
         self.gameId = gameId
         self.currentUserId = currentUserId
@@ -146,6 +156,7 @@ final class GameBoardViewModel: ObservableObject {
         self.cloudFunctions = cloudFunctions
         self.cardDatabase = cardDatabase
         self.planeDatabase = planeDatabase
+        self.clock = clock
         startListening()
     }
 
@@ -159,13 +170,15 @@ final class GameBoardViewModel: ObservableObject {
         firestoreManager: FirestoreManaging = FirestoreManager(),
         cloudFunctions: CloudFunctionsProtocol = CloudFunctions(),
         cardDatabase: CardLookupProviding = CardDatabase.shared,
-        planeDatabase: PlaneLookupProviding = PlaneDatabase.shared
+        planeDatabase: PlaneLookupProviding = PlaneDatabase.shared,
+        clock: any Clock<Duration> = ContinuousClock()
     ) {
         self.gameId = gameId
         self.firestoreManager = firestoreManager
         self.cloudFunctions = cloudFunctions
         self.cardDatabase = cardDatabase
         self.planeDatabase = planeDatabase
+        self.clock = clock
         self.currentUserId = currentUserId
         self.serverPlayers = previewPlayers
         self.players = previewPlayers
@@ -176,8 +189,9 @@ final class GameBoardViewModel: ObservableObject {
     deinit {
         gameListener?.remove()
         playersListener?.remove()
-        for timer in debounceTimers.values {
-            timer.cancel()
+        // Sends under way don't hold the view model and are left to finish.
+        for debounce in lifeChangeDebounces.values {
+            debounce.cancel()
         }
     }
 
@@ -191,62 +205,10 @@ final class GameBoardViewModel: ObservableObject {
             guard let self else { return }
             switch result {
             case .success(let players):
-                self.serverPlayers = players
-                withAnimation(.easeInOut(duration: 0.3)) {
-                    self.applyOptimisticDeltas()
-                }
+                self.receivePlayers(players)
             case .failure(let failure):
                 self.recordListenerFailure(failure, listener: "players")
             }
-        }
-    }
-
-    // MARK: - Optimistic Helpers
-
-    private func applyOptimisticDeltas() {
-        players = serverPlayers.map { player in
-            guard let delta = lifeDeltas[player.id], delta != 0 else { return player }
-            var p = player
-            p.lifeTotal = max(0, p.lifeTotal + delta)
-            return p
-        }
-    }
-
-    // MARK: - Life Adjustment (optimistic + debounced)
-
-    func adjustLife(for playerId: String, by amount: Int) {
-        guard let player = serverPlayers.first(where: { $0.id == playerId }) else { return }
-        guard !player.isEliminated else { return }
-        errorMessage = nil
-
-        // Accumulate optimistic delta
-        lifeDeltas[playerId, default: 0] += amount
-        applyOptimisticDeltas()
-
-        // Cancel existing debounce timer for this player
-        debounceTimers[playerId]?.cancel()
-
-        // Flush after 500ms of inactivity
-        debounceTimers[playerId] = Task { [weak self] in
-            try? await Task.sleep(nanoseconds: 500_000_000)
-            guard !Task.isCancelled else { return }
-            await self?.flushLifeDelta(for: playerId)
-        }
-    }
-
-    private func flushLifeDelta(for playerId: String) async {
-        guard let delta = lifeDeltas[playerId], delta != 0 else { return }
-
-        // Clear delta before sending so new taps start fresh
-        lifeDeltas[playerId] = 0
-
-        do {
-            try await cloudFunctions.adjustLife(gameId: gameId, playerId: playerId, amount: delta)
-        } catch {
-            // Revert on failure
-            lifeDeltas[playerId, default: 0] += delta
-            applyOptimisticDeltas()
-            errorMessage = error.localizedDescription
         }
     }
 
@@ -510,6 +472,147 @@ final class GameBoardViewModel: ObservableObject {
             return true
         }
         return false
+    }
+}
+
+// MARK: - Life Tracking (optimistic + debounced)
+//
+// A tap shows at once and goes to the server in a batch with the taps that
+// follow it. LifeLedger decides what the board shows until the server
+// confirms a batch; this extension feeds it taps, snapshots and call
+// outcomes, and times and makes the calls.
+
+extension GameBoardViewModel {
+
+    /// How long a player's taps must pause before they're sent as one call.
+    static let lifeChangeDebounce: Duration = .milliseconds(500)
+
+    /// Shows the tap at once, then sends it with any taps on the same player
+    /// that follow within `lifeChangeDebounce`, as one adjustLife call.
+    func adjustLife(for playerId: String, by amount: Int) {
+        guard let player = serverPlayers.first(where: { $0.id == playerId }) else { return }
+        guard !player.isEliminated else { return }
+        errorMessage = nil
+
+        lifeLedger.record(amount, for: playerId)
+        refreshPlayers()
+        restartLifeChangeDebounce(for: playerId)
+    }
+
+    /// Sends every tap still waiting out its debounce, straight away. The
+    /// board calls this as it goes away: the debounce ends with the view
+    /// model, and would take those taps with it.
+    ///
+    /// These sends aren't tracked, since nothing will show them. Nor do they
+    /// wait for a call still under way for the same player: adjustLife adds
+    /// whatever it's given, so two calls at once still add up.
+    ///
+    /// - Returns: The sends, for tests to await.
+    @discardableResult
+    func sendPendingLifeChanges() -> [Task<Void, Never>] {
+        for debounce in lifeChangeDebounces.values {
+            debounce.cancel()
+        }
+        lifeChangeDebounces.removeAll()
+        let pendingTaps = lifeLedger.takePendingTaps()
+        refreshPlayers()
+
+        let cloudFunctions = cloudFunctions
+        let gameId = gameId
+        return pendingTaps.map { playerId, amount in
+            // Holds what the call needs, not the view model, which is
+            // usually gone before the call returns.
+            Task { [weak self] in
+                do {
+                    _ = try await cloudFunctions.adjustLife(gameId: gameId, playerId: playerId, amount: amount)
+                } catch {
+                    self?.reportLifeChangeFailure(for: playerId, error: error)
+                }
+            }
+        }
+    }
+
+    /// A players snapshot: settles the batches it shows, redraws the board,
+    /// and sends any taps that were waiting on a batch it settled.
+    private func receivePlayers(_ players: [Player]) {
+        serverPlayers = players
+        lifeLedger.reconcile(with: players)
+        withAnimation(.easeInOut(duration: 0.3)) {
+            refreshPlayers()
+        }
+        for playerId in lifeLedger.playersWithPendingTaps {
+            sendPendingLifeChange(for: playerId)
+        }
+    }
+
+    /// Rebuilds `players`: the latest snapshot with the ledger laid over it.
+    private func refreshPlayers() {
+        players = lifeLedger.displayedPlayers(from: serverPlayers)
+    }
+
+    private func restartLifeChangeDebounce(for playerId: String) {
+        lifeChangeDebounces[playerId]?.cancel()
+        lifeChangeDebounces[playerId] = Task { [weak self, clock] in
+            do {
+                try await clock.sleep(for: Self.lifeChangeDebounce)
+            } catch {
+                return // A later tap restarted it, or the board went away.
+            }
+            // Cancelled after waking but before getting here: the later
+            // tap's debounce takes over.
+            guard !Task.isCancelled else { return }
+            self?.lifeChangeDebounceEnded(for: playerId)
+        }
+    }
+
+    private func lifeChangeDebounceEnded(for playerId: String) {
+        lifeChangeDebounces[playerId] = nil
+        sendPendingLifeChange(for: playerId)
+    }
+
+    /// Sends the player's pending taps as one batch once nothing holds them
+    /// back: their debounce has ended and their previous batch has settled.
+    /// Each of those calls this, and the later one finds the taps pending.
+    private func sendPendingLifeChange(for playerId: String) {
+        guard lifeChangeDebounces[playerId] == nil,
+              let serverLife = serverPlayers.first(where: { $0.id == playerId })?.lifeTotal,
+              let batch = lifeLedger.beginBatch(for: playerId, serverLife: serverLife) else { return }
+        let cloudFunctions = cloudFunctions
+        let gameId = gameId
+        // Holds what the call needs, not the view model, so the call still
+        // completes if the board closes first.
+        lifeChangeSends[playerId] = Task { [weak self] in
+            do {
+                let newLife = try await cloudFunctions.adjustLife(gameId: gameId, playerId: playerId, amount: batch.amount)
+                self?.batchSucceeded(batch, newLife: newLife)
+            } catch {
+                self?.batchFailed(batch, error: error)
+            }
+        }
+    }
+
+    private func batchSucceeded(_ batch: LifeLedger.Batch, newLife: Int?) {
+        lifeChangeSends[batch.playerId] = nil
+        lifeLedger.recordSuccess(of: batch, newLife: newLife)
+        refreshPlayers()
+        sendPendingLifeChange(for: batch.playerId)
+    }
+
+    /// The batch comes off the board and is never resent; see
+    /// `LifeLedger.recordFailure(of:)`. Taps made since it was sent go out
+    /// as a change of their own.
+    private func batchFailed(_ batch: LifeLedger.Batch, error: Error) {
+        lifeChangeSends[batch.playerId] = nil
+        lifeLedger.recordFailure(of: batch)
+        refreshPlayers()
+        reportLifeChangeFailure(for: batch.playerId, error: error)
+        sendPendingLifeChange(for: batch.playerId)
+    }
+
+    private func reportLifeChangeFailure(for playerId: String, error: Error) {
+        logger.error("adjustLife failed: \(String(describing: error), privacy: .public)")
+        let name = serverPlayers.first { $0.id == playerId }?.displayName ?? "the player"
+        errorMessage = "Couldn't update \(name)'s life. Check your connection and try again."
     }
 }
 
