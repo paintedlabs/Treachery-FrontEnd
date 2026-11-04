@@ -3,6 +3,7 @@
 //  Treachery-iOS
 //
 
+import Accessibility
 import SwiftUI
 
 /// Bottom bar with a "Roll Planar Die" button, mana cost display, die result animation,
@@ -50,6 +51,16 @@ struct PlanarDieBar: View {
             alignment: .top
         )
         .animation(reduceMotion ? .easeInOut(duration: 0.2) : .spring(response: 0.4, dampingFraction: 0.7), value: viewModel.dieRollResult)
+        .onChange(of: viewModel.dieRollResult) { _, result in
+            // Only the player's own roll shows a result, for a few seconds,
+            // and at large text sizes it can start out of view: read it out,
+            // once VoiceOver has finished what it's saying. Not once the
+            // game is over, when Game Over covers the board.
+            guard let result, viewModel.announcesBoardChanges else { return }
+            var message = AttributedString(spokenResult(result))
+            message.accessibilitySpeechAnnouncementPriority = .low
+            AccessibilityNotification.Announcement(message).post()
+        }
     }
 
     private var rollButton: some View {
@@ -133,7 +144,12 @@ struct PlanarDieBar: View {
                 )
         )
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("Die result: \(dieLabel(for: result))")
+        .accessibilityLabel(spokenResult(result))
+    }
+
+    /// The result as VoiceOver reads it, on the result and as it appears.
+    private func spokenResult(_ result: String) -> String {
+        "Die result: \(dieLabel(for: result))"
     }
 
     private func dieIcon(for result: String) -> Image {

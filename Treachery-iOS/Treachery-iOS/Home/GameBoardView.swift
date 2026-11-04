@@ -183,9 +183,11 @@ struct GameBoardView: View {
     /// How strongly the signed-in player's color tints the board.
     static let playerTintOpacity = 0.15
 
-    /// The parts of the board that its own actions bring into view.
+    /// The parts of the board that its own actions bring into view, and the
+    /// feedback that appears in its pinned controls.
     private enum ScrollTarget: Hashable {
         case identity, plane
+        case error, lifeChanges, unveilFailure, dieResult
     }
 
     /// The identity card, the plane and the players scroll together. The
@@ -230,6 +232,25 @@ struct GameBoardView: View {
                     guard isRolling else { return }
                     bringIntoView(.plane, with: scroll)
                 }
+                // Feedback appears at the top of the pinned controls. When
+                // there's more of them than fits, as at large text sizes,
+                // that's above the part in view: bring it into view.
+                .onChange(of: viewModel.errorMessage) { _, message in
+                    guard message != nil else { return }
+                    bringIntoView(.error, anchor: .top, with: scroll)
+                }
+                .onChange(of: viewModel.lifeChangeMessage) { _, message in
+                    guard message != nil else { return }
+                    bringIntoView(.lifeChanges, anchor: .top, with: scroll)
+                }
+                .onChange(of: viewModel.unveilFailure) { _, failure in
+                    guard failure != nil else { return }
+                    bringIntoView(.unveilFailure, anchor: .top, with: scroll)
+                }
+                .onChange(of: viewModel.dieRollResult) { _, result in
+                    guard result != nil else { return }
+                    bringIntoView(.dieResult, anchor: .top, with: scroll)
+                }
             }
             .sheet(item: $inspectedPlayer) { player in
                 if let card = viewModel.identityCard(for: player) {
@@ -239,10 +260,11 @@ struct GameBoardView: View {
         }
     }
 
-    /// Scrolls just far enough to show `target`, at once with Reduce Motion.
-    private func bringIntoView(_ target: ScrollTarget, with scroll: ScrollViewProxy) {
+    /// Scrolls just far enough to show `target`, or to put it at `anchor`,
+    /// at once with Reduce Motion.
+    private func bringIntoView(_ target: ScrollTarget, anchor: UnitPoint? = nil, with scroll: ScrollViewProxy) {
         withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.3)) {
-            scroll.scrollTo(target)
+            scroll.scrollTo(target, anchor: anchor)
         }
     }
 
@@ -313,9 +335,11 @@ struct GameBoardView: View {
             VStack(spacing: 0) {
                 errorBanners
 
-                // Planar die bar — only when planechase active
+                // Planar die bar — only when planechase active. A roll's
+                // result shows at its top.
                 if viewModel.isPlanechaseActive {
                     PlanarDieBar(viewModel: viewModel)
+                        .id(ScrollTarget.dieResult)
                 }
 
                 // Action bar (unveil/win) — only when treachery active
@@ -377,16 +401,19 @@ struct GameBoardView: View {
             MtgErrorBanner(message: error)
                 .padding(.horizontal)
                 .padding(.vertical, 4)
+                .id(ScrollTarget.error)
         }
         if let message = viewModel.lifeChangeMessage {
             MtgErrorBanner(message: message)
                 .padding(.horizontal)
                 .padding(.vertical, 4)
+                .id(ScrollTarget.lifeChanges)
         }
         if let failure = viewModel.unveilFailure {
             MtgErrorBanner(message: failure)
                 .padding(.horizontal)
                 .padding(.vertical, 4)
+                .id(ScrollTarget.unveilFailure)
         }
     }
 
