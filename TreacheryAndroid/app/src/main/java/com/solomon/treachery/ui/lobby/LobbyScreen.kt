@@ -544,7 +544,8 @@ private fun GameSettingsCard(
                         Icon(Icons.Default.UnfoldMore, null, tint = MtgGold, modifier = Modifier.size(16.dp))
                     }
                     DropdownMenu(expanded = showLifeMenu, onDismissRequest = { showLifeMenu = false }) {
-                        listOf(20, 25, 30, 40, 50).forEach { life ->
+                        // Every value the server accepts, the create screen's stepper range.
+                        (20..60 step 5).forEach { life ->
                             DropdownMenuItem(
                                 text = { Text("$life") },
                                 onClick = { onStartingLifeChange(life); showLifeMenu = false }

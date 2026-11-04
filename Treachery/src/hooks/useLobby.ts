@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { httpsCallable } from 'firebase/functions';
+import { httpsCallable, FunctionsError } from 'firebase/functions';
+import type { FunctionsErrorCode } from 'firebase/functions';
 import { Game, Player, Rarity } from '@/models/types';
 import * as firestoreService from '@/services/firestore';
 import { functions } from '@/config/firebase';
@@ -28,6 +29,34 @@ interface UseLobbyReturn {
   }) => Promise<void>;
 }
 
+// What a failed lobby action tells the player. Firebase's own text is not
+// meant for players: a callable that can't reach the server fails with the
+// bare word "internal", and a refused Firestore write (color, commander name)
+// says "Missing or insufficient permissions."
+function lobbyErrorMessage(error: unknown, failed: string): string {
+  if (error instanceof FunctionsError) {
+    switch (error.code as FunctionsErrorCode) {
+      // The lobby callables write these refusals for players, such as
+      // "Cannot set max players below the current lobby size." Only a
+      // sentence the server wrote is shown: when a response carries no
+      // message, the SDK falls back to the bare code or status
+      // ("invalid-argument", "FAILED_PRECONDITION"), which isn't for players.
+      case 'functions/failed-precondition':
+      case 'functions/invalid-argument': {
+        const message = error.message.trim();
+        const isBareCode = /^[A-Za-z_-]+$/.test(message);
+        return message && !isBareCode ? message : `${failed} Try again.`;
+      }
+      // Offline, timed out, or the server failed.
+      case 'functions/internal':
+      case 'functions/unavailable':
+      case 'functions/deadline-exceeded':
+        return `${failed} Check your connection and try again.`;
+    }
+  }
+  return `${failed} Try again.`;
+}
+
 export function useLobby(
   gameId: string,
   _navIsHost: boolean,
@@ -35,6 +64,8 @@ export function useLobby(
 ): UseLobbyReturn {
   const [game, setGame] = useState<Game | null>(null);
   const [players, setPlayers] = useState<Player[]>([]);
+  // Every action clears this before it runs, so a repeated failure with the
+  // same message still reads as a new error (the lobby scrolls to it).
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isStartingGame, setIsStartingGame] = useState(false);
   const [isGameDisbanded, setIsGameDisbanded] = useState(false);
@@ -80,9 +111,12 @@ export function useLobby(
     try {
       const startGameFn = httpsCallable(functions, 'startGame');
       await startGameFn({ gameId });
-      trackEvent('start_game', { player_count: players.length, game_mode: game.game_mode ?? 'unknown' });
+      trackEvent('start_game', {
+        player_count: players.length,
+        game_mode: game.game_mode ?? 'unknown',
+      });
     } catch (error: unknown) {
-      setErrorMessage(error instanceof Error ? error.message : 'Failed to start game.');
+      setErrorMessage(lobbyErrorMessage(error, "Couldn't start the game."));
     }
     setIsStartingGame(false);
   }, [game, currentUserId, gameId, players.length]);
@@ -99,7 +133,7 @@ export function useLobby(
         await leaveGameFn({ gameId });
         trackEvent('leave_lobby');
       } catch (error: unknown) {
-        setErrorMessage(error instanceof Error ? error.message : 'Failed to leave game.');
+        setErrorMessage(lobbyErrorMessage(error, "Couldn't leave the game."));
       }
     },
     [gameId],
@@ -110,10 +144,11 @@ export function useLobby(
   const updatePlayerColor = useCallback(
     async (color: string | null) => {
       if (!currentPlayer) return;
+      setErrorMessage(null);
       try {
         await firestoreService.updatePlayerColor(gameId, currentPlayer.id, color);
       } catch (error: unknown) {
-        setErrorMessage(error instanceof Error ? error.message : 'Failed to update color.');
+        setErrorMessage(lobbyErrorMessage(error, "Couldn't update your color."));
       }
     },
     [gameId, currentPlayer],
@@ -122,12 +157,11 @@ export function useLobby(
   const updateCommanderName = useCallback(
     async (name: string | null) => {
       if (!currentPlayer) return;
+      setErrorMessage(null);
       try {
         await firestoreService.updateCommanderName(gameId, currentPlayer.id, name);
       } catch (error: unknown) {
-        setErrorMessage(
-          error instanceof Error ? error.message : 'Failed to update commander name.',
-        );
+        setErrorMessage(lobbyErrorMessage(error, "Couldn't update your commander name."));
       }
     },
     [gameId, currentPlayer],
@@ -141,11 +175,12 @@ export function useLobby(
       maxTraitorRarity?: Rarity;
     }) => {
       if (!game || !currentUserId || game.host_id !== currentUserId) return;
+      setErrorMessage(null);
       try {
         const fn = httpsCallable(functions, 'updateGameSettings');
         await fn({ gameId, ...settings });
       } catch (error: unknown) {
-        setErrorMessage(error instanceof Error ? error.message : 'Failed to update settings.');
+        setErrorMessage(lobbyErrorMessage(error, "Couldn't update the game settings."));
       }
     },
     [game, currentUserId, gameId],

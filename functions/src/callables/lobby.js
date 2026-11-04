@@ -4,7 +4,7 @@
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const { callableOptions } = require("../config");
 const { db, FieldValue } = require("../firebase");
-const { isValidRarity, parseIntegerArg } = require("../validation");
+const { isValidRarity, parseIntegerArg, parseStartingLife } = require("../validation");
 const { getRoleDistribution, shuffle } = require("../rules");
 const { PLANE_CARDS, getCardsForRole, getTraitorPool, _getCard } = require("../cards");
 const { notifyPlayers } = require("../notifications");
@@ -67,8 +67,8 @@ exports.createGame = onCall(callableOptions, async (request) => {
     throw new HttpsError("invalid-argument", "Max players must be 2-8.");
   }
 
-  const sl = parseIntegerArg(startingLife);
-  if (sl === null || ![20, 25, 30, 40, 50].includes(sl)) {
+  const sl = parseStartingLife(startingLife);
+  if (sl === null) {
     throw new HttpsError("invalid-argument", "Invalid starting life value.");
   }
 
@@ -558,8 +558,8 @@ exports.updateGameSettings = onCall(callableOptions, async (request) => {
     }
 
     if (startingLife !== undefined) {
-      const sl = parseIntegerArg(startingLife);
-      if (sl === null || ![20, 25, 30, 40, 50].includes(sl)) {
+      const sl = parseStartingLife(startingLife);
+      if (sl === null) {
         throw new HttpsError("invalid-argument", "Invalid starting life value.");
       }
       update.starting_life = sl;
