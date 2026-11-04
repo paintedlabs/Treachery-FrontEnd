@@ -382,15 +382,25 @@ export default function LobbyScreen() {
                 disabled={game.max_players <= 2}
                 accessibilityLabel="Decrease max players"
               >
-                <Ionicons name="remove-circle-outline" size={24} color={game.max_players > 2 ? colors.primary : colors.textTertiary} />
+                <Ionicons
+                  name="remove-circle-outline"
+                  size={24}
+                  color={game.max_players > 2 ? colors.primary : colors.textTertiary}
+                />
               </TouchableOpacity>
               <Text style={styles.settingsValue}>{game.max_players}</Text>
               <TouchableOpacity
-                onPress={() => updateGameSettings({ maxPlayers: Math.min(8, game.max_players + 1) })}
+                onPress={() =>
+                  updateGameSettings({ maxPlayers: Math.min(8, game.max_players + 1) })
+                }
                 disabled={game.max_players >= 8}
                 accessibilityLabel="Increase max players"
               >
-                <Ionicons name="add-circle-outline" size={24} color={game.max_players < 8 ? colors.primary : colors.textTertiary} />
+                <Ionicons
+                  name="add-circle-outline"
+                  size={24}
+                  color={game.max_players < 8 ? colors.primary : colors.textTertiary}
+                />
               </TouchableOpacity>
             </View>
           </View>
@@ -432,7 +442,9 @@ export default function LobbyScreen() {
                   onPress={() => updateGameSettings({ gameMode: key })}
                   accessibilityLabel={`Set game mode to ${label}`}
                 >
-                  <Text style={[styles.chipText, game.game_mode === key && styles.chipTextActive]}>{label}</Text>
+                  <Text style={[styles.chipText, game.game_mode === key && styles.chipTextActive]}>
+                    {label}
+                  </Text>
                 </TouchableOpacity>
               ))}
             </View>
@@ -471,9 +483,7 @@ export default function LobbyScreen() {
       )}
 
       {/* Player list */}
-      <Text style={styles.sectionTitle}>
-        Players ({players.length})
-      </Text>
+      <Text style={styles.sectionTitle}>Players ({players.length})</Text>
 
       {players.length === 0 ? (
         <Text style={styles.waitingText}>Waiting for players to join...</Text>

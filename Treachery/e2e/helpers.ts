@@ -132,7 +132,10 @@ export async function hostCreateGame(
   await expect(page).toHaveURL(/\/lobby\//);
   const gameId = parseGameIdFromUrl(page.url());
   const code = (
-    await page.getByText(/^[A-Z0-9]{4}$/).first().textContent()
+    await page
+      .getByText(/^[A-Z0-9]{4}$/)
+      .first()
+      .textContent()
   )?.trim();
   if (!code || !/^[A-Z0-9]{4}$/.test(code)) {
     throw new Error(`Failed to read game code from lobby (got ${JSON.stringify(code)})`);
@@ -164,7 +167,10 @@ function parseGameIdFromUrl(url: string): string {
 export async function getCurrentUserId(page: Page): Promise<string> {
   const uid = await page.evaluate(() => {
     const e2e = (window as unknown as { __e2e?: { getCurrentUserId: () => string | null } }).__e2e;
-    if (!e2e) throw new Error('window.__e2e missing — was the bundle built with EXPO_PUBLIC_USE_EMULATOR=true?');
+    if (!e2e)
+      throw new Error(
+        'window.__e2e missing — was the bundle built with EXPO_PUBLIC_USE_EMULATOR=true?',
+      );
     return e2e.getCurrentUserId();
   });
   if (!uid) throw new Error('No authenticated user in this page context');
@@ -174,9 +180,11 @@ export async function getCurrentUserId(page: Page): Promise<string> {
 async function callStartGameWithSeed(hostPage: Page, gameId: string, seed: TestSeed) {
   await hostPage.evaluate(
     async ({ gameId, seed }) => {
-      const e2e = (window as unknown as {
-        __e2e?: { startGameWithSeed: (gid: string, seed: unknown) => Promise<unknown> };
-      }).__e2e;
+      const e2e = (
+        window as unknown as {
+          __e2e?: { startGameWithSeed: (gid: string, seed: unknown) => Promise<unknown> };
+        }
+      ).__e2e;
       if (!e2e) throw new Error('window.__e2e missing');
       await e2e.startGameWithSeed(gameId, seed);
     },
@@ -321,9 +329,7 @@ export async function setupNonTreacheryGame(
 
   await expect(hostPage.getByRole('button', { name: 'Start game' })).toBeEnabled();
   await hostPage.getByRole('button', { name: 'Start game' }).click();
-  await Promise.all(
-    lobby.pages.map((p) => expect(p).toHaveURL(/\/game\//, { timeout: 20_000 })),
-  );
+  await Promise.all(lobby.pages.map((p) => expect(p).toHaveURL(/\/game\//, { timeout: 20_000 })));
 
   const players: PlayerHandle[] = lobby.pages.map((page, i) => ({
     name: lobby.names[i],
@@ -457,9 +463,7 @@ export async function forfeit(page: Page) {
  * winning team text is present on at least the first page.
  */
 export async function expectWinner(pages: Page[], team: 'Leader' | 'Assassin' | 'Traitor') {
-  await Promise.all(
-    pages.map((p) => expect(p).toHaveURL(/\/game-over\//, { timeout: 30_000 })),
-  );
+  await Promise.all(pages.map((p) => expect(p).toHaveURL(/\/game-over\//, { timeout: 30_000 })));
   // The game-over screen renders the winning team's display name.
   // Match permissively: "Leader", "Leader/Guardian", "Assassins", "Traitor", etc.
   const re = new RegExp(team, 'i');
@@ -513,9 +517,11 @@ export interface ServerPlayer {
 export async function fetchGameDoc(page: Page, gameId: string): Promise<ServerGame | null> {
   return page.evaluate(
     async ({ gameId }) => {
-      const e2e = (window as unknown as {
-        __e2e?: { fetchGame: (gid: string) => Promise<unknown> };
-      }).__e2e;
+      const e2e = (
+        window as unknown as {
+          __e2e?: { fetchGame: (gid: string) => Promise<unknown> };
+        }
+      ).__e2e;
       if (!e2e) throw new Error('window.__e2e missing');
       return e2e.fetchGame(gameId);
     },
@@ -529,13 +535,18 @@ export async function fetchGameDoc(page: Page, gameId: string): Promise<ServerGa
  * is_face_down state after an ability resolves.
  */
 export async function fetchPlayerDocs(page: Page, gameId: string): Promise<ServerPlayer[]> {
-  return page.evaluate(async ({ gameId }) => {
-    const e2e = (window as unknown as {
-      __e2e?: { fetchPlayers: (gid: string) => Promise<unknown[]> };
-    }).__e2e;
-    if (!e2e) throw new Error('window.__e2e missing');
-    return e2e.fetchPlayers(gameId);
-  }, { gameId }) as Promise<ServerPlayer[]>;
+  return page.evaluate(
+    async ({ gameId }) => {
+      const e2e = (
+        window as unknown as {
+          __e2e?: { fetchPlayers: (gid: string) => Promise<unknown[]> };
+        }
+      ).__e2e;
+      if (!e2e) throw new Error('window.__e2e missing');
+      return e2e.fetchPlayers(gameId);
+    },
+    { gameId },
+  ) as Promise<ServerPlayer[]>;
 }
 
 /**
