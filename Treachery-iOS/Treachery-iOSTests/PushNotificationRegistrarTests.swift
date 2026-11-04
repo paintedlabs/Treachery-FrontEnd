@@ -301,6 +301,29 @@ final class PushNotificationRegistrarTests {
     }
 }
 
+/// Which `users/{uid}` snapshots count as the server having the profile. Registering
+/// on any other would let registerFcmToken create an empty profile on the server.
+struct FirestoreUserProfileObserverTests {
+
+    @Test func serverConfirmedProfileCounts() {
+        #expect(FirestoreUserProfileObserver.serverHasProfile(exists: true, isFromCache: false, hasPendingWrites: false))
+    }
+
+    /// The persistent cache can still hold a profile the server has since deleted.
+    @Test(arguments: [false, true]) func cachedProfileDoesNotCount(hasPendingWrites: Bool) {
+        #expect(!FirestoreUserProfileObserver.serverHasProfile(exists: true, isFromCache: true, hasPendingWrites: hasPendingWrites))
+    }
+
+    /// The app's own profile write, before the server has committed it.
+    @Test(arguments: [false, true]) func profileWithAnUncommittedWriteDoesNotCount(isFromCache: Bool) {
+        #expect(!FirestoreUserProfileObserver.serverHasProfile(exists: true, isFromCache: isFromCache, hasPendingWrites: true))
+    }
+
+    @Test(arguments: [false, true], [false, true]) func missingProfileNeverCounts(isFromCache: Bool, hasPendingWrites: Bool) {
+        #expect(!FirestoreUserProfileObserver.serverHasProfile(exists: false, isFromCache: isFromCache, hasPendingWrites: hasPendingWrites))
+    }
+}
+
 // MARK: - Fakes
 
 private extension PushNotificationRegistrar {

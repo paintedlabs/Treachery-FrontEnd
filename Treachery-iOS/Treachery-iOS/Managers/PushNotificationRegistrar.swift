@@ -22,8 +22,11 @@ protocol SignedInUserObserving {
 
 /// Reports when the server has a user's public profile (`users/{uid}`).
 protocol UserProfileObserving {
-    /// Calls `onExists` once the server has `uid`'s public profile, straight away if it
-    /// already does, until the returned handle is removed.
+    /// Calls `onExists` once the server confirms it has `uid`'s public profile, straight
+    /// away if that is already known, until the returned handle is removed. A cached copy
+    /// doesn't count, because the server may have deleted the profile after it was
+    /// cached, and neither does a write the server hasn't committed. Offline, it waits
+    /// until the server answers.
     func observeProfileExists(forUser uid: String, _ onExists: @escaping @MainActor () -> Void) -> ListenerCancellable
 }
 
@@ -45,11 +48,14 @@ protocol NotificationAuthorizing {
 /// Keeps this device's FCM token registered to the signed-in account, and only to it.
 ///
 /// - When someone becomes signed in, including a session restored at launch, it waits
-///   until the server has their public profile, asks for notification permission if
-///   that was never decided, then registers the current token for them. The wait
-///   matters for new accounts: registerFcmToken (functions/src/callables/users.js)
-///   merge-writes `users/{uid}`, so calling it first creates an empty profile, and
-///   firestore.rules then deny the app's own profile creation for good.
+///   until the server confirms it has their public profile, asks for notification
+///   permission if that was never decided, then registers the current token for them.
+///   The wait matters because registerFcmToken (functions/src/callables/users.js)
+///   merge-writes `users/{uid}`: called while the server has no profile (a new account,
+///   or one deleted on the server that this device still has cached), it creates an
+///   empty one, and firestore.rules then deny the app's own profile creation for good.
+///   A cached copy therefore doesn't count, so an offline launch registers once the
+///   server answers.
 /// - When FCM refreshes the token while someone is signed in, it registers the new one.
 /// - When the signed-in account ends (sign-out, or a switch straight to another
 ///   account), it deletes the token so this device stops receiving that account's
@@ -333,14 +339,25 @@ private struct AuthStateListenerHandle: ListenerCancellable {
     }
 }
 
-/// The public profile's existence, from a Firestore listener on `users/{uid}`.
+/// The public profile's existence as the server reports it, from a Firestore listener
+/// on `users/{uid}`.
 struct FirestoreUserProfileObserver: UserProfileObserving {
     let firestore: Firestore
 
     private static let logger = Logger(subsystem: "com.Solomon.Treachery-iOS", category: "PushNotifications")
 
+    /// Whether a `users/{uid}` snapshot shows the server has the profile: it exists, it
+    /// came from the server rather than the persistent cache (which can still hold a
+    /// profile the server has since deleted), and it has no local write the server
+    /// hasn't committed.
+    static func serverHasProfile(exists: Bool, isFromCache: Bool, hasPendingWrites: Bool) -> Bool {
+        exists && !isFromCache && !hasPendingWrites
+    }
+
     func observeProfileExists(forUser uid: String, _ onExists: @escaping @MainActor () -> Void) -> ListenerCancellable {
         let registration = firestore.collection("users").document(uid)
+            // Metadata changes included, so Firestore reports the document again when the
+            // server confirms a cached or pending snapshot, even if nothing else changed.
             .addSnapshotListener(includeMetadataChanges: true) { snapshot, error in
                 if let error {
                     let error = error as NSError
@@ -352,8 +369,13 @@ struct FirestoreUserProfileObserver: UserProfileObserving {
                     )
                     return
                 }
-                // A profile the app has written but the server hasn't committed doesn't count yet.
-                guard let snapshot, snapshot.exists, !snapshot.metadata.hasPendingWrites else { return }
+                guard let snapshot,
+                      Self.serverHasProfile(
+                          exists: snapshot.exists,
+                          isFromCache: snapshot.metadata.isFromCache,
+                          hasPendingWrites: snapshot.metadata.hasPendingWrites
+                      )
+                else { return }
                 // Firestore calls listeners on the main queue (`FirestoreSettings.dispatchQueue`'s default).
                 MainActor.assumeIsolated { onExists() }
             }
