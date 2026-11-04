@@ -121,4 +121,38 @@ struct FirestoreListenerMappingTests {
         }
         #expect(error is DecodeError)
     }
+
+    // MARK: - Errors
+
+    /// Shaped like the errors the Firestore SDK reports: its domain and a
+    /// FirestoreErrorCode raw value.
+    private func firestoreError(code: Int) -> NSError {
+        NSError(domain: "FIRFirestoreErrorDomain", code: code)
+    }
+
+    @Test func refusedReadIsAccessDenied() {
+        // A players read once the user is no longer in player_ids. Retrying
+        // can't help, so it mustn't look like a dropped connection.
+        guard case .accessDenied = FirestoreManager.listenerFailure(for: firestoreError(code: 7)) else {
+            Issue.record("expected .accessDenied")
+            return
+        }
+    }
+
+    @Test(arguments: [4, 13, 14])
+    func otherFirestoreErrorsStopTheListener(code: Int) {
+        // Deadline exceeded, internal, unavailable: worth trying again.
+        guard case .listenerStopped = FirestoreManager.listenerFailure(for: firestoreError(code: code)) else {
+            Issue.record("expected .listenerStopped")
+            return
+        }
+    }
+
+    @Test func permissionDeniedCodeFromAnotherDomainStopsTheListener() {
+        let error = NSError(domain: "com.firebase.functions", code: 7)
+        guard case .listenerStopped = FirestoreManager.listenerFailure(for: error) else {
+            Issue.record("expected .listenerStopped")
+            return
+        }
+    }
 }

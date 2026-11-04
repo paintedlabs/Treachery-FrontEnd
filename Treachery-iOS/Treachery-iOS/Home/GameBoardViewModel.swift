@@ -724,17 +724,20 @@ extension GameBoardViewModel {
 
     /// Outcomes that come with nothing to show. All of them stick: Firestore
     /// stops delivering after a listener error, unreadable data would only
-    /// arrive again, and nothing re-creates a deleted game. Ordered by
-    /// precedence, lowest first; see `interrupt(_:)`.
+    /// arrive again, a refused read would be refused again, and nothing
+    /// re-creates a deleted game. Ordered by precedence, lowest first; see
+    /// `interrupt(_:)`.
     private enum ListenerInterruption: Comparable {
         case failed
         case unreadable
+        case notInGame
         case gameMissing
     }
 
     var status: Status {
         switch interruption {
         case .gameMissing: return .unavailable
+        case .notInGame: return .notInGame
         case .unreadable: return .needsNewerVersion
         case .failed: return .failed
         case nil: break
@@ -774,13 +777,17 @@ extension GameBoardViewModel {
         case .unreadable(let error):
             logger.error("Game board \(listener, privacy: .public) data unreadable: \(String(describing: error), privacy: .public)")
             interrupt(.unreadable)
+        case .accessDenied(let error):
+            logger.error("Game board \(listener, privacy: .public) read denied: \(String(describing: error), privacy: .public)")
+            interrupt(.notInGame)
         }
     }
 
     /// Keeps the more telling interruption. A missing game wins, because once
     /// it's deleted the players read is denied too, in whichever order the
-    /// two arrive; unreadable data beats a listener failure, because retrying
-    /// can't fix it.
+    /// two arrive. A denied read beats unreadable data, since a newer version
+    /// wouldn't give the player their seat back, and unreadable data beats a
+    /// listener failure, because retrying can't fix it.
     private func interrupt(_ new: ListenerInterruption) {
         interruption = max(interruption ?? new, new)
     }

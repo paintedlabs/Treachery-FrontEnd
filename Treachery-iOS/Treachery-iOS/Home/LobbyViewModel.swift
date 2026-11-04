@@ -32,6 +32,10 @@ final class LobbyViewModel: ObservableObject {
         /// left, or the hourly cleanup removed it after a day without
         /// activity. Nothing re-creates a deleted game, so this is final.
         case disbanded
+        /// The server refused to show the user this game's players: they're
+        /// no longer in it, for instance because a leave got through but its
+        /// reply was lost. Retrying would be refused again, so this is final.
+        case notInGame
         /// A listener failed. Firestore stops delivering after an error, so
         /// only `retry()` leaves this state.
         case failed
@@ -72,11 +76,13 @@ final class LobbyViewModel: ObservableObject {
 
     /// A listener outcome that leaves no lobby to show. All of them stick:
     /// Firestore stops delivering after an error (only `retry()` clears
-    /// that), unreadable data would only arrive again, and nothing re-creates
-    /// a deleted game. Ordered by precedence, lowest first; see `interrupt(_:)`.
+    /// that), unreadable data would only arrive again, a refused read would
+    /// be refused again, and nothing re-creates a deleted game. Ordered by
+    /// precedence, lowest first; see `interrupt(_:)`.
     private enum Interruption: Comparable {
         case listenerFailed
         case unreadable
+        case notInGame
         case gameMissing
     }
 
@@ -110,6 +116,7 @@ final class LobbyViewModel: ObservableObject {
     var status: Status {
         switch interruption {
         case .gameMissing: return .disbanded
+        case .notInGame: return .notInGame
         case .unreadable: return .needsNewerVersion
         case .listenerFailed: return .failed
         case nil: break
@@ -278,13 +285,17 @@ final class LobbyViewModel: ObservableObject {
         case .unreadable(let error):
             logger.error("Lobby \(listener, privacy: .public) data unreadable: \(String(describing: error), privacy: .public)")
             interrupt(.unreadable)
+        case .accessDenied(let error):
+            logger.error("Lobby \(listener, privacy: .public) read denied: \(String(describing: error), privacy: .public)")
+            interrupt(.notInGame)
         }
     }
 
     /// Keeps the more telling interruption. A missing game wins, because once
     /// it's deleted the players read is denied too, in whichever order the
-    /// two arrive; unreadable data beats a listener failure, because retrying
-    /// can't fix it.
+    /// two arrive. A denied read beats unreadable data, since a newer version
+    /// wouldn't give the player their seat back, and unreadable data beats a
+    /// listener failure, because retrying can't fix it.
     private func interrupt(_ new: Interruption) {
         interruption = max(interruption ?? new, new)
     }

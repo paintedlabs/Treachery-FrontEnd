@@ -34,7 +34,8 @@ protocol FirestoreManaging {
     func updatePlayer(_ player: Player, inGame gameId: String) async throws
     func removePlayer(id: String, fromGame gameId: String) async throws
     /// Streams the game's players in seat order. `onChange` runs on the main
-    /// actor for each snapshot. A listener error arrives as
+    /// actor for each snapshot. A refused read arrives as
+    /// `.failure(.accessDenied)`, any other listener error as
     /// `.failure(.listenerStopped)`; a snapshot with any player document that
     /// can't be decoded arrives as `.failure(.unreadable)`.
     func listenToPlayers(gameId: String, onChange: @escaping @MainActor (Result<[Player], ListenerFailure>) -> Void) -> ListenerCancellable

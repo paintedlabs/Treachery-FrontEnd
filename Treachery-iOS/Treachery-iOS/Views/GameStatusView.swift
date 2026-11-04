@@ -120,6 +120,17 @@ extension GameStatusView {
             onGoHome: onGoHome
         )
     }
+
+    /// For a game the server won't show the user any more because they're
+    /// no longer in it. There's nothing to try again.
+    static func notInGame(onGoHome: @escaping () -> Void) -> GameStatusView {
+        GameStatusView(
+            systemImage: "person.crop.circle.badge.xmark",
+            title: "Not in This Game",
+            message: "You're no longer in this game. You can create or join another game from Home.",
+            onGoHome: onGoHome
+        )
+    }
 }
 
 #if DEBUG
@@ -149,5 +160,12 @@ extension GameStatusView {
         GameStatusView.needsNewerVersion(onGoHome: {})
     }
     .dynamicTypeSize(.accessibility5)
+}
+
+#Preview("Not in This Game") {
+    ZStack {
+        Color.mtgBackground.ignoresSafeArea()
+        GameStatusView.notInGame(onGoHome: {})
+    }
 }
 #endif

@@ -254,7 +254,7 @@ final class FirestoreManager: FirestoreManaging {
             .addSnapshotListener(includeMetadataChanges: Self.gameListenerIncludesMetadataChanges) { snapshot, error in
                 let event: DocumentEvent<Game>?
                 if let error {
-                    event = .failed(.listenerStopped(error))
+                    event = .failed(Self.listenerFailure(for: error))
                 } else if let snapshot {
                     event = Self.gameEvent(
                         exists: snapshot.exists,
@@ -315,7 +315,7 @@ final class FirestoreManager: FirestoreManaging {
             .addSnapshotListener { snapshot, error in
                 let result: Result<[Player], ListenerFailure>?
                 if let error {
-                    result = .failure(.listenerStopped(error))
+                    result = .failure(Self.listenerFailure(for: error))
                 } else if let snapshot {
                     result = Self.playersResult(decoded: snapshot.documents.map { document in
                         Result {
@@ -379,6 +379,18 @@ extension FirestoreManager {
     /// metadata changes. Without it, a screen opened on a game that's gone
     /// would wait for the confirmation forever.
     static let gameListenerIncludesMetadataChanges = true
+
+    /// How a listener reports the error Firestore stopped it with. A refused
+    /// read gets an outcome of its own: the rules let only a game's players
+    /// read its player documents, so trying again can't help, and "check
+    /// your connection" would be wrong.
+    static func listenerFailure(for error: any Error) -> ListenerFailure {
+        let nsError = error as NSError
+        if nsError.domain == FirestoreErrorDomain, nsError.code == FirestoreErrorCode.permissionDenied.rawValue {
+            return .accessDenied(error)
+        }
+        return .listenerStopped(error)
+    }
 
     /// What a game snapshot reports, or nil when there's nothing to report
     /// yet.

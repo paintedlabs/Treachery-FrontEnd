@@ -399,6 +399,8 @@ struct GameBoardView: View {
                 message: "This game has closed and is no longer available.",
                 onGoHome: { goHome() }
             )
+        case .notInGame:
+            GameStatusView.notInGame(onGoHome: { goHome() })
         case .failed:
             GameStatusView(
                 systemImage: "exclamationmark.triangle.fill",

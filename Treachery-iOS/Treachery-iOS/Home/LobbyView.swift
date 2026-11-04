@@ -61,6 +61,8 @@ struct LobbyView: View {
                         message: "This lobby has closed. You can create or join another game from Home.",
                         onGoHome: { goHome() }
                     )
+                case .notInGame:
+                    GameStatusView.notInGame(onGoHome: { goHome() })
                 case .failed:
                     GameStatusView(
                         systemImage: "exclamationmark.triangle.fill",

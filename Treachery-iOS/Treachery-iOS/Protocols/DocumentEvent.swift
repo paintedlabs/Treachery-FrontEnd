@@ -24,9 +24,14 @@ enum DocumentEvent<Value> {
 
 /// Why a listener delivered nothing usable.
 enum ListenerFailure: Error {
-    /// Firestore reported an error, such as permission denied, and stopped
-    /// the listener. Nothing more arrives until it is attached again.
+    /// Firestore reported an error and stopped the listener. Nothing more
+    /// arrives until it is attached again.
     case listenerStopped(any Error)
+    /// Firestore refused the read. Only a game's players may read its player
+    /// documents, so this most likely means the user is no longer in the
+    /// game: they left, or never got a seat when it started. Attaching again
+    /// would be refused again.
+    case accessDenied(any Error)
     /// A document arrived that this build can't decode, most likely written
     /// by a newer server or client. Attaching again would read the same
     /// data, so retrying can't help; updating the app might.

@@ -203,6 +203,39 @@ struct LobbyViewModelListenerTests {
         #expect(vm.status == .disbanded)
     }
 
+    // MARK: - No longer in the game
+
+    @Test func deniedPlayersReadMeansNoLongerInTheGame() {
+        // Firestore refuses the players read once the user is out of
+        // player_ids. That used to show as a connection problem, with a Try
+        // Again that could never work.
+        let (vm, mockFS) = makeLobby(initialGame: makeGame(), players: makePlayers(count: 2))
+        mockFS.emitPlayers(.failure(.accessDenied(ListenerError())), gameId: "game1")
+        #expect(vm.status == .notInGame)
+
+        vm.retry()
+        #expect(vm.status == .notInGame)
+    }
+
+    @Test func deletionOutranksTheDeniedRead() {
+        // Deleting the lobby denies the players read too, in either order.
+        let (vm, mockFS) = makeLobby(initialGame: makeGame())
+        mockFS.emitPlayers(.failure(.accessDenied(ListenerError())), gameId: "game1")
+        mockFS.emitGame(.missing, gameId: "game1")
+        #expect(vm.status == .disbanded)
+    }
+
+    @Test func deniedReadOutranksUnreadableDataAndFailures() {
+        // Neither an update nor a retry would give the player a seat.
+        let (vm, mockFS) = makeLobby(initialGame: makeGame())
+        mockFS.emitGame(.failed(.unreadable(ListenerError())), gameId: "game1")
+        mockFS.emitPlayers(.failure(.accessDenied(ListenerError())), gameId: "game1")
+        #expect(vm.status == .notInGame)
+
+        mockFS.emitGame(.failed(.listenerStopped(ListenerError())), gameId: "game1")
+        #expect(vm.status == .notInGame)
+    }
+
     // MARK: - Unknown state and mode
 
     @Test func unknownStateNeedsANewerVersion() {

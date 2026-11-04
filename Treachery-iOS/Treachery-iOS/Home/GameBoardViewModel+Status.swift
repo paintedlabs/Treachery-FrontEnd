@@ -20,6 +20,9 @@ extension GameBoardViewModel {
         case needsNewerVersion
         /// The server confirmed the game no longer exists.
         case unavailable
+        /// The server refused to show the user this game's players: they're
+        /// no longer in it. Nothing here can change that.
+        case notInGame
         /// A listener failed; `retry()` re-attaches.
         case failed
     }

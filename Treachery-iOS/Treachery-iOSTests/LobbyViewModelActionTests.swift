@@ -113,6 +113,26 @@ struct LobbyViewModelActionTests {
         #expect(mockFS.activePlayersListenerCount(gameId: "game1") == 0)
     }
 
+    @Test func leaveWhoseReplyWasLostEndsNotInTheGame() async {
+        // The leave went through, but its reply never arrived, so leave()
+        // reports a failure and listens again. The restarted players read
+        // is refused, and the lobby says the player is out instead of
+        // blaming the connection.
+        let (mockFS, mockCF) = makeMockSetup(players: makePlayers(count: 4))
+        mockCF.errorToThrow = URLError(.networkConnectionLost)
+        let vm = LobbyViewModel(
+            gameId: "game1", isHost: false,
+            firestoreManager: mockFS, cloudFunctions: mockCF
+        )
+
+        let didLeave = await vm.leave()
+        let denied = NSError(domain: "FIRFirestoreErrorDomain", code: 7)
+        mockFS.emitPlayers(.failure(.accessDenied(denied)), gameId: "game1")
+
+        #expect(!didLeave)
+        #expect(vm.status == .notInGame)
+    }
+
     @Test(.timeLimit(.minutes(1)))
     func leaveRefusedBecauseTheGameStartedStillReachesTheBoard() async {
         // The host starts while we leave: the server refuses the leave, and
