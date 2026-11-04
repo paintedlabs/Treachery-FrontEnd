@@ -72,6 +72,7 @@ test-encoded — no CI job builds Swift or Kotlin (see Repo hygiene).
 | **Android has no traitor-ability support whatsoever** — no `resolveMetamorph`/`resolvePuppetMaster`/`resolveWearerOfMasks` in `CloudFunctionsRepository`, no resolver UI. Treachery games are unplayable past an unveil on Android | **fixed** — repository methods, `ability_resolved` gating, `AbilityResolverSheet` mirroring the iOS sheets; 211 unit tests green |
 | `maxTraitorRarity` is plumbed through both native clients but never sent (iOS passes `nil`, Android omits it), so the setting is web-only | **fixed** — create + lobby pickers on iOS/Android; both `Game` models decode `max_traitor_rarity` and the lobby seeds from the live snapshot |
 | Both native lobbies fall back to the `navIsHost` nav param before the first game snapshot, so a demoted host briefly still sees host UI. Cosmetic — the server enforces host actions | **open** |
+| Web and Android can't delete an account in the app; iOS can, from Profile | **open** — deletion on request instead: `functions/scripts/delete-account.js` deletes one account with the iPhone app's own steps (`deleteAccountFor`) once its owner has set the display-name code we send. Runbook, from the request to the reply: [ACCOUNT-DELETION.md](ACCOUNT-DELETION.md) |
 
 ## Lower severity
 
