@@ -214,6 +214,7 @@ struct GameBoardViewModelTests {
 
     private func abilityPlayer(
         cardId: String = "traitor_07",
+        originalCardId: String? = nil,
         isUnveiled: Bool = true,
         isEliminated: Bool = false,
         abilityResolved: Bool = false
@@ -222,6 +223,7 @@ struct GameBoardViewModelTests {
             id: "p1", orderId: 1, userId: "u1", displayName: "Alice",
             role: .traitor, identityCardId: cardId, lifeTotal: 40,
             isEliminated: isEliminated, isUnveiled: isUnveiled, joinedAt: Date(),
+            originalIdentityCardId: originalCardId,
             abilityResolved: abilityResolved
         )
     }
@@ -254,6 +256,23 @@ struct GameBoardViewModelTests {
     @Test func resolvableAbilityNilForNonAbilityCard() {
         let vm = makeVM(players: [abilityPlayer(cardId: "assassin_01")])
         #expect(vm.resolvableAbility == nil)
+    }
+
+    @Test(arguments: ["traitor_07", "traitor_09", "traitor_13"])
+    func abilityCardSwappedInGivesNoAbility(cardId: String) {
+        // A Puppet Master handed it over; every resolver refuses a holder
+        // who was dealt another card ("Your card is not The Metamorph.").
+        let vm = makeVM(players: [abilityPlayer(cardId: cardId, originalCardId: "guardian_03")])
+        #expect(vm.resolvableAbility == nil)
+        vm.presentAbilityResolver()
+        #expect(vm.pendingAbilityResolution == nil)
+    }
+
+    @Test func abilityCardDealtAndHeldAgainKeepsItsAbility() {
+        // The server records the card first dealt; holding that one again
+        // passes its check.
+        let vm = makeVM(players: [abilityPlayer(cardId: "traitor_07", originalCardId: "traitor_07")])
+        #expect(vm.resolvableAbility == .metamorph)
     }
 
     @Test func presentAbilityResolverOpensSheet() {

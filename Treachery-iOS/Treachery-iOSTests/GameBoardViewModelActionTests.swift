@@ -215,6 +215,24 @@ struct GameBoardViewModelActionTests {
         #expect(vm.pendingAbilityResolution?.abilityType == .metamorph)
     }
 
+    @Test func unveilingACardSwappedInOpensNoAbilitySheet() async {
+        // A Puppet Master handed The Metamorph to a Guardian, whose
+        // resolveMetamorph the server would refuse.
+        var players = makePlayers()
+        players[1] = Player(
+            id: "p1", orderId: 1, userId: "u1", displayName: "Alice",
+            role: .traitor, identityCardId: "traitor_07", lifeTotal: 40,
+            isEliminated: false, isUnveiled: false, joinedAt: Date(),
+            originalIdentityCardId: "guardian_03"
+        )
+        let (vm, cf, _) = makeVM(players: players)
+
+        await vm.unveilCurrentPlayer()
+
+        #expect(cf.unveilPlayerCalls == ["game1"])
+        #expect(vm.pendingAbilityResolution == nil)
+    }
+
     // MARK: - eliminateAndLeave
 
     @Test func eliminateCallsCloudFunction() async {

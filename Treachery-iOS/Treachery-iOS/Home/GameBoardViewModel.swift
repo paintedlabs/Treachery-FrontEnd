@@ -82,9 +82,8 @@ final class GameBoardViewModel: ObservableObject {
         guard let player = currentPlayer,
               player.isUnveiled,
               !player.isEliminated,
-              !player.abilityResolved,
-              let cardId = player.identityCardId else { return nil }
-        return ExecutableAbility(cardId: cardId)
+              !player.abilityResolved else { return nil }
+        return ExecutableAbility(heldBy: player)
     }
 
     var currentIdentityCard: IdentityCard? {
@@ -270,13 +269,12 @@ final class GameBoardViewModel: ObservableObject {
     private func presentAbilityAfterUnveil() {
         guard pendingAbilityResolution == nil,
               let player = currentPlayer, !player.isEliminated, !player.abilityResolved,
-              ExecutableAbility(cardId: player.identityCardId ?? "") != nil else { return }
+              ExecutableAbility(heldBy: player) != nil else { return }
         pendingAbilityResolution = makeAbilityResolution(for: player)
     }
 
     private func makeAbilityResolution(for player: Player) -> AbilityResolution? {
-        guard let cardId = player.identityCardId,
-              let ability = ExecutableAbility(cardId: cardId) else { return nil }
+        guard let ability = ExecutableAbility(heldBy: player) else { return nil }
 
         switch ability {
         case .metamorph:
