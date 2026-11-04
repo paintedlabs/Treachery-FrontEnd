@@ -210,8 +210,9 @@ struct LobbyView: View {
             .onChange(of: viewModel.errorMessage) { _, message in
                 guard let message else { return }
                 // It appears away from wherever the player is looking, or
-                // VoiceOver is reading: bring it into view and read it out.
-                withAnimation { proxy.scrollTo(Self.errorBannerID, anchor: .bottom) }
+                // VoiceOver is reading: bring it into view, at once with
+                // Reduce Motion, and read it out.
+                withAnimation(reduceMotion ? nil : .default) { proxy.scrollTo(Self.errorBannerID, anchor: .bottom) }
                 AccessibilityNotification.Announcement(message).post()
             }
             .safeAreaInset(edge: .bottom, spacing: 0) {

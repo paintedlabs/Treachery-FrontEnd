@@ -74,6 +74,9 @@ struct GameOverView: View {
                 results
             }
         }
+        // A players snapshot redraws the results with a short ease, at once
+        // with Reduce Motion.
+        .animation(reduceMotion ? nil : .easeInOut(duration: 0.3), value: viewModel.serverPlayers)
         .navigationBarTitleDisplayMode(.inline)
         .toolbarColorScheme(.dark, for: .navigationBar)
         .navigationBarBackButtonHidden(true)

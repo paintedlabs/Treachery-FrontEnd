@@ -52,6 +52,10 @@ struct GameBoardView: View {
                 }
             }
         }
+        // A players snapshot redraws the board with a short ease, at once
+        // with Reduce Motion. A tap's change shows at once, as before: the
+        // totals animate by themselves.
+        .animation(reduceMotion ? nil : .easeInOut(duration: 0.3), value: viewModel.serverPlayers)
         .navigationBarTitleDisplayMode(.inline)
         .toolbarColorScheme(.dark, for: .navigationBar)
         .navigationBarBackButtonHidden(true)

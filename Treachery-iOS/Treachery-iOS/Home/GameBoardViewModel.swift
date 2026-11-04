@@ -56,7 +56,9 @@ final class GameBoardViewModel: ObservableObject {
     /// Per player: the wait for a confirmed change to show up in a
     /// snapshot. Visible to tests, which await it rather than sleep.
     private(set) var lifeChangeEchoWaits: [String: Task<Void, Never>] = [:]
-    private var serverPlayers: [Player] = []
+    /// The latest players snapshot. The board and Game Over animate its
+    /// changes, unless Reduce Motion is on; a tap's change shows at once.
+    private(set) var serverPlayers: [Player] = []
     /// Times the debounce and the wait for a confirmed change's echo.
     private let clock: any Clock<Duration>
 
@@ -559,9 +561,7 @@ extension GameBoardViewModel {
             lifeChangeDebounces.removeValue(forKey: player.id)?.cancel()
         }
         lifeChangeFailures = revisedLifeChangeFailures(by: players)
-        withAnimation(.easeInOut(duration: 0.3)) {
-            refreshPlayers()
-        }
+        refreshPlayers()
         // A snapshot that settles a confirmed batch ends its wait.
         let settled = lifeChangeEchoWaits.keys.filter { !lifeLedger.isWaitingForEcho(for: $0) }
         for playerId in settled {
