@@ -101,7 +101,9 @@ export default function PrivacyPolicyScreen() {
               account ID. On every platform, Analytics also collects identifiers for your app
               installation or browser, your device or browser type, operating system, app version
               and language, your approximate location (city, region and country, worked out from
-              your IP address), and when and for how long you use the app. On Android it can also
+              your IP address), and when and for how long you use the app. On iPhone it also records
+              the ID that iOS gives to apps from the same developer on your device (the identifier
+              for vendor, or IDFV), but not your iPhone’s advertising ID. On Android it can also
               record your device’s advertising ID, which you can reset or delete in your device
               settings. On the web it uses cookies. Analytics never includes your email address,
               phone number or display name. We use it to see how Treachery is used and what to
@@ -117,6 +119,12 @@ export default function PrivacyPolicyScreen() {
             <Bullet>
               <Term>Web requests.</Term> When you open the web app, including this page, Firebase
               Hosting logs your IP address to detect abuse and to measure how the site is used.
+            </Bullet>
+            <Bullet>
+              <Term>Server requests.</Term> Each time the app asks our server to do something, such
+              as join a game, change a life total or accept a friend request, Cloud Functions logs
+              the request with your IP address and details of your browser or app. We use these logs
+              to find and fix problems.
             </Bullet>
           </BulletList>
           <Paragraph>
@@ -222,8 +230,8 @@ export default function PrivacyPolicyScreen() {
               remain. Crash reports: 90 days. Deleting your account doesn’t remove these sooner.
             </Bullet>
             <Bullet>
-              Logs that include your IP address: a few weeks for sign-ins and a few months for web
-              requests.
+              Logs that include your IP address: a few weeks for sign-ins, 30 days for server
+              requests and a few months for web requests.
             </Bullet>
             <Bullet>
               After information is deleted, Google can take up to 180 days to clear it from its
