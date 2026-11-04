@@ -106,9 +106,16 @@ struct GameHistoryView: View {
 // MARK: - Game History Row
 
 private struct GameHistoryRow: View {
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     let game: Game
     let players: [Player]
     let currentUserId: String?
+
+    /// Two columns of players, or one at the accessibility text sizes,
+    /// where half the card's width cut names down to a letter or two.
+    private var playerColumns: [GridItem] {
+        Array(repeating: GridItem(.flexible()), count: dynamicTypeSize.isAccessibilitySize ? 1 : 2)
+    }
 
     private var winningRole: Role? {
         guard let teamString = game.winningTeam else { return nil }
@@ -145,8 +152,8 @@ private struct GameHistoryRow: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            // Header: date + result
-            HStack {
+            // Header: date + result, stacked at the accessibility text sizes
+            AdaptiveRow {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(game.createdAt, style: .date)
                         .font(.subheadline)
@@ -156,12 +163,10 @@ private struct GameHistoryRow: View {
                         .font(.caption)
                         .foregroundStyle(Color.mtgTextSecondary)
                 }
-
-                Spacer()
-
+            } trailing: {
                 // Win/Loss badge
                 if result != nil || winningRole != nil {
-                    VStack(alignment: .trailing, spacing: 2) {
+                    VStack(alignment: dynamicTypeSize.isAccessibilitySize ? .leading : .trailing, spacing: 2) {
                         if let result {
                             Text(result.label)
                                 .font(.subheadline)
@@ -189,10 +194,7 @@ private struct GameHistoryRow: View {
             if !players.isEmpty {
                 OrnateDivider()
 
-                LazyVGrid(columns: [
-                    GridItem(.flexible()),
-                    GridItem(.flexible())
-                ], alignment: .leading, spacing: 4) {
+                LazyVGrid(columns: playerColumns, alignment: .leading, spacing: 4) {
                     ForEach(players) { player in
                         HStack(spacing: 4) {
                             Circle()
@@ -200,7 +202,7 @@ private struct GameHistoryRow: View {
                                 .frame(width: 6, height: 6)
                             Text(player.displayName)
                                 .font(.caption)
-                                .lineLimit(1)
+                                .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 1)
                                 .foregroundStyle(player.userId == currentUserId ? Color.mtgTextPrimary : Color.mtgTextSecondary)
                                 .fontWeight(player.userId == currentUserId ? .semibold : .regular)
                             if player.isEliminated {

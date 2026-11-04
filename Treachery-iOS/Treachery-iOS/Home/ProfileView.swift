@@ -10,6 +10,7 @@ import SwiftUI
 
 struct ProfileView: View {
     @EnvironmentObject var authViewModel: AuthViewModel
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @StateObject private var viewModel: ProfileViewModel
 
     /// `viewModel` is built once, the first time this view is installed.
@@ -234,7 +235,8 @@ struct ProfileView: View {
             ProfileRow(label: "Display Name", value: viewModel.isEditingName ? nil : user.displayName) {
                 if viewModel.isEditingName {
                     TextField("Name", text: $viewModel.editedName)
-                        .multilineTextAlignment(.trailing)
+                        // Under its label when the row stacks, so aligned with it.
+                        .multilineTextAlignment(dynamicTypeSize.isAccessibilitySize ? .leading : .trailing)
                         .textInputAutocapitalization(.words)
                         .foregroundStyle(Color.mtgGoldBright)
                 }
@@ -313,8 +315,15 @@ struct ProfileView: View {
 // MARK: - Game Stats Card
 
 private struct GameStatsCard: View {
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     let stats: GameStats
     let elo: Int
+
+    /// Side by side, or one under another at the accessibility text sizes,
+    /// where a quarter of the card's width broke their labels mid-word.
+    private var resultsLayout: AnyLayout {
+        dynamicTypeSize.isAccessibilitySize ? AnyLayout(VStackLayout(spacing: 8)) : AnyLayout(HStackLayout(spacing: 8))
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -328,7 +337,7 @@ private struct GameStatsCard: View {
                 .padding(.horizontal, 16)
                 .padding(.bottom, 12)
 
-            HStack(spacing: 8) {
+            resultsLayout {
                 MtgStatBox(value: "\(stats.totalGames)", label: "Games", color: Color.mtgTextPrimary)
                 MtgStatBox(value: "\(stats.wins)", label: "Wins", color: Color.mtgSuccess)
                 MtgStatBox(value: "\(stats.losses)", label: "Losses", color: Color.mtgError)
@@ -401,7 +410,16 @@ private struct GameStatsCard: View {
 // MARK: - Deck Performance Card
 
 private struct DeckPerformanceCard: View {
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     let deckStats: [String: DeckStat]
+
+    /// Side by side, or one under another at the accessibility text sizes,
+    /// where a third of the card's width broke the labels mid-word.
+    private var statsLayout: AnyLayout {
+        dynamicTypeSize.isAccessibilitySize
+            ? AnyLayout(VStackLayout(alignment: .leading, spacing: 4))
+            : AnyLayout(HStackLayout(spacing: 16))
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -422,7 +440,7 @@ private struct DeckPerformanceCard: View {
                         .italic()
                         .foregroundStyle(Color.mtgGoldBright)
 
-                    HStack(spacing: 16) {
+                    statsLayout {
                         HStack(spacing: 4) {
                             Text("ELO")
                                 .font(.caption)
@@ -449,9 +467,8 @@ private struct DeckPerformanceCard: View {
                                 .font(.subheadline.weight(.semibold))
                                 .foregroundStyle(Color.mtgTextPrimary)
                         }
-
-                        Spacer()
                     }
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
                 .padding(.horizontal, 16)
                 .padding(.vertical, 8)
@@ -681,10 +698,12 @@ private struct ProfileRow<Content: View>: View {
     }
 
     var body: some View {
-        HStack {
+        // Stacked at the accessibility text sizes, where side by side broke
+        // the user's own name mid-word.
+        AdaptiveRow {
             Text(label)
                 .foregroundStyle(Color.mtgTextPrimary)
-            Spacer()
+        } trailing: {
             if let value = value {
                 Text(value)
                     .foregroundStyle(Color.mtgTextSecondary)
