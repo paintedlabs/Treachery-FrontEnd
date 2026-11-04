@@ -8,6 +8,9 @@ const { sanitizeCommanderKey } = require("./validation");
 const { isTreacheryMode } = require("./rules");
 const { notifyPlayers } = require("./notifications");
 
+// gRPC status code Firestore uses when an update targets a missing document.
+const FIRESTORE_NOT_FOUND = 5;
+
 // ════════════════════════════════════════════════════════════════
 // CLOUD FUNCTION: cleanupStaleGames (Scheduled)
 // Runs every hour. Deletes games stuck in "waiting" or
@@ -144,10 +147,19 @@ exports.onPlayerJoined = onDocumentCreated(
     const gameId = event.params.gameId;
     const displayName = player.display_name || "Someone";
 
-    // Update last_activity_at on the game
-    await db.doc(`games/${gameId}`).update({
-      last_activity_at: FieldValue.serverTimestamp(),
-    });
+    // Update last_activity_at on the game. The game can already be gone:
+    // a lobby closed, swept or left by its last player right after this
+    // join. Then there is no one to notify, and an unhandled NOT_FOUND
+    // would only fail this invocation (and, in the emulator, kill the
+    // worker and drop other functions' requests).
+    try {
+      await db.doc(`games/${gameId}`).update({
+        last_activity_at: FieldValue.serverTimestamp(),
+      });
+    } catch (error) {
+      if (error.code === FIRESTORE_NOT_FOUND) return;
+      throw error;
+    }
 
     // Notify other players
     await notifyPlayers(
