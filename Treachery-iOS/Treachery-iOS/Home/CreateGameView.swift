@@ -66,9 +66,14 @@ struct CreateGameView: View {
 
                         OrnateDivider()
 
-                        Stepper("Starting Life: \(viewModel.startingLife)", value: $viewModel.startingLife, in: 20...60, step: 5)
-                            .foregroundStyle(Color.mtgTextPrimary)
-                            .accessibilityValue("\(viewModel.startingLife) life")
+                        Stepper(
+                            "Starting Life: \(viewModel.startingLife)",
+                            value: $viewModel.startingLife,
+                            in: Game.startingLifeRange,
+                            step: Game.startingLifeStep
+                        )
+                        .foregroundStyle(Color.mtgTextPrimary)
+                        .accessibilityValue("\(viewModel.startingLife) life")
                     }
                     .padding(16)
                     .mtgCardFrame()

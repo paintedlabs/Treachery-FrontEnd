@@ -4,6 +4,9 @@
 //
 
 import Foundation
+import os
+
+private let logger = Logger(subsystem: "com.Solomon.Treachery-iOS", category: "JoinGame")
 
 @MainActor
 final class JoinGameViewModel: ObservableObject {
@@ -43,9 +46,24 @@ final class JoinGameViewModel: ObservableObject {
             isJoining = false
             return .lobby(gameId: result.gameId, isHost: false)
         } catch {
-            errorMessage = error.localizedDescription
+            logger.error("joinGame failed: \(String(describing: error), privacy: .public)")
+            errorMessage = Self.message(for: error)
             isJoining = false
             return nil
+        }
+    }
+
+    /// A plain sentence for a failed join: the server's own reason when it
+    /// turned the join down ("Game not found. Check the code and try again.",
+    /// "This game is full."), otherwise what to try next.
+    private static func message(for error: any Error) -> String {
+        switch error {
+        case let refusal as CallableRefusal:
+            return refusal.message
+        case is JoinGameResult.MissingGameIdError:
+            return "Couldn't join the game. Please try again."
+        default:
+            return "Couldn't join the game. Check your connection and try again."
         }
     }
 }

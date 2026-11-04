@@ -10,7 +10,24 @@ final class MockCloudFunctions: CloudFunctionsProtocol {
     )
 
     var joinGameResult = JoinGameResult(action: "joined", gameId: "mock-game-id")
+    /// When set, joinGame parses this server-shaped payload with the
+    /// production parser instead of returning `joinGameResult`.
+    var joinGamePayload: [String: Any]?
     var createGameResult = "mock-created-game-id"
+
+    /// When set, these calls wait at the gate until the test releases them,
+    /// so a test can act while one is in flight.
+    var startGameGate: CallGate?
+    var leaveGameGate: CallGate?
+    var adjustLifeGate: CallGate?
+    var unveilPlayerGate: CallGate?
+
+    /// What adjustLife answers with as the server's new total. Read when the
+    /// call returns, so a test can set it while the call is held.
+    var adjustLifeNewLife: Int?
+    /// Thrown by the next adjustLife calls, one each, ahead of
+    /// `errorToThrow`: a test can fail one call and let the next through.
+    var adjustLifeErrors: [Error] = []
 
     // Call tracking
     var createGameCalls: [(gameMode: String, maxPlayers: Int, startingLife: Int, maxTraitorRarity: String?)] = []
@@ -19,6 +36,7 @@ final class MockCloudFunctions: CloudFunctionsProtocol {
     var adjustLifeCalls: [(gameId: String, playerId: String, amount: Int)] = []
     var eliminatePlayerCalls: [String] = []
     var unveilPlayerCalls: [String] = []
+    var rollPlanarDieCalls: [String] = []
     var leaveGameCalls: [String] = []
     var endGameCalls: [(gameId: String, winnerUserIds: [String]?)] = []
     var acceptFriendRequestCalls: [String] = []
@@ -40,17 +58,28 @@ final class MockCloudFunctions: CloudFunctionsProtocol {
     func joinGame(gameCode: String) async throws -> JoinGameResult {
         if let error = errorToThrow { throw error }
         joinGameCalls.append(gameCode)
+        if let joinGamePayload {
+            return try JoinGameResult(payload: joinGamePayload)
+        }
         return joinGameResult
     }
 
     func startGame(gameId: String) async throws {
+        if let startGameGate { await startGameGate.hold() }
         if let error = errorToThrow { throw error }
         startGameCalls.append(gameId)
     }
 
-    func adjustLife(gameId: String, playerId: String, amount: Int) async throws {
+    /// On the main actor, where the tests read the call log: the board sends
+    /// each player's changes separately, so calls can overlap and would
+    /// otherwise append to it from several threads at once.
+    @MainActor
+    func adjustLife(gameId: String, playerId: String, amount: Int) async throws -> Int? {
+        if let adjustLifeGate { await adjustLifeGate.hold() }
+        if !adjustLifeErrors.isEmpty { throw adjustLifeErrors.removeFirst() }
         if let error = errorToThrow { throw error }
         adjustLifeCalls.append((gameId, playerId, amount))
+        return adjustLifeNewLife
     }
 
     func eliminatePlayer(gameId: String) async throws {
@@ -59,11 +88,13 @@ final class MockCloudFunctions: CloudFunctionsProtocol {
     }
 
     func unveilPlayer(gameId: String) async throws {
+        if let unveilPlayerGate { await unveilPlayerGate.hold() }
         if let error = errorToThrow { throw error }
         unveilPlayerCalls.append(gameId)
     }
 
     func leaveGame(gameId: String) async throws {
+        if let leaveGameGate { await leaveGameGate.hold() }
         if let error = errorToThrow { throw error }
         leaveGameCalls.append(gameId)
     }
@@ -94,6 +125,7 @@ final class MockCloudFunctions: CloudFunctionsProtocol {
 
     func rollPlanarDie(gameId: String) async throws -> String {
         if let error = errorToThrow { throw error }
+        rollPlanarDieCalls.append(gameId)
         return rollPlanarDieResult
     }
 

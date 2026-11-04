@@ -86,8 +86,10 @@ struct WearerOfMasksAbilitySheet: View {
                     Image(systemName: "minus.circle.fill")
                         .font(.system(size: 32))
                         .foregroundStyle(Color.mtgAssassin)
+                        .minimumTapTarget()
                 }
                 .buttonStyle(.plain)
+                .accessibilityLabel("Decrease X")
 
                 Text("\(xValue)")
                     .font(.system(size: 48, weight: .bold, design: .serif))
@@ -100,8 +102,10 @@ struct WearerOfMasksAbilitySheet: View {
                     Image(systemName: "plus.circle.fill")
                         .font(.system(size: 32))
                         .foregroundStyle(Color.mtgSuccess)
+                        .minimumTapTarget()
                 }
                 .buttonStyle(.plain)
+                .accessibilityLabel("Increase X")
             }
         }
         .padding()
@@ -164,10 +168,12 @@ struct WearerOfMasksAbilitySheet: View {
                     Spacer()
                     Text(card.role.displayName)
                         .font(.caption)
-                        .foregroundStyle(card.role.color)
+                        .foregroundStyle(card.role.textColor)
                     if isSelected {
                         Image(systemName: "checkmark.circle.fill")
                             .foregroundStyle(Color.mtgGold)
+                            // VoiceOver hears "Selected" instead.
+                            .accessibilityHidden(true)
                     }
                 }
 
@@ -185,6 +191,7 @@ struct WearerOfMasksAbilitySheet: View {
             )
         }
         .buttonStyle(.plain)
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 
     private var actionButtons: some View {

@@ -36,32 +36,17 @@ struct LobbyGameCodeCard: View {
                 .clipShape(Capsule())
                 .accessibilityLabel("Game mode: \(game.gameMode.displayName)")
 
-            HStack(spacing: 16) {
-                Button {
-                    UIPasteboard.general.string = game.code
-                } label: {
-                    HStack(spacing: 4) {
-                        Image(systemName: "doc.on.doc")
-                            .font(.caption)
-                        Text("Copy")
-                            .font(.caption)
-                    }
-                    .foregroundStyle(Color.mtgGold)
+            // Side by side, or one above the other when the text is too
+            // large for both on one line.
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 16) {
+                    copyButton
+                    shareButton
                 }
-                .accessibilityLabel("Copy game code")
-
-                Button {
-                    showShareSheet = true
-                } label: {
-                    HStack(spacing: 4) {
-                        Image(systemName: "square.and.arrow.up")
-                            .font(.caption)
-                        Text("Share")
-                            .font(.caption)
-                    }
-                    .foregroundStyle(Color.mtgGold)
+                VStack(spacing: 12) {
+                    copyButton
+                    shareButton
                 }
-                .accessibilityLabel("Share game code with friends")
             }
             .padding(.top, 4)
         }
@@ -71,5 +56,42 @@ struct LobbyGameCodeCard: View {
         .mtgCardGlow(color: .mtgGold, radius: 12, opacity: 0.12)
         .padding(.horizontal)
         .padding(.top, 12)
+    }
+
+    // Each keeps its look; its tap area reaches around it to 44pt. Plain,
+    // so the whole area takes the tap, not only the label's own frame.
+
+    private var copyButton: some View {
+        Button {
+            UIPasteboard.general.string = game.code
+        } label: {
+            HStack(spacing: 4) {
+                Image(systemName: "doc.on.doc")
+                    .font(.caption)
+                Text("Copy")
+                    .font(.caption)
+            }
+            .foregroundStyle(Color.mtgGold)
+            .minimumTapTarget()
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Copy game code")
+    }
+
+    private var shareButton: some View {
+        Button {
+            showShareSheet = true
+        } label: {
+            HStack(spacing: 4) {
+                Image(systemName: "square.and.arrow.up")
+                    .font(.caption)
+                Text("Share")
+                    .font(.caption)
+            }
+            .foregroundStyle(Color.mtgGold)
+            .minimumTapTarget()
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Share game code with friends")
     }
 }

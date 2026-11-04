@@ -5,6 +5,7 @@
 //  Created by Luke Solomon on 3/14/26.
 //
 
+import Accessibility
 import SwiftUI
 
 struct GameBoardView: View {
@@ -12,15 +13,16 @@ struct GameBoardView: View {
     @StateObject private var viewModel: GameBoardViewModel
     @Binding var navigationPath: NavigationPath
     @State private var showCardDetail = false
-    @State private var cardFlipDegrees: Double = 0
-    @State private var showUnveiledBanner = false
     @State private var showForfeitConfirmation = false
-    @State private var showGameUnavailableAlert = false
     @State private var showEndGameConfirmation = false
     @State private var showWinnerSelection = false
     @State private var selectedWinners: Set<String> = []
     @State private var inspectedPlayer: Player?
     @State private var showColorPicker = false
+    /// Counts changes to the pinned controls' height, to flash their scroll
+    /// indicators when there's more of them than fits.
+    @State private var pinnedControlsChanges = 0
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     init(gameId: String, currentUserId: String? = nil, navigationPath: Binding<NavigationPath>) {
         _viewModel = StateObject(wrappedValue: GameBoardViewModel(gameId: gameId, currentUserId: currentUserId))
@@ -37,237 +39,31 @@ struct GameBoardView: View {
 
     var body: some View {
         ZStack {
-            Color.mtgBackground.ignoresSafeArea()
-
-            if let hex = viewModel.currentPlayer?.playerColor {
-                Color(hex: hex).opacity(0.15).ignoresSafeArea()
-            }
+            boardBackground
+                .ignoresSafeArea()
 
             VStack(spacing: 0) {
                 ConnectionBanner()
 
-                if viewModel.isGameUnavailable {
-                    // Game was deleted or became unavailable
-                    Spacer()
-                    VStack(spacing: 12) {
-                        Image(systemName: "wifi.exclamationmark")
-                            .font(.system(size: 48))
-                            .foregroundStyle(Color.mtgGold)
-                        Text("Game Unavailable")
-                            .font(.system(.title2, design: .serif))
-                            .fontWeight(.bold)
-                            .foregroundStyle(Color.mtgTextPrimary)
-                        Text("This game is no longer available. It may have been deleted by the host.")
-                            .font(.subheadline)
-                            .foregroundStyle(Color.mtgTextSecondary)
-                            .multilineTextAlignment(.center)
-                        Button("Return to Home") {
-                            navigationPath.removeLast(navigationPath.count)
-                        }
-                        .buttonStyle(MtgPrimaryButtonStyle())
-                        .padding(.top)
-                        .padding(.horizontal, 40)
-                    }
-                    .padding()
-                    Spacer()
-                } else if viewModel.players.isEmpty {
-                    // Loading state
-                    Spacer()
-                    MtgLoadingView(message: "Loading game...")
-                    Spacer()
+                if viewModel.status != .ready {
+                    statusContent
                 } else {
-                    // Identity card header — only when treachery active
-                    if viewModel.isTreacheryActive {
-                        if let card = viewModel.currentIdentityCard,
-                           let player = viewModel.currentPlayer {
-                            ZStack {
-                                Button {
-                                    showCardDetail = true
-                                } label: {
-                                    IdentityCardHeader(card: card, player: player)
-                                }
-                                .buttonStyle(.plain)
-                                .rotation3DEffect(
-                                    .degrees(cardFlipDegrees),
-                                    axis: (x: 0, y: 1, z: 0),
-                                    perspective: 0.5
-                                )
-
-                                // Unveiled banner overlay
-                                if showUnveiledBanner {
-                                    VStack {
-                                        Text("IDENTITY REVEALED")
-                                            .font(.headline)
-                                            .fontWeight(.black)
-                                            .foregroundStyle(Color.mtgBackground)
-                                            .padding(.horizontal, 20)
-                                            .padding(.vertical, 10)
-                                            .background(
-                                                RoundedRectangle(cornerRadius: 8)
-                                                    .fill(player.role?.color ?? Color.mtgGuardian)
-                                                    .shadow(color: (player.role?.color ?? Color.mtgGuardian).opacity(0.6), radius: 12)
-                                            )
-                                    }
-                                    .transition(.scale.combined(with: .opacity))
-                                    .zIndex(1)
-                                }
-                            }
-                        } else {
-                            // Current player not found (reconnection case)
-                            VStack(spacing: 8) {
-                                Image(systemName: "exclamationmark.triangle.fill")
-                                    .font(.title)
-                                    .foregroundStyle(Color.mtgGold)
-                                Text("Unable to find your player data")
-                                    .font(.subheadline)
-                                    .foregroundStyle(Color.mtgTextSecondary)
-                            }
-                            .padding()
-                        }
-                    }
-
-                    // Plane card banner — only when planechase active (and not own-deck)
-                    if viewModel.isPlanechaseActive && !viewModel.isOwnDeckMode {
-                        // Chaotic Aether indicator
-                        if viewModel.isChaoticAetherActive {
-                            ChaoticAetherIndicator()
-                        }
-
-                        if let plane = viewModel.currentPlane {
-                            PlaneCardBanner(plane: plane, secondaryPlane: viewModel.secondaryPlane)
-
-                            // Phenomenon overlay when current plane is a phenomenon.
-                            // Eliminated spectators keep the banner but not the
-                            // resolver — the server rejects their resolve anyway.
-                            if plane.isPhenomenon && viewModel.currentPlayer?.isEliminated != true {
-                                PhenomenonOverlay(plane: plane, viewModel: viewModel)
-                            }
-                        }
-                    }
-
-                    OrnateDivider()
-                        .padding(.horizontal)
-                        .padding(.vertical, 4)
-
-                    // Player list with life controls — always shown
-                    ScrollView {
-                        VStack(spacing: 0) {
-                            MtgSectionHeader(title: "Players")
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .padding(.horizontal, 16)
-                                .padding(.bottom, 8)
-
-                            VStack(spacing: 0) {
-                                ForEach(viewModel.players) { player in
-                                    GameBoardPlayerRow(
-                                        player: player,
-                                        viewModel: viewModel,
-                                        showColorPicker: player.userId == viewModel.currentUserId ? $showColorPicker : .constant(false)
-                                    ) { tappedPlayer in
-                                        inspectedPlayer = tappedPlayer
-                                    }
-                                    .padding(.horizontal, 16)
-                                    .padding(.vertical, 8)
-
-                                    if player.id != viewModel.players.last?.id {
-                                        Rectangle()
-                                            .fill(Color.mtgDivider)
-                                            .frame(height: 1)
-                                            .padding(.horizontal, 16)
-                                    }
-                                }
-                            }
-                            .mtgCardFrame()
-                            .padding(.horizontal)
-                        }
-                    }
-                    .sheet(item: $inspectedPlayer) { player in
-                        if let card = viewModel.identityCard(for: player) {
-                            IdentityCardView(card: card, player: player)
-                        }
-                    }
-
-                    // Error display
-                    if let error = viewModel.errorMessage {
-                        MtgErrorBanner(message: error)
-                            .padding(.horizontal)
-                            .padding(.vertical, 4)
-                    }
-
-                    // Spectator overlay for eliminated players (treachery only)
-                    if viewModel.isTreacheryActive,
-                       let player = viewModel.currentPlayer, player.isEliminated {
-                        VStack(spacing: 8) {
-                            HStack(spacing: 8) {
-                                Image(systemName: "person.slash.fill")
-                                    .foregroundStyle(Color.mtgError)
-                                Text("You've Been Eliminated")
-                                    .font(.system(.headline, design: .serif))
-                                    .fontWeight(.bold)
-                                    .foregroundStyle(Color.mtgError)
-                            }
-
-                            Text("You're now spectating. Watch the game unfold or leave.")
-                                .font(.caption)
-                                .foregroundStyle(Color.mtgTextSecondary)
-                                .italic()
-                                .multilineTextAlignment(.center)
-
-                            Button("Leave Game") {
-                                // Spectators go home — game-over must not reveal identities mid-game.
-                                navigationPath.removeLast(navigationPath.count)
-                            }
-                            .foregroundStyle(Color.mtgError)
-                            .padding(.top, 4)
-                        }
-                        .padding()
-                        .frame(maxWidth: .infinity)
-                        .background(Color.mtgError.opacity(0.1))
-                        .overlay(
-                            Rectangle()
-                                .fill(Color.mtgError)
-                                .frame(height: 1),
-                            alignment: .top
-                        )
-                    }
-
-                    // Planar die bar — only when planechase active
-                    if viewModel.isPlanechaseActive {
-                        PlanarDieBar(viewModel: viewModel)
-                    }
-
-                    // Action bar (unveil/win) — only when treachery active
-                    if viewModel.isTreacheryActive,
-                       !(viewModel.currentPlayer?.isEliminated ?? true) {
-                        ActionBar(viewModel: viewModel, onUnveil: playUnveilAnimation)
-                    }
-
-                    // End Game button — only when NOT treachery (host only)
-                    if !viewModel.isTreacheryActive && viewModel.isHost {
-                        Button {
-                            selectedWinners = []
-                            showWinnerSelection = true
-                        } label: {
-                            HStack(spacing: 8) {
-                                Image(systemName: "flag.checkered")
-                                Text("End Game")
-                                    .fontWeight(.semibold)
-                            }
-                        }
-                        .buttonStyle(MtgSecondaryButtonStyle())
-                        .padding(.horizontal)
-                        .padding(.vertical, 8)
-                    }
+                    board
                 }
             }
         }
+        // A players snapshot redraws the board with a short ease, at once
+        // with Reduce Motion. A tap's change shows at once, as before: the
+        // totals animate by themselves.
+        .animation(reduceMotion ? nil : .easeInOut(duration: 0.3), value: viewModel.serverPlayers)
         .navigationBarTitleDisplayMode(.inline)
         .toolbarColorScheme(.dark, for: .navigationBar)
         .navigationBarBackButtonHidden(true)
         .onAppear { AnalyticsService.trackScreen("GameBoard") }
         .toolbar {
-            // Forfeit button — available in all game modes so players can always leave
-            if !viewModel.isGameUnavailable && !(viewModel.currentPlayer?.isEliminated ?? true) {
+            // Forfeit button — available in all game modes so players can always
+            // leave: a forfeit brings up the spectator bar, whose Leave goes home
+            if viewModel.status == .ready && viewModel.seat == .playing {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {
                         showForfeitConfirmation = true
@@ -298,14 +94,39 @@ struct GameBoardView: View {
         .onAppear {
             viewModel.currentUserId = authViewModel.currentUserId
         }
+        .onDisappear {
+            // Taps still waiting out their debounce would go with the board.
+            viewModel.sendPendingLifeChanges()
+        }
+        // What each change reads out, if anything, is the view model's call;
+        // see GameBoardViewModel+Accessibility.swift. Nothing is, once the
+        // game is over and Game Over covers the board.
+        .onChange(of: viewModel.errorMessage) { _, message in
+            // An action that fails (a roll, a forfeit, an ability) says so in
+            // the controls pinned below the players.
+            guard let announcement = viewModel.announcement(forError: message) else { return }
+            AccessibilityNotification.Announcement(announcement).post()
+        }
+        .onChange(of: viewModel.lifeChangeFailures) { old, new in
+            // Each new failure by itself.
+            for announcement in viewModel.announcements(forFailuresFrom: old, to: new) {
+                var message = AttributedString(announcement.message)
+                // Low priority waits for VoiceOver to finish what it's saying.
+                message.accessibilitySpeechAnnouncementPriority = announcement.interrupts ? .default : .low
+                AccessibilityNotification.Announcement(message).post()
+            }
+        }
+        .onChange(of: viewModel.seat) { oldSeat, newSeat in
+            guard let announcement = viewModel.announcement(forSeatChangeFrom: oldSeat, to: newSeat) else { return }
+            AccessibilityNotification.Announcement(announcement).post()
+        }
+        .onChange(of: viewModel.unveilProgress) { _, progress in
+            guard let announcement = viewModel.announcement(for: progress) else { return }
+            AccessibilityNotification.Announcement(announcement).post()
+        }
         .onChange(of: viewModel.isGameFinished) { _, finished in
             if finished {
                 navigationPath.append(AppDestination.gameOver(gameId: viewModel.gameId))
-            }
-        }
-        .onChange(of: viewModel.isGameUnavailable) { _, unavailable in
-            if unavailable {
-                showGameUnavailableAlert = true
             }
         }
         .sheet(isPresented: $showCardDetail) {
@@ -356,52 +177,374 @@ struct GameBoardView: View {
         }
     }
 
-    // MARK: - Unveil Animation
+    // MARK: - Board
 
-    private func playUnveilAnimation() {
-        // Phase 1: Flip card away (0 -> 90 degrees)
-        withAnimation(.easeIn(duration: 0.3)) {
-            cardFlipDegrees = 90
-        }
+    /// How much of the board the pinned controls may take before they
+    /// scroll by themselves. At the largest text sizes they would otherwise
+    /// leave no room for the players.
+    private static let pinnedControlsShare: CGFloat = 0.5
 
-        // Phase 2: Perform the unveil at the midpoint, then flip back (90 -> 0)
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-            Task { await viewModel.unveilCurrentPlayer() }
+    /// How strongly the signed-in player's color tints the board.
+    static let playerTintOpacity = 0.15
 
-            withAnimation(.easeOut(duration: 0.3)) {
-                cardFlipDegrees = 0
+    /// The parts of the board that its own actions bring into view, and the
+    /// feedback that appears in its pinned controls.
+    private enum ScrollTarget: Hashable {
+        case identity, plane
+        case error, lifeChanges, unveilFailure, dieResult
+        /// The end of the pinned controls, where they rest.
+        case controlsEnd
+    }
+
+    /// Feedback showing in the pinned controls, and what it says.
+    private struct Feedback: Equatable {
+        let target: ScrollTarget
+        let text: String
+    }
+
+    /// What the pinned controls' scroll position follows: the feedback
+    /// showing in them, and the seat that decides which controls they hold.
+    private struct PinnedControlsState: Equatable {
+        let feedback: [Feedback]
+        let seat: GameBoardViewModel.Seat
+    }
+
+    /// The feedback showing in the pinned controls, top to bottom.
+    private var feedback: [Feedback] {
+        let shown: [(ScrollTarget, String?)] = [
+            (.error, viewModel.errorMessage),
+            (.lifeChanges, viewModel.lifeChangeMessage),
+            (.unveilFailure, viewModel.unveilFailure),
+            (.dieResult, viewModel.dieRollResult),
+        ]
+        return shown.compactMap { target, text in text.map { Feedback(target: target, text: $0) } }
+    }
+
+    /// The identity card, the plane and the players scroll together. The
+    /// controls that act on the game stay pinned below them, so Unveil,
+    /// Roll and End Game are always within reach.
+    private var board: some View {
+        GeometryReader { proxy in
+            ScrollViewReader { scroll in
+                ScrollView {
+                    VStack(spacing: 0) {
+                        GameBoardIdentityArea(
+                            viewModel: viewModel,
+                            onShowCard: { showCardDetail = true },
+                            onGoHome: { goHome() }
+                        )
+                        .id(ScrollTarget.identity)
+
+                        planechaseArea
+                            .id(ScrollTarget.plane)
+
+                        OrnateDivider()
+                            .padding(.horizontal)
+                            .padding(.vertical, 4)
+
+                        playersSection
+                    }
+                    .padding(.bottom, 8)
+                }
+                .scrollBounceBehavior(.basedOnSize)
+                .safeAreaInset(edge: .bottom, spacing: 0) {
+                    pinnedControls(maxHeight: proxy.size.height * Self.pinnedControlsShare)
+                }
+                // The reveal plays in the identity card, and a roll is about
+                // the plane: when the player unveils or rolls from further
+                // down the board, bring it into view. Only on their own
+                // tap, so the rows never move under a finger.
+                .onChange(of: viewModel.unveilProgress) { _, progress in
+                    guard progress == .sending else { return }
+                    bringIntoView(.identity, with: scroll)
+                }
+                .onChange(of: viewModel.isRollingDie) { _, isRolling in
+                    guard isRolling else { return }
+                    bringIntoView(.plane, with: scroll)
+                }
+                // One decision for the pinned controls' position, so it
+                // never depends on which of two handlers runs last.
+                // - Becoming a spectator shows the controls' end, where
+                //   Leave Game is, whatever feedback shows: a spectator may
+                //   have no action left that clears it, and it was brought
+                //   into view and read out when it appeared.
+                // - Otherwise feedback appears at the top of the controls.
+                //   When there's more of them than fits, as at large text
+                //   sizes, that's above the part in view: bring new feedback
+                //   into view, the highest if there's more than one.
+                // - Once feedback goes, and none is new, bring back the end,
+                //   where they rest. Not while a roll is under way: it clears
+                //   the last result and error as it starts, and its own
+                //   result or error brings itself into view when it lands.
+                // - A new seat with no feedback showing changes the
+                //   controls too: show their end.
+                .onChange(of: PinnedControlsState(feedback: feedback, seat: viewModel.seat)) { old, new in
+                    if new.seat == .spectating, old.seat != .spectating {
+                        bringIntoView(.controlsEnd, anchor: .bottom, with: scroll)
+                    } else if let shown = new.feedback.first(where: { !old.feedback.contains($0) }) {
+                        bringIntoView(shown.target, anchor: .top, with: scroll)
+                    } else if new.feedback.count < old.feedback.count, !viewModel.isRollingDie {
+                        bringIntoView(.controlsEnd, anchor: .bottom, with: scroll)
+                    } else if new.seat != old.seat, new.feedback.isEmpty {
+                        bringIntoView(.controlsEnd, anchor: .bottom, with: scroll)
+                    }
+                }
             }
-
-            // Phase 3: Show the "IDENTITY REVEALED" banner
-            withAnimation(.spring(response: 0.4, dampingFraction: 0.6)) {
-                showUnveiledBanner = true
-            }
-
-            // Phase 4: Dismiss the banner after a delay
-            DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
-                withAnimation(.easeOut(duration: 0.5)) {
-                    showUnveiledBanner = false
+            .sheet(item: $inspectedPlayer) { player in
+                if let card = viewModel.identityCard(for: player) {
+                    IdentityCardView(card: card, player: player)
                 }
             }
         }
+    }
+
+    /// Scrolls just far enough to show `target`, or to put it at `anchor`,
+    /// at once with Reduce Motion.
+    private func bringIntoView(_ target: ScrollTarget, anchor: UnitPoint? = nil, with scroll: ScrollViewProxy) {
+        withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.3)) {
+            scroll.scrollTo(target, anchor: anchor)
+        }
+    }
+
+    /// The plane card banner, only when Planechase is on and the board deals
+    /// the planes (not with the players' own decks).
+    @ViewBuilder
+    private var planechaseArea: some View {
+        if viewModel.isPlanechaseActive && !viewModel.isOwnDeckMode {
+            VStack(spacing: 0) {
+                if viewModel.isChaoticAetherActive {
+                    ChaoticAetherIndicator()
+                }
+
+                if let plane = viewModel.currentPlane {
+                    PlaneCardBanner(plane: plane, secondaryPlane: viewModel.secondaryPlane)
+
+                    // Phenomenon overlay when current plane is a phenomenon.
+                    // Eliminated spectators keep the banner but not the
+                    // resolver — the server rejects their resolve anyway.
+                    if plane.isPhenomenon && viewModel.currentPlayer?.isEliminated != true {
+                        PhenomenonOverlay(plane: plane, viewModel: viewModel)
+                    }
+                }
+            }
+        }
+    }
+
+    /// Every player, with their life controls.
+    private var playersSection: some View {
+        VStack(spacing: 0) {
+            MtgSectionHeader(title: "Players")
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 16)
+                .padding(.bottom, 8)
+
+            VStack(spacing: 0) {
+                ForEach(viewModel.players) { player in
+                    GameBoardPlayerRow(
+                        player: player,
+                        viewModel: viewModel,
+                        showColorPicker: player.userId == viewModel.currentUserId ? $showColorPicker : .constant(false)
+                    ) { tappedPlayer in
+                        inspectedPlayer = tappedPlayer
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 8)
+
+                    if player.id != viewModel.players.last?.id {
+                        Rectangle()
+                            .fill(Color.mtgDivider)
+                            .frame(height: 1)
+                            .padding(.horizontal, 16)
+                    }
+                }
+            }
+            .mtgCardFrame()
+            .padding(.horizontal)
+        }
+    }
+
+    /// The errors, and the controls that act on the game: as tall as they
+    /// need, up to `maxHeight`, past which they scroll by themselves. Then
+    /// they show their end first, where the controls are, and keep it in
+    /// view as they grow, flashing their scroll indicators to show there's
+    /// more above.
+    private func pinnedControls(maxHeight: CGFloat) -> some View {
+        ScrollView {
+            VStack(spacing: 0) {
+                errorBanners
+
+                // Planar die bar — only when planechase active. A roll's
+                // result shows at its top.
+                if viewModel.isPlanechaseActive {
+                    PlanarDieBar(viewModel: viewModel)
+                        .id(ScrollTarget.dieResult)
+                }
+
+                // Action bar (unveil/win) — only when treachery active
+                if viewModel.isTreacheryActive, viewModel.seat == .playing {
+                    ActionBar(viewModel: viewModel)
+                }
+
+                // End Game button — the host's, in every mode but Treachery's,
+                // eliminated or not
+                if viewModel.canEndGame {
+                    Button {
+                        presentWinnerSelection()
+                    } label: {
+                        HStack(spacing: 8) {
+                            Image(systemName: "flag.checkered")
+                                .accessibilityHidden(true)
+                            Text("End Game")
+                                .fontWeight(.semibold)
+                        }
+                    }
+                    .buttonStyle(MtgSecondaryButtonStyle())
+                    .padding(.horizontal)
+                    .padding(.vertical, 8)
+                }
+
+                // Spectator bar for eliminated players, in every mode: its
+                // Leave is their only way off the board, so it comes last,
+                // the first thing shown when the controls don't all fit.
+                if let leave = viewModel.spectatorLeave {
+                    SpectatorBar(leave: leave, onGoHome: { goHome() }, onEndGame: { presentWinnerSelection() })
+                }
+
+                // Where the controls end, for the board to bring back into
+                // view. An id on the stack itself would change its layout.
+                Color.clear
+                    .frame(height: 0)
+                    .id(ScrollTarget.controlsEnd)
+            }
+        }
+        .scrollBounceBehavior(.basedOnSize)
+        .defaultScrollAnchor(.bottom)
+        .defaultScrollAnchor(.bottom, for: .sizeChanges)
+        .onScrollGeometryChange(for: CGFloat.self, of: \.contentSize.height) { _, _ in
+            pinnedControlsChanges += 1
+        }
+        .scrollIndicatorsFlash(trigger: pinnedControlsChanges)
+        .scrollIndicatorsFlash(onAppear: true)
+        // Asks the scroll view for its content's height, capped.
+        .frame(maxHeight: maxHeight)
+        .fixedSize(horizontal: false, vertical: true)
+        .background { boardBackground.ignoresSafeArea(edges: .bottom) }
+        .overlay(alignment: .top) {
+            Rectangle()
+                .fill(Color.mtgDivider)
+                .frame(height: 1)
+        }
+    }
+
+    /// The last action's error, failed life changes and a failed unveil.
+    /// They wrap rather than truncate, so they stay readable at the largest
+    /// text sizes; the pinned controls scroll if they need to.
+    @ViewBuilder
+    private var errorBanners: some View {
+        if let error = viewModel.errorMessage {
+            MtgErrorBanner(message: error)
+                .padding(.horizontal)
+                .padding(.vertical, 4)
+                .id(ScrollTarget.error)
+        }
+        if let message = viewModel.lifeChangeMessage {
+            MtgErrorBanner(message: message)
+                .padding(.horizontal)
+                .padding(.vertical, 4)
+                .id(ScrollTarget.lifeChanges)
+        }
+        if let failure = viewModel.unveilFailure {
+            MtgErrorBanner(message: failure)
+                .padding(.horizontal)
+                .padding(.vertical, 4)
+                .id(ScrollTarget.unveilFailure)
+        }
+    }
+
+    /// Dark, tinted with the signed-in player's color.
+    private var boardBackground: some View {
+        ZStack {
+            Color.mtgBackground
+            if let hex = viewModel.currentPlayer?.playerColor {
+                Color(hex: hex).opacity(Self.playerTintOpacity)
+            }
+        }
+    }
+
+    // MARK: - Status
+
+    /// Everything but the board itself. Each state offers a way home, since
+    /// this screen hides the back button and the tab bar.
+    @ViewBuilder
+    private var statusContent: some View {
+        switch viewModel.status {
+        case .ready:
+            EmptyView() // the board itself is shown instead
+        case .loading:
+            GameLoadingView(message: "Loading game...", onGoHome: { goHome() })
+        case .unavailable:
+            GameStatusView(
+                systemImage: "wifi.exclamationmark",
+                title: "Game Unavailable",
+                message: "This game has closed and is no longer available.",
+                onGoHome: { goHome() }
+            )
+        case .notInGame:
+            GameStatusView.notInGame(onGoHome: { goHome() })
+        case .failed:
+            GameStatusView(
+                systemImage: "exclamationmark.triangle.fill",
+                title: "Couldn't Load the Game",
+                message: "Check your connection and try again.",
+                action: .tryAgain { viewModel.retry() },
+                onGoHome: { goHome() }
+            )
+        case .needsNewerVersion:
+            GameStatusView.needsNewerVersion(onGoHome: { goHome() })
+        }
+    }
+
+    private func goHome() {
+        navigationPath.removeLast(navigationPath.count)
+    }
+
+    private func presentWinnerSelection() {
+        selectedWinners = []
+        showWinnerSelection = true
     }
 }
 
 // MARK: - Previews
 
 #if DEBUG
-#Preview("Game Board") {
+/// The board with `players`, signed in as user2.
+@MainActor
+private func gameBoard(_ players: [Player]) -> some View {
     NavigationStack {
         GameBoardView(
             viewModel: GameBoardViewModel(
                 gameId: "preview-game",
-                previewPlayers: Player.sampleGamePlayers,
+                previewPlayers: players,
                 previewGame: .sampleInProgress,
-                currentUserId: "user2"  // Sarah (Guardian)
+                currentUserId: "user2"
             ),
             navigationPath: .preview
         )
     }
     .environmentObject(AuthViewModel())
+}
+
+#Preview("Game Board") {
+    gameBoard(Player.sampleGamePlayers)  // Sarah (Guardian)
+}
+
+#Preview("Game Board, long names, xxxLarge") {
+    gameBoard(Player.sampleLongNamePlayers)
+        .dynamicTypeSize(.xxxLarge)
+}
+
+#Preview("Game Board, long names, AX5") {
+    gameBoard(Player.sampleLongNamePlayers)
+        .dynamicTypeSize(.accessibility5)
 }
 #endif

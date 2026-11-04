@@ -8,21 +8,32 @@ import SwiftUI
 struct ActionBar: View {
     @ObservedObject var viewModel: GameBoardViewModel
     @State private var showUnveilConfirmation = false
-    var onUnveil: () -> Void
 
     var body: some View {
         VStack(spacing: 12) {
-            if let player = viewModel.currentPlayer,
-               !player.isUnveiled,
-               !player.isEliminated,
-               player.role != .leader {
-                Button("Unveil Identity") {
+            if let player = viewModel.currentPlayer, viewModel.offersUnveil {
+                Button {
                     showUnveilConfirmation = true
+                } label: {
+                    if isSending {
+                        HStack(spacing: 8) {
+                            ProgressView()
+                                .controlSize(.small)
+                                .tint(Color.mtgBackground)
+                            Text("Unveiling...")
+                        }
+                    } else {
+                        Text("Unveil Identity")
+                    }
                 }
-                .buttonStyle(MtgPrimaryButtonStyle(isDisabled: viewModel.isPending))
-                .disabled(viewModel.isPending)
+                .buttonStyle(MtgPrimaryButtonStyle(isDisabled: isSending))
+                .disabled(isSending)
                 .padding(.horizontal)
-                .accessibilityLabel("Unveil your identity as \(player.role?.displayName ?? "unknown")")
+                .accessibilityLabel(
+                    isSending
+                        ? "Unveiling your identity"
+                        : "Unveil your identity as \(player.role?.displayName ?? "unknown")"
+                )
                 .accessibilityHint("Reveals your role to all players. Cannot be undone.")
                 .confirmationDialog(
                     "Unveil your identity?",
@@ -30,7 +41,7 @@ struct ActionBar: View {
                     titleVisibility: .visible
                 ) {
                     Button("Unveil") {
-                        onUnveil()
+                        viewModel.unveilCurrentPlayer()
                     }
                     Button("Cancel", role: .cancel) {}
                 } message: {
@@ -52,5 +63,12 @@ struct ActionBar: View {
             }
         }
         .padding()
+    }
+
+    /// While the call is under way. The view model ignores a second unveil
+    /// then too; this keeps the button from looking tappable. Once the
+    /// server has unveiled them, the button goes.
+    private var isSending: Bool {
+        viewModel.unveilProgress == .sending
     }
 }

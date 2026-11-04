@@ -53,7 +53,7 @@ struct IdentityCardView: View {
                                     Text(player.role?.displayName ?? "Unknown")
                                         .font(.subheadline)
                                         .fontWeight(.semibold)
-                                        .foregroundStyle(player.role?.color ?? Color.mtgTextPrimary)
+                                        .foregroundStyle(player.role?.textColor ?? Color.mtgTextPrimary)
                                 }
                                 Spacer()
                                 Text(card.rarity.displayName)

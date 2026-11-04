@@ -9,8 +9,13 @@ struct ColorPickerRow: View {
     let selectedHex: String?
     let onSelect: (String?) -> Void
 
+    /// Each swatch has a 44pt target, so the eleven don't fit on one line
+    /// across a phone: they wrap onto as many lines as they need, all in
+    /// view.
+    private let columns = [GridItem(.adaptive(minimum: 44), spacing: 0)]
+
     var body: some View {
-        HStack(spacing: 8) {
+        LazyVGrid(columns: columns, alignment: .leading, spacing: 0) {
             ForEach(PlayerColors.palette, id: \.hex) { playerColor in
                 Button {
                     if selectedHex == playerColor.hex {
@@ -27,9 +32,12 @@ struct ColorPickerRow: View {
                                 .stroke(Color.mtgTextPrimary, lineWidth: selectedHex == playerColor.hex ? 2 : 0)
                                 .padding(selectedHex == playerColor.hex ? -2 : 0)
                         )
+                        .frame(width: 44, height: 44)
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel(playerColor.name)
+                .accessibilityAddTraits(selectedHex == playerColor.hex ? .isSelected : [])
             }
 
             Button {
@@ -43,11 +51,12 @@ struct ColorPickerRow: View {
                         .font(.system(size: 10, weight: .bold))
                         .foregroundStyle(Color.mtgTextSecondary)
                 }
+                .frame(width: 44, height: 44)
+                .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
             .accessibilityLabel("Clear color")
         }
-        .padding(.vertical, 4)
     }
 }
 

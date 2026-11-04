@@ -25,7 +25,10 @@ struct PlaneCardDetailView: View {
                             Image(systemName: "xmark.circle.fill")
                                 .font(.title2)
                                 .foregroundStyle(Color.mtgTextSecondary)
+                                .frame(minWidth: 44, minHeight: 44)
+                                .contentShape(Rectangle())
                         }
+                        .accessibilityLabel("Close")
                     }
                     .padding(.horizontal)
 

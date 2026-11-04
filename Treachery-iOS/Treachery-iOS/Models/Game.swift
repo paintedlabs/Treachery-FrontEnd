@@ -7,10 +7,52 @@
 
 import Foundation
 
-enum GameState: String, Codable {
+/// Where a game is in its lifecycle, as stored in `state`.
+///
+/// `unknown` keeps a state this build doesn't recognise (one a newer server or
+/// web client added) instead of failing to decode the whole game, which the
+/// listeners used to report as a deleted game. Screens show "needs a newer
+/// version" for it rather than guessing what it means.
+enum GameState: Hashable {
     case waiting
-    case inProgress = "in_progress"
+    case inProgress
     case finished
+    case unknown(String)
+
+    init(rawValue: String) {
+        switch rawValue {
+        case "waiting": self = .waiting
+        case "in_progress": self = .inProgress
+        case "finished": self = .finished
+        default: self = .unknown(rawValue)
+        }
+    }
+
+    /// The string the server stores, unchanged for an unknown state.
+    var rawValue: String {
+        switch self {
+        case .waiting: return "waiting"
+        case .inProgress: return "in_progress"
+        case .finished: return "finished"
+        case .unknown(let rawValue): return rawValue
+        }
+    }
+
+    var isUnknown: Bool {
+        if case .unknown = self { return true }
+        return false
+    }
+}
+
+extension GameState: Codable {
+    init(from decoder: Decoder) throws {
+        self.init(rawValue: try decoder.singleValueContainer().decode(String.self))
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        try container.encode(rawValue)
+    }
 }
 
 struct Game: Codable, Identifiable, Hashable {
@@ -48,6 +90,8 @@ struct Game: Codable, Identifiable, Hashable {
 
     // Custom decoder: defaults playerIds to [] for documents created before
     // this field existed, preventing decoding crashes on legacy data.
+    // An unrecognised state or game_mode string decodes as `.unknown` rather
+    // than throwing (see GameState and GameMode).
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         id = try container.decodeIfPresent(String.self, forKey: .id) ?? ""
@@ -99,6 +143,21 @@ struct Game: Codable, Identifiable, Hashable {
         self.winnerUserIds = winnerUserIds
         self.maxTraitorRarity = maxTraitorRarity
     }
+}
+
+// MARK: - Starting Life
+
+extension Game {
+    /// The starting life totals the create screen's stepper and the lobby's
+    /// menu offer: 20 to 60 in steps of 5. createGame and updateGameSettings
+    /// (functions/src/callables/lobby.js) must accept every one of them, so
+    /// the functions that do have to be deployed before a build offering
+    /// them ships.
+    static let startingLifeRange = 20...60
+    static let startingLifeStep = 5
+    static let startingLifeOptions = Array(
+        stride(from: startingLifeRange.lowerBound, through: startingLifeRange.upperBound, by: startingLifeStep)
+    )
 }
 
 // MARK: - Game Errors

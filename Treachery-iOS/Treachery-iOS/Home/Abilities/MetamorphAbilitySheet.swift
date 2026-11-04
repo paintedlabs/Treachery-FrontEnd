@@ -148,7 +148,7 @@ struct MetamorphAbilitySheet: View {
                                 .frame(width: 8, height: 8)
                             Text(card.name)
                                 .font(.caption)
-                                .foregroundStyle(card.role.color)
+                                .foregroundStyle(card.role.textColor)
                         }
 
                         Text(card.abilityText)
@@ -164,6 +164,8 @@ struct MetamorphAbilitySheet: View {
                     Image(systemName: "checkmark.circle.fill")
                         .foregroundStyle(Color.mtgGold)
                         .font(.title3)
+                        // VoiceOver hears "Selected" instead.
+                        .accessibilityHidden(true)
                 }
             }
             .padding(12)
@@ -175,6 +177,7 @@ struct MetamorphAbilitySheet: View {
             )
         }
         .buttonStyle(.plain)
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 
     private var actionButtons: some View {

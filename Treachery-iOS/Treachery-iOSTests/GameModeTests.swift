@@ -41,4 +41,36 @@ struct GameModeTests {
         let mode = try JSONDecoder().decode(GameMode.self, from: json)
         #expect(mode == .treacheryPlanechase)
     }
+
+    // MARK: - Unknown modes
+
+    @Test func allCasesListsOnlyKnownModes() {
+        #expect(!GameMode.allCases.contains { $0.isUnknown })
+    }
+
+    @Test func knownRawValuesRoundTrip() {
+        for mode in GameMode.allCases {
+            #expect(GameMode(rawValue: mode.rawValue) == mode)
+        }
+    }
+
+    @Test func unrecognisedRawValueBecomesUnknown() {
+        let mode = GameMode(rawValue: "archenemy")
+        #expect(mode == .unknown("archenemy"))
+        #expect(mode.rawValue == "archenemy")
+        #expect(mode.isUnknown)
+    }
+
+    @Test func unknownModeIncludesNeitherRuleSet() {
+        let mode = GameMode.unknown("archenemy")
+        #expect(!mode.includesTreachery)
+        #expect(!mode.includesPlanechase)
+        #expect(mode.displayName == "Unsupported Mode")
+    }
+
+    @Test func decodesUnknownModeFromJSON() throws {
+        let json = Data(#""archenemy""#.utf8)
+        let mode = try JSONDecoder().decode(GameMode.self, from: json)
+        #expect(mode == .unknown("archenemy"))
+    }
 }

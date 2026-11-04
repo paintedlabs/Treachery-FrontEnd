@@ -38,6 +38,8 @@ struct WinnerSelectionSheet: View {
                                         Image(systemName: selectedWinners.contains(player.userId) ? "checkmark.circle.fill" : "circle")
                                             .foregroundStyle(selectedWinners.contains(player.userId) ? Color.mtgSuccess : Color.mtgTextSecondary)
                                             .font(.title3)
+                                            // VoiceOver hears "Selected" instead.
+                                            .accessibilityHidden(true)
 
                                         VStack(alignment: .leading, spacing: 2) {
                                             Text(player.displayName)
@@ -62,6 +64,7 @@ struct WinnerSelectionSheet: View {
                                     .padding(.vertical, 12)
                                 }
                                 .buttonStyle(.plain)
+                                .accessibilityAddTraits(selectedWinners.contains(player.userId) ? .isSelected : [])
 
                                 if player.id != players.last?.id {
                                     Rectangle()

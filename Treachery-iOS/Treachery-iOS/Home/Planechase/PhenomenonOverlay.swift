@@ -17,6 +17,7 @@ struct PhenomenonOverlay: View {
                 Image(systemName: "sparkles")
                     .font(.title2)
                     .foregroundStyle(Color.mtgGoldBright)
+                    .accessibilityHidden(true)
                 Text("PHENOMENON")
                     .font(.system(.headline, design: .serif))
                     .fontWeight(.bold)
@@ -25,6 +26,7 @@ struct PhenomenonOverlay: View {
                 Image(systemName: "sparkles")
                     .font(.title2)
                     .foregroundStyle(Color.mtgGoldBright)
+                    .accessibilityHidden(true)
             }
 
             Text(plane.name)
@@ -32,11 +34,15 @@ struct PhenomenonOverlay: View {
                 .fontWeight(.semibold)
                 .foregroundStyle(Color.mtgTextPrimary)
 
+            // The longest phenomena run past 500 characters, which would push
+            // the players far down the board. The plane banner above opens
+            // the whole text.
             Text(plane.oracleText)
                 .font(.subheadline)
                 .foregroundStyle(Color.mtgTextSecondary)
                 .multilineTextAlignment(.center)
                 .lineSpacing(3)
+                .lineLimit(4)
                 .padding(.horizontal)
 
             Button {

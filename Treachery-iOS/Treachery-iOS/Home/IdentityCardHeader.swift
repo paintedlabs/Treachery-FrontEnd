@@ -8,6 +8,11 @@ import SwiftUI
 struct IdentityCardHeader: View {
     let card: IdentityCard
     let player: Player
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    // The totals grow with the text, following the large-title style, as
+    // the board's rows do.
+    @ScaledMetric(relativeTo: .largeTitle) private var concealedLifeSize: CGFloat = 28
+    @ScaledMetric(relativeTo: .largeTitle) private var revealedLifeSize: CGFloat = 30
 
     /// Leaders are always face-up; unveiled players show openly; face-down cards (from ability swaps) stay hidden.
     private var isAlwaysVisible: Bool {
@@ -31,6 +36,7 @@ struct IdentityCardHeader: View {
                 Image(systemName: "eye.slash.fill")
                     .font(.title3)
                     .foregroundStyle(Color.mtgGold)
+                    .accessibilityHidden(true)
 
                 Spacer()
 
@@ -38,10 +44,12 @@ struct IdentityCardHeader: View {
                     Image(systemName: "heart.fill")
                         .font(.caption)
                         .foregroundStyle(Color.mtgError)
+                        .accessibilityHidden(true)
                     Text("\(player.lifeTotal)")
-                        .font(.system(size: 28, weight: .bold, design: .serif))
+                        .font(.system(size: concealedLifeSize, weight: .bold, design: .serif))
                         .foregroundStyle(Color.mtgTextPrimary)
-                        .contentTransition(.numericText())
+                        .contentTransition(reduceMotion ? .opacity : .numericText())
+                        .accessibilityLabel("\(player.lifeTotal) life")
                 }
             }
 
@@ -70,7 +78,7 @@ struct IdentityCardHeader: View {
                         .shadow(color: (player.role?.color ?? .gray).opacity(0.5), radius: 4)
                     Text(player.role?.displayName ?? "Unknown")
                         .font(.headline)
-                        .foregroundStyle(player.role?.color ?? Color.mtgTextPrimary)
+                        .foregroundStyle(player.role?.textColor ?? Color.mtgTextPrimary)
                 }
 
                 Spacer()
@@ -79,11 +87,13 @@ struct IdentityCardHeader: View {
                     Image(systemName: "heart.fill")
                         .font(.caption)
                         .foregroundStyle(Color.mtgError)
+                        .accessibilityHidden(true)
                     Text("\(player.lifeTotal)")
-                        .font(.system(size: 30, weight: .bold, design: .serif))
+                        .font(.system(size: revealedLifeSize, weight: .bold, design: .serif))
                         .foregroundStyle(Color.mtgTextPrimary)
-                        .contentTransition(.numericText())
-                        .animation(.spring(response: 0.3, dampingFraction: 0.6), value: player.lifeTotal)
+                        .contentTransition(reduceMotion ? .opacity : .numericText())
+                        .animation(reduceMotion ? .easeInOut(duration: 0.2) : .spring(response: 0.3, dampingFraction: 0.6), value: player.lifeTotal)
+                        .accessibilityLabel("\(player.lifeTotal) life")
                 }
             }
 
@@ -96,6 +106,7 @@ struct IdentityCardHeader: View {
                 Image(systemName: "chevron.right")
                     .font(.caption)
                     .foregroundStyle(Color.mtgTextSecondary)
+                    .accessibilityHidden(true)
             }
 
             Text(card.abilityText)

@@ -149,15 +149,19 @@ struct PuppetMasterAbilitySheet: View {
 
                 Spacer()
 
-                if isFirstSelected {
-                    Image(systemName: "arrow.left.arrow.right.circle.fill")
-                        .foregroundStyle(Color.mtgGold)
-                        .font(.title3)
-                } else {
-                    Image(systemName: "arrow.left.arrow.right")
-                        .foregroundStyle(Color.mtgTextSecondary)
-                        .font(.caption)
+                // Decorative: VoiceOver hears "Selected" on the first pick.
+                Group {
+                    if isFirstSelected {
+                        Image(systemName: "arrow.left.arrow.right.circle.fill")
+                            .foregroundStyle(Color.mtgGold)
+                            .font(.title3)
+                    } else {
+                        Image(systemName: "arrow.left.arrow.right")
+                            .foregroundStyle(Color.mtgTextSecondary)
+                            .font(.caption)
+                    }
                 }
+                .accessibilityHidden(true)
             }
             .padding(12)
             .background(isFirstSelected ? Color.mtgTraitor.opacity(0.15) : Color.mtgSurface)
@@ -169,6 +173,7 @@ struct PuppetMasterAbilitySheet: View {
             )
         }
         .buttonStyle(.plain)
+        .accessibilityAddTraits(isFirstSelected ? .isSelected : [])
     }
 
     private var actionButtons: some View {

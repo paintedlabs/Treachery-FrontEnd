@@ -54,6 +54,7 @@ struct CreateGameViewModelTests {
         let vm = CreateGameViewModel(firestoreManager: mockFS, cloudFunctions: mockCF)
         let destination = await vm.createGame(userId: "u1")
         #expect(destination == nil)
-        #expect(vm.errorMessage == "create failed")
+        // A plain sentence, never the SDK's description.
+        #expect(vm.errorMessage == "Couldn't create the game. Check your connection and try again.")
     }
 }

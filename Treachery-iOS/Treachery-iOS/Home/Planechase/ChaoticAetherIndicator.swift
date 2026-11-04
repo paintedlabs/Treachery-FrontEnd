@@ -32,6 +32,8 @@ struct ChaoticAetherIndicator: View {
                 .frame(height: 1),
             alignment: .bottom
         )
+        // One element with this label, so the bolts aren't read out.
+        .accessibilityElement(children: .ignore)
         .accessibilityLabel("Chaotic Aether is active. Blank die rolls count as chaos.")
     }
 }

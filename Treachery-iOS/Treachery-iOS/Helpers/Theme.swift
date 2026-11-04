@@ -48,6 +48,17 @@ extension Color {
     static let mtgGuardian = Color(hex: "4c8cc9")
     static let mtgAssassin = Color(hex: "c94c4c")
     static let mtgTraitor = Color(hex: "9c4cc9")
+
+    // For text in the colors above, which are too dark for caption- and
+    // body-size text on the app's backgrounds. Each is at least 4.5:1 on
+    // mtgSurface, and so on the darker mtgBackground too (WCAG AA). Error
+    // text also sits on the board's tint of the player's color, under the
+    // spectator bar's red wash: still 4.58:1 there with the lightest
+    // color, Amber. The colors above stay for dots, icons, borders and
+    // fills.
+    static let mtgErrorText = Color(hex: "e47474")      // 5.96:1 on mtgSurface
+    static let mtgAssassinText = Color(hex: "e07070")   // 5.69:1
+    static let mtgTraitorText = Color(hex: "b57ae0")    // 5.77:1
 }
 
 // MARK: - View Modifiers
@@ -209,6 +220,19 @@ extension View {
     func mtgGoldShimmer() -> some View {
         modifier(MtgGoldShimmer())
     }
+
+    /// Takes taps across at least 44×44pt, centered on the view, without
+    /// changing its size or place in the layout, so a small control keeps
+    /// its look. The extra area reaches into the space around the view:
+    /// keep other controls out of it, and draw the control above any
+    /// neighbor it covers.
+    func minimumTapTarget() -> some View {
+        background {
+            Color.clear
+                .frame(minWidth: 44, minHeight: 44)
+                .contentShape(Rectangle())
+        }
+    }
 }
 
 // MARK: - Reusable Styled Components
@@ -227,6 +251,8 @@ struct OrnateDivider: View {
                 .fill(Color.mtgDivider)
                 .frame(height: 1)
         }
+        // Decoration: VoiceOver read the diamond aloud.
+        .accessibilityHidden(true)
     }
 }
 
@@ -322,7 +348,7 @@ struct MtgErrorBanner: View {
                 .foregroundStyle(Color.mtgError)
                 .font(.caption)
             Text(message)
-                .foregroundStyle(Color.mtgError)
+                .foregroundStyle(Color.mtgErrorText)
                 .font(.caption)
         }
         .accessibilityElement(children: .combine)

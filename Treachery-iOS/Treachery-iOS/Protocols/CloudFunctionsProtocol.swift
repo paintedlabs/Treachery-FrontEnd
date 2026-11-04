@@ -11,7 +11,9 @@ protocol CloudFunctionsProtocol {
     ) async throws -> String
     func joinGame(gameCode: String) async throws -> JoinGameResult
     func startGame(gameId: String) async throws
-    func adjustLife(gameId: String, playerId: String, amount: Int) async throws
+    /// Adds `amount` to the player's life total. Returns the total the server
+    /// stored, or nil if the response doesn't say.
+    func adjustLife(gameId: String, playerId: String, amount: Int) async throws -> Int?
     func eliminatePlayer(gameId: String) async throws
     func unveilPlayer(gameId: String) async throws
     func leaveGame(gameId: String) async throws
