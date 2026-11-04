@@ -81,3 +81,16 @@ struct SpectatorBar: View {
         )
     }
 }
+
+#if DEBUG
+#Preview("Spectator Bar") {
+    SpectatorBar(leave: .goHome, onGoHome: {}, onEndGame: {})
+        .background(Color.mtgBackground)
+}
+
+#Preview("Spectator Bar, AX5") {
+    SpectatorBar(leave: .confirmFirst, onGoHome: {}, onEndGame: {})
+        .background(Color.mtgBackground)
+        .dynamicTypeSize(.accessibility5)
+}
+#endif

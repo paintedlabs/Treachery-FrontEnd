@@ -306,34 +306,42 @@ private struct LifeAdjustment: ViewModifier {
 }
 
 #if DEBUG
-#Preview("Player Rows") {
+/// `players`' rows in the board's card, with user2 signed in.
+@MainActor
+private func playerRows(_ players: [Player]) -> some View {
     let vm = GameBoardViewModel(
         gameId: "preview",
-        previewPlayers: Player.sampleGamePlayers,
+        previewPlayers: players,
         previewGame: .sampleInProgress,
         currentUserId: "user2"
     )
-    ZStack {
+    return ZStack {
         Color.mtgBackground.ignoresSafeArea()
         VStack(spacing: 0) {
-            GameBoardPlayerRow(
-                player: .sampleGuardian,
-                viewModel: vm,
-                showColorPicker: .constant(false)
-            )
-            GameBoardPlayerRow(
-                player: .sampleAssassin,
-                viewModel: vm,
-                showColorPicker: .constant(false)
-            )
-            GameBoardPlayerRow(
-                player: .sampleEliminated,
-                viewModel: vm,
-                showColorPicker: .constant(false)
-            )
+            ForEach(players) { player in
+                GameBoardPlayerRow(
+                    player: player,
+                    viewModel: vm,
+                    showColorPicker: .constant(false)
+                )
+            }
         }
         .mtgCardFrame()
         .padding()
     }
+}
+
+#Preview("Player Rows") {
+    playerRows(Player.sampleGamePlayers)
+}
+
+#Preview("Player Rows, long names, xxxLarge") {
+    playerRows(Player.sampleLongNamePlayers)
+        .dynamicTypeSize(.xxxLarge)
+}
+
+#Preview("Player Rows, long names, AX5") {
+    playerRows(Player.sampleLongNamePlayers)
+        .dynamicTypeSize(.accessibility5)
 }
 #endif

@@ -459,18 +459,34 @@ struct GameBoardView: View {
 // MARK: - Previews
 
 #if DEBUG
-#Preview("Game Board") {
+/// The board with `players`, signed in as user2.
+@MainActor
+private func gameBoard(_ players: [Player]) -> some View {
     NavigationStack {
         GameBoardView(
             viewModel: GameBoardViewModel(
                 gameId: "preview-game",
-                previewPlayers: Player.sampleGamePlayers,
+                previewPlayers: players,
                 previewGame: .sampleInProgress,
-                currentUserId: "user2"  // Sarah (Guardian)
+                currentUserId: "user2"
             ),
             navigationPath: .preview
         )
     }
     .environmentObject(AuthViewModel())
+}
+
+#Preview("Game Board") {
+    gameBoard(Player.sampleGamePlayers)  // Sarah (Guardian)
+}
+
+#Preview("Game Board, long names, xxxLarge") {
+    gameBoard(Player.sampleLongNamePlayers)
+        .dynamicTypeSize(.xxxLarge)
+}
+
+#Preview("Game Board, long names, AX5") {
+    gameBoard(Player.sampleLongNamePlayers)
+        .dynamicTypeSize(.accessibility5)
 }
 #endif

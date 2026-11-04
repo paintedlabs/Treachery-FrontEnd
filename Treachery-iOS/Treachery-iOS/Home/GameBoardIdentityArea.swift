@@ -102,3 +102,34 @@ struct GameBoardIdentityArea: View {
         }
     }
 }
+
+#if DEBUG
+#Preview("Identity Area") {
+    GameBoardIdentityArea(
+        viewModel: GameBoardViewModel(
+            gameId: "preview",
+            previewPlayers: Player.sampleGamePlayers,
+            previewGame: .sampleInProgress,
+            currentUserId: "user2"
+        ),
+        onShowCard: {},
+        onGoHome: {}
+    )
+    .background(Color.mtgBackground)
+}
+
+#Preview("Identity Area, AX5") {
+    GameBoardIdentityArea(
+        viewModel: GameBoardViewModel(
+            gameId: "preview",
+            previewPlayers: Player.sampleGamePlayers,
+            previewGame: .sampleInProgress,
+            currentUserId: "user1"
+        ),
+        onShowCard: {},
+        onGoHome: {}
+    )
+    .background(Color.mtgBackground)
+    .dynamicTypeSize(.accessibility5)
+}
+#endif

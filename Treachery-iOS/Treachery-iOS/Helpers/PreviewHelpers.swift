@@ -89,6 +89,18 @@ extension Player {
         .sampleTraitor,
         .sampleEliminated,
     ]
+
+    /// `sampleGamePlayers` with long names and commanders, the signed-in
+    /// one (user2) with a color: for checking how the board's rows fit.
+    static let sampleLongNamePlayers: [Player] = {
+        var players = sampleGamePlayers
+        players[1].displayName = "Christopher"
+        players[1].commanderName = "Atraxa, Praetors' Voice"
+        players[1].playerColor = PlayerColors.palette[2].hex
+        players[2].displayName = "Alexandra"
+        players[2].commanderName = "Kenrith, the Returned King"
+        return players
+    }()
 }
 
 // MARK: - Sample Identity Card
