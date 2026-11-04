@@ -225,6 +225,53 @@ struct LifeLedgerTests {
         #expect(shown(ledger, on: echo, for: "p1") == 40)
     }
 
+    // MARK: - Echo timeout
+
+    @Test func anEchoTimeoutSettlesAConfirmedBatchNoSnapshotShowed() throws {
+        // This -3 lands, then another device's +3, and the only snapshot
+        // shows both: still 40, the baseline.
+        var ledger = LifeLedger()
+        ledger.record(-3, for: "p0")
+        let batch = try beginBatch(in: &ledger)
+        ledger.recordSuccess(of: batch, newLife: 37)
+        let snapshot = server(40)
+        ledger.reconcile(with: snapshot)
+        #expect(ledger.isWaitingForEcho(for: "p0"))
+        #expect(shown(ledger, on: snapshot) == 37)
+        ledger.record(-1, for: "p0")
+        let whileWaiting = ledger.beginBatch(for: "p0", serverLife: 40)
+        #expect(whileWaiting == nil)
+
+        ledger.recordEchoTimeout(of: batch)
+
+        #expect(!ledger.isWaitingForEcho(for: "p0"))
+        #expect(shown(ledger, on: snapshot) == 39)
+        let next = try beginBatch(in: &ledger)
+        #expect(next.amount == -1)
+    }
+
+    @Test func anEchoTimeoutOnlySettlesTheBatchItWasFor() throws {
+        var ledger = LifeLedger()
+        ledger.record(-3, for: "p0")
+        let first = try beginBatch(in: &ledger)
+        // Its call is still out: not confirmed, so nothing to time out.
+        #expect(!ledger.isWaitingForEcho(for: "p0"))
+        ledger.recordEchoTimeout(of: first)
+        #expect(shown(ledger, on: server(40)) == 37)
+
+        ledger.recordSuccess(of: first, newLife: 37)
+        ledger.reconcile(with: server(37))
+        ledger.record(-1, for: "p0")
+        let second = try beginBatch(in: &ledger, serverLife: 37)
+        ledger.recordSuccess(of: second, newLife: 36)
+        #expect(ledger.isWaitingForEcho(for: "p0"))
+
+        // A timeout left over from the first doesn't touch the second.
+        ledger.recordEchoTimeout(of: first)
+        #expect(ledger.isWaitingForEcho(for: "p0"))
+        #expect(shown(ledger, on: server(37)) == 36)
+    }
+
     // MARK: - Leaving
 
     @Test func takingPendingTapsLeavesBatchesInFlight() throws {

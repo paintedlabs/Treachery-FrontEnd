@@ -432,12 +432,16 @@ struct HeldLifeTapTests {
         gate.release()
         await send.value
         #expect(board.vm.lifeChangeSends.isEmpty)
+        #expect(board.vm.lifeChangeEchoWaits["p0"] != nil)
         #expect(board.functions.adjustLifeCalls.map(\.amount) == [-3])
         #expect(board.shown() == 36)
 
         board.functions.adjustLifeNewLife = 36
         board.snapshot([37, 40, 40])
         #expect(board.vm.lifeChangeSends["p0"] != nil)
+        // The echo ended the wait for it.
+        #expect(board.vm.lifeChangeEchoWaits.isEmpty)
+        #expect(board.clock.pendingDeadlines.isEmpty)
         await board.finishSends()
         #expect(board.functions.adjustLifeCalls.map(\.amount) == [-3, -1])
         #expect(board.shown() == 36)
@@ -477,6 +481,37 @@ struct HeldLifeTapTests {
         // The -3 failed and is never resent; the -1 went out on its own.
         #expect(board.functions.adjustLifeCalls.map(\.amount) == [-1])
         #expect(gate.arrivals == 2)
+        #expect(board.shown() == 39)
+    }
+
+    @Test(.timeLimit(.minutes(1)))
+    func aConfirmedChangeNoSnapshotShowsComesOffAfterTheEchoTimeout() async throws {
+        // This -3 lands, then another device's +3, and this device only gets
+        // the snapshot with both: 40, the total the -3 was sent from.
+        let board = LifeBoard()
+        board.functions.adjustLifeNewLife = 37
+        board.vm.adjustLife(for: "p0", by: -3)
+        await board.endDebounces()
+        await board.finishSends()
+        board.snapshot([40, 40, 40])
+        #expect(board.shown() == 37)
+
+        board.vm.adjustLife(for: "p0", by: -1)
+        await board.endDebounces()
+        #expect(board.vm.lifeChangeSends.isEmpty)
+        #expect(board.shown() == 36)
+
+        // The wait runs from the response, at 0.5 s.
+        let echoWait = try #require(board.vm.lifeChangeEchoWaits["p0"])
+        let deadline = Duration.milliseconds(500) + GameBoardViewModel.lifeChangeEchoTimeout
+        #expect(board.clock.pendingDeadlines == [deadline])
+        board.functions.adjustLifeNewLife = 39
+        board.clock.advance(by: deadline - board.clock.now.offset)
+        await echoWait.value
+        await board.finishSends()
+
+        // The server's total stands, and the held tap went out from it.
+        #expect(board.functions.adjustLifeCalls.map(\.amount) == [-3, -1])
         #expect(board.shown() == 39)
     }
 }
@@ -555,10 +590,11 @@ private struct LifeBoard {
     }
 
     /// Ends every running debounce, all started at the current time, and
-    /// waits until each has started its send.
+    /// waits until each has started its send. Echo waits sleep on the same
+    /// clock, so they're counted in; none is due this soon.
     func endDebounces() async {
         let debounces = Array(vm.lifeChangeDebounces.values)
-        await clock.waitForSleepers(count: debounces.count)
+        await clock.waitForSleepers(count: debounces.count + vm.lifeChangeEchoWaits.count)
         clock.advance(by: GameBoardViewModel.lifeChangeDebounce)
         for debounce in debounces {
             await debounce.value

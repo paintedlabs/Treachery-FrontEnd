@@ -21,7 +21,9 @@ import Foundation
 /// A player's next batch waits until the previous one has settled: its call
 /// has returned, and it either failed or the server's total includes it. So
 /// only one batch per player is ever in flight, its calls never overlap, and
-/// an echo can't be taken for a later batch's.
+/// an echo can't be taken for a later batch's. A batch whose echo never comes
+/// is settled by `recordEchoTimeout(of:)`, so it can't hold the next one back
+/// for good.
 ///
 /// A pure value: GameBoardViewModel feeds it taps, snapshots and call
 /// outcomes, and owns the timing and the calls.
@@ -102,6 +104,26 @@ struct LifeLedger {
         case .confirmed:
             break
         }
+    }
+
+    /// Whether the player's batch has succeeded but no snapshot has shown it
+    /// yet. It stays on screen, and holds back the player's next batch, until
+    /// one does or `recordEchoTimeout(of:)` settles it.
+    func isWaitingForEcho(for playerId: String) -> Bool {
+        entries[playerId]?.inFlight?.progress == .confirmed
+    }
+
+    /// No snapshot has shown `batch` long after its call succeeded. The
+    /// batch settles, and the board shows the latest snapshot's total.
+    ///
+    /// Snapshots can stay at the baseline for good after the server applied
+    /// the batch: another device's change can take the total straight back,
+    /// and this device may only get the snapshot with both. Without a limit,
+    /// the batch would stay on screen, and hold back the player's next one,
+    /// until someone changed that player's life again.
+    mutating func recordEchoTimeout(of batch: Batch) {
+        guard inFlight(of: batch)?.progress == .confirmed else { return }
+        settle(batch)
     }
 
     /// The call for `batch` failed. Its amount is dropped, so the board falls
@@ -185,7 +207,7 @@ struct LifeLedger {
         /// Not shown: the server's total includes it.
         case reflected
         /// The call succeeded, but no snapshot has moved off the baseline yet.
-        /// Shown until one does.
+        /// Shown until one does, or until the echo times out.
         case confirmed
     }
 

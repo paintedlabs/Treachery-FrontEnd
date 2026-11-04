@@ -38,8 +38,11 @@ final class GameBoardViewModel: ObservableObject {
     /// Per player: the adjustLife call under way. Visible to tests, which
     /// await it rather than sleep.
     private(set) var lifeChangeSends: [String: Task<Void, Never>] = [:]
+    /// Per player: the wait for a confirmed change to show up in a
+    /// snapshot. Visible to tests, which await it rather than sleep.
+    private(set) var lifeChangeEchoWaits: [String: Task<Void, Never>] = [:]
     private var serverPlayers: [Player] = []
-    /// Times the debounce.
+    /// Times the debounce and the wait for a confirmed change's echo.
     private let clock: any Clock<Duration>
 
     // MARK: - Properties
@@ -192,6 +195,9 @@ final class GameBoardViewModel: ObservableObject {
         // Sends under way don't hold the view model and are left to finish.
         for debounce in lifeChangeDebounces.values {
             debounce.cancel()
+        }
+        for echoWait in lifeChangeEchoWaits.values {
+            echoWait.cancel()
         }
     }
 
@@ -487,6 +493,13 @@ extension GameBoardViewModel {
     /// How long a player's taps must pause before they're sent as one call.
     static let lifeChangeDebounce: Duration = .milliseconds(500)
 
+    /// How long a change the server has confirmed stays on screen waiting
+    /// for a snapshot to show it; see `LifeLedger.recordEchoTimeout(of:)`.
+    /// The echo usually comes within moments of the response, often before
+    /// it. This is far longer, because ending the wait while snapshots are
+    /// slow shows the old total again until they catch up.
+    static let lifeChangeEchoTimeout: Duration = .seconds(5)
+
     /// Shows the tap at once, then sends it with any taps on the same player
     /// that follow within `lifeChangeDebounce`, as one adjustLife call.
     func adjustLife(for playerId: String, by amount: Int) {
@@ -539,6 +552,11 @@ extension GameBoardViewModel {
         lifeLedger.reconcile(with: players)
         withAnimation(.easeInOut(duration: 0.3)) {
             refreshPlayers()
+        }
+        // A snapshot that settles a confirmed batch ends its wait.
+        let settled = lifeChangeEchoWaits.keys.filter { !lifeLedger.isWaitingForEcho(for: $0) }
+        for playerId in settled {
+            lifeChangeEchoWaits.removeValue(forKey: playerId)?.cancel()
         }
         for playerId in lifeLedger.playersWithPendingTaps {
             sendPendingLifeChange(for: playerId)
@@ -594,6 +612,33 @@ extension GameBoardViewModel {
     private func batchSucceeded(_ batch: LifeLedger.Batch, newLife: Int?) {
         lifeChangeSends[batch.playerId] = nil
         lifeLedger.recordSuccess(of: batch, newLife: newLife)
+        refreshPlayers()
+        if lifeLedger.isWaitingForEcho(for: batch.playerId) {
+            waitForEcho(of: batch)
+        }
+        sendPendingLifeChange(for: batch.playerId)
+    }
+
+    /// Gives a confirmed batch `lifeChangeEchoTimeout` to show up in a
+    /// snapshot. A snapshot that shows it ends the wait early.
+    private func waitForEcho(of batch: LifeLedger.Batch) {
+        lifeChangeEchoWaits[batch.playerId]?.cancel()
+        lifeChangeEchoWaits[batch.playerId] = Task { [weak self, clock] in
+            do {
+                try await clock.sleep(for: Self.lifeChangeEchoTimeout)
+            } catch {
+                return // A snapshot showed the batch, or the board went away.
+            }
+            guard !Task.isCancelled else { return }
+            self?.echoWaitEnded(for: batch)
+        }
+    }
+
+    /// The batch comes off the board, which shows the latest snapshot's
+    /// total, and taps held behind it go out.
+    private func echoWaitEnded(for batch: LifeLedger.Batch) {
+        lifeChangeEchoWaits[batch.playerId] = nil
+        lifeLedger.recordEchoTimeout(of: batch)
         refreshPlayers()
         sendPendingLifeChange(for: batch.playerId)
     }
