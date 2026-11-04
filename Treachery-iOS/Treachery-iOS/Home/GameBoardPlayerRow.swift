@@ -78,21 +78,25 @@ struct GameBoardPlayerRow: View {
                 showColorPicker.toggle()
             }
         } label: {
-            if let hex = player.playerColor {
-                Circle()
-                    .fill(Color(hex: hex))
-                    .frame(width: 16, height: 16)
-                    .overlay(
-                        Circle().stroke(Color.mtgTextSecondary.opacity(0.3), lineWidth: 1)
-                    )
-            } else {
-                Circle()
-                    .stroke(Color.mtgTextSecondary, lineWidth: 1.5)
-                    .frame(width: 16, height: 16)
+            Group {
+                if let hex = player.playerColor {
+                    Circle()
+                        .fill(Color(hex: hex))
+                        .frame(width: 16, height: 16)
+                        .overlay(
+                            Circle().stroke(Color.mtgTextSecondary.opacity(0.3), lineWidth: 1)
+                        )
+                } else {
+                    Circle()
+                        .stroke(Color.mtgTextSecondary, lineWidth: 1.5)
+                        .frame(width: 16, height: 16)
+                }
             }
+            // The dot keeps its size; the area around it takes the tap.
+            .frame(minWidth: 44, minHeight: 44)
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .padding(.trailing, 6)
         .accessibilityLabel("Choose player color")
     }
 
@@ -145,7 +149,11 @@ struct GameBoardPlayerRow: View {
                 Button {
                     onViewCard?(player)
                 } label: {
+                    // The role sits where it does in the other rows, and its
+                    // target runs on below it to a full 44pt.
                     roleLabel(showsInfoIcon: true)
+                        .frame(minWidth: 44, minHeight: 44, alignment: .topLeading)
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel("View \(player.displayName)'s identity card")
@@ -187,7 +195,9 @@ struct GameBoardPlayerRow: View {
         // Life controls. A spectator sees the totals but can't
         // change them.
         if !player.isEliminated {
-            HStack(spacing: 12) {
+            // The buttons' 44pt hit areas reach 2pt past their 40pt circles,
+            // so the spacing is that much less than the 8pt it looks.
+            HStack(spacing: 6) {
                 Button {
                     viewModel.adjustLife(for: player.id, by: -1)
                 } label: {
@@ -199,6 +209,8 @@ struct GameBoardPlayerRow: View {
                                 .fill(Color.mtgAssassin.opacity(0.1))
                                 .frame(width: 40, height: 40)
                         )
+                        .frame(minWidth: 44, minHeight: 44)
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
                 .disabled(!viewModel.canAdjustLife)
@@ -223,6 +235,8 @@ struct GameBoardPlayerRow: View {
                                 .fill(Color.mtgSuccess.opacity(0.1))
                                 .frame(width: 40, height: 40)
                         )
+                        .frame(minWidth: 44, minHeight: 44)
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
                 .disabled(!viewModel.canAdjustLife)

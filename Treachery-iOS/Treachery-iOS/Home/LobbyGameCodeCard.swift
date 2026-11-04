@@ -47,6 +47,8 @@ struct LobbyGameCodeCard: View {
                             .font(.caption)
                     }
                     .foregroundStyle(Color.mtgGold)
+                    .frame(minWidth: 44, minHeight: 44)
+                    .contentShape(Rectangle())
                 }
                 .accessibilityLabel("Copy game code")
 
@@ -60,10 +62,11 @@ struct LobbyGameCodeCard: View {
                             .font(.caption)
                     }
                     .foregroundStyle(Color.mtgGold)
+                    .frame(minWidth: 44, minHeight: 44)
+                    .contentShape(Rectangle())
                 }
                 .accessibilityLabel("Share game code with friends")
             }
-            .padding(.top, 4)
         }
         .padding(.vertical, 24)
         .padding(.horizontal, 20)

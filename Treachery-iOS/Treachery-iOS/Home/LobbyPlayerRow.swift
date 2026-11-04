@@ -78,21 +78,25 @@ struct LobbyPlayerRow: View {
                 showColorPicker.toggle()
             }
         } label: {
-            if let hex = player.playerColor {
-                Circle()
-                    .fill(Color(hex: hex))
-                    .frame(width: 16, height: 16)
-                    .overlay(
-                        Circle().stroke(Color.mtgTextSecondary.opacity(0.3), lineWidth: 1)
-                    )
-            } else {
-                Circle()
-                    .stroke(Color.mtgTextSecondary, lineWidth: 1.5)
-                    .frame(width: 16, height: 16)
+            Group {
+                if let hex = player.playerColor {
+                    Circle()
+                        .fill(Color(hex: hex))
+                        .frame(width: 16, height: 16)
+                        .overlay(
+                            Circle().stroke(Color.mtgTextSecondary.opacity(0.3), lineWidth: 1)
+                        )
+                } else {
+                    Circle()
+                        .stroke(Color.mtgTextSecondary, lineWidth: 1.5)
+                        .frame(width: 16, height: 16)
+                }
             }
+            // The dot keeps its size; the area around it takes the tap.
+            .frame(minWidth: 44, minHeight: 44)
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .padding(.trailing, 6)
         .accessibilityLabel("Choose player color")
     }
 
