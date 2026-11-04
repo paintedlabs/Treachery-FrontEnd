@@ -204,8 +204,10 @@ platform :ios do
         "Release tag #{tag.inspect} is not vX.Y.Z, so it can't be checked against " \
         "MARKETING_VERSION. Don't publish the release again, or a replacement: " \
         "that deploys web and Play production a second time. To send this commit " \
-        "to the App Store, tag it vX.Y.Z to match MARKETING_VERSION and run the " \
-        "App Store workflow by hand on that tag. See docs/DEPLOYMENT.md."
+        "to the App Store, tag it vX.Y.Z to match MARKETING_VERSION and, once no " \
+        "TestFlight run is in progress or queued (overlapping runs can pick the " \
+        "same build number), run the App Store workflow by hand on that tag. See " \
+        "docs/DEPLOYMENT.md."
       )
     end
 
@@ -218,8 +220,11 @@ platform :ios do
       "Treachery-iOS target is #{actual}. Don't publish the release again, or a " \
       "replacement: that deploys web and Play production a second time. Set " \
       "MARKETING_VERSION to #{expected} (Debug and Release) in a PR and merge it, " \
-      "move the #{tag} tag to that commit, then run the App Store workflow by hand " \
-      "on #{tag}. See docs/DEPLOYMENT.md."
+      "and move the #{tag} tag to that commit. Overlapping TestFlight and App " \
+      "Store runs can pick the same build number, so wait until the TestFlight " \
+      "run that the merge starts has finished, successfully or not, and no other " \
+      "one is in progress or queued. Then run the App Store workflow by hand on " \
+      "#{tag}. See docs/DEPLOYMENT.md."
     )
   end
 

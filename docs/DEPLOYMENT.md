@@ -65,6 +65,16 @@ pipelines only bump the build number, so the version is yours to manage:
    tag from PR labels, so edit the draft's tag if it doesn't match. (Runs
    started by hand from the Actions tab on a branch carry no tag and skip the
    check.)
+
+   The merge changes `Treachery-iOS/**`, so it also starts a TestFlight run
+   (**Deploy to TestFlight** in the Actions tab). Publish only once that run
+   has finished, successfully or not, and no other TestFlight run is in
+   progress or queued. Before building, each lane looks up the newest upload
+   in App Store Connect and numbers its build one higher. The two workflows
+   have different concurrency groups, so neither waits for the other: a
+   TestFlight run and an App Store run that overlap can pick the same number.
+   App Store Connect then rejects the second upload of that version and build
+   number, so that run fails after a full build.
 2. **Right after Apple approves a release**, bump `MARKETING_VERSION` again
    (e.g. `1.3.0` → `1.3.1`) in a PR. App Store Connect rejects uploads whose
    version is not higher than the last approved one, so every TestFlight
@@ -84,7 +94,12 @@ production again. Ship the iOS app on its own instead, here for version
    this moves it, and the release then points at that commit too:
    `git tag -f v1.3.0 <commit>`, then `git push --force origin v1.3.0`. No
    workflow runs on tag pushes.
-3. Run the App Store workflow on the tag:
+3. Wait until the TestFlight run that the merge in step 1 started has
+   finished, successfully or not, and no other TestFlight run is in progress
+   or queued. Otherwise the App Store run and a TestFlight run can pick the
+   same build number, and App Store Connect rejects the second upload (see
+   [iOS version numbers](#ios-version-numbers)).
+4. Run the App Store workflow on the tag:
    `gh workflow run deploy-appstore.yml --ref v1.3.0`, or **Run workflow** on
    the workflow's page with the tag picked under **Use workflow from**. On a
    tag, the run's `GITHUB_REF_NAME` is the tag, so the lane checks the version
