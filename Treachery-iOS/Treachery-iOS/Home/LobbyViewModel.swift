@@ -397,8 +397,9 @@ final class LobbyViewModel: ObservableObject {
 
     /// The server's own explanation when it refused the request because of
     /// the game's state, such as "Cannot set max players below the current
-    /// lobby size."; otherwise `fallback`, since the request most likely
-    /// never reached the server.
+    /// lobby size.", or because of what was asked, such as "Invalid starting
+    /// life value." from a server older than this app; otherwise `fallback`,
+    /// since the request most likely never reached the server.
     private static func message(for error: any Error, otherwise fallback: String) -> String {
         CallableRefusal.explanation(of: error) ?? fallback
     }

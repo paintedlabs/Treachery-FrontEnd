@@ -3,8 +3,9 @@ import Foundation
 @testable import Treachery_iOS
 
 /// What the board says when one of its actions fails: the server's own
-/// reason when it turned the request down because of the game's state,
-/// otherwise a plain sentence saying what to try. Never the SDK's text.
+/// reason when it turned the request down because of the game's state or
+/// what was asked, otherwise a plain sentence saying what to try. Never the
+/// SDK's text.
 @MainActor
 struct GameBoardErrorTextTests {
 
@@ -89,7 +90,22 @@ struct GameBoardErrorTextTests {
         #expect(vm.errorMessage == "This ability has already been resolved.")
     }
 
-    @Test func onlyAReasonAboutTheGamesStateIsShown() async {
+    @Test func aRequestTheServerRefusesGivesItsSentence() async {
+        // Invalid argument: what was asked, not the game's state.
+        let functions = MockCloudFunctions()
+        let sdkError = NSError(
+            domain: "com.firebase.functions", code: 3,
+            userInfo: [NSLocalizedDescriptionKey: "Winners must be players in this game."]
+        )
+        functions.errorToThrow = CallableRefusal(sdkError) ?? sdkError
+        let vm = makeVM(cloudFunctions: functions)
+
+        await vm.endGame(winnerUserIds: ["u9"])
+
+        #expect(vm.errorMessage == "Winners must be players in this game.")
+    }
+
+    @Test func aMissingGamesReasonIsNotShown() async {
         // A missing game gets the plain sentence: the board's listener says
         // the game is gone, and "Game not found." adds nothing.
         let functions = MockCloudFunctions()

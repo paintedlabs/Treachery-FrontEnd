@@ -58,6 +58,9 @@ struct CallableRefusal: Error {
         /// The game isn't in a state that allows the request: it has
         /// started, it's full, it's over, and so on.
         case failedPrecondition
+        /// The server doesn't accept what was asked, such as a starting
+        /// life a server older than this app doesn't offer.
+        case invalidArgument
     }
 
     let reason: Reason
@@ -78,6 +81,8 @@ extension CallableRefusal {
             (reason, sdkPlaceholder) = (.notFound, "NOT FOUND")
         case .failedPrecondition:
             (reason, sdkPlaceholder) = (.failedPrecondition, "FAILED PRECONDITION")
+        case .invalidArgument:
+            (reason, sdkPlaceholder) = (.invalidArgument, "INVALID ARGUMENT")
         default:
             return nil
         }
@@ -91,11 +96,19 @@ extension CallableRefusal {
     }
 
     /// The server's own explanation when it turned a request down because
-    /// of the game's state, such as "Game is not in progress."; nil for any
-    /// other failure, which most likely never reached the server.
+    /// of the game's state, such as "Game is not in progress.", or because
+    /// of what was asked, such as "Invalid starting life value."; nil for
+    /// any other failure, which most likely never reached the server. A
+    /// refusal without the server's sentence isn't one (see `init(_:)`), so
+    /// this never gives a bare code.
     static func explanation(of error: any Error) -> String? {
-        guard let refusal = error as? CallableRefusal, refusal.reason == .failedPrecondition else { return nil }
-        return refusal.message
+        guard let refusal = error as? CallableRefusal else { return nil }
+        switch refusal.reason {
+        case .failedPrecondition, .invalidArgument:
+            return refusal.message
+        case .notFound:
+            return nil
+        }
     }
 }
 
