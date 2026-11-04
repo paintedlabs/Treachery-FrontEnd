@@ -125,7 +125,9 @@ function usage() {
       "  --expect-name <code>   Required. Refuses unless the profile's display name is",
       "                         exactly this. With -, it reads the name from the first",
       "                         line of stdin instead, which keeps it out of shell",
-      "                         history.",
+      "                         history. When neither a sign-in account nor a",
+      "                         profile is left, only documents an earlier deletion",
+      "                         left under users/{uid}, the name isn't checked.",
       "  --project <id>         Firebase project to target. --apply requires it; a dry",
       "                         run without it uses GOOGLE_CLOUD_PROJECT /",
       "                         GCLOUD_PROJECT, or the Application Default",
@@ -332,6 +334,15 @@ function gameOf(seatPath) {
 function displayName(profile) {
   const name = profile.get("display_name");
   if (typeof name !== "string") return "not set";
+  return quotedName(name);
+}
+
+/**
+ * A name as the output shows it: quoted, so stray spaces show, and masked the
+ * way an email address is when it has "@" in it. Both sides of the name
+ * check go through it, because a name pasted on stdin can be an address too.
+ */
+function quotedName(name) {
   if (name.includes("@")) return `${JSON.stringify(maskEmail(name))} (masked: it contains "@")`;
   return JSON.stringify(name);
 }
@@ -379,7 +390,7 @@ function checkName({ uid, user, profile, leftovers }, expectName) {
   }
   if (profile.get("display_name") !== expectName) {
     throw refusal(
-      `the display name is ${displayName(profile)}, not ${JSON.stringify(expectName)}. ` +
+      `the display name is ${displayName(profile)}, not ${quotedName(expectName)}. ` +
         "It must match --expect-name exactly."
     );
   }
@@ -439,12 +450,14 @@ async function main(argv, env, stdin) {
   checkOptions(opts);
   const mismatch = emulatorMismatch(env);
   if (mismatch) throw usageError(mismatch);
+  const target = await resolveTarget(opts, env);
+  if (target.error) throw usageError(target.error);
+  // Only once the command line is known to be usable, so nobody pastes a
+  // name just to be told --apply needs --project.
   if (opts.expectName === "-") {
     opts.expectName = await readName(stdin);
     if (!opts.expectName) throw usageError("--expect-name - found no name on the first line of stdin.");
   }
-  const target = await resolveTarget(opts, env);
-  if (target.error) throw usageError(target.error);
   print(describeTarget(target, opts.apply));
   const authHost = env.FIREBASE_AUTH_EMULATOR_HOST;
   console.log(`auth:     ${authHost ? `emulator ${authHost}` : "LIVE Firebase Auth"}`);

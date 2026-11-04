@@ -138,6 +138,7 @@ profile again, its name can be the requester's email address.
 
 ```sh
 unset HISTFILE
+cd functions
 node scripts/delete-account.js --uid <uid> --expect-name <code> --project treachery-71922
 ```
 

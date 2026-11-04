@@ -644,6 +644,17 @@ describe('delete-account script — refusals', () => {
       `refused: the display name is ${shown}, not ${JSON.stringify(CODE)}. It must match --expect-name exactly.\n`
     );
 
+    // A near miss pasted from the console, here without the trailing space,
+    // is shown masked too: the paste is the requester's address.
+    const nearMiss = runScriptWithInput(`${contact.email}\n`, named);
+    runs.push(nearMiss);
+    assert.equal(nearMiss.status, 1, nearMiss.stderr);
+    const pasted = `"${contact.email[0]}***${contact.email.slice(contact.email.indexOf('@'))}" (masked: it contains "@")`;
+    assert.equal(
+      nearMiss.stderr,
+      `refused: the display name is ${shown}, not ${pasted}. It must match --expect-name exactly.\n`
+    );
+
     // With no name to read, it stops before printing or reading anything.
     for (const input of [undefined, '', '\n']) {
       const result = runScriptWithInput(input, [...named, '--apply']);
