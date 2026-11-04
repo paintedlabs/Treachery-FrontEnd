@@ -12,6 +12,7 @@ struct ProfileView: View {
     @EnvironmentObject var authViewModel: AuthViewModel
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @StateObject private var viewModel: ProfileViewModel
+    @FocusState private var isNameFieldFocused: Bool
 
     /// `viewModel` is built once, the first time this view is installed.
     init(viewModel: @autoclosure @escaping () -> ProfileViewModel) {
@@ -104,6 +105,8 @@ struct ProfileView: View {
             ToolbarItem(placement: .topBarTrailing) {
                 if viewModel.isEditingName {
                     Button(viewModel.isSavingName ? "Saving..." : "Save") {
+                        // Nothing more can be typed while the name saves.
+                        isNameFieldFocused = false
                         Task { await viewModel.saveName() }
                     }
                     .foregroundStyle(Color.mtgGold)
@@ -236,6 +239,20 @@ struct ProfileView: View {
                         .multilineTextAlignment(dynamicTypeSize.isAccessibilitySize ? .leading : .trailing)
                         .textInputAutocapitalization(.words)
                         .foregroundStyle(Color.mtgGoldBright)
+                        .focused($isNameFieldFocused)
+                        // A 44-point target though the text is shorter: a tap
+                        // just above or below it focuses the field too.
+                        .frame(minHeight: 44)
+                        .background {
+                            Color.clear
+                                .contentShape(Rectangle())
+                                .onTapGesture { isNameFieldFocused = true }
+                        }
+                        // Locked while the name saves: anything typed then
+                        // would be dropped when the save succeeds.
+                        .disabled(viewModel.isSavingName)
+                        // Edit opens the field ready to type.
+                        .onAppear { isNameFieldFocused = true }
                 }
             }
 
