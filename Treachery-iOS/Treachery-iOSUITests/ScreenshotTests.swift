@@ -8,9 +8,9 @@
 //  WARNING: these tests run against PRODUCTION Firebase. Every one taps
 //  "Play as Guest", which creates a real anonymous auth user, and the captured
 //  screens show whatever live Firestore returns. There is no offline or mock
-//  mode: SnapshotHelper passes --FASTLANE_SNAPSHOT to the app, but no app code
-//  reads it. Deterministic screenshots would need the app to check that launch
-//  argument at startup and point FirebaseManager / FirestoreManager at seeded
+//  mode: SnapshotHelper passes -FASTLANE_SNAPSHOT YES to the app, which only
+//  uses it to hide the DEBUG dev-tools link. Deterministic screenshots would
+//  also need the app to point FirebaseManager / FirestoreManager at seeded
 //  fixtures or the Firebase emulator instead of production.
 //
 //  Because of that, the shared Treachery-iOS scheme selects no UI tests, new

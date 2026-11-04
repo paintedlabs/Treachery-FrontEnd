@@ -36,7 +36,7 @@ override_status_bar(true)
 # marker and snapshot's freshness check would abort the run before building.
 skip_helper_version_check(true)
 
-# No launch_arguments on purpose: SnapshotHelper injects --FASTLANE_SNAPSHOT
+# No launch_arguments on purpose: SnapshotHelper injects -FASTLANE_SNAPSHOT YES
 # itself and never reads snapshot-launch_arguments.txt, so anything set here
-# would silently do nothing. Nothing in the app reads that flag yet either —
-# see the warning in the Fastfile's screenshots lane.
+# would silently do nothing. The app only uses that flag to hide its DEBUG
+# dev-tools link — see the warning in the Fastfile's screenshots lane.

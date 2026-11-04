@@ -101,6 +101,13 @@ private struct HomeTab: View {
     @State private var path = NavigationPath()
     @StateObject private var viewModel = HomeViewModel()
 
+    #if DEBUG
+    /// fastlane snapshot launches the app with `-FASTLANE_SNAPSHOT YES`. App Store
+    /// screenshots must not show the dev-tools link, which Release builds don't have.
+    /// Read from `UserDefaults.standard` rather than injected: a DEBUG-only test hook.
+    private let showsDevTools = !UserDefaults.standard.bool(forKey: "FASTLANE_SNAPSHOT")
+    #endif
+
     var body: some View {
         NavigationStack(path: $path) {
             ZStack {
@@ -202,14 +209,16 @@ private struct HomeTab: View {
                     .padding(.horizontal)
 
                     #if DEBUG
-                    NavigationLink(value: AppDestination.devTestAbilities) {
-                        HStack(spacing: 6) {
-                            Image(systemName: "hammer.fill")
-                            Text("Dev: Test Abilities")
+                    if showsDevTools {
+                        NavigationLink(value: AppDestination.devTestAbilities) {
+                            HStack(spacing: 6) {
+                                Image(systemName: "hammer.fill")
+                                Text("Dev: Test Abilities")
+                            }
                         }
+                        .buttonStyle(MtgSecondaryButtonStyle())
+                        .padding(.horizontal)
                     }
-                    .buttonStyle(MtgSecondaryButtonStyle())
-                    .padding(.horizontal)
                     #endif
 
                     Spacer()

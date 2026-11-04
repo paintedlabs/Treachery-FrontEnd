@@ -34,10 +34,10 @@ platform :ios do
     # Firebase, and the captured screens show whatever live Firestore returns.
     # Expect network access, real writes, and non-deterministic content.
     #
-    # SnapshotHelper injects --FASTLANE_SNAPSHOT into the app's launch arguments,
-    # but no app code reads it. Making this offline and repeatable means having
-    # the app check that argument at startup and point FirebaseManager /
-    # FirestoreManager at seeded fixtures or the Firebase emulator instead.
+    # SnapshotHelper launches the app with -FASTLANE_SNAPSHOT YES. The app only
+    # uses it to hide the DEBUG dev-tools link (Release builds have none).
+    # Making this offline and repeatable means also pointing FirebaseManager /
+    # FirestoreManager at seeded fixtures or the Firebase emulator when it is set.
     #
     # The shared scheme selects none of the UI tests, so Cmd-U never runs them.
     # This lane runs through its own scheme instead, which selects only
