@@ -26,11 +26,15 @@ struct UserFacingError: Error, Equatable {
 extension UserFacingError {
     /// The sentence for `error`, or `unknown` for an error not recognized.
     ///
-    /// Text written by the server reaches players only for a Cloud Functions
-    /// `failed-precondition`: our functions use that code to refuse an action
-    /// the game's state doesn't allow, with a sentence written for players,
-    /// such as "This game is full." Every other code carries developer text,
-    /// so it gets a sentence from here instead.
+    /// Text written by the server never reaches players as is. Of Cloud
+    /// Functions, this mapper serves two callables today: acceptFriendRequest
+    /// and removeFriend. A `failed-precondition` is the server refusing an
+    /// action the current state doesn't allow, and across functions/ its text
+    /// is written for developers, such as "Request is not pending.", "Using
+    /// own deck." or "Leader is always visible." So the refusals those two
+    /// callables send are translated in `functionsRefusals`, and any other
+    /// gets `unknown`. A screen that starts using this mapper for another
+    /// callable adds that callable's refusals there first.
     init(_ error: any Error) {
         self = Self.recognized(error) ?? .unknown
     }
@@ -55,9 +59,8 @@ extension UserFacingError {
         switch error.domain {
         case FunctionsErrorDomain:
             guard let code = FunctionsErrorCode(rawValue: error.code) else { return nil }
-            if code == .failedPrecondition,
-               let serverMessage = playerFacingServerMessage(error.userInfo[NSLocalizedDescriptionKey] as? String) {
-                return Self(message: serverMessage)
+            if code == .failedPrecondition {
+                return refusal(describedAs: error.userInfo[NSLocalizedDescriptionKey] as? String)
             }
             return functionsErrors[code]
         case FirestoreErrorDomain:
@@ -69,20 +72,26 @@ extension UserFacingError {
         }
     }
 
-    /// What FirebaseFunctions reports in place of a message the server didn't
-    /// send (`FunctionsError.errorDescription(from:)`).
-    private static let missingFailedPreconditionMessage = "FAILED PRECONDITION"
-
-    /// The server's sentence, unless it is blank or the SDK's stand-in for one.
-    private static func playerFacingServerMessage(_ message: String?) -> String? {
-        guard let message = message?.trimmingCharacters(in: .whitespacesAndNewlines),
-              !message.isEmpty,
-              message != missingFailedPreconditionMessage else { return nil }
-        return message
+    /// The sentence for a Cloud Functions refusal, found by the server's
+    /// text. Only the refusals in `functionsRefusals` are recognized; any
+    /// other text, a blank one, or the SDK's "FAILED PRECONDITION" stand-in
+    /// for none, isn't.
+    private static func refusal(describedAs serverText: String?) -> Self? {
+        guard let serverText = serverText?.trimmingCharacters(in: .whitespacesAndNewlines) else { return nil }
+        return functionsRefusals[serverText]
     }
 
     // Lookup tables rather than switches: the codes not listed fall back to
     // `unknown`, and each table reads as the decision it records.
+
+    /// The refusals (`failed-precondition`) of the callables this mapper
+    /// serves, by the server's text (functions/src/callables/users.js).
+    /// removeFriend sends none.
+    private static let functionsRefusals: [String: Self] = [
+        // acceptFriendRequest, for a request accepted or declined already:
+        // on another device, say, or by an earlier tap whose answer was lost.
+        "Request is not pending.": .requestAlreadyAnswered,
+    ]
 
     private static let urlErrors: [URLError.Code: Self] = [
         .notConnectedToInternet: .offline,
@@ -102,7 +111,7 @@ extension UserFacingError {
         .nothingCachedOffline: .serverUnreachable,
     ]
 
-    /// A failed-precondition with a usable message never gets here.
+    /// A failed-precondition never gets here: see `functionsRefusals`.
     private static let functionsErrors: [FunctionsErrorCode: Self] = [
         .unavailable: .serverUnreachable,
         .deadlineExceeded: .timedOut,
@@ -240,5 +249,12 @@ extension UserFacingError {
     static let signInMethodUnavailable = Self(message: String(
         localized: "This way of signing in isn't available right now.",
         comment: "Sign-in error when the sign-in method is turned off"
+    ))
+
+    // Friends
+
+    static let requestAlreadyAnswered = Self(message: String(
+        localized: "That request was already answered.",
+        comment: "Error shown when accepting a friend request that was already accepted or declined"
     ))
 }

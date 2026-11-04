@@ -243,8 +243,8 @@ struct FriendsListViewModelTests {
         #expect(viewModel.overview.value?.pendingRequests.map(\.id) == ["r2"])
     }
 
-    /// The server's failed-precondition sentence is written for players.
-    @Test func failedAcceptShowsTheServersSentenceAndDoesNotReload() async {
+    /// The server's refusal is developer text; players get a sentence.
+    @Test func failedAcceptSaysWhyInPlainWordsAndDoesNotReload() async {
         firestore.pendingRequestsToReturn = [request("r1")]
         await viewModel.loadData(userId: "u1")
         cloudFunctions.errorToThrow = NSError(
@@ -257,7 +257,7 @@ struct FriendsListViewModelTests {
 
         #expect(viewModel.actionFailure == FriendActionFailure(
             action: .acceptRequest,
-            error: UserFacingError(message: "Request is not pending.")
+            error: .requestAlreadyAnswered
         ))
         #expect(firestore.getFriendsCallCount == 1)
         #expect(viewModel.overview.value?.pendingRequests.map(\.id) == ["r1"])

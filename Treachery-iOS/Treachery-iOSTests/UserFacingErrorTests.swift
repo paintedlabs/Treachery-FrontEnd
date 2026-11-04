@@ -52,18 +52,25 @@ struct UserFacingErrorTests {
         #expect(UserFacingError(error) == expected)
     }
 
-    @Test func failedPreconditionShowsTheServersSentence() {
-        let refusal = error(functionsDomain, 9, "  This game is full. ")
+    /// acceptFriendRequest's refusal, the only one the callables this mapper
+    /// serves send, is developer text; players get a sentence for it.
+    @Test func acceptingAnAnsweredRequestIsSaidPlainly() {
+        let refusal = error(functionsDomain, 9, "  Request is not pending. ")
 
-        #expect(UserFacingError(refusal) == UserFacingError(message: "This game is full."))
+        #expect(UserFacingError(refusal) == .requestAlreadyAnswered)
     }
 
-    @Test("A failed-precondition without a usable sentence gets a plain one", arguments: [
+    /// The server's refusal text is written for developers, so any refusal
+    /// not translated, from a game callable say, never reaches players.
+    @Test("Any other failed-precondition gets a plain sentence, never the server's text", arguments: [
+        error(functionsDomain, 9, "Using own deck."),
+        error(functionsDomain, 9, "Leader is always visible."),
+        error(functionsDomain, 9, "This game is full."),
         error(functionsDomain, 9, "FAILED PRECONDITION"),
         error(functionsDomain, 9, "   "),
         error(functionsDomain, 9),
     ])
-    func failedPreconditionWithoutASentence(error: NSError) {
+    func otherFailedPreconditions(error: NSError) {
         #expect(UserFacingError(error) == .unknown)
     }
 
@@ -74,7 +81,7 @@ struct UserFacingErrorTests {
         (error(firestoreDomain, 7, "Missing or insufficient permissions."), .notPermitted),
         (error(firestoreDomain, 5, "No document to update"), .notFound),
         (error(firestoreDomain, 8, "Quota exceeded."), .tooManyRequests),
-        // Firestore's failed-precondition is developer text, unlike the server's.
+        // Firestore's failed-precondition is developer text: a missing index.
         (error(firestoreDomain, 9, "The query requires an index. You can create it here: https://console.firebase.google.com"), .unknown),
         (error(firestoreDomain, 13, "Internal error"), .unknown),
     ])
