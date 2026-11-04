@@ -358,8 +358,7 @@ struct GameBoardViewModelActionTests {
         // Simulate already rolling
         vm.isRollingDie = true
         await vm.rollDie()
-        // Should not have called cloud function
-        // (rollPlanarDie is not in cf's tracked calls, but we check dieRollResult)
+        #expect(cf.rollPlanarDieCalls.isEmpty)
         #expect(vm.dieRollResult == nil)
     }
 

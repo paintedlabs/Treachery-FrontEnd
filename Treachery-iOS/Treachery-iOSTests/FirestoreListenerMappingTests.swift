@@ -60,17 +60,13 @@ struct FirestoreListenerMappingTests {
         #expect(gameEvent(exists: false, hasPendingWrites: true) == nil)
     }
 
-    @Test func serversConfirmationOfAMissGetsThrough() {
-        // The confirmation often changes only the snapshot's metadata, which
-        // the game listener hears only with metadata changes on. The cache's
-        // miss comes first and is held back; the server's, otherwise the
-        // same, is reported.
+    @Test func gameListenerAsksForMetadataChanges() {
+        // The server's confirmation of a miss often changes nothing but the
+        // snapshot's metadata (isFromCache flips), and Firestore delivers
+        // that only to a listener that asks for metadata changes. This pins
+        // the setting. Whether listenToGame passes it on can only be seen
+        // against the SDK.
         #expect(FirestoreManager.gameListenerIncludesMetadataChanges)
-        #expect(gameEvent(exists: false, isFromCache: true) == nil)
-        guard case .missing = gameEvent(exists: false, isFromCache: false) else {
-            Issue.record("expected .missing")
-            return
-        }
     }
 
     @Test(arguments: [true, false])

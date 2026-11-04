@@ -1,3 +1,4 @@
+import Combine
 import Testing
 import Foundation
 @testable import Treachery_iOS
@@ -83,6 +84,19 @@ struct GameBoardSeatTests {
         #expect(vm.spectatorLeave == nil)
         #expect(!vm.canAdjustLife)
         #expect(!vm.canRollDie)
+    }
+
+    @Test func settingTheUserRedrawsTheBoard() {
+        // The board sets the user as it appears, possibly after the first
+        // snapshots. Unless that tells the screen to redraw, it keeps the
+        // seat it drew without a user, and the life buttons stay disabled.
+        let vm = makeVM(gameMode: .none, currentUserId: nil)
+        var redraws = 0
+        let subscription = vm.objectWillChange.sink { _ in redraws += 1 }
+        vm.currentUserId = "u1"
+        subscription.cancel()
+        #expect(redraws == 1)
+        #expect(vm.seat == .playing)
     }
 
     // MARK: - Leaving and ending
