@@ -67,15 +67,6 @@ extension GameStats {
     }
 }
 
-/// What the Profile screen shows once it has loaded: the user's public
-/// profile and their stats over finished games. One value, loaded together,
-/// so the screen never shows a profile beside stats that are still loading
-/// or failed.
-struct ProfileOverview {
-    var user: TreacheryUser
-    let stats: GameStats
-}
-
 /// Where the delete-account flow is. One enum rather than Bool flags, so
 /// states like "confirming while deleting" cannot be represented.
 enum AccountDeletionState: Equatable {
@@ -140,7 +131,12 @@ final class ProfileViewModel: ObservableObject {
 
     // MARK: - Published State
 
-    @Published private(set) var overview: Loadable<ProfileOverview, UserFacingError> = .idle
+    /// The user's public profile.
+    @Published private(set) var profile: Loadable<TreacheryUser, UserFacingError> = .idle
+    /// The user's stats over their finished games. They load with the
+    /// profile but can fail on their own, so a cached profile still shows
+    /// when the games aren't cached.
+    @Published private(set) var stats: Loadable<GameStats, UserFacingError> = .idle
     /// The name being typed while renaming.
     @Published var editedName = ""
     @Published private(set) var renameState: RenameState = .idle
@@ -149,7 +145,25 @@ final class ProfileViewModel: ObservableObject {
 
     /// The profile shown, if one has loaded.
     var user: TreacheryUser? {
-        overview.value?.user
+        profile.value
+    }
+
+    /// Why the stats didn't load, if they didn't. Offline with no finished
+    /// games cached, the usual reason, that's said plainly.
+    var statsFailureMessage: String? {
+        guard let failure = stats.failure else { return nil }
+        switch failure {
+        case .offline, .serverUnreachable:
+            return String(
+                localized: "Stats need a connection. Try again when you're back online.",
+                comment: "Shown on the stats card when the stats couldn't load because the server couldn't be reached"
+            )
+        default:
+            return String(
+                localized: "Your stats didn't load. \(failure.message)",
+                comment: "Shown on the stats card when the stats couldn't load. The argument says why."
+            )
+        }
     }
 
     /// Whether the name field is open, including while its draft is saved.
@@ -211,29 +225,46 @@ final class ProfileViewModel: ObservableObject {
 
     // MARK: - Data Loading
 
-    /// Loads the profile and the stats over the user's finished games
-    /// together. What's already shown stays while this runs and if it fails.
-    /// A profile that is missing or can't be read fails the load, rather
-    /// than leave a spinner running.
+    /// Loads the profile and the stats over the user's finished games side by
+    /// side, and shows them together. Each fails on its own: offline with no
+    /// finished games cached, the cached profile still shows and only the
+    /// stats say why they're missing, since stale beats blank. What's
+    /// already shown stays while this runs and if it fails. A profile that
+    /// is missing or can't be read fails, rather than leave a spinner running.
     func loadData(userId: String) async {
         self.userId = userId
-        overview.startLoading()
+        profile.startLoading()
+        stats.startLoading()
 
+        async let userRead = firestoreManager.getUser(id: userId)
+        async let gamesRead = firestoreManager.getFinishedGames(forUserId: userId)
+
+        let profileResult: Result<TreacheryUser, UserFacingError>
         do {
-            async let userTask = firestoreManager.getUser(id: userId)
-            async let gamesTask = firestoreManager.getFinishedGames(forUserId: userId)
-
-            guard let user = try await userTask else { throw FirestoreReadError.profileUnavailable }
-            let games = try await gamesTask
-            let playersByGame = await firestoreManager.playersByGame(for: games)
-
-            overview = .loaded(ProfileOverview(
-                user: user,
-                stats: GameStats(games: games, playersByGame: playersByGame, userId: userId)
-            ))
+            guard let user = try await userRead else { throw FirestoreReadError.profileUnavailable }
+            profileResult = .success(user)
         } catch {
             Self.profileLogger.error("Loading the profile failed: \(String(describing: error), privacy: .private)")
-            overview.fail(with: UserFacingError(error))
+            profileResult = .failure(UserFacingError(error))
+        }
+
+        let statsResult: Result<GameStats, UserFacingError>
+        do {
+            let games = try await gamesRead
+            let playersByGame = await firestoreManager.playersByGame(for: games)
+            statsResult = .success(GameStats(games: games, playersByGame: playersByGame, userId: userId))
+        } catch {
+            Self.profileLogger.error("Loading the stats failed: \(String(describing: error), privacy: .private)")
+            statsResult = .failure(UserFacingError(error))
+        }
+
+        switch profileResult {
+        case .success(let user): profile = .loaded(user)
+        case .failure(let failure): profile.fail(with: failure)
+        }
+        switch statsResult {
+        case .success(let loaded): stats = .loaded(loaded)
+        case .failure(let failure): stats.fail(with: failure)
         }
     }
 
@@ -259,7 +290,7 @@ final class ProfileViewModel: ObservableObject {
 
         do {
             try await firestoreManager.updateDisplayName(newName, forUserId: userId)
-            overview.updateValue { $0.user.displayName = newName }
+            profile.updateValue { $0.displayName = newName }
             renameState = .idle
         } catch {
             Self.profileLogger.error("Renaming failed: \(String(describing: error), privacy: .private)")

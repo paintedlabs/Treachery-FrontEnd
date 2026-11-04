@@ -126,19 +126,22 @@ struct ProfileViewModelTests {
     // MARK: - Loading
 
     @Test func nothingIsShownUntilTheFirstLoadFinishes() async {
-        #expect(viewModel.overview.phase == .idle)
-        var phaseMidLoad: LoadablePhase?
+        #expect(viewModel.profile.phase == .idle)
+        #expect(viewModel.stats.phase == .idle)
+        var phasesMidLoad: [LoadablePhase]?
         var hadValueMidLoad: Bool?
         firestore.whileGettingFinishedGames = { [viewModel] in
-            phaseMidLoad = viewModel.overview.phase
-            hadValueMidLoad = viewModel.overview.value != nil
+            phasesMidLoad = [viewModel.profile.phase, viewModel.stats.phase]
+            hadValueMidLoad = viewModel.profile.value != nil || viewModel.stats.value != nil
         }
 
         await viewModel.loadData(userId: "u1")
 
-        #expect(phaseMidLoad == .loading)
+        // The profile and its stats show together, not one beside a spinner.
+        #expect(phasesMidLoad == [.loading, .loading])
         #expect(hadValueMidLoad == false)
-        #expect(viewModel.overview.phase == .loaded)
+        #expect(viewModel.profile.phase == .loaded)
+        #expect(viewModel.stats.phase == .loaded)
         #expect(viewModel.user?.displayName == "Old Name")
     }
 
@@ -151,23 +154,23 @@ struct ProfileViewModelTests {
 
         await viewModel.loadData(userId: "u1")
 
-        #expect(viewModel.overview.phase == .failed)
-        #expect(viewModel.overview.failure == .serverUnreachable)
+        #expect(viewModel.profile.phase == .failed)
+        #expect(viewModel.profile.failure == .serverUnreachable)
         // Nothing to show, rather than an endless "Loading stats...".
-        #expect(viewModel.overview.value == nil)
+        #expect(viewModel.profile.value == nil)
         #expect(viewModel.user == nil)
 
         firestore.errorToThrow = nil
         await viewModel.loadData(userId: "u1")
 
-        #expect(viewModel.overview.phase == .loaded)
-        #expect(viewModel.overview.failure == nil)
+        #expect(viewModel.profile.phase == .loaded)
+        #expect(viewModel.profile.failure == nil)
         #expect(viewModel.user?.displayName == "Old Name")
     }
 
     @Test func failedRefreshKeepsTheProfileOnScreen() async {
         await viewModel.loadData(userId: "u1")
-        firestore.finishedGamesError = NSError(domain: "FIRFirestoreErrorDomain", code: 4)
+        firestore.errorToThrow = NSError(domain: "FIRFirestoreErrorDomain", code: 4)
         var nameMidRefresh: String?
         firestore.whileGettingFinishedGames = { [viewModel] in
             nameMidRefresh = viewModel.user?.displayName
@@ -176,8 +179,8 @@ struct ProfileViewModelTests {
         await viewModel.loadData(userId: "u1")
 
         #expect(nameMidRefresh == "Old Name")
-        #expect(viewModel.overview.phase == .failed)
-        #expect(viewModel.overview.failure == .timedOut)
+        #expect(viewModel.profile.phase == .failed)
+        #expect(viewModel.profile.failure == .timedOut)
         #expect(viewModel.user?.displayName == "Old Name")
         #expect(viewModel.user?.elo == 1640)
     }
@@ -189,8 +192,8 @@ struct ProfileViewModelTests {
 
         await viewModel.loadData(userId: "u1")
 
-        #expect(viewModel.overview.phase == .failed)
-        #expect(viewModel.overview.failure == .unknown)
+        #expect(viewModel.profile.phase == .failed)
+        #expect(viewModel.profile.failure == .unknown)
         #expect(viewModel.user == nil)
 
         // Once the profile can be read, Try Again loads it.
@@ -202,18 +205,46 @@ struct ProfileViewModelTests {
         )
         await viewModel.loadData(userId: "u1")
 
-        #expect(viewModel.overview.phase == .loaded)
-        #expect(viewModel.overview.failure == nil)
+        #expect(viewModel.profile.phase == .loaded)
+        #expect(viewModel.profile.failure == nil)
         #expect(viewModel.user?.displayName == "Repaired Name")
     }
 
-    @Test func statsFailingFailsTheLoadInsteadOfShowingAPartialProfile() async {
-        firestore.finishedGamesError = NSError(domain: "FIRFirestoreErrorDomain", code: 14)
+    /// Offline with the profile cached but no finished games, Firestore
+    /// answers the games with nothing it can vouch for. The profile still
+    /// shows, and only the stats say they need a connection: stale beats
+    /// blank.
+    @Test func offlineWithNoGamesCachedStillShowsTheProfile() async {
+        firestore.finishedGamesError = FirestoreReadError.nothingCachedOffline
 
         await viewModel.loadData(userId: "u1")
 
-        #expect(viewModel.overview.failure == .serverUnreachable)
-        #expect(viewModel.overview.value == nil)
+        #expect(viewModel.profile.phase == .loaded)
+        #expect(viewModel.user?.displayName == "Old Name")
+        #expect(viewModel.user?.elo == 1640)
+        #expect(viewModel.stats.phase == .failed)
+        #expect(viewModel.stats.value == nil)
+        #expect(viewModel.statsFailureMessage == "Stats need a connection. Try again when you're back online.")
+    }
+
+    @Test func failedStatsRefreshKeepsTheLastStats() async {
+        firestore.finishedGamesToReturn = [game("won", winningTeam: "leader")]
+        firestore.playersByGameToReturn = ["won": [seat(role: .leader)]]
+        await viewModel.loadData(userId: "u1")
+        firestore.finishedGamesError = NSError(domain: "FIRFirestoreErrorDomain", code: 4)
+
+        await viewModel.loadData(userId: "u1")
+
+        #expect(viewModel.profile.phase == .loaded)
+        #expect(viewModel.stats.failure == .timedOut)
+        #expect(viewModel.stats.value?.wins == 1)
+        #expect(viewModel.statsFailureMessage == "Your stats didn't load. The server took too long to respond. Try again.")
+
+        firestore.finishedGamesError = nil
+        await viewModel.loadData(userId: "u1")
+
+        #expect(viewModel.stats.phase == .loaded)
+        #expect(viewModel.statsFailureMessage == nil)
     }
 
     @Test func statsCountOnlyDecidedGamesInTheWinRate() async throws {
@@ -232,7 +263,7 @@ struct ProfileViewModelTests {
 
         await viewModel.loadData(userId: "u1")
 
-        let stats = try #require(viewModel.overview.value?.stats)
+        let stats = try #require(viewModel.stats.value)
         #expect(stats.totalGames == 4)
         #expect(stats.wins == 1)
         #expect(stats.losses == 1)
@@ -250,13 +281,14 @@ struct ProfileViewModelTests {
 
         await viewModel.loadData(userId: "u1")
 
-        let stats = try #require(viewModel.overview.value?.stats)
+        let stats = try #require(viewModel.stats.value)
         #expect(stats.totalGames == 2)
         #expect(stats.wins == 1)
         #expect(stats.losses == 0)
         #expect(stats.unknownResults == 1)
-        // A game whose players didn't load doesn't fail the whole profile.
-        #expect(viewModel.overview.failure == nil)
+        // A game whose players didn't load doesn't fail the stats or the profile.
+        #expect(viewModel.stats.failure == nil)
+        #expect(viewModel.profile.failure == nil)
     }
 
     // MARK: - Fixtures

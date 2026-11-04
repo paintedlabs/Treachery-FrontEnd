@@ -35,7 +35,7 @@ struct ProfileView: View {
 
             ScrollView {
                 VStack(spacing: 24) {
-                    overviewContent
+                    profileContent
 
                     // Sign Out, About and Delete Account stay reachable even
                     // when the profile can't load.
@@ -176,10 +176,11 @@ struct ProfileView: View {
 
     // MARK: - Profile and Stats
 
-    /// The profile and stats only once they've loaded, and a failure with
-    /// Try Again above anything kept from an earlier load.
-    @ViewBuilder private var overviewContent: some View {
-        switch viewModel.overview {
+    /// The profile only once it's loaded, and a failure with Try Again above
+    /// anything kept from an earlier load. The stats card says on its own if
+    /// the stats didn't load.
+    @ViewBuilder private var profileContent: some View {
+        switch viewModel.profile {
         case .idle, .loading(previous: nil):
             MtgLoadingView(message: "Loading profile...")
                 .frame(maxWidth: .infinity)
@@ -189,17 +190,19 @@ struct ProfileView: View {
                 Task { await reload() }
             }
             if let previous {
-                overviewCards(for: previous)
+                profileCards(for: previous)
             }
-        case .loading(previous: let overview?), .loaded(let overview):
-            overviewCards(for: overview)
+        case .loading(previous: let user?), .loaded(let user):
+            profileCards(for: user)
         }
     }
 
-    @ViewBuilder private func overviewCards(for overview: ProfileOverview) -> some View {
-        profileCard(for: overview.user)
-        GameStatsCard(stats: overview.stats, elo: overview.user.elo)
-        if let deckStats = overview.user.deckStats, !deckStats.isEmpty {
+    @ViewBuilder private func profileCards(for user: TreacheryUser) -> some View {
+        profileCard(for: user)
+        GameStatsCard(stats: viewModel.stats, failureMessage: viewModel.statsFailureMessage, elo: user.elo) {
+            Task { await reload() }
+        }
+        if let deckStats = user.deckStats, !deckStats.isEmpty {
             DeckPerformanceCard(deckStats: deckStats)
         }
         NavigationLink {
@@ -209,7 +212,7 @@ struct ProfileView: View {
                 Text("Friends")
                     .foregroundStyle(Color.mtgTextPrimary)
                 Spacer()
-                Text("\(overview.user.friendIds.count)")
+                Text("\(user.friendIds.count)")
                     .foregroundStyle(Color.mtgTextSecondary)
                 Image(systemName: "chevron.right")
                     .font(.caption)
@@ -317,10 +320,16 @@ struct ProfileView: View {
 
 // MARK: - Game Stats Card
 
+/// The stats over finished games, which load with the profile but can fail
+/// on their own: then the card says why, with Try Again, above any stats
+/// kept from an earlier load. The ELO is the profile's, so it always shows.
 private struct GameStatsCard: View {
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
-    let stats: GameStats
+    let stats: Loadable<GameStats, UserFacingError>
+    /// Why the stats didn't load, if they didn't.
+    let failureMessage: String?
     let elo: Int
+    let retry: () -> Void
 
     /// Side by side, or one under another at the accessibility text sizes,
     /// where a quarter of the card's width broke their labels mid-word.
@@ -340,14 +349,21 @@ private struct GameStatsCard: View {
                 .padding(.horizontal, 16)
                 .padding(.bottom, 12)
 
-            resultsLayout {
-                MtgStatBox(value: "\(stats.totalGames)", label: "Games", color: Color.mtgTextPrimary)
-                MtgStatBox(value: "\(stats.wins)", label: "Wins", color: Color.mtgSuccess)
-                MtgStatBox(value: "\(stats.losses)", label: "Losses", color: Color.mtgError)
-                MtgStatBox(value: stats.winRateText, label: "Win %", color: Color.mtgGuardian)
+            if let failureMessage {
+                failure(failureMessage)
             }
-            .padding(.horizontal, 16)
-            .padding(.bottom, 8)
+
+            if let shown = stats.value {
+                results(for: shown)
+            } else if stats.failure == nil {
+                // Only while the stats load again after failing: the
+                // profile and its stats first load together.
+                ProgressView()
+                    .tint(Color.mtgGold)
+                    .frame(maxWidth: .infinity, minHeight: 44)
+                    .padding(.bottom, 8)
+                    .accessibilityLabel("Loading stats")
+            }
 
             HStack(spacing: 8) {
                 MtgStatBox(value: "\(elo)", label: "ELO", color: Color.mtgGoldBright)
@@ -355,40 +371,8 @@ private struct GameStatsCard: View {
             .padding(.horizontal, 16)
             .padding(.bottom, 12)
 
-            // Partial stats say so rather than pass for complete ones.
-            if stats.unknownResults > 0 {
-                Text("Results for some games couldn't be loaded, so they're left out of wins, losses and Win %.")
-                    .font(.footnote)
-                    .foregroundStyle(Color.mtgTextSecondary)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal, 16)
-                    .padding(.bottom, 12)
-            }
-
-            // Role breakdown
-            if !stats.roleBreakdown.isEmpty {
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("Roles Played")
-                        .font(.caption)
-                        .foregroundStyle(Color.mtgTextSecondary)
-                    ForEach(stats.roleBreakdown.sorted(by: { $0.value > $1.value }), id: \.key) { role, count in
-                        HStack(spacing: 6) {
-                            Circle()
-                                .fill(role.color)
-                                .frame(width: 8, height: 8)
-                            Text(role.displayName)
-                                .font(.subheadline)
-                                .foregroundStyle(Color.mtgTextPrimary)
-                            Spacer()
-                            Text("\(count)")
-                                .font(.subheadline)
-                                .foregroundStyle(Color.mtgTextSecondary)
-                        }
-                    }
-                }
-                .padding(.horizontal, 16)
-                .padding(.bottom, 12)
+            if let shown = stats.value {
+                details(for: shown)
             }
 
             NavigationLink {
@@ -407,6 +391,69 @@ private struct GameStatsCard: View {
             }
         }
         .mtgCardFrame()
+    }
+
+    /// Why the stats didn't load, and Try Again, on this card only: the
+    /// profile above it loaded.
+    private func failure(_ message: String) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            FailureMessage(message: message)
+            Button("Try Again", action: retry)
+                .buttonStyle(MtgSecondaryButtonStyle())
+        }
+        .padding(.horizontal, 16)
+        .padding(.bottom, 12)
+        // It appears after a load, away from VoiceOver focus, so say it.
+        .onAppear { FailureMessage.announce(message) }
+    }
+
+    private func results(for stats: GameStats) -> some View {
+        resultsLayout {
+            MtgStatBox(value: "\(stats.totalGames)", label: "Games", color: Color.mtgTextPrimary)
+            MtgStatBox(value: "\(stats.wins)", label: "Wins", color: Color.mtgSuccess)
+            MtgStatBox(value: "\(stats.losses)", label: "Losses", color: Color.mtgError)
+            MtgStatBox(value: stats.winRateText, label: "Win %", color: Color.mtgGuardian)
+        }
+        .padding(.horizontal, 16)
+        .padding(.bottom, 8)
+    }
+
+    @ViewBuilder private func details(for stats: GameStats) -> some View {
+        // Partial stats say so rather than pass for complete ones.
+        if stats.unknownResults > 0 {
+            Text("Results for some games couldn't be loaded, so they're left out of wins, losses and Win %.")
+                .font(.footnote)
+                .foregroundStyle(Color.mtgTextSecondary)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 16)
+                .padding(.bottom, 12)
+        }
+
+        // Role breakdown
+        if !stats.roleBreakdown.isEmpty {
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Roles Played")
+                    .font(.caption)
+                    .foregroundStyle(Color.mtgTextSecondary)
+                ForEach(stats.roleBreakdown.sorted(by: { $0.value > $1.value }), id: \.key) { role, count in
+                    HStack(spacing: 6) {
+                        Circle()
+                            .fill(role.color)
+                            .frame(width: 8, height: 8)
+                        Text(role.displayName)
+                            .font(.subheadline)
+                            .foregroundStyle(Color.mtgTextPrimary)
+                        Spacer()
+                        Text("\(count)")
+                            .font(.subheadline)
+                            .foregroundStyle(Color.mtgTextSecondary)
+                    }
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.bottom, 12)
+        }
     }
 }
 
