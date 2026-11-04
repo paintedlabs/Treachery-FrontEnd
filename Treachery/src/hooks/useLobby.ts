@@ -43,8 +43,11 @@ export function useLobby(
   const unsubPlayersRef = useRef<(() => void) | null>(null);
 
   useEffect(() => {
-    unsubGameRef.current = firestoreService.listenToGame(gameId, (g) => {
-      if (g === null && hasReceivedFirstSnapshot.current) {
+    unsubGameRef.current = firestoreService.listenToGame(gameId, (g, fromCache) => {
+      // Closed when the lobby is deleted while open, or when the first load
+      // finds it missing and the server (not just the cache) says so, e.g. a
+      // link to a lobby the hourly cleanup already deleted.
+      if (g === null && (hasReceivedFirstSnapshot.current || !fromCache)) {
         setIsGameDisbanded(true);
       }
       setGame(g);

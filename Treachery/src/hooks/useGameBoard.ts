@@ -66,8 +66,11 @@ export function useGameBoard(gameId: string, currentUserId: string | null): UseG
   const [lifeDeltas, setLifeDeltas] = useState<Record<string, number>>({});
 
   useEffect(() => {
-    const unsubGame = firestoreService.listenToGame(gameId, (g) => {
-      if (g === null && hasReceivedFirstSnapshot.current) {
+    const unsubGame = firestoreService.listenToGame(gameId, (g, fromCache) => {
+      // Unavailable when the game is deleted while open, or when the first
+      // load finds it missing and the server (not just the cache) says so,
+      // e.g. a link to a game the hourly cleanup already deleted.
+      if (g === null && (hasReceivedFirstSnapshot.current || !fromCache)) {
         setIsGameUnavailable(true);
       }
       setGame(g);
