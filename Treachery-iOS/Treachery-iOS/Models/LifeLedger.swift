@@ -33,6 +33,9 @@ struct LifeLedger {
     struct Batch: Equatable {
         let playerId: String
         let amount: Int
+        /// The player's life in the latest snapshot when the batch was sent.
+        /// The batch shows until a snapshot moves off it.
+        let baseline: Int
         /// Tells this batch from the player's earlier and later ones.
         fileprivate let number: Int
     }
@@ -69,14 +72,14 @@ struct LifeLedger {
     /// Puts the player's pending taps in flight as one batch. Returns nil when
     /// there are none, or while their previous batch hasn't settled.
     ///
-    /// - Parameter serverLife: The player's life in the latest snapshot. The
-    ///   batch shows until a snapshot moves off it.
+    /// - Parameter serverLife: The player's life in the latest snapshot, the
+    ///   batch's baseline.
     mutating func beginBatch(for playerId: String, serverLife: Int) -> Batch? {
         guard var entry = entries[playerId], entry.pending != 0, entry.inFlight == nil else { return nil }
         batchCount += 1
-        let batch = Batch(playerId: playerId, amount: entry.pending, number: batchCount)
+        let batch = Batch(playerId: playerId, amount: entry.pending, baseline: serverLife, number: batchCount)
         entry.pending = 0
-        entry.inFlight = InFlight(batch: batch, baseline: serverLife, progress: .sent)
+        entry.inFlight = InFlight(batch: batch, progress: .sent)
         entries[playerId] = entry
         return batch
     }
@@ -210,9 +213,9 @@ struct LifeLedger {
 
     private struct InFlight {
         let batch: Batch
-        /// The player's server life when the batch was sent.
-        let baseline: Int
         var progress: Progress
+
+        var baseline: Int { batch.baseline }
 
         /// Nothing once a snapshot has taken the batch in.
         var shownAmount: Int {

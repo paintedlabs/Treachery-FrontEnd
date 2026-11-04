@@ -320,8 +320,10 @@ struct OptimisticLifeTrackingTests {
         #expect(board.shown("p1") == 40)
         #expect(board.vm.lifeChangeFailure == GameBoardViewModel.LifeChangeFailure(
             playerId: "p1",
-            message: "Couldn't update Player 1's life. Check your connection and try again."
+            playerName: "Player 1",
+            kind: .notApplied(baseline: 40, amount: -3)
         ))
+        #expect(board.vm.lifeChangeFailure?.message == "Couldn't update Player 1's life. Check your connection and try again.")
         // Not retried: nothing is left running that could send it again.
         #expect(board.vm.lifeChangeDebounces.isEmpty)
         #expect(board.vm.lifeChangeSends.isEmpty)

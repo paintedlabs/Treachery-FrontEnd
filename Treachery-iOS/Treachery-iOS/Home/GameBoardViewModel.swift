@@ -472,13 +472,6 @@ extension GameBoardViewModel {
     /// slow shows the old total again until they catch up.
     static let lifeChangeEchoTimeout: Duration = .seconds(5)
 
-    /// A life change whose call failed.
-    struct LifeChangeFailure: Equatable {
-        let playerId: String
-        /// What the board says, naming the player.
-        let message: String
-    }
-
     /// Shows the tap at once, then sends it with any taps on the same player
     /// that follow within `lifeChangeDebounce`, as one adjustLife call.
     func adjustLife(for playerId: String, by amount: Int) {
@@ -519,13 +512,16 @@ extension GameBoardViewModel {
         let cloudFunctions = cloudFunctions
         let gameId = gameId
         return pendingTaps.map { playerId, amount in
+            // Taps are only made on players on the board; a failure for one
+            // no longer there isn't reported.
+            let baseline = serverPlayers.first { $0.id == playerId }?.lifeTotal ?? 0
             // Holds what the call needs, not the view model, which is
             // usually gone before the call returns.
-            Task { [weak self] in
+            return Task { [weak self] in
                 do {
                     _ = try await cloudFunctions.adjustLife(gameId: gameId, playerId: playerId, amount: amount)
                 } catch {
-                    self?.reportLifeChangeFailure(.reverted, for: playerId, error: error)
+                    self?.reportLifeChangeFailure(.reverted, amount: amount, from: baseline, for: playerId, error: error)
                 }
             }
         }
@@ -535,7 +531,9 @@ extension GameBoardViewModel {
     /// sends any taps that were waiting on a batch it settled, and settles
     /// an unveil whose call couldn't. A player it shows eliminated loses
     /// their unsent taps and any failure explained for them: the server
-    /// refuses changes to them, and no tap could clear the message.
+    /// refuses changes to them, and no tap could clear the message. A
+    /// failure for anyone else is revised by where their total went; see
+    /// `LifeChangeFailure.revised(by:)`.
     private func receivePlayers(_ players: [Player]) {
         serverPlayers = players
         lifeLedger.reconcile(with: players)
@@ -544,6 +542,9 @@ extension GameBoardViewModel {
             if lifeChangeFailure?.playerId == player.id {
                 lifeChangeFailure = nil
             }
+        }
+        if let failure = lifeChangeFailure, let player = players.first(where: { $0.id == failure.playerId }) {
+            lifeChangeFailure = failure.revised(by: player)
         }
         withAnimation(.easeInOut(duration: 0.3)) {
             refreshPlayers()
@@ -648,33 +649,34 @@ extension GameBoardViewModel {
         // Never nil here: a batch can't settle before its call returns.
         let outcome = lifeLedger.recordFailure(of: batch) ?? .reverted
         refreshPlayers()
-        reportLifeChangeFailure(outcome, for: batch.playerId, error: error)
+        reportLifeChangeFailure(outcome, amount: batch.amount, from: batch.baseline, for: batch.playerId, error: error)
         sendPendingLifeChange(for: batch.playerId)
     }
 
-    private func reportLifeChangeFailure(_ outcome: LifeLedger.FailureOutcome, for playerId: String, error: Error) {
+    /// - Parameter baseline: The player's server life when the change was
+    ///   sent.
+    private func reportLifeChangeFailure(
+        _ outcome: LifeLedger.FailureOutcome, amount: Int, from baseline: Int, for playerId: String, error: Error
+    ) {
         logger.error("adjustLife failed: \(String(describing: error), privacy: .public)")
         // Once the game is over or the player is out, the board shows that,
-        // and no tap could clear the message.
-        let player = serverPlayers.first { $0.id == playerId }
-        guard !isGameFinished, player?.isEliminated != true else { return }
-        let name = player?.displayName ?? "the player"
-        let message: String
+        // and no tap could clear the message. A player no longer on the
+        // board has no row to explain.
+        guard !isGameFinished, let player = serverPlayers.first(where: { $0.id == playerId }),
+              !player.isEliminated else { return }
+        let kind: LifeChangeFailure.Kind
         if let reason = CallableRefusal.explanation(of: error) {
-            // Turned down, so certainly not applied, whatever the board has
-            // shown since.
-            message = "Couldn't update \(name)'s life. \(reason)"
+            kind = .refused(reason: reason)
         } else {
             switch outcome {
             case .reverted:
-                message = "Couldn't update \(name)'s life. Check your connection and try again."
+                kind = .notApplied(baseline: baseline, amount: amount)
             case .unconfirmed:
-                // The total shown most likely includes the change already,
-                // and "try again" would make it twice.
-                message = "Couldn't confirm \(name)'s life change. Check the total before changing it again."
+                // The total shown most likely includes the change already.
+                kind = .unconfirmed
             }
         }
-        lifeChangeFailure = LifeChangeFailure(playerId: playerId, message: message)
+        lifeChangeFailure = LifeChangeFailure(playerId: playerId, playerName: player.displayName, kind: kind)
     }
 }
 
