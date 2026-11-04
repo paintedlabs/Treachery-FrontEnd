@@ -444,7 +444,6 @@ struct LobbyView: View {
                         }
                     }
                 }
-                .animation(.easeInOut(duration: 0.3), value: viewModel.players.map(\.id))
                 .mtgCardFrame()
                 .padding(.horizontal)
             }
@@ -461,6 +460,9 @@ struct LobbyView: View {
                 .padding(.top, 16)
             }
         }
+        // A players snapshot redraws the list with a short ease, at once
+        // with Reduce Motion.
+        .animation(reduceMotion ? nil : .easeInOut(duration: 0.3), value: viewModel.players)
     }
 }
 

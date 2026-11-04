@@ -289,9 +289,9 @@ final class LobbyViewModel: ObservableObject {
     private func receivePlayers(_ result: Result<[Player], ListenerFailure>) {
         switch result {
         case .success(let players):
-            withAnimation(.easeInOut(duration: 0.3)) {
-                self.players = players
-            }
+            // LobbyView animates the change, unless Reduce Motion is on: a
+            // view model can't read the setting.
+            self.players = players
             loadCommanderNameIfNeeded()
         case .failure(let failure):
             record(failure, listener: "players")
