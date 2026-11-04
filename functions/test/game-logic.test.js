@@ -7,6 +7,7 @@
  *   - Planechase deck mechanics
  *   - ELO calculations
  *   - Concurrency/race condition scenarios (simulated)
+ *   - The Firestore indexes the stale-game sweep's queries need
  *
  * Run: cd functions && npm test
  */
@@ -1590,6 +1591,44 @@ suite("Callable Argument Validation — parseIntegerArg", () => {
       );
     }
   });
+});
+
+// ═════════════════════════════════════════════════════════════════
+// Firestore Indexes
+// ═════════════════════════════════════════════════════════════════
+
+// cleanupStaleGames (src/triggers.js) pairs `state ==` with a range filter on
+// last_activity_at or created_at. Firestore rejects each such query with
+// FAILED_PRECONDITION unless the composite index (state ASC, <field> ASC)
+// exists, and the emulator never enforces indexes, so no integration test can
+// catch a missing one. Deploy Staging creates what firestore.indexes.json
+// declares; this suite is the only automated check that it declares these.
+const { indexes: FIRESTORE_INDEXES } = require("../../firestore.indexes.json");
+
+function declaresIndex(collectionGroup, fields) {
+  return FIRESTORE_INDEXES.some(
+    (index) =>
+      index.collectionGroup === collectionGroup &&
+      index.queryScope === "COLLECTION" &&
+      index.fields.length === fields.length &&
+      index.fields.every(
+        (f, i) => f.fieldPath === fields[i].fieldPath && f.order === fields[i].order
+      )
+  );
+}
+
+suite("Firestore Indexes — Stale-Game Sweep", () => {
+  for (const field of ["last_activity_at", "created_at"]) {
+    test(`games (state ASC, ${field} ASC) is declared`, () => {
+      assert.ok(
+        declaresIndex("games", [
+          { fieldPath: "state", order: "ASCENDING" },
+          { fieldPath: field, order: "ASCENDING" },
+        ]),
+        `firestore.indexes.json must declare games (state ASC, ${field} ASC) for cleanupStaleGames`
+      );
+    });
+  }
 });
 
 // ═════════════════════════════════════════════════════════════════
