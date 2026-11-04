@@ -9,21 +9,19 @@ import SwiftUI
 
 struct RootView: View {
     @EnvironmentObject var authViewModel: AuthViewModel
+    // Built here rather than in Treachery_iOSApp, the composition root, only
+    // because that file was being changed in parallel when the gate landed.
+    // Moving it there would also let the app hold off start-up work, such as
+    // the auth listener, until the gate allows.
+    @StateObject private var versionGate = VersionGateViewModel.live()
 
     var body: some View {
-        Group {
+        // The version gate comes before the auth switch, so a build that must
+        // update never reaches sign-in or the home screen.
+        VersionGateView(model: versionGate) {
             switch authViewModel.authState {
             case .loading:
-                ZStack {
-                    Color.mtgBackground.ignoresSafeArea()
-                    VStack(spacing: 16) {
-                        Text("Treachery")
-                            .font(.system(size: 36, weight: .bold, design: .serif))
-                            .foregroundStyle(Color.mtgGoldBright)
-                        ProgressView()
-                            .tint(Color.mtgGold)
-                    }
-                }
+                LaunchSplashView()
             case .authenticated:
                 if authViewModel.isNewUser {
                     OnboardingFlow()

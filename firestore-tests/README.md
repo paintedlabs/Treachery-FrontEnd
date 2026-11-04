@@ -17,7 +17,7 @@ npm test
 `npm test` runs `scripts/run-rules-tests.js`, which boots the Firestore emulator via
 `firebase emulators:exec` and runs mocha inside it. One command, no manual emulator step.
 
-Current state of the suite: **109 passing, 0 skipped**.
+Current state of the suite: **120 passing, 0 skipped**.
 
 ### Ports and project id
 
@@ -64,6 +64,7 @@ test/users.test.js            /users/{userId}
 test/friend-requests.test.js  /friend_requests/{requestId}
 test/games.test.js            /games/{gameId}
 test/players.test.js          /games/{gameId}/players/{playerId}
+test/config.test.js           /config/{doc}
 ```
 
 `firebase-tools` refuses to reference a rules file outside its own config directory, so
