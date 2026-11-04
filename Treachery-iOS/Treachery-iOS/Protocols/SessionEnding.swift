@@ -1,6 +1,8 @@
 import Foundation
 
-/// Ends the signed-in session on this device.
+/// Ends the signed-in session on this device, and hears when the account's
+/// deletion starts and how it fails, so that setting up the profile can
+/// hold back meanwhile.
 ///
 /// `AuthViewModel`, the app's single source of auth state, is the conformer,
 /// so every sign-out goes through it. A client that only needs to end the
@@ -18,10 +20,13 @@ protocol SessionEnding {
 
     /// Called before the server is asked to delete the signed-in account.
     /// Until the session ends, or `accountDeletionDidFail(_:)` says the
-    /// server deleted nothing, nothing sets up the account's profile: the
-    /// server deletes the profile before the sign-in account, and an attempt
-    /// in between could create the profile again, with the email and phone
-    /// number, to outlive the account.
+    /// server deleted nothing, no attempt to set up the account's profile
+    /// starts: the server deletes the profile before the sign-in account,
+    /// and an attempt in between could create the profile again, with the
+    /// email and phone number, to outlive the account. An attempt already
+    /// running stops before it creates the profile, unless it's already
+    /// writing it then: those writes still finish, and can reach the server
+    /// after it deleted the profile.
     func accountDeletionWillStart()
 
     /// Called when the server didn't confirm the deletion, so this device

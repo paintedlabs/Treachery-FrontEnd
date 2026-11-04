@@ -104,10 +104,10 @@ struct AuthViewModelProfileSetupTests {
         #expect(auth.reloadAccountCalls == ["u1", "u2", "u2"])
     }
 
-    /// An attempt still running when its account signs out, another signs
-    /// in or the account's deletion starts creates no profile, and finishes
-    /// without acting on its outcome: no name prompt for an account that's
-    /// gone, and no sign-out of the next one.
+    /// An attempt stopped during its Auth reload, as when its account signs
+    /// out, another signs in or the account's deletion starts, creates no
+    /// profile, and finishes without acting on its outcome: no name prompt
+    /// for an account that's gone, and no sign-out of the next one.
     @Test("A cancelled attempt doesn't act on its outcome", arguments: [AccountStatus.exists, .gone])
     func cancelledAttemptDoesNotActOnItsOutcome(status: AccountStatus) async {
         auth.accountStatus = status
@@ -145,8 +145,8 @@ struct AuthViewModelProfileSetupTests {
     // The server deletes the profile, then the sign-in account. An attempt
     // in between could find the profile gone but the account still there,
     // and create the profile again, with the email and phone number, to
-    // outlive the account. So nothing sets up the profile while the account
-    // is being deleted, nor after a deletion whose outcome is unknown.
+    // outlive the account. So the setup is on hold while the account is
+    // being deleted, and after a deletion whose outcome is unknown.
     // ProfileViewModel's deletion tells the session when the deletion starts
     // and how it failed. Most of these tests stand in for it; the ones about
     // how a deletion failed run it.
@@ -194,9 +194,10 @@ struct AuthViewModelProfileSetupTests {
         #expect(viewModel.profileSetupState == .onHold)
     }
 
-    /// The deletion can start while an attempt is running. That attempt is
-    /// stopped there, so it creates nothing (see the cancelled-attempt test
-    /// above), and the name prompt can't open over the deletion.
+    /// The deletion can start while an attempt is running, here during its
+    /// Auth reload. The attempt is stopped there, so it creates nothing (see
+    /// the cancelled-attempt test above), and the name prompt can't open
+    /// over the deletion.
     @Test func theDeletionStopsAnAttemptThatIsRunning() async {
         viewModel.authStateDidChange(to: account())
         await clock.waitForSleepersUnlessCancelled()

@@ -67,7 +67,8 @@ final class AuthViewModel: ObservableObject {
 
     /// Sets up the signed-in account's profile, retrying while that's
     /// postponed (`startProfileSetup(for:)`). Nil once the profile is set
-    /// up, and while no one is signed in.
+    /// up, while the setup is on hold for the account's deletion, and while
+    /// no one is signed in.
     private var profileSetup: Task<Void, Never>?
     /// The profile setup's wait before its next retry, while it waits.
     /// Cancelling it retries at once.
@@ -343,8 +344,12 @@ final class AuthViewModel: ObservableObject {
 
     /// Stops the profile setup, if one runs, because its account signed out,
     /// another signed in or the account is being deleted. An attempt still
-    /// running creates no profile (`ProfileProvisioner`) and ends without
-    /// acting on its outcome (`provisionProfile(for:)`).
+    /// running ends without acting on its outcome (`provisionProfile(for:)`),
+    /// and creates no profile unless it was already past
+    /// `ProfileProvisioner`'s last check, just before
+    /// `FirestoreManager.createUser`. That call's writes, the profile and
+    /// then any private data, still go ahead: they can't be cancelled, and
+    /// while offline Firestore sends them once it's back online.
     private func stopProfileSetup() {
         profileSetup?.cancel()
         profileSetup = nil
@@ -365,9 +370,10 @@ final class AuthViewModel: ObservableObject {
     /// usable profile (see `ProfileProvisioner`), asks for a name when the
     /// profile's is a placeholder, and signs out if Firebase Auth says the
     /// account no longer exists. Unless it's postponed, it ends the setup
-    /// (`profileSetupState`). An attempt whose task was cancelled, because
-    /// the account signed out or another signed in meanwhile, doesn't act on
-    /// its outcome. Only the profile setup calls this in the app.
+    /// (`profileSetupState`). An attempt whose task was cancelled
+    /// (`stopProfileSetup()`), because the account signed out, another
+    /// signed in or the account's deletion put the setup on hold, doesn't
+    /// act on its outcome. Only the profile setup calls this in the app.
     @discardableResult
     func provisionProfile(for account: SignedInAccount) async -> ProfileProvisioner.Outcome {
         let outcome = await profileProvisioner.provision(account) {
@@ -408,10 +414,11 @@ extension AuthViewModel: SessionEnding {
         AnalyticsService.trackEvent("sign_out")
     }
 
-    /// Puts a pending profile setup on hold (`ProfileSetupState.onHold`),
-    /// stopping an attempt that's running before it creates anything.
-    /// Retries, the app becoming active and Try Again then set nothing up
-    /// until the session ends, or the deletion fails having deleted nothing.
+    /// Puts a pending profile setup on hold (`ProfileSetupState.onHold`) and
+    /// stops an attempt that's running, which then creates no profile unless
+    /// it was already writing one (`stopProfileSetup()`). Retries, the app
+    /// becoming active and Try Again then start no attempt until the session
+    /// ends, or the deletion fails having deleted nothing.
     func accountDeletionWillStart() {
         guard profileSetupState == .pending else { return }
         stopProfileSetup()
