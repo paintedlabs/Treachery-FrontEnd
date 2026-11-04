@@ -35,6 +35,16 @@ struct RootView: View {
                         .accessibilityHidden(authViewModel.isNewUser)
                     if authViewModel.isNewUser {
                         OnboardingFlow()
+                            // Modal, as AccountDeletionOverlay is: VoiceOver
+                            // stays in the prompt, out of the tabs beneath.
+                            .accessibilityElement(children: .contain)
+                            .accessibilityAddTraits(.isModal)
+                            // A field focused in the tabs, such as Friends'
+                            // search, would keep the keyboard, and what's
+                            // typed would go where no one can see it.
+                            .onAppear {
+                                UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+                            }
                     }
                 }
             case .unauthenticated:
