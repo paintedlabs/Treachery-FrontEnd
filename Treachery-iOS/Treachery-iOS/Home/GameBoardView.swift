@@ -202,6 +202,13 @@ struct GameBoardView: View {
         let text: String
     }
 
+    /// What the pinned controls' scroll position follows: the feedback
+    /// showing in them, and the seat that decides which controls they hold.
+    private struct PinnedControlsState: Equatable {
+        let feedback: [Feedback]
+        let seat: GameBoardViewModel.Seat
+    }
+
     /// The feedback showing in the pinned controls, top to bottom.
     private var feedback: [Feedback] {
         let shown: [(ScrollTarget, String?)] = [
@@ -255,26 +262,32 @@ struct GameBoardView: View {
                     guard isRolling else { return }
                     bringIntoView(.plane, with: scroll)
                 }
-                // Feedback appears at the top of the pinned controls. When
-                // there's more of them than fits, as at large text sizes,
-                // that's above the part in view: bring new feedback into
-                // view, the highest if there's more than one. Once feedback
-                // goes, and none is new, bring back the controls' end,
-                // where they rest.
-                .onChange(of: feedback) { old, new in
-                    if let shown = new.first(where: { !old.contains($0) }) {
+                // One decision for the pinned controls' position, so it
+                // never depends on which of two handlers runs last.
+                // - Becoming a spectator shows the controls' end, where
+                //   Leave Game is, whatever feedback shows: a spectator may
+                //   have no action left that clears it, and it was brought
+                //   into view and read out when it appeared.
+                // - Otherwise feedback appears at the top of the controls.
+                //   When there's more of them than fits, as at large text
+                //   sizes, that's above the part in view: bring new feedback
+                //   into view, the highest if there's more than one.
+                // - Once feedback goes, and none is new, bring back the end,
+                //   where they rest. Not while a roll is under way: it clears
+                //   the last result and error as it starts, and its own
+                //   result or error brings itself into view when it lands.
+                // - A new seat with no feedback showing changes the
+                //   controls too: show their end.
+                .onChange(of: PinnedControlsState(feedback: feedback, seat: viewModel.seat)) { old, new in
+                    if new.seat == .spectating, old.seat != .spectating {
+                        bringIntoView(.controlsEnd, anchor: .bottom, with: scroll)
+                    } else if let shown = new.feedback.first(where: { !old.feedback.contains($0) }) {
                         bringIntoView(shown.target, anchor: .top, with: scroll)
-                    } else if new.count < old.count {
+                    } else if new.feedback.count < old.feedback.count, !viewModel.isRollingDie {
+                        bringIntoView(.controlsEnd, anchor: .bottom, with: scroll)
+                    } else if new.seat != old.seat, new.feedback.isEmpty {
                         bringIntoView(.controlsEnd, anchor: .bottom, with: scroll)
                     }
-                }
-                // A new seat changes the controls, as when an eliminated
-                // player's spectator bar replaces Unveil: show their end,
-                // where Leave Game is. Feedback showing keeps its place, and
-                // the end comes back once it goes.
-                .onChange(of: viewModel.seat) {
-                    guard feedback.isEmpty else { return }
-                    bringIntoView(.controlsEnd, anchor: .bottom, with: scroll)
                 }
             }
             .sheet(item: $inspectedPlayer) { player in
