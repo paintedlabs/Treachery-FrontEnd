@@ -47,6 +47,7 @@ struct AuthViewModelProfileSetupTests {
         ProfileViewModel(
             session: viewModel,
             retryProfileSetup: { [viewModel] in await viewModel.retryProfileSetup() },
+            profileSetupState: { [viewModel] in viewModel.profileSetupState },
             firestoreManager: firestore,
             cloudFunctions: cloudFunctions,
             trackEvent: { _ in }
@@ -418,6 +419,7 @@ struct AuthViewModelProfileSetupTests {
                     firestore.usersToReturn[created.id] = created
                 }
             },
+            profileSetupState: { [viewModel] in viewModel.profileSetupState },
             firestoreManager: firestore,
             cloudFunctions: MockCloudFunctions(),
             trackEvent: { _ in }
@@ -459,12 +461,14 @@ struct AuthViewModelProfileSetupTests {
         let profileScreen = ProfileViewModel(
             session: SessionEndingSpy(),
             retryProfileSetup: {},
+            profileSetupState: { [viewModel] in viewModel.profileSetupState },
             firestoreManager: firestore,
             cloudFunctions: MockCloudFunctions(),
             trackEvent: { _ in }
         )
         let friendsScreen = FriendsListViewModel(
             retryProfileSetup: {},
+            profileSetupState: { [viewModel] in viewModel.profileSetupState },
             firestoreManager: firestore,
             cloudFunctions: MockCloudFunctions(),
             trackEvent: { _ in },
@@ -595,15 +599,18 @@ extension AuthViewModelProfileSetupTests {
     }
 
     /// Without a profile, Profile and Friends fail to load. On hold, "check
-    /// your connection" would be untrue. Their failure cards say why instead,
-    /// as ProfileView and FriendsListView put it (`whileProfileSetup(is:)`),
-    /// and Try Again on each checks the account and sets nothing up.
-    @Test func profileAndFriendsSayWhyTheProfileIsNotSetUpWhileOnHold() async {
+    /// your connection" would be untrue, so the failure each view model gives
+    /// its failure card (`profileFailureShown`, `overviewFailureShown`) says
+    /// why instead, before and after Try Again, which checks the account and
+    /// sets nothing up. ProfileView and FriendsListView pass these failures
+    /// to their cards as they are; no test renders the views.
+    @Test func profileAndFriendsViewModelsSayWhyTheProfileIsNotSetUpWhileOnHold() async {
         await holdTheSetupWithATimedOutDeletion()
         auth.accountStatus = .exists
         let profileScreen = profileScreen(deletingWith: MockCloudFunctions())
         let friendsScreen = FriendsListViewModel(
             retryProfileSetup: { [viewModel] in await viewModel.retryProfileSetup() },
+            profileSetupState: { [viewModel] in viewModel.profileSetupState },
             firestoreManager: firestore,
             cloudFunctions: MockCloudFunctions(),
             trackEvent: { _ in },
@@ -613,15 +620,14 @@ extension AuthViewModelProfileSetupTests {
         await profileScreen.loadData(userId: "u1")
         await friendsScreen.loadData(userId: "u1")
 
-        let setup = viewModel.profileSetupState
-        #expect(profileScreen.profile.failure?.whileProfileSetup(is: setup) == .profileSetupOnHold)
-        #expect(friendsScreen.overview.failure?.whileProfileSetup(is: setup) == .profileSetupOnHold)
+        #expect(profileScreen.profileFailureShown == .profileSetupOnHold)
+        #expect(friendsScreen.overviewFailureShown == .profileSetupOnHold)
 
         await profileScreen.retry(userId: "u1")
         await friendsScreen.retry(userId: "u1")
 
-        #expect(profileScreen.profile.failure?.whileProfileSetup(is: setup) == .profileSetupOnHold)
-        #expect(friendsScreen.overview.failure?.whileProfileSetup(is: setup) == .profileSetupOnHold)
+        #expect(profileScreen.profileFailureShown == .profileSetupOnHold)
+        #expect(friendsScreen.overviewFailureShown == .profileSetupOnHold)
         #expect(auth.reloadAccountCalls == ["u1", "u1", "u1"])
         #expect(firestore.getUserDocumentCallCount == 1)
         #expect(firestore.createUserCalls.isEmpty)

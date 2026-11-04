@@ -113,6 +113,15 @@ final class FriendsListViewModel: ObservableObject {
     /// failure always shows, even if an earlier alert never presented.
     @Published private(set) var actionFailure: FriendActionFailure?
 
+    /// Why the friends and requests didn't load, if they didn't, as their
+    /// failure card says it. While the profile setup is on hold after a
+    /// deletion whose outcome is unknown, a profile that isn't set up says
+    /// so rather than blame the connection
+    /// (`UserFacingError.whileProfileSetup(is:)`).
+    var overviewFailureShown: UserFacingError? {
+        overview.failure?.whileProfileSetup(is: profileSetupState())
+    }
+
     // MARK: - Properties
 
     private var userId: String?
@@ -126,6 +135,7 @@ final class FriendsListViewModel: ObservableObject {
     /// for the profile setup, even if the screen reappears meanwhile.
     private var retryPhase = RetryPhase.idle
     private let retryProfileSetup: () async -> Void
+    private let profileSetupState: () -> ProfileSetupState
     private let firestoreManager: FirestoreManaging
     private let cloudFunctions: CloudFunctionsProtocol
     private let trackEvent: (String) -> Void
@@ -139,16 +149,23 @@ final class FriendsListViewModel: ObservableObject {
     ///   - retryProfileSetup: Gives a postponed profile setup another go and
     ///     returns once it's over: the friends list is part of the profile.
     ///     In the app this is `AuthViewModel.retryProfileSetup()`.
+    ///   - profileSetupState: How far the profile setup has got, read
+    ///     whenever the screen shows a failure (`overviewFailureShown`). In
+    ///     the app this is `AuthViewModel.profileSetupState`;
+    ///     FriendsListView observes that view model too, so it shows a
+    ///     change at once.
     ///   - trackEvent: Records an analytics event by name.
     ///   - announce: Says a message to VoiceOver.
     init(
         retryProfileSetup: @escaping () async -> Void,
+        profileSetupState: @escaping () -> ProfileSetupState,
         firestoreManager: FirestoreManaging = FirestoreManager(),
         cloudFunctions: CloudFunctionsProtocol = CloudFunctions(),
         trackEvent: @escaping (String) -> Void = { AnalyticsService.trackEvent($0) },
         announce: @escaping @MainActor (String) -> Void = { FailureMessage.announce($0) }
     ) {
         self.retryProfileSetup = retryProfileSetup
+        self.profileSetupState = profileSetupState
         self.firestoreManager = firestoreManager
         self.cloudFunctions = cloudFunctions
         self.trackEvent = trackEvent

@@ -194,12 +194,11 @@ struct ProfileView: View {
             MtgLoadingView(message: "Loading profile...")
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 40)
-        case .failed(let failure, let previous):
-            LoadFailureCard(
-                title: "Couldn't Load Your Profile",
-                failure: failure.whileProfileSetup(is: authViewModel.profileSetupState)
-            ) {
-                Task { await retry() }
+        case .failed(_, let previous):
+            if let failure = viewModel.profileFailureShown {
+                LoadFailureCard(title: "Couldn't Load Your Profile", failure: failure) {
+                    Task { await retry() }
+                }
             }
             if let previous {
                 profileCards(for: previous)
@@ -218,7 +217,10 @@ struct ProfileView: View {
             DeckPerformanceCard(deckStats: deckStats)
         }
         NavigationLink {
-            FriendsListView(retryProfileSetup: { [authViewModel] in await authViewModel.retryProfileSetup() })
+            FriendsListView(
+                retryProfileSetup: { [authViewModel] in await authViewModel.retryProfileSetup() },
+                profileSetupState: { [authViewModel] in authViewModel.profileSetupState }
+            )
         } label: {
             HStack {
                 Text("Friends")
@@ -775,7 +777,11 @@ private struct ProfileRow<Content: View>: View {
 #Preview {
     let authViewModel = AuthViewModel()
     NavigationStack {
-        ProfileView(viewModel: ProfileViewModel(session: authViewModel, retryProfileSetup: {}))
+        ProfileView(viewModel: ProfileViewModel(
+            session: authViewModel,
+            retryProfileSetup: {},
+            profileSetupState: { authViewModel.profileSetupState }
+        ))
     }
     .environmentObject(authViewModel)
 }

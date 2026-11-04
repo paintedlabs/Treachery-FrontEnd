@@ -18,10 +18,13 @@ struct FriendsListView: View {
         _viewModel = StateObject(wrappedValue: viewModel())
     }
 
-    /// - Parameter retryProfileSetup: Gives a postponed profile setup
-    ///   another go: `AuthViewModel.retryProfileSetup()` in the app.
-    init(retryProfileSetup: @escaping () async -> Void) {
-        self.init(viewModel: FriendsListViewModel(retryProfileSetup: retryProfileSetup))
+    /// - Parameters:
+    ///   - retryProfileSetup: Gives a postponed profile setup another go:
+    ///     `AuthViewModel.retryProfileSetup()` in the app.
+    ///   - profileSetupState: How far the profile setup has got:
+    ///     `AuthViewModel.profileSetupState` in the app.
+    init(retryProfileSetup: @escaping () async -> Void, profileSetupState: @escaping () -> ProfileSetupState) {
+        self.init(viewModel: FriendsListViewModel(retryProfileSetup: retryProfileSetup, profileSetupState: profileSetupState))
     }
 
     var body: some View {
@@ -266,12 +269,11 @@ struct FriendsListView: View {
         switch viewModel.overview {
         case .idle, .loading(previous: nil):
             friendsCard(friends: nil)
-        case .failed(let failure, let previous):
-            LoadFailureCard(
-                title: "Couldn't Load Friends",
-                failure: failure.whileProfileSetup(is: authViewModel.profileSetupState)
-            ) {
-                Task { await retry() }
+        case .failed(_, let previous):
+            if let failure = viewModel.overviewFailureShown {
+                LoadFailureCard(title: "Couldn't Load Friends", failure: failure) {
+                    Task { await retry() }
+                }
             }
             // What an earlier load found, but never "No friends yet": under
             // a failure it would read as the answer.
@@ -523,7 +525,7 @@ private extension FriendAction {
 #if DEBUG
 #Preview {
     NavigationStack {
-        FriendsListView(retryProfileSetup: {})
+        FriendsListView(retryProfileSetup: {}, profileSetupState: { .finished })
     }
     .environmentObject(AuthViewModel())
 }

@@ -148,6 +148,14 @@ final class ProfileViewModel: ObservableObject {
         profile.value
     }
 
+    /// Why the profile didn't load, if it didn't, as its failure card says
+    /// it. While the profile setup is on hold after a deletion whose outcome
+    /// is unknown, a profile that isn't set up says so rather than blame the
+    /// connection (`UserFacingError.whileProfileSetup(is:)`).
+    var profileFailureShown: UserFacingError? {
+        profile.failure?.whileProfileSetup(is: profileSetupState())
+    }
+
     /// Why the stats didn't load, if they didn't. Offline with no finished
     /// games cached, the usual reason, that's said plainly.
     var statsFailureMessage: String? {
@@ -205,6 +213,7 @@ final class ProfileViewModel: ObservableObject {
     private var retryPhase = RetryPhase.idle
     private let session: SessionEnding
     private let retryProfileSetup: () async -> Void
+    private let profileSetupState: () -> ProfileSetupState
     private let firestoreManager: FirestoreManaging
     private let cloudFunctions: CloudFunctionsProtocol
     private let trackEvent: (String) -> Void
@@ -224,11 +233,16 @@ final class ProfileViewModel: ObservableObject {
     ///     returns once it's over, so Try Again can find a profile that
     ///     couldn't be created at sign-in. In the app this is
     ///     `AuthViewModel.retryProfileSetup()`.
+    ///   - profileSetupState: How far the profile setup has got, read
+    ///     whenever the screen shows a failure (`profileFailureShown`). In
+    ///     the app this is `AuthViewModel.profileSetupState`; ProfileView
+    ///     observes that view model too, so it shows a change at once.
     ///   - trackEvent: Records an analytics event by name.
     ///   - announce: Says a message to VoiceOver.
     init(
         session: SessionEnding,
         retryProfileSetup: @escaping () async -> Void,
+        profileSetupState: @escaping () -> ProfileSetupState,
         firestoreManager: FirestoreManaging = FirestoreManager(),
         cloudFunctions: CloudFunctionsProtocol = CloudFunctions(),
         trackEvent: @escaping (String) -> Void = { AnalyticsService.trackEvent($0) },
@@ -236,6 +250,7 @@ final class ProfileViewModel: ObservableObject {
     ) {
         self.session = session
         self.retryProfileSetup = retryProfileSetup
+        self.profileSetupState = profileSetupState
         self.firestoreManager = firestoreManager
         self.cloudFunctions = cloudFunctions
         self.trackEvent = trackEvent

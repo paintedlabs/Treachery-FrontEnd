@@ -20,6 +20,7 @@ struct ProfileViewModelTests {
         viewModel = ProfileViewModel(
             session: SessionEndingSpy(),
             retryProfileSetup: {},
+            profileSetupState: { .finished },
             firestoreManager: firestore,
             cloudFunctions: MockCloudFunctions(),
             trackEvent: { _ in }
@@ -204,6 +205,7 @@ struct ProfileViewModelTests {
                     createdAt: Date(timeIntervalSince1970: 1_000_000)
                 )
             },
+            profileSetupState: { .pending },
             firestoreManager: firestore,
             cloudFunctions: MockCloudFunctions(),
             trackEvent: { _ in }
@@ -234,6 +236,7 @@ struct ProfileViewModelTests {
         let viewModel = ProfileViewModel(
             session: SessionEndingSpy(),
             retryProfileSetup: { await setup.retry() },
+            profileSetupState: { .pending },
             firestoreManager: firestore,
             cloudFunctions: MockCloudFunctions(),
             trackEvent: { _ in }
@@ -268,6 +271,7 @@ struct ProfileViewModelTests {
         let viewModel = ProfileViewModel(
             session: SessionEndingSpy(),
             retryProfileSetup: { await setup.retry() },
+            profileSetupState: { .pending },
             firestoreManager: firestore,
             cloudFunctions: MockCloudFunctions(),
             trackEvent: { _ in }
@@ -302,6 +306,7 @@ struct ProfileViewModelTests {
         let viewModel = ProfileViewModel(
             session: SessionEndingSpy(),
             retryProfileSetup: { await setup.retry() },
+            profileSetupState: { .pending },
             firestoreManager: firestore,
             cloudFunctions: MockCloudFunctions(),
             trackEvent: { _ in }
@@ -343,6 +348,7 @@ struct ProfileViewModelTests {
         let viewModel = ProfileViewModel(
             session: SessionEndingSpy(),
             retryProfileSetup: { await setup.retry() },
+            profileSetupState: { .pending },
             firestoreManager: firestore,
             cloudFunctions: MockCloudFunctions(),
             trackEvent: { _ in }

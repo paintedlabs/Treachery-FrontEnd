@@ -18,6 +18,7 @@ struct FriendsListViewModelTests {
     init() {
         viewModel = FriendsListViewModel(
             retryProfileSetup: {},
+            profileSetupState: { .finished },
             firestoreManager: firestore,
             cloudFunctions: cloudFunctions,
             trackEvent: analytics.record,
@@ -48,7 +49,13 @@ struct FriendsListViewModelTests {
         #expect(viewModel.overview.phase == .loaded)
         #expect(viewModel.overview.value?.friends.isEmpty == true)
 
-        let failing = FriendsListViewModel(retryProfileSetup: {}, firestoreManager: firestore, cloudFunctions: cloudFunctions, trackEvent: { _ in })
+        let failing = FriendsListViewModel(
+            retryProfileSetup: {},
+            profileSetupState: { .finished },
+            firestoreManager: firestore,
+            cloudFunctions: cloudFunctions,
+            trackEvent: { _ in }
+        )
         firestore.friendsError = unavailable
         await failing.loadData(userId: "u1")
 
@@ -86,6 +93,7 @@ struct FriendsListViewModelTests {
                     id: "u1", displayName: "Ada", friendIds: [], createdAt: Date(timeIntervalSince1970: 1_000_000)
                 )
             },
+            profileSetupState: { .pending },
             firestoreManager: firestore,
             cloudFunctions: cloudFunctions,
             trackEvent: { _ in }
@@ -116,6 +124,7 @@ struct FriendsListViewModelTests {
         let setup = ProfileSetupRetrySpy()
         let viewModel = FriendsListViewModel(
             retryProfileSetup: { await setup.retry() },
+            profileSetupState: { .pending },
             firestoreManager: firestore,
             cloudFunctions: cloudFunctions,
             trackEvent: { _ in },
@@ -148,6 +157,7 @@ struct FriendsListViewModelTests {
         let setup = ProfileSetupRetrySpy()
         let viewModel = FriendsListViewModel(
             retryProfileSetup: { await setup.retry() },
+            profileSetupState: { .pending },
             firestoreManager: firestore,
             cloudFunctions: cloudFunctions,
             trackEvent: { _ in },
@@ -529,6 +539,7 @@ extension FriendsListViewModelTests {
         let setup = ProfileSetupRetrySpy()
         let viewModel = FriendsListViewModel(
             retryProfileSetup: { await setup.retry() },
+            profileSetupState: { .pending },
             firestoreManager: firestore,
             cloudFunctions: cloudFunctions,
             trackEvent: { _ in },
@@ -564,6 +575,7 @@ extension FriendsListViewModelTests {
         let setup = ProfileSetupRetrySpy()
         let viewModel = FriendsListViewModel(
             retryProfileSetup: { await setup.retry() },
+            profileSetupState: { .pending },
             firestoreManager: firestore,
             cloudFunctions: cloudFunctions,
             trackEvent: { _ in },
