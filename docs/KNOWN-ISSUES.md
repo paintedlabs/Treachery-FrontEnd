@@ -115,9 +115,9 @@ Not all individually test-encoded; from the audit report.
 - `GoogleService-Info.plist` is tracked despite matching `.gitignore`; left that
   way deliberately because the iOS build needs it
 - Screenshot capture (`fastlane screenshots`) runs against **production**
-  Firebase via real guest auth — `--FASTLANE_SNAPSHOT` is passed but no app code
-  reads it. Making it repeatable means honouring that flag and pointing at
-  fixtures or the emulator
+  Firebase via real guest auth — `-FASTLANE_SNAPSHOT YES` is passed, but the app
+  only uses it to hide the DEBUG dev-tools link. Making it repeatable means also
+  pointing at fixtures or the emulator when the flag is set
 - Lobby "Game Mode" chips clip off-screen at phone widths ("Treachery +
   Planechase" unreachable at 375px)
 - ~~`functions/node_modules` is committed~~ — **fixed**, untracked along with

@@ -48,7 +48,117 @@ Practical implications of the path filters:
 Publish a GitHub release. That single event fans out to production web
 hosting, App Store submission, and Play production. There is no partial
 promote — cut the release when *all three* clients are ready for what's on
-`main`.
+`main`. That includes the iOS version number: if it doesn't match the
+release's tag, the App Store run stops while web and Play still deploy (see
+[iOS version numbers](#ios-version-numbers)).
+
+## iOS version numbers
+
+The App Store version is `MARKETING_VERSION` on the `Treachery-iOS` target
+(Xcode → target → General → Version sets Debug and Release together). The
+pipelines only bump the build number, so the version is yours to manage:
+
+1. **Before publishing a release**, bump `MARKETING_VERSION` to the release's
+   version in a PR and merge it. A release tagged `v1.3.0` must build version
+   `1.3.0`; the App Store lane checks this and stops before building if they
+   differ, or if the release's tag isn't `vX.Y.Z`. Release Drafter picks the
+   tag from PR labels, so edit the draft's tag if it doesn't match. (Runs
+   started by hand from the Actions tab on a branch carry no tag and skip the
+   check.)
+
+   The merge changes `Treachery-iOS/**`, so it also starts a TestFlight run
+   (**Deploy to TestFlight** in the Actions tab). Publish only once that run
+   has succeeded and no other TestFlight run is in progress or queued. If it
+   failed, fix the cause first: a failure there (signing, the App Store
+   Connect key, a rejected version) would almost certainly fail the App Store
+   run too, after web and Play have already deployed. Until the App Store run
+   has uploaded its build, don't merge anything under `Treachery-iOS/`.
+
+   Why: before building, each lane looks up the newest upload in App Store
+   Connect and numbers its build one higher. The two workflows have different
+   concurrency groups, so neither waits for the other: a TestFlight run and an
+   App Store run that overlap can pick the same number. App Store Connect then
+   rejects the second upload of that version and build number, so that run
+   fails after a full build. If that happens to the App Store run, don't
+   publish the release again: run the App Store workflow by hand on the
+   release's tag, as in step 4 of
+   [When the App Store run stops on the version check](#when-the-app-store-run-stops-on-the-version-check).
+2. **Right after Apple approves a release**, bump `MARKETING_VERSION` again
+   (e.g. `1.3.0` → `1.3.1`) in a PR. App Store Connect rejects uploads whose
+   version is not higher than the last approved one, so every TestFlight
+   upload from `main` fails until the bump lands.
+
+### When the App Store run stops on the version check
+
+The check stops only the App Store run: web hosting and Play production still
+deploy from the same release. Don't publish the release again, or a
+replacement, because every `release: published` event deploys web and Play
+production again. Ship the iOS app on its own instead, here for version
+`1.3.0`:
+
+1. If `MARKETING_VERSION` isn't `1.3.0`, set it in a PR and merge it.
+2. Tag the commit to ship `v1.3.0`, usually that merge commit. The App Store
+   build contains everything up to it. If the release already owns the tag,
+   this moves it, and the release then points at that commit too:
+   `git tag -f v1.3.0 <commit>`, then `git push --force origin v1.3.0`. No
+   workflow runs on tag pushes.
+3. Wait until the TestFlight run that the merge in step 1 started has
+   finished, successfully or not, and no other TestFlight run is in progress
+   or queued. Otherwise the App Store run and a TestFlight run can pick the
+   same build number, and App Store Connect rejects the second upload (see
+   [iOS version numbers](#ios-version-numbers)).
+4. Run the App Store workflow on the tag:
+   `gh workflow run deploy-appstore.yml --ref v1.3.0`, or **Run workflow** on
+   the workflow's page with the tag picked under **Use workflow from**. On a
+   tag, the run's `GITHUB_REF_NAME` is the tag, so the lane checks the version
+   again before it builds. Run on a branch, it would skip the check.
+
+## iOS phased rollout
+
+Once a version of the app is live, the App Store lane submits each update with
+Apple's 7-day phased release: automatic updates reach 1%, 2%, 5%, 10%, 20%,
+50% and then 100% of users. App Store Connect offers phased release only for
+updates, so the app's first version goes to everyone as soon as it is
+approved. The lane asks App Store Connect for a live version before it builds
+and logs the answer as "Phased release: on" or "Phased release: off". Phased
+release only paces automatic updates; anyone can still download the new
+version from the App Store.
+
+Whoever published the release checks Crashlytics (or Xcode Organizer) and
+player reports every day of the rollout, and pauses it from the version's
+page in App Store Connect when any of these happens:
+
+- crash-free sessions for the new version fall below 99.9%, or a new crash
+  hits more than one user;
+- a player reports they can't sign in, create or join a lobby, or keep a game
+  in sync;
+- the Cloud Functions logs show a rise in errors from callables the new
+  version uses.
+
+Pauses add up to at most 30 days, and a resumed rollout continues where it
+stopped. Fix forward with a new version, or choose "Release to All Users" once
+the cause turns out to be harmless.
+
+## iOS crash symbols
+
+The TestFlight and App Store lanes upload each build's dSYMs to Crashlytics
+right after building, before anything goes to App Store Connect, so a failed
+upload or review submission still leaves Crashlytics with them. A failed
+symbol upload never fails the lane; it logs "No dSYMs went to Crashlytics"
+with the reason. Each deploy run also keeps the dSYM zip as its
+`ios-dsyms-<run id>-<attempt>` artifact for 14 days. To upload it by hand
+within that time, from `Treachery-iOS/`:
+
+```bash
+# The run id is the number at the end of the run's URL. gh unzips the
+# artifact to build/dsyms/Treachery-iOS.app.dSYM.zip.
+gh run download <run id> -n ios-dsyms-<run id>-<attempt> -D build/dsyms
+# Firebase's uploader comes with the pinned firebase-ios-sdk package.
+xcodebuild -resolvePackageDependencies -project Treachery-iOS.xcodeproj \
+  -scheme Treachery-iOS -clonedSourcePackagesDirPath build/SourcePackages
+build/SourcePackages/checkouts/firebase-ios-sdk/Crashlytics/upload-symbols \
+  -gsp Treachery-iOS/GoogleService-Info.plist -p ios build/dsyms/Treachery-iOS.app.dSYM.zip
+```
 
 ## Rules changes
 

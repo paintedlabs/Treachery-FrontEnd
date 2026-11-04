@@ -3,24 +3,30 @@ default_platform(:ios)
 XCODEPROJ = "Treachery-iOS.xcodeproj"
 SCHEME    = "Treachery-iOS"
 
+# Where build_app clones Swift packages, relative to this project folder. A
+# fixed path lets the lanes find Crashlytics' upload-symbols tool inside the
+# Firebase checkout. The deploy workflows resolve packages into the same
+# directory before fastlane runs, so keep the two in step.
+SOURCE_PACKAGES = "build/SourcePackages"
+
 platform :ios do
 
   # ── Testing ────────────────────────────────────────────
 
   desc "Run unit tests"
   lane :test do
-    # ScreenshotTests sits in the same synchronized folder as the other UI tests,
-    # so it compiles into Treachery-iOSUITests automatically and the shared scheme
-    # already runs that target. It signs in for real against production Firebase,
-    # so keep it out of the ordinary test run — it belongs to :screenshots only.
+    # Every Treachery-iOSUITests class launches the app against production
+    # Firebase. The shared scheme builds that bundle but selects none of its
+    # tests (new classes stay out too), and only_testing keeps this run to the
+    # mock-based unit tests regardless. :screenshots has a scheme of its own.
     run_tests(
       project: XCODEPROJ,
       scheme: SCHEME,
-      devices: ["iPhone 16"],
+      devices: ["iPhone 17"],
       code_coverage: true,
       result_bundle: true,
       output_directory: "./build/test_output",
-      skip_testing: ["Treachery-iOSUITests/ScreenshotTests"],
+      only_testing: ["Treachery-iOSTests"],
       clean: true
     )
   end
@@ -34,17 +40,22 @@ platform :ios do
     # Firebase, and the captured screens show whatever live Firestore returns.
     # Expect network access, real writes, and non-deterministic content.
     #
-    # SnapshotHelper injects --FASTLANE_SNAPSHOT into the app's launch arguments,
-    # but no app code reads it. Making this offline and repeatable means having
-    # the app check that argument at startup and point FirebaseManager /
-    # FirestoreManager at seeded fixtures or the Firebase emulator instead.
+    # SnapshotHelper launches the app with -FASTLANE_SNAPSHOT YES. The app only
+    # uses it to hide the DEBUG dev-tools link (Release builds have none).
+    # Making this offline and repeatable means also pointing FirebaseManager /
+    # FirestoreManager at seeded fixtures or the Firebase emulator when it is set.
+    #
+    # The shared scheme selects none of the UI tests, so Cmd-U never runs them.
+    # This lane runs through its own scheme instead, which selects only
+    # ScreenshotTests and runs it without parallel-testing clones, on the
+    # simulators snapshot prepares; only_testing pins the run to that class even
+    # if the scheme's selection changes. Check that a run actually writes
+    # screenshots: xcodebuild reports success when a filter leaves zero tests.
     #
     # Remaining config (devices, languages, output) lives in fastlane/Snapfile.
     capture_ios_screenshots(
       project: XCODEPROJ,
-      scheme: SCHEME,
-      # The UI test target also holds Treachery_iOSUITests and PerformanceTests,
-      # so restrict the capture run to the screenshot class.
+      scheme: "Treachery-iOS-Screenshots",
       only_testing: ["Treachery-iOSUITests/ScreenshotTests"]
     )
   end
@@ -66,6 +77,35 @@ platform :ios do
       "-authenticationKeyID '#{ENV['APP_STORE_CONNECT_KEY_ID']}'",
       "-authenticationKeyIssuerID '#{ENV['APP_STORE_CONNECT_ISSUER_ID']}'"
     ].join(" ")
+  end
+
+  # Gives Crashlytics this build's dSYMs so its crash reports are symbolicated.
+  # Runs right after the export, before anything goes to App Store Connect:
+  # deliver uploads the binary before it submits for review, so a failed
+  # upload or submission must not lose the symbols. It must never fail the
+  # lane either: any error is logged and the lane carries on. The deploy
+  # workflows also keep the dSYM zip as a run artifact for a manual upload
+  # (docs/DEPLOYMENT.md).
+  #
+  # Runs Firebase's upload-symbols itself rather than through
+  # upload_symbols_to_crashlytics: that action logs a failed upload and then
+  # reports success, so a failure would never reach the rescue below.
+  private_lane :upload_crashlytics_symbols do
+    begin
+      dsym_zip = lane_context[SharedValues::DSYM_OUTPUT_PATH]
+      UI.user_error!("build_app produced no dSYM zip") unless dsym_zip
+
+      # sh runs in fastlane/, and these paths are relative to the project folder.
+      Dir.chdir("..") do
+        upload_symbols = File.join(SOURCE_PACKAGES, "checkouts/firebase-ios-sdk/Crashlytics/upload-symbols")
+        UI.user_error!("No upload-symbols at #{upload_symbols}") unless File.executable?(upload_symbols)
+
+        sh(upload_symbols, "-gsp", "Treachery-iOS/GoogleService-Info.plist", "-p", "ios", dsym_zip)
+      end
+      UI.success("Uploaded dSYMs to Crashlytics")
+    rescue => e
+      UI.important("No dSYMs went to Crashlytics; upload the run's ios-dsyms artifact by hand (docs/DEPLOYMENT.md). Reason: #{e.message}")
+    end
   end
 
   # ── Beta (TestFlight) ─────────────────────────────────
@@ -120,7 +160,8 @@ platform :ios do
       clean: true,
       xcargs: signing_args,
       skip_package_ipa: true,
-      archive_path: archive_path
+      archive_path: archive_path,
+      cloned_source_packages_path: SOURCE_PACKAGES
     )
 
     # Export IPA — no cloud signing flags; uses the distribution
@@ -131,8 +172,12 @@ platform :ios do
       export_method: "app-store",
       output_directory: "./build",
       archive_path: archive_path,
-      skip_build_archive: true
+      skip_build_archive: true,
+      cloned_source_packages_path: SOURCE_PACKAGES
     )
+
+    # Symbols first, so a failed upload below can't lose them.
+    upload_crashlytics_symbols
 
     # Upload to TestFlight
     upload_to_testflight(
@@ -143,8 +188,80 @@ platform :ios do
 
   # ── Release (App Store) ──────────────────────────────
 
+  # A published GitHub release runs the release lane with GITHUB_REF_NAME set
+  # to its tag, which Release Drafter writes as vX.Y.Z. The App Store version
+  # comes from MARKETING_VERSION, so stop before anything builds when a
+  # release's tag has another shape or names another version. Runs started by
+  # hand (workflow_dispatch) carry the ref they run on: a vX.Y.Z tag is checked
+  # the same way, which is how to resume after this check stops a release, and
+  # a branch skips the check.
+  private_lane :ensure_version_matches_release_tag do
+    tag = ENV["GITHUB_REF_NAME"].to_s
+    unless tag.match?(/\Av\d+\.\d+\.\d+\z/)
+      next unless ENV["GITHUB_EVENT_NAME"] == "release"
+
+      UI.user_error!(
+        "Release tag #{tag.inspect} is not vX.Y.Z, so it can't be checked against " \
+        "MARKETING_VERSION. Don't publish the release again, or a replacement: " \
+        "that deploys web and Play production a second time. To send this commit " \
+        "to the App Store, tag it vX.Y.Z to match MARKETING_VERSION and, once no " \
+        "TestFlight run is in progress or queued (overlapping runs can pick the " \
+        "same build number), run the App Store workflow by hand on that tag. See " \
+        "docs/DEPLOYMENT.md."
+      )
+    end
+
+    expected = tag.delete_prefix("v")
+    actual = get_version_number(xcodeproj: XCODEPROJ, target: "Treachery-iOS", configuration: "Release")
+    next if actual == expected
+
+    UI.user_error!(
+      "Release #{tag} expects version #{expected}, but MARKETING_VERSION of the " \
+      "Treachery-iOS target is #{actual}. Don't publish the release again, or a " \
+      "replacement: that deploys web and Play production a second time. Set " \
+      "MARKETING_VERSION to #{expected} (Debug and Release) in a PR and merge it, " \
+      "and move the #{tag} tag to that commit. Overlapping TestFlight and App " \
+      "Store runs can pick the same build number, so wait until the TestFlight " \
+      "run that the merge starts has finished, successfully or not, and no other " \
+      "one is in progress or queued. Then run the App Store workflow by hand on " \
+      "#{tag}. See docs/DEPLOYMENT.md."
+    )
+  end
+
+  # Whether a version of the app is live on the App Store. Uses the token that
+  # app_store_connect_api_key sets for Spaceship, so call it after that.
+  private_lane :app_store_version_live do
+    app = Spaceship::ConnectAPI::App.find("com.Solomon.Treachery-iOS")
+    !app&.get_live_app_store_version(platform: Spaceship::ConnectAPI::Platform::IOS).nil?
+  end
+
   desc "Build and submit to App Store review"
   lane :release do
+    ensure_version_matches_release_tag
+
+    # Ahead of the keychain setup, which it doesn't need: the phased-release
+    # query below uses the Spaceship token this sets.
+    api_key = app_store_connect_api_key(
+      key_id: ENV["APP_STORE_CONNECT_KEY_ID"],
+      issuer_id: ENV["APP_STORE_CONNECT_ISSUER_ID"],
+      key_content: ENV["APP_STORE_CONNECT_KEY"],
+      is_key_content_base64: true
+    )
+
+    # Phased release only paces automatic updates for people who already have
+    # the app, so App Store Connect has none for an app's first version, and
+    # deliver fails if asked to create one. Request it only once a version is
+    # live: the first version goes to everyone when approved, and later ones
+    # roll out over Apple's 7 days. Pause or finish a rollout in App Store
+    # Connect (see docs/DEPLOYMENT.md). Decided before anything builds, so an
+    # App Store Connect error here costs no archive.
+    use_phased_release = app_store_version_live
+    if use_phased_release
+      UI.message("Phased release: on. A version is live on the App Store, so this update rolls out over 7 days.")
+    else
+      UI.message("Phased release: off. No version is live on the App Store yet, so this one goes to everyone when approved.")
+    end
+
     setup_ci if is_ci
 
     # Import distribution certificate into Fastlane's temp keychain
@@ -156,13 +273,6 @@ platform :ios do
         keychain_password: ""
       )
     end
-
-    api_key = app_store_connect_api_key(
-      key_id: ENV["APP_STORE_CONNECT_KEY_ID"],
-      issuer_id: ENV["APP_STORE_CONNECT_ISSUER_ID"],
-      key_content: ENV["APP_STORE_CONNECT_KEY"],
-      is_key_content_base64: true
-    )
 
     # Increment build number
     current = latest_testflight_build_number(api_key: api_key)
@@ -188,7 +298,8 @@ platform :ios do
       clean: true,
       xcargs: signing_args,
       skip_package_ipa: true,
-      archive_path: archive_path
+      archive_path: archive_path,
+      cloned_source_packages_path: SOURCE_PACKAGES
     )
 
     build_app(
@@ -197,18 +308,26 @@ platform :ios do
       export_method: "app-store",
       output_directory: "./build",
       archive_path: archive_path,
-      skip_build_archive: true
+      skip_build_archive: true,
+      cloned_source_packages_path: SOURCE_PACKAGES
     )
 
-    # Upload and submit for review
+    # Symbols first, so a failed upload or submission below can't lose them.
+    upload_crashlytics_symbols
+
+    # Upload and submit for review, phased as decided at the top of the lane.
     upload_to_app_store(
       api_key: api_key,
       submit_for_review: true,
       automatic_release: true,
+      phased_release: use_phased_release,
       force: true,
       precheck_include_in_app_purchases: false,
       submission_information: {
-        add_id_info_uses_idfa: false
+        add_id_info_uses_idfa: false,
+        # The app only uses OS and Firebase TLS, which is exempt. Same answer as
+        # INFOPLIST_KEY_ITSAppUsesNonExemptEncryption in the target settings.
+        export_compliance_uses_encryption: false
       }
     )
   end

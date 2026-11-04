@@ -2,16 +2,19 @@
 # Docs: https://docs.fastlane.tools/actions/snapshot/
 #
 # Run this through `fastlane screenshots`, not `fastlane snapshot` directly.
-# The project, scheme and test-class filter are passed by that lane so they
-# track the XCODEPROJ/SCHEME constants the other lanes use, and the lane carries
-# the warning about these tests hitting production Firebase.
+# The project, the screenshot scheme and the test-class filter are passed by
+# that lane, which also carries the warning about these tests hitting
+# production Firebase.
 
-# Devices to capture (App Store requires specific display sizes)
+# Devices to capture (App Store requires specific display sizes). The app is
+# iPhone-only (TARGETED_DEVICE_FAMILY = 1), so App Store Connect needs no iPad
+# screenshots. Each name must be a simulator the installed Xcode has
+# (`xcrun simctl list devices available`): snapshot stops before building on
+# a name it can't find.
 devices([
-  "iPhone 16 Pro Max",   # 6.9" — required for App Store
-  "iPhone 16 Pro",       # 6.3"
-  "iPhone 16",           # 6.1"
-  "iPad Pro 13-inch (M4)" # iPad — if you want iPad screenshots
+  "iPhone 17 Pro Max",   # 6.9" — required for App Store
+  "iPhone 17 Pro",       # 6.3"
+  "iPhone 17e"           # 6.1"
 ])
 
 # Languages / locales
@@ -35,7 +38,7 @@ override_status_bar(true)
 # marker and snapshot's freshness check would abort the run before building.
 skip_helper_version_check(true)
 
-# No launch_arguments on purpose: SnapshotHelper injects --FASTLANE_SNAPSHOT
+# No launch_arguments on purpose: SnapshotHelper injects -FASTLANE_SNAPSHOT YES
 # itself and never reads snapshot-launch_arguments.txt, so anything set here
-# would silently do nothing. Nothing in the app reads that flag yet either —
-# see the warning in the Fastfile's screenshots lane.
+# would silently do nothing. The app only uses that flag to hide its DEBUG
+# dev-tools link — see the warning in the Fastfile's screenshots lane.

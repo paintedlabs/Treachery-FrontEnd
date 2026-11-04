@@ -29,7 +29,9 @@ enum Snapshot {
         Snapshot.app = app
         Snapshot.waitForAnimations = waitForAnimations
 
-        app.launchArguments += ["--FASTLANE_SNAPSHOT"]
+        // Same form as fastlane's stock helper: a "-key value" pair lands in the
+        // app's UserDefaults, so the app reads it as the FASTLANE_SNAPSHOT default.
+        app.launchArguments += ["-FASTLANE_SNAPSHOT", "YES"]
 
         // Read language and locale from Fastlane's temporary cache
         do {

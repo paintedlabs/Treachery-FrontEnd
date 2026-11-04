@@ -61,11 +61,22 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Select latest Xcode
+      # Same pick as the deploy workflows (newest real Xcode bundle without
+      # "beta" in its name, skipping the images' version-only symlinks), so
+      # PRs compile with the toolchain releases are built with.
+      - name: Select latest stable Xcode
         run: |
-          LATEST_XCODE=$(ls -d /Applications/Xcode*.app 2>/dev/null | sort -V | tail -1)
-          echo "Using $LATEST_XCODE"
-          sudo xcode-select -s "$LATEST_XCODE/Contents/Developer"
+          XCODE=$(for app in /Applications/Xcode*.app; do
+            if [ -d "$app" ] && [ ! -L "$app" ]; then echo "$app"; fi
+          done | grep -iv beta | sort -V | tail -1 || true)
+          if [ -z "$XCODE" ]; then
+            echo "::error::No non-beta Xcode found in /Applications. Installed:"
+            ls -ld /Applications/Xcode*.app || true
+            exit 1
+          fi
+          sudo xcode-select -s "$XCODE/Contents/Developer"
+          echo "Using $XCODE"
+          xcodebuild -version
 
       # Config lives at the repo root (.swiftlint.yml) with repo-relative
       # included paths, so lint runs from the root. Non-strict: errors fail,
@@ -78,14 +89,14 @@ jobs:
           command -v swiftlint >/dev/null || brew install -q swiftlint
           swiftlint lint --quiet --reporter github-actions-logging
 
-      # Package.resolved is gitignored, so key on the pbxproj (it pins the
-      # Firebase version requirement). Without this cache, Firebase SPM
-      # resolution alone takes several minutes per run.
+      # Key on the committed Package.resolved: it pins every package version,
+      # so the cache turns over only when a dependency changes. Without this
+      # cache, Firebase SPM resolution alone takes several minutes per run.
       - name: Cache Swift packages
         uses: actions/cache@v4
         with:
           path: Treachery-iOS/SourcePackages
-          key: spm-${{ runner.os }}-${{ hashFiles('Treachery-iOS/Treachery-iOS.xcodeproj/project.pbxproj') }}
+          key: spm-${{ runner.os }}-${{ hashFiles('Treachery-iOS/Treachery-iOS.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved') }}
           restore-keys: spm-${{ runner.os }}-
 
       # The compile gate: builds the app and both test bundles without
