@@ -26,7 +26,8 @@ final class VersionGateViewModel: ObservableObject {
     private let loader: any VersionGateConfigLoading
     private let installedBuild: String?
     private let clock: any Clock<Duration>
-    private let timeout: Duration
+    /// Not private, so a test can check that `live()` uses `launchTimeout`.
+    let timeout: Duration
     private let logger = Logger(subsystem: "com.Solomon.Treachery-iOS", category: "VersionGate")
     private let signposter = OSSignposter(subsystem: "com.Solomon.Treachery-iOS", category: "VersionGate")
     /// Set only while the launch check runs. It times the check for Instruments
@@ -169,8 +170,15 @@ private extension VersionGateViewModel {
 // MARK: - Production Wiring
 
 extension VersionGateViewModel {
+    /// The longest a Release launch waits for `config/ios` before letting the
+    /// user in. Every fresh start of a Release build can spend this long on
+    /// the launch splash, and a read slower than this lets an outdated build
+    /// in, so changing it is a deliberate product decision, not a tuning
+    /// tweak. A test pins the value, and docs/DEPLOYMENT.md quotes it.
+    static let launchTimeout: Duration = .seconds(3)
+
     /// The gate RootView uses: Firestore's `config/ios` against this binary's
-    /// build number, with three seconds to answer before launch goes ahead.
+    /// build number, with `launchTimeout` to answer before launch goes ahead.
     ///
     /// Debug builds skip the check and never read. They are always build 1, so
     /// a real `min_build` would lock out the simulator, previews, the UI tests
@@ -185,7 +193,7 @@ extension VersionGateViewModel {
             loader: FirestoreVersionGateConfigLoader(),
             installedBuild: Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String,
             clock: ContinuousClock(),
-            timeout: .seconds(3),
+            timeout: Self.launchTimeout,
             initialState: initialState
         )
     }

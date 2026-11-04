@@ -172,6 +172,13 @@ struct VersionGateViewModelTests {
         #endif
     }
 
+    @Test func liveGateWaitsAtMostThreeSeconds() {
+        // Every Release launch can sit on the splash this long, and a slower
+        // read lets an outdated build in. Changing it is a product decision.
+        #expect(VersionGateViewModel.launchTimeout == .seconds(3))
+        #expect(VersionGateViewModel.live().timeout == VersionGateViewModel.launchTimeout)
+    }
+
     // MARK: - Re-check
 
     @Test func recheckLetsUserInOnceMinimumIsLowered() async {
