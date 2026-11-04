@@ -3,6 +3,12 @@ default_platform(:ios)
 XCODEPROJ = "Treachery-iOS.xcodeproj"
 SCHEME    = "Treachery-iOS"
 
+# Where build_app clones Swift packages, relative to this project folder. A
+# fixed path lets the lanes find Crashlytics' upload-symbols tool inside the
+# Firebase checkout. The deploy workflows resolve packages into the same
+# directory before fastlane runs, so keep the two in step.
+SOURCE_PACKAGES = "build/SourcePackages"
+
 platform :ios do
 
   # ── Testing ────────────────────────────────────────────
@@ -73,6 +79,32 @@ platform :ios do
     ].join(" ")
   end
 
+  # Gives Crashlytics this build's dSYMs so its crash reports are symbolicated.
+  # Runs after the upload to App Store Connect, so it must never fail the lane:
+  # any error is logged and the lane carries on. The deploy workflows also keep
+  # the dSYM zip as a run artifact for a manual re-upload.
+  #
+  # Runs Firebase's upload-symbols itself rather than through
+  # upload_symbols_to_crashlytics: that action logs a failed upload and then
+  # reports success, so a failure would never reach the rescue below.
+  private_lane :upload_crashlytics_symbols do
+    begin
+      dsym_zip = lane_context[SharedValues::DSYM_OUTPUT_PATH]
+      UI.user_error!("build_app produced no dSYM zip") unless dsym_zip
+
+      # sh runs in fastlane/, and these paths are relative to the project folder.
+      Dir.chdir("..") do
+        upload_symbols = File.join(SOURCE_PACKAGES, "checkouts/firebase-ios-sdk/Crashlytics/upload-symbols")
+        UI.user_error!("No upload-symbols at #{upload_symbols}") unless File.executable?(upload_symbols)
+
+        sh(upload_symbols, "-gsp", "Treachery-iOS/GoogleService-Info.plist", "-p", "ios", dsym_zip)
+      end
+      UI.success("Uploaded dSYMs to Crashlytics")
+    rescue => e
+      UI.important("No dSYMs went to Crashlytics; upload the run's ios-dsyms artifact by hand. Reason: #{e.message}")
+    end
+  end
+
   # ── Beta (TestFlight) ─────────────────────────────────
 
   desc "Build and upload to TestFlight"
@@ -125,7 +157,8 @@ platform :ios do
       clean: true,
       xcargs: signing_args,
       skip_package_ipa: true,
-      archive_path: archive_path
+      archive_path: archive_path,
+      cloned_source_packages_path: SOURCE_PACKAGES
     )
 
     # Export IPA — no cloud signing flags; uses the distribution
@@ -136,7 +169,8 @@ platform :ios do
       export_method: "app-store",
       output_directory: "./build",
       archive_path: archive_path,
-      skip_build_archive: true
+      skip_build_archive: true,
+      cloned_source_packages_path: SOURCE_PACKAGES
     )
 
     # Upload to TestFlight
@@ -144,6 +178,8 @@ platform :ios do
       api_key: api_key,
       skip_waiting_for_build_processing: true
     )
+
+    upload_crashlytics_symbols
   end
 
   # ── Release (App Store) ──────────────────────────────
@@ -232,7 +268,8 @@ platform :ios do
       clean: true,
       xcargs: signing_args,
       skip_package_ipa: true,
-      archive_path: archive_path
+      archive_path: archive_path,
+      cloned_source_packages_path: SOURCE_PACKAGES
     )
 
     build_app(
@@ -241,7 +278,8 @@ platform :ios do
       export_method: "app-store",
       output_directory: "./build",
       archive_path: archive_path,
-      skip_build_archive: true
+      skip_build_archive: true,
+      cloned_source_packages_path: SOURCE_PACKAGES
     )
 
     # Upload and submit for review. Phased release only paces automatic updates
@@ -264,6 +302,8 @@ platform :ios do
         export_compliance_uses_encryption: false
       }
     )
+
+    upload_crashlytics_symbols
   end
 
   # ── Utilities ────────────────────────────────────────

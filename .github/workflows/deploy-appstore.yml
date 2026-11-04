@@ -46,8 +46,11 @@ jobs:
           bundler-cache: true
           working-directory: Treachery-iOS
 
+      # Versions come from the committed Package.resolved. Clone into the
+      # directory the Fastfile's build_app calls use (SOURCE_PACKAGES), so
+      # fastlane reuses these checkouts and finds Crashlytics' upload-symbols.
       - name: Resolve Swift packages
-        run: xcodebuild -resolvePackageDependencies -project Treachery-iOS.xcodeproj -scheme Treachery-iOS
+        run: xcodebuild -resolvePackageDependencies -project Treachery-iOS.xcodeproj -scheme Treachery-iOS -clonedSourcePackagesDirPath build/SourcePackages
 
       - name: Decode signing certificate
         env:
@@ -63,3 +66,15 @@ jobs:
           P12_PASSWORD: ${{ secrets.P12_PASSWORD }}
           FASTLANE_XCODEBUILD_SETTINGS_TIMEOUT: 30
         run: bundle exec fastlane release
+
+      # Keep this build's symbols with the run, even when submission fails (the
+      # binary may already be in App Store Connect). The lane also uploads them
+      # to Crashlytics; this copy is for re-uploads and manual symbolication.
+      - name: Keep dSYMs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-dsyms-${{ github.run_id }}-${{ github.run_attempt }}
+          path: Treachery-iOS/build/*.app.dSYM.zip
+          retention-days: 14
+          if-no-files-found: warn
