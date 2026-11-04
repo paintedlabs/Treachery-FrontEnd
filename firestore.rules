@@ -168,9 +168,9 @@ service cloud.firestore {
       return mode in ['treachery', 'planechase', 'treachery_planechase', 'none'];
     }
 
-    // 20 to 60 in steps of 5: every value the create screens offer, and the
-    // set createGame and updateGameSettings accept (parseStartingLife in
-    // functions/src/validation.js). The lobby's quick-pick chips are a subset.
+    // 20 to 60 in steps of 5: the values every create screen and lobby
+    // offers, and the set createGame and updateGameSettings accept
+    // (parseStartingLife in functions/src/validation.js).
     function isValidStartingLife(life) {
       return life in [20, 25, 30, 35, 40, 45, 50, 55, 60];
     }

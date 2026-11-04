@@ -44,10 +44,10 @@ function parseIntegerArg(value, { min, max } = {}) {
 }
 
 // ── Starting Life ──
-// 20 to 60 in steps of 5: every value the create screens (iOS, web, Android)
-// offer. The lobby's quick-pick chips are a subset. createGame and
-// updateGameSettings both validate through this, and firestore.rules
-// (isValidStartingLife) accepts the same set for direct client writes.
+// 20 to 60 in steps of 5: the values every create screen and lobby offers.
+// createGame and updateGameSettings both validate through this, and
+// firestore.rules (isValidStartingLife) accepts the same set for direct
+// client writes.
 // Returns the coerced integer, or null when the value is not one of those.
 
 function parseStartingLife(value) {
