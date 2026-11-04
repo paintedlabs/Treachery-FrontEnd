@@ -469,7 +469,8 @@ extension GameBoardViewModel {
     /// for a snapshot to show it; see `LifeLedger.recordEchoTimeout(of:)`.
     /// The echo usually comes within moments of the response, often before
     /// it. This is far longer, because ending the wait while snapshots are
-    /// slow shows the old total again until they catch up.
+    /// slow shows the old total again until they catch up. It starts again
+    /// for as long as no snapshot has come since the response.
     static let lifeChangeEchoTimeout: Duration = .seconds(5)
 
     /// Shows the tap at once, then sends it with any taps on the same player
@@ -633,12 +634,22 @@ extension GameBoardViewModel {
     }
 
     /// The batch comes off the board, which shows the latest snapshot's
-    /// total, and taps held behind it go out.
+    /// total, and taps held behind it go out. While no snapshot has come
+    /// since the response, the listener may be behind, so the wait starts
+    /// again instead.
     private func echoWaitEnded(for batch: LifeLedger.Batch) {
         lifeChangeEchoWaits[batch.playerId] = nil
-        lifeLedger.recordEchoTimeout(of: batch)
-        refreshPlayers()
-        sendPendingLifeChange(for: batch.playerId)
+        switch lifeLedger.recordEchoTimeout(of: batch) {
+        case .settled:
+            refreshPlayers()
+            sendPendingLifeChange(for: batch.playerId)
+        case .waitAgain:
+            // Nothing needs the batch settled once the game is over.
+            guard !isGameFinished else { return }
+            waitForEcho(of: batch)
+        case .notWaiting:
+            break
+        }
     }
 
     /// The batch comes off the board and is never resent; see

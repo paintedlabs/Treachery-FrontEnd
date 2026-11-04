@@ -284,6 +284,26 @@ struct LifeLedgerTests {
         #expect(next.amount == -1)
     }
 
+    @Test func anEchoTimeoutWaitsForASnapshotSinceTheResponse() throws {
+        // A snapshot from before the response says nothing about whether
+        // the listener has caught up with the change since.
+        var ledger = LifeLedger()
+        ledger.record(-3, for: "p0")
+        let batch = try beginBatch(in: &ledger)
+        ledger.reconcile(with: server(40))
+        ledger.recordSuccess(of: batch, newLife: 37)
+
+        #expect(ledger.recordEchoTimeout(of: batch) == .waitAgain)
+        #expect(ledger.isWaitingForEcho(for: "p0"))
+        #expect(shown(ledger, on: server(40)) == 37)
+
+        // Any player's snapshot shows the listener is delivering.
+        ledger.reconcile(with: server(40, 35))
+        #expect(ledger.recordEchoTimeout(of: batch) == .settled)
+        #expect(shown(ledger, on: server(40)) == 40)
+        #expect(ledger.recordEchoTimeout(of: batch) == .notWaiting)
+    }
+
     @Test func anEchoTimeoutOnlySettlesTheBatchItWasFor() throws {
         var ledger = LifeLedger()
         ledger.record(-3, for: "p0")

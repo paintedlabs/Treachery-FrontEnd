@@ -23,7 +23,7 @@ import Foundation
 /// only one batch per player is ever in flight, its calls never overlap, and
 /// an echo can't be taken for a later batch's. A batch whose echo never comes
 /// is settled by `recordEchoTimeout(of:)`, so it can't hold the next one back
-/// for good.
+/// for good, though only once snapshots are arriving again.
 ///
 /// A pure value: GameBoardViewModel feeds it taps, snapshots and call
 /// outcomes, and owns the timing and the calls.
@@ -50,6 +50,18 @@ struct LifeLedger {
         /// only its response failed, but the move may have been another
         /// device's change, or the late echo of an earlier batch.
         case unconfirmed
+    }
+
+    /// What happens when a confirmed batch's wait for its echo runs out.
+    enum EchoTimeout: Equatable {
+        /// The batch settled. The board shows the latest snapshot's total.
+        case settled
+        /// No players snapshot has come since the batch's response, so the
+        /// listener may just be behind, and the total it last showed comes
+        /// from before the change. The batch stays on screen; wait again.
+        case waitAgain
+        /// The batch isn't waiting for its echo any more.
+        case notWaiting
     }
 
     private var entries: [String: Entry] = [:]
@@ -114,7 +126,7 @@ struct LifeLedger {
             settle(batch)
         case .sent:
             // The echo hasn't arrived; keep showing the change until it does.
-            inFlight.progress = .confirmed
+            inFlight.progress = .confirmed(snapshotSinceResponse: false)
             entries[batch.playerId]?.inFlight = inFlight
         case .confirmed:
             break
@@ -125,20 +137,29 @@ struct LifeLedger {
     /// yet. It stays on screen, and holds back the player's next batch, until
     /// one does or `recordEchoTimeout(of:)` settles it.
     func isWaitingForEcho(for playerId: String) -> Bool {
-        entries[playerId]?.inFlight?.progress == .confirmed
+        if case .confirmed = entries[playerId]?.inFlight?.progress { return true }
+        return false
     }
 
     /// No snapshot has shown `batch` long after its call succeeded. The
-    /// batch settles, and the board shows the latest snapshot's total.
+    /// batch settles, and the board shows the latest snapshot's total, once
+    /// a players snapshot (for anyone) has come since the response.
     ///
     /// Snapshots can stay at the baseline for good after the server applied
     /// the batch: another device's change can take the total straight back,
     /// and this device may only get the snapshot with both. Without a limit,
     /// the batch would stay on screen, and hold back the player's next one,
-    /// until someone changed that player's life again.
-    mutating func recordEchoTimeout(of batch: Batch) {
-        guard inFlight(of: batch)?.progress == .confirmed else { return }
+    /// until someone changed that player's life again. But with no snapshot
+    /// since the response, the listener may just be behind (reconnecting,
+    /// say): settling then would put back a total from before a change the
+    /// server confirmed, with nothing to say so, and making the change again
+    /// would apply it twice.
+    @discardableResult
+    mutating func recordEchoTimeout(of batch: Batch) -> EchoTimeout {
+        guard case .confirmed(let snapshotSinceResponse) = inFlight(of: batch)?.progress else { return .notWaiting }
+        guard snapshotSinceResponse else { return .waitAgain }
         settle(batch)
+        return .settled
     }
 
     /// The call for `batch` failed. Its amount is dropped, so the board falls
@@ -164,22 +185,29 @@ struct LifeLedger {
     ///
     /// A player the snapshot shows eliminated loses the taps not sent yet,
     /// held ones included: the server refuses any change to them.
+    ///
+    /// Any snapshot also shows the listener is delivering, which lets a
+    /// confirmed batch's echo wait end; see `recordEchoTimeout(of:)`.
     mutating func reconcile(with serverPlayers: [Player]) {
-        for player in serverPlayers {
-            if player.isEliminated {
-                entries[player.id]?.pending = 0
-            }
-            guard var inFlight = entries[player.id]?.inFlight,
-                  player.lifeTotal != inFlight.baseline else { continue }
+        for player in serverPlayers where player.isEliminated {
+            entries[player.id]?.pending = 0
+        }
+        for (playerId, entry) in entries {
+            guard var inFlight = entry.inFlight else { continue }
+            let serverLife = serverPlayers.first { $0.id == playerId }?.lifeTotal
+            let moved = serverLife != nil && serverLife != inFlight.baseline
             switch inFlight.progress {
-            case .sent:
+            case .sent where moved:
                 inFlight.progress = .reflected
-                entries[player.id]?.inFlight = inFlight
-            case .confirmed:
+            case .confirmed where moved:
                 settle(inFlight.batch)
-            case .reflected:
-                break
+                continue
+            case .confirmed:
+                inFlight.progress = .confirmed(snapshotSinceResponse: true)
+            case .sent, .reflected:
+                continue
             }
+            entries[playerId]?.inFlight = inFlight
         }
     }
 
@@ -225,7 +253,7 @@ struct LifeLedger {
 
     /// How far a batch has got. It settles, and leaves the ledger, once its
     /// call has returned and either failed or the server's total includes it.
-    private enum Progress {
+    private enum Progress: Equatable {
         /// Neither the response nor a snapshot that includes it has arrived.
         /// Shown.
         case sent
@@ -233,8 +261,9 @@ struct LifeLedger {
         /// Not shown: the server's total includes it.
         case reflected
         /// The call succeeded, but no snapshot has moved off the baseline yet.
-        /// Shown until one does, or until the echo times out.
-        case confirmed
+        /// Shown until one does, or until the echo times out, which needs a
+        /// players snapshot to have come since the response.
+        case confirmed(snapshotSinceResponse: Bool)
     }
 
     private func inFlight(of batch: Batch) -> InFlight? {

@@ -557,4 +557,64 @@ struct HeldLifeTapTests {
         #expect(board.functions.adjustLifeCalls.map(\.amount) == [-3, -1])
         #expect(board.shown() == 39)
     }
+
+    @Test(.timeLimit(.minutes(1)))
+    func aConfirmedChangeStaysWhileNoSnapshotHasComeSinceItsResponse() async throws {
+        // The players listener is behind, reconnecting say: the last total
+        // it showed, 40, comes from before the -3 the server confirmed.
+        // Putting 40 back would invite making the change again.
+        let board = LifeBoard()
+        board.functions.adjustLifeNewLife = 37
+        board.vm.adjustLife(for: "p0", by: -3)
+        await board.endDebounces()
+        await board.finishSends()
+        board.vm.adjustLife(for: "p0", by: -1)
+        await board.endDebounces()
+        #expect(board.shown() == 36)
+
+        let timeout = GameBoardViewModel.lifeChangeEchoTimeout
+        let firstWait = try #require(board.vm.lifeChangeEchoWaits["p0"])
+        board.clock.advance(by: .milliseconds(500) + timeout - board.clock.now.offset)
+        await firstWait.value
+
+        // The -3 stays, the -1 stays held, and the wait starts again.
+        #expect(board.shown() == 36)
+        #expect(board.vm.lifeChangeSends.isEmpty)
+        #expect(board.functions.adjustLifeCalls.map(\.amount) == [-3])
+        let secondWait = try #require(board.vm.lifeChangeEchoWaits["p0"])
+        await board.clock.waitForSleepers()
+        #expect(board.clock.pendingDeadlines == [.milliseconds(500) + timeout * 2])
+
+        // A snapshot at last, still at 40: another device's +3 cancelled
+        // the -3 out. The next time the wait runs out, it settles.
+        board.snapshot([40, 40, 40])
+        #expect(board.shown() == 36)
+        board.functions.adjustLifeNewLife = 39
+        board.clock.advance(by: timeout)
+        await secondWait.value
+        await board.finishSends()
+
+        #expect(board.functions.adjustLifeCalls.map(\.amount) == [-3, -1])
+        #expect(board.shown() == 39)
+    }
+
+    @Test(.timeLimit(.minutes(1)))
+    func theWaitStopsOnceTheGameIsOver() async throws {
+        // Game Over covers the board, which nothing will show again, so the
+        // wait doesn't start over every few seconds behind it.
+        let board = LifeBoard()
+        board.functions.adjustLifeNewLife = 37
+        board.vm.adjustLife(for: "p0", by: -3)
+        await board.endDebounces()
+        await board.finishSends()
+        let wait = try #require(board.vm.lifeChangeEchoWaits["p0"])
+        try board.finishGame()
+
+        await board.clock.waitForSleepers()
+        board.clock.advance(by: GameBoardViewModel.lifeChangeEchoTimeout)
+        await wait.value
+
+        #expect(board.vm.lifeChangeEchoWaits.isEmpty)
+        #expect(board.clock.pendingDeadlines.isEmpty)
+    }
 }
