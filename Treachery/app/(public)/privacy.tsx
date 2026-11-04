@@ -3,12 +3,7 @@ import { View, Text, ScrollView, StyleSheet } from 'react-native';
 import { Link } from 'expo-router';
 import Head from 'expo-router/head';
 import { colors, spacing, fonts, fontSize, contentMaxWidths } from '@/constants/theme';
-
-// Placeholders the operator fills in before this page is published. Each one is
-// defined only here, so a single grep finds it, and CI fails while any remain.
-const OPERATOR_NAME = 'TODO_OPERATOR_NAME';
-const CONTACT_EMAIL = 'TODO_CONTACT_EMAIL';
-const EFFECTIVE_DATE = 'TODO_EFFECTIVE_DATE';
+import { OPERATOR_NAME, CONTACT_EMAIL, EFFECTIVE_DATE } from '@/constants/operator';
 
 const GOOGLE_PRIVACY_URL = 'https://policies.google.com/privacy';
 const FIREBASE_PRIVACY_URL = 'https://firebase.google.com/support/privacy';
