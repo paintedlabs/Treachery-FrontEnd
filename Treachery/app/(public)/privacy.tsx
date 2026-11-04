@@ -128,9 +128,9 @@ export default function PrivacyPolicyScreen() {
             </Bullet>
           </BulletList>
           <Paragraph>
-            Treachery doesn’t access your contacts, photos, camera, microphone or your device’s
-            location, and it shows no ads. On the web, the app keeps you signed in using your
-            browser’s storage.
+            Treachery doesn’t access your phone’s address book, photos, camera, microphone or your
+            device’s location, and it shows no ads. On the web, the app keeps you signed in using
+            your browser’s storage.
           </Paragraph>
         </Section>
 
