@@ -9,6 +9,10 @@ struct IdentityCardHeader: View {
     let card: IdentityCard
     let player: Player
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    // The totals grow with the text, following the large-title style, as
+    // the board's rows do.
+    @ScaledMetric(relativeTo: .largeTitle) private var concealedLifeSize: CGFloat = 28
+    @ScaledMetric(relativeTo: .largeTitle) private var revealedLifeSize: CGFloat = 30
 
     /// Leaders are always face-up; unveiled players show openly; face-down cards (from ability swaps) stay hidden.
     private var isAlwaysVisible: Bool {
@@ -42,7 +46,7 @@ struct IdentityCardHeader: View {
                         .foregroundStyle(Color.mtgError)
                         .accessibilityHidden(true)
                     Text("\(player.lifeTotal)")
-                        .font(.system(size: 28, weight: .bold, design: .serif))
+                        .font(.system(size: concealedLifeSize, weight: .bold, design: .serif))
                         .foregroundStyle(Color.mtgTextPrimary)
                         .contentTransition(reduceMotion ? .opacity : .numericText())
                         .accessibilityLabel("\(player.lifeTotal) life")
@@ -85,7 +89,7 @@ struct IdentityCardHeader: View {
                         .foregroundStyle(Color.mtgError)
                         .accessibilityHidden(true)
                     Text("\(player.lifeTotal)")
-                        .font(.system(size: 30, weight: .bold, design: .serif))
+                        .font(.system(size: revealedLifeSize, weight: .bold, design: .serif))
                         .foregroundStyle(Color.mtgTextPrimary)
                         .contentTransition(reduceMotion ? .opacity : .numericText())
                         .animation(reduceMotion ? .easeInOut(duration: 0.2) : .spring(response: 0.3, dampingFraction: 0.6), value: player.lifeTotal)

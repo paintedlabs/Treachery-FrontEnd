@@ -10,8 +10,17 @@ struct GameBoardPlayerRow: View {
     @ObservedObject var viewModel: GameBoardViewModel
     @Binding var showColorPicker: Bool
     var onViewCard: ((Player) -> Void)?
-    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    // The life controls grow with the text, following the large-title
+    // style, so the total stays the largest text in the row.
+    @ScaledMetric(relativeTo: .largeTitle) private var lifeTotalSize: CGFloat = 36
+    @ScaledMetric(relativeTo: .largeTitle) private var lifeTotalMinWidth: CGFloat = 52
+    @ScaledMetric(relativeTo: .largeTitle) private var lifeButtonSize: CGFloat = 32
+    @ScaledMetric(relativeTo: .largeTitle) private var lifeButtonCircle: CGFloat = 40
+    @ScaledMetric(relativeTo: .largeTitle) private var lifeSpacing: CGFloat = 12
+    /// How far above the role's baseline its dot is centered: the middle of
+    /// a caption line.
+    @ScaledMetric(relativeTo: .caption) private var roleDotLift: CGFloat = 4.5
 
     private var isCurrentUser: Bool {
         player.userId == viewModel.currentUserId
@@ -45,18 +54,23 @@ struct GameBoardPlayerRow: View {
                         .zIndex(1)
                 }
 
-                // At the accessibility text sizes the name needs the row's
-                // width, so the life controls go underneath it.
-                if dynamicTypeSize.isAccessibilitySize {
+                // The life controls sit beside the name and role while
+                // those fit on their lines there, and go underneath them
+                // when they don't: with a long name, or larger text.
+                ViewThatFits(in: .horizontal) {
+                    HStack(spacing: 8) {
+                        playerInfo
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        lifeStatus
+                    }
                     VStack(alignment: .leading, spacing: 8) {
                         playerInfo
                         lifeStatus
+                            .frame(maxWidth: .infinity, alignment: .trailing)
                     }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                } else {
-                    playerInfo
-                    Spacer()
-                    lifeStatus
+                    // Always fits, so it's laid out at the row's width and
+                    // its lines wrap there, even with a name too long for it.
+                    .frame(minWidth: 0, idealWidth: 0, maxWidth: .infinity)
                 }
             }
             .padding(.vertical, 4)
@@ -113,6 +127,7 @@ struct GameBoardPlayerRow: View {
                         .fontWeight(isCurrentUser ? .bold : .regular)
                         .strikethrough(player.isEliminated)
                         .foregroundStyle(player.isEliminated ? Color.mtgTextSecondary : Color.mtgTextPrimary)
+                        .fixedSize(horizontal: false, vertical: true)
 
                     if isCurrentUser {
                         MtgBadge(text: "You", foregroundColor: .mtgGold, backgroundColor: Color.mtgGold.opacity(0.15), fontWeight: .regular)
@@ -126,12 +141,18 @@ struct GameBoardPlayerRow: View {
                     }
                 }
 
-                // Commander name
+                // Commander name. It wraps to the width the name and role
+                // leave, rather than moving the life controls underneath:
+                // with no ideal width, it doesn't count in the row's fit.
                 if let commanderName = player.commanderName, !commanderName.isEmpty {
                     Text(commanderName)
                         .font(.system(.caption, design: .serif))
                         .italic()
                         .foregroundStyle(Color.mtgTextSecondary)
+                        // All its lines: the stack would otherwise cut it
+                        // short at the largest sizes.
+                        .fixedSize(horizontal: false, vertical: true)
+                        .frame(minWidth: 0, idealWidth: 0, maxWidth: .infinity, alignment: .leading)
                 }
 
                 // Role visibility — only show for visible players
@@ -167,24 +188,37 @@ struct GameBoardPlayerRow: View {
     }
 
     private func roleLabel(showsInfoIcon: Bool) -> some View {
-        HStack(spacing: 4) {
+        HStack(alignment: .firstTextBaseline, spacing: 4) {
             Circle()
                 .fill(player.role?.color ?? .gray)
                 .frame(width: 8, height: 8)
-            Text(player.role?.displayName ?? "")
-                .font(.caption)
-                .foregroundStyle(player.role?.textColor ?? Color.mtgTextSecondary)
-            if player.isUnveiled && player.role != .leader {
-                Text("(Unveiled)")
-                    .font(.caption2)
-                    .foregroundStyle(Color.mtgTextSecondary)
-            }
-            if showsInfoIcon {
-                Image(systemName: "info.circle")
-                    .font(.caption2)
-                    .foregroundStyle(player.role?.color ?? Color.mtgTextSecondary)
-            }
+                // Centered on the first line of the text, as it is on a
+                // line of its own.
+                .alignmentGuide(.firstTextBaseline) { $0[VerticalAlignment.center] + roleDotLift }
+            roleText(showsInfoIcon: showsInfoIcon)
+                .fixedSize(horizontal: false, vertical: true)
         }
+    }
+
+    /// The role, "(Unveiled)" and the info icon as one text, so at the
+    /// largest sizes it wraps between them rather than inside a word.
+    private func roleText(showsInfoIcon: Bool) -> Text {
+        var text = Text(player.role?.displayName ?? "")
+            .foregroundStyle(player.role?.textColor ?? Color.mtgTextSecondary)
+        if player.isUnveiled && player.role != .leader {
+            let unveiled = Text("(Unveiled)")
+                .font(.caption2)
+                .foregroundStyle(Color.mtgTextSecondary)
+            text = Text("\(text) \(unveiled)")
+        }
+        if showsInfoIcon {
+            let icon = Text(Image(systemName: "info.circle"))
+                .font(.caption2)
+                .foregroundStyle(player.role?.color ?? Color.mtgTextSecondary)
+            text = Text("\(text) \(icon)")
+        }
+        // The role, and the spaces, in caption; the parts above keep theirs.
+        return text.font(.caption)
     }
 
     /// The role as the view-card button gives it to VoiceOver.
@@ -198,51 +232,21 @@ struct GameBoardPlayerRow: View {
         // Life controls. A spectator sees the totals but can't
         // change them.
         if !player.isEliminated {
-            // Each button's tap area reaches into the spacing around it.
-            HStack(spacing: 12) {
-                Button {
-                    viewModel.adjustLife(for: player.id, by: -1)
-                } label: {
-                    Image(systemName: "minus.circle.fill")
-                        .font(.system(size: 32))
-                        .foregroundStyle(Color.mtgAssassin)
-                        .background(
-                            Circle()
-                                .fill(Color.mtgAssassin.opacity(0.1))
-                                .frame(width: 40, height: 40)
-                        )
-                        .minimumTapTarget()
-                }
-                .buttonStyle(.plain)
-                .disabled(!viewModel.canAdjustLife)
-                .opacity(viewModel.canAdjustLife ? 1 : 0.35)
+            HStack(spacing: lifeSpacing) {
+                lifeButton("minus.circle.fill", color: .mtgAssassin, amount: -1)
 
                 Text("\(player.lifeTotal)")
-                    .font(.system(size: 36, weight: .bold, design: .serif))
+                    .font(.system(size: lifeTotalSize, weight: .bold, design: .serif))
                     .foregroundStyle(Color.mtgTextPrimary)
-                    .frame(minWidth: 52)
-                    .multilineTextAlignment(.center)
+                    // A total never wraps; the name beside it does instead.
+                    .fixedSize()
+                    .frame(minWidth: lifeTotalMinWidth)
                     // Rolling digits and a spring, or with Reduce Motion a
                     // cross-fade.
                     .contentTransition(reduceMotion ? .opacity : .numericText())
                     .animation(reduceMotion ? .easeInOut(duration: 0.2) : .spring(response: 0.3, dampingFraction: 0.6), value: player.lifeTotal)
 
-                Button {
-                    viewModel.adjustLife(for: player.id, by: 1)
-                } label: {
-                    Image(systemName: "plus.circle.fill")
-                        .font(.system(size: 32))
-                        .foregroundStyle(Color.mtgSuccess)
-                        .background(
-                            Circle()
-                                .fill(Color.mtgSuccess.opacity(0.1))
-                                .frame(width: 40, height: 40)
-                        )
-                        .minimumTapTarget()
-                }
-                .buttonStyle(.plain)
-                .disabled(!viewModel.canAdjustLife)
-                .opacity(viewModel.canAdjustLife ? 1 : 0.35)
+                lifeButton("plus.circle.fill", color: .mtgSuccess, amount: 1)
             }
             // One element for VoiceOver: the total, which a swipe up or
             // down changes by 1, as the buttons do.
@@ -260,6 +264,27 @@ struct GameBoardPlayerRow: View {
                 .foregroundStyle(Color.mtgErrorText)
                 .accessibilityHidden(true)
         }
+    }
+
+    /// A − or + beside the total: its circle as before, and a tap area of
+    /// at least 44pt that reaches into the spacing around it.
+    private func lifeButton(_ systemName: String, color: Color, amount: Int) -> some View {
+        Button {
+            viewModel.adjustLife(for: player.id, by: amount)
+        } label: {
+            Image(systemName: systemName)
+                .font(.system(size: lifeButtonSize))
+                .foregroundStyle(color)
+                .background(
+                    Circle()
+                        .fill(color.opacity(0.1))
+                        .frame(width: lifeButtonCircle, height: lifeButtonCircle)
+                )
+                .minimumTapTarget()
+        }
+        .buttonStyle(.plain)
+        .disabled(!viewModel.canAdjustLife)
+        .opacity(viewModel.canAdjustLife ? 1 : 0.35)
     }
 }
 
