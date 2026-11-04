@@ -318,12 +318,12 @@ struct OptimisticLifeTrackingTests {
         await send.value
 
         #expect(board.shown("p1") == 40)
-        #expect(board.vm.lifeChangeFailure == GameBoardViewModel.LifeChangeFailure(
+        #expect(board.vm.lifeChangeFailures == [GameBoardViewModel.LifeChangeFailure(
             playerId: "p1",
             playerName: "Player 1",
             kind: .notApplied(baseline: 40, amount: -3)
-        ))
-        #expect(board.vm.lifeChangeFailure?.message == "Couldn't update Player 1's life. Check your connection and try again.")
+        )])
+        #expect(board.vm.lifeChangeMessage == "Couldn't update Player 1's life. Check your connection and try again.")
         // Not retried: nothing is left running that could send it again.
         #expect(board.vm.lifeChangeDebounces.isEmpty)
         #expect(board.vm.lifeChangeSends.isEmpty)
@@ -348,7 +348,7 @@ struct OptimisticLifeTrackingTests {
         await send.value
 
         #expect(board.shown() == 37)
-        #expect(board.vm.lifeChangeFailure?.message == "Couldn't confirm Player 0's life change. Check the total before changing it again.")
+        #expect(board.vm.lifeChangeMessage == "Couldn't confirm Player 0's life change. Check the total before changing it again.")
     }
 
     @Test(.timeLimit(.minutes(1)))
@@ -359,14 +359,14 @@ struct OptimisticLifeTrackingTests {
         await board.endDebounces()
         await board.finishSends()
         let message = "Couldn't update Player 1's life. Check your connection and try again."
-        #expect(board.vm.lifeChangeFailure?.message == message)
+        #expect(board.vm.lifeChangeMessage == message)
 
         // Changing someone else doesn't say why Player 1 went back to 40.
         board.vm.adjustLife(for: "p2", by: -1)
-        #expect(board.vm.lifeChangeFailure?.message == message)
+        #expect(board.vm.lifeChangeMessage == message)
 
         board.vm.adjustLife(for: "p1", by: -3)
-        #expect(board.vm.lifeChangeFailure == nil)
+        #expect(board.vm.lifeChangeFailures.isEmpty)
     }
 
     @Test(.timeLimit(.minutes(1)))

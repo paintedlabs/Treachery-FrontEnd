@@ -19,7 +19,7 @@ struct FailedLifeChangeSnapshotTests {
         await board.endDebounces()
         await board.finishSends()
         #expect(board.shown() == 40)
-        #expect(board.vm.lifeChangeFailure?.message == tryAgain)
+        #expect(board.vm.lifeChangeMessage == tryAgain)
         return board
     }
 
@@ -29,7 +29,7 @@ struct FailedLifeChangeSnapshotTests {
 
         board.snapshot([37, 40, 40])
 
-        #expect(board.vm.lifeChangeFailure == nil)
+        #expect(board.vm.lifeChangeFailures.isEmpty)
         #expect(board.shown() == 37)
     }
 
@@ -40,7 +40,7 @@ struct FailedLifeChangeSnapshotTests {
 
         board.snapshot([35, 40, 40])
 
-        #expect(board.vm.lifeChangeFailure?.message == "Couldn't confirm Player 0's life change. Check the total before changing it again.")
+        #expect(board.vm.lifeChangeMessage == "Couldn't confirm Player 0's life change. Check the total before changing it again.")
         #expect(board.shown() == 35)
     }
 
@@ -50,7 +50,7 @@ struct FailedLifeChangeSnapshotTests {
 
         board.snapshot([40, 33, 40])
 
-        #expect(board.vm.lifeChangeFailure?.message == tryAgain)
+        #expect(board.vm.lifeChangeMessage == tryAgain)
     }
 
     @Test(.timeLimit(.minutes(1)))
@@ -66,7 +66,7 @@ struct FailedLifeChangeSnapshotTests {
 
         board.snapshot([37, 40, 40])
 
-        #expect(board.vm.lifeChangeFailure?.message == "Couldn't update Player 0's life. Game is not in progress.")
+        #expect(board.vm.lifeChangeMessage == "Couldn't update Player 0's life. Game is not in progress.")
     }
 }
 

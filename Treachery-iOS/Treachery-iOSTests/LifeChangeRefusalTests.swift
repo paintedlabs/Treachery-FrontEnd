@@ -23,7 +23,7 @@ struct LifeChangeRefusalTests {
         await board.finishSends()
 
         #expect(board.shown("p1") == 40)
-        #expect(board.vm.lifeChangeFailure?.message == "Couldn't update Player 1's life. Player is already eliminated.")
+        #expect(board.vm.lifeChangeMessage == "Couldn't update Player 1's life. Player is already eliminated.")
     }
 
     @Test(.timeLimit(.minutes(1)))
@@ -46,7 +46,7 @@ struct LifeChangeRefusalTests {
         await send.value
 
         #expect(board.shown() == 35)
-        #expect(board.vm.lifeChangeFailure?.message == "Couldn't update Player 0's life. Game is not in progress.")
+        #expect(board.vm.lifeChangeMessage == "Couldn't update Player 0's life. Game is not in progress.")
     }
 
     // MARK: - Eliminated players
@@ -74,7 +74,7 @@ struct LifeChangeRefusalTests {
         // The -1 never goes out: the server would refuse it.
         #expect(board.functions.adjustLifeCalls.map(\.amount) == [-3])
         #expect(gate.arrivals == 1)
-        #expect(board.vm.lifeChangeFailure == nil)
+        #expect(board.vm.lifeChangeFailures.isEmpty)
         #expect(board.shown() == 0)
     }
 
@@ -101,11 +101,11 @@ struct LifeChangeRefusalTests {
         board.vm.adjustLife(for: "p1", by: -3)
         await board.endDebounces()
         await board.finishSends()
-        #expect(board.vm.lifeChangeFailure?.playerId == "p1")
+        #expect(board.vm.lifeChangeFailures.map(\.playerId) == ["p1"])
 
         board.snapshot([40, 0, 40])
 
-        #expect(board.vm.lifeChangeFailure == nil)
+        #expect(board.vm.lifeChangeFailures.isEmpty)
     }
 
     @Test(.timeLimit(.minutes(1)))
@@ -124,7 +124,7 @@ struct LifeChangeRefusalTests {
         gate.release()
         await send.value
 
-        #expect(board.vm.lifeChangeFailure == nil)
+        #expect(board.vm.lifeChangeFailures.isEmpty)
         #expect(board.shown("p1") == 0)
     }
 
@@ -175,6 +175,6 @@ struct LifeChangeRefusalTests {
         gate.release()
         await send.value
 
-        #expect(board.vm.lifeChangeFailure == nil)
+        #expect(board.vm.lifeChangeFailures.isEmpty)
     }
 }

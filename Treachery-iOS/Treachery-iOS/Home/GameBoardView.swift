@@ -5,6 +5,7 @@
 //  Created by Luke Solomon on 3/14/26.
 //
 
+import Accessibility
 import SwiftUI
 
 struct GameBoardView: View {
@@ -201,8 +202,8 @@ struct GameBoardView: View {
                             .padding(.horizontal)
                             .padding(.vertical, 4)
                     }
-                    if let failure = viewModel.lifeChangeFailure {
-                        MtgErrorBanner(message: failure.message)
+                    if let message = viewModel.lifeChangeMessage {
+                        MtgErrorBanner(message: message)
                             .padding(.horizontal)
                             .padding(.vertical, 4)
                     }
@@ -340,11 +341,15 @@ struct GameBoardView: View {
             // Taps still waiting out their debounce would go with the board.
             viewModel.sendPendingLifeChanges()
         }
-        .onChange(of: viewModel.lifeChangeFailure) { _, failure in
+        .onChange(of: viewModel.lifeChangeFailures) { old, new in
             // A failed change can put a total back with no other sign, and
-            // the banner is away from the rows: read it out.
-            guard let failure else { return }
-            AccessibilityNotification.Announcement(failure.message).post()
+            // the banner is away from the rows: read out each new one.
+            for announcement in GameBoardViewModel.LifeChangeFailure.announcements(from: old, to: new) {
+                var message = AttributedString(announcement.message)
+                // Low priority waits for VoiceOver to finish what it's saying.
+                message.accessibilitySpeechAnnouncementPriority = announcement.interrupts ? .default : .low
+                AccessibilityNotification.Announcement(message).post()
+            }
         }
         .onChange(of: viewModel.seat) { oldSeat, newSeat in
             // Elimination changes the board with no other sign: the life

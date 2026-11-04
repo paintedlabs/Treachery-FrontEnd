@@ -19,11 +19,12 @@ final class GameBoardViewModel: ObservableObject {
     @Published var game: Game?
     @Published var players: [Player] = []
     @Published var errorMessage: String?
-    /// The latest life change whose call failed, shown until that player's
-    /// life is changed again here or a snapshot shows them eliminated. Kept
-    /// apart from `errorMessage`, which any tap clears, so tapping someone
-    /// else doesn't hide it.
-    @Published private(set) var lifeChangeFailure: LifeChangeFailure?
+    /// Life changes whose calls failed, one per player in the order they
+    /// failed. Each stays until that player's life is changed again here or
+    /// a snapshot settles it; see `receivePlayers(_:)`. Kept apart from
+    /// `errorMessage`, which any tap clears, so tapping someone else doesn't
+    /// hide them.
+    @Published private(set) var lifeChangeFailures: [LifeChangeFailure] = []
     @Published var isPending = false
     /// Unveiling has its own progress, so another action under way can't
     /// make an unveil silently do nothing.
@@ -473,6 +474,11 @@ extension GameBoardViewModel {
     /// for as long as no snapshot has come since the response.
     static let lifeChangeEchoTimeout: Duration = .seconds(5)
 
+    /// The banner for `lifeChangeFailures`, naming everyone affected.
+    var lifeChangeMessage: String? {
+        LifeChangeFailure.bannerMessage(for: lifeChangeFailures)
+    }
+
     /// Shows the tap at once, then sends it with any taps on the same player
     /// that follow within `lifeChangeDebounce`, as one adjustLife call.
     func adjustLife(for playerId: String, by amount: Int) {
@@ -480,9 +486,7 @@ extension GameBoardViewModel {
               let player = serverPlayers.first(where: { $0.id == playerId }) else { return }
         guard !player.isEliminated else { return }
         errorMessage = nil
-        if lifeChangeFailure?.playerId == playerId {
-            lifeChangeFailure = nil
-        }
+        lifeChangeFailures.removeAll { $0.playerId == playerId }
 
         lifeLedger.record(amount, for: playerId)
         refreshPlayers()
@@ -540,12 +544,10 @@ extension GameBoardViewModel {
         lifeLedger.reconcile(with: players)
         for player in players where player.isEliminated {
             lifeChangeDebounces.removeValue(forKey: player.id)?.cancel()
-            if lifeChangeFailure?.playerId == player.id {
-                lifeChangeFailure = nil
-            }
         }
-        if let failure = lifeChangeFailure, let player = players.first(where: { $0.id == failure.playerId }) {
-            lifeChangeFailure = failure.revised(by: player)
+        lifeChangeFailures = lifeChangeFailures.compactMap { failure in
+            guard let player = players.first(where: { $0.id == failure.playerId }) else { return failure }
+            return player.isEliminated ? nil : failure.revised(by: player)
         }
         withAnimation(.easeInOut(duration: 0.3)) {
             refreshPlayers()
@@ -687,7 +689,13 @@ extension GameBoardViewModel {
                 kind = .unconfirmed
             }
         }
-        lifeChangeFailure = LifeChangeFailure(playerId: playerId, playerName: player.displayName, kind: kind)
+        let failure = LifeChangeFailure(playerId: playerId, playerName: player.displayName, kind: kind)
+        // One per player, kept in the order they first failed.
+        if let index = lifeChangeFailures.firstIndex(where: { $0.playerId == playerId }) {
+            lifeChangeFailures[index] = lifeChangeFailures[index].followed(by: failure)
+        } else {
+            lifeChangeFailures.append(failure)
+        }
     }
 }
 
