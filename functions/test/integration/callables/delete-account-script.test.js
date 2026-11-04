@@ -939,6 +939,7 @@ describe('delete-account script — what a deletion that stops in step 5 leaves'
     await adminAuth.deleteUser(account.uid); // what the console's Delete account does
 
     // No account is left whose name could be checked, so any code passes.
+    const before = await readDocs(seededPaths(seed));
     const dryRun = runScript(['--uid', account.uid, '--expect-name', 'Lantern-4822', '--project', PROJECT_ID]);
     assert.equal(dryRun.status, 0, dryRun.stderr);
     assert.equal(dryRun.stderr, '');
@@ -964,6 +965,7 @@ describe('delete-account script — what a deletion that stops in step 5 leaves'
       'DRY RUN — nothing was written. Re-run with --apply --project <id> to delete this account.',
       '',
     ]);
+    assertUnchanged(before, await readDocs(seededPaths(seed)));
 
     const done = runScript(apply);
     assert.equal(done.status, 0, done.stderr);
