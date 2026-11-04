@@ -7,7 +7,7 @@
 // never require this file: unit tests load them with no credentials.
 
 const { initializeApp } = require("firebase-admin/app");
-const { getFirestore, FieldValue, Timestamp } = require("firebase-admin/firestore");
+const { getFirestore, FieldValue } = require("firebase-admin/firestore");
 const { getMessaging } = require("firebase-admin/messaging");
 
 initializeApp();
@@ -16,6 +16,5 @@ const db = getFirestore();
 module.exports = {
   db,
   FieldValue,
-  Timestamp,
   getMessaging,
 };

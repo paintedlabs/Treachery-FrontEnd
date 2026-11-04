@@ -34,7 +34,8 @@ const HUB_HOST = process.env.FIREBASE_EMULATOR_HUB || '127.0.0.1:4460';
 // The sweep deletes games: never point this file at a real project.
 assert.match(process.env.GCLOUD_PROJECT, /^demo-/, 'the sweep test only runs against a demo-* project');
 
-const { db, Timestamp } = require('../../../src/firebase');
+const { Timestamp } = require('firebase-admin/firestore');
+const { db } = require('../../../src/firebase');
 const { sweepStaleGames } = require('../../../src/triggers');
 
 const HOUR = 60 * 60 * 1000;
