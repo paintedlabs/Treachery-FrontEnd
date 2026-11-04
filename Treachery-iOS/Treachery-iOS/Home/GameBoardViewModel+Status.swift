@@ -38,8 +38,8 @@ extension GameBoardViewModel {
     }
 
     /// Decided only once both the game and its players are in, whichever
-    /// arrives first: a players snapshot ahead of the game's used to show
-    /// "Game Still In Progress" for a moment.
+    /// arrives first, so a players snapshot that comes ahead of the game's
+    /// can't show "Game Still In Progress" for a moment.
     var gameOverContent: GameOverContent {
         guard status == .ready, let game else { return .status }
         return game.state == .finished ? .results : .stillInProgress
