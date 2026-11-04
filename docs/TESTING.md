@@ -80,6 +80,69 @@ Native browser dialogs (`window.confirm`) are auto-accepted in playground
 windows — Playwright silently *cancels* them otherwise, which reads as
 buttons doing nothing.
 
+## iOS app against local emulators
+
+Debug builds of the iOS app can run against the same local emulators as the
+web playtest instead of the shared production project. Launch the app with
+`-useEmulators` and it:
+
+- configures Firebase with fake options for project `demo-test` instead of
+  `GoogleService-Info.plist`, so anything not pointed at an emulator fails
+  rather than reaching production;
+- points Auth at `localhost:9099`, Firestore at `localhost:8087` (no SSL,
+  in-memory cache) and Functions at `localhost:5001`, the ports in the
+  repo-root `firebase.json`;
+- turns off Analytics, Crashlytics and FCM auto-init. Those switches persist,
+  so the next launch without the argument turns them back on, in any build
+  (including a TestFlight or App Store build installed over a Debug one).
+
+Emulator sign-ins live in their own keychain item, so they don't touch your
+real session. Release builds don't contain this code. The hosted unit tests
+always run this way: the app sees the XCTest host and never configures
+production (`thisTestHostIsKeptOffProduction` checks what was configured).
+
+One unit test needs a signed test host:
+`FirebaseAuthKeychainMigrationTests/movedItemIsFoundByFirebaseAuthsOwnQuery`
+moves an item through the real keychain. CI and the other
+`CODE_SIGNING_ALLOWED=NO` builds have no keychain access, so they skip it.
+Run it from Xcode's Test navigator with a simulator selected (Xcode signs the
+host). Don't use Cmd-U for this: the scheme's test action also runs the UI
+tests, which use production.
+
+**1. Start the emulators** the way the web playtest does (Java 21+, see the
+top of this doc), from `Treachery/`:
+
+```bash
+npx --no-install firebase emulators:start --project=demo-test \
+  --only auth,firestore,functions --config=../firebase.json
+```
+
+Or run `npm run playtest`: while the Playwright Inspector is paused, the
+emulators are up and the browser windows are already in a game.
+
+**2. Launch the app with the argument.** In Xcode, Product > Scheme > Edit
+Scheme > Run > Arguments, add `-useEmulators` under Arguments Passed On Launch,
+and untick it when you want production again. From the command line, with
+the app installed on a booted simulator:
+
+```bash
+xcrun simctl launch <simulator-udid> com.Solomon.Treachery-iOS -useEmulators
+```
+
+The console logs "Using the local Firebase emulators for project demo-test".
+
+**3. Play across clients.** The web app in emulator mode
+(`EXPO_PUBLIC_USE_EMULATOR=true npm run web`, or the playtest windows) uses
+the same `demo-test` project, so iOS and web can create and join the same
+games by code.
+
+Limits: push notifications don't work (FCM isn't emulated). Phone sign-in
+uses the Auth emulator's fake codes, which it prints in its log; the
+simulator skips app verification, so no reCAPTCHA page opens. A physical
+device can't reach your Mac's `localhost`, so use a simulator. Use a build
+Xcode signed (any normal Run): a `CODE_SIGNING_ALLOWED=NO` build, like CI's,
+has no keychain access, so Firebase Auth can't keep anyone signed in.
+
 ## Known flake
 
 Under heavy machine load, concurrent lobby joins can exceed even the 20s
