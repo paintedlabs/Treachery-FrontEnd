@@ -40,6 +40,9 @@
  *     FIRESTORE_EMULATOR_HOST=localhost:8087 \
  *       node scripts/reset-email-display-names.js --project demo-treachery --apply
  *
+ * `npm run test:integration` rehearses it on seeded data every time
+ * (test/integration/callables/reset-email-display-names.test.js).
+ *
  * Run it once the fixed clients are out: app versions from before the fix
  * still name new email accounts after their address until they update. It is
  * safe to re-run then and later. A reset name never contains "@", so a pass
@@ -196,9 +199,10 @@ function resetName(name) {
  * Counts the name updates and, with `apply`, sends each through a
  * BulkWriter as an update that requires its document to be unchanged since
  * it was read (`doc.updateTime`). A refused update is counted as skipped,
- * any other failure as failed; neither stops the run.
+ * any other failure as failed and reported to `logError`; neither stops the
+ * run.
  */
-function createWriter(db, apply) {
+function createWriter(db, apply, logError = console.error) {
   const bulkWriter = apply ? db.bulkWriter() : null;
   const totals = { planned: 0, updated: 0, skipped: 0, failed: 0 };
   const results = [];
@@ -222,7 +226,7 @@ function createWriter(db, apply) {
             } else {
               totals.failed++;
               // Path and status only: a message could quote the name.
-              console.error(`  ${doc.ref.path}: update failed (gRPC status ${error.code})`);
+              logError(`  ${doc.ref.path}: update failed (gRPC status ${error.code})`);
             }
           }
         )
@@ -264,17 +268,12 @@ function isSeat(ref) {
   return game !== null && game.parent.id === "games" && game.parent.parent === null;
 }
 
-async function main() {
-  const opts = parseArgs(process.argv.slice(2));
-  const target = await resolveTarget(opts, process.env);
-  if (target.error) fail(target.error);
-  for (const line of describeTarget(target, opts.apply)) console.log(line);
-  console.log("");
-
-  // The id is always explicit, so Firestore uses the project printed above.
-  initializeApp({ projectId: target.projectId });
-  const db = getFirestore();
-
+/**
+ * Resets every name in `db` that is a whole email address, in the three
+ * places listed at the top of this file, writing only with `apply`. Reports
+ * to `log` (document paths and counts, never a name) and returns the counts.
+ */
+async function resetEmailDisplayNames(db, { apply, log = console.log, logError = console.error }) {
   // Per collection: email-address names to reset, and other names with an
   // "@" that stay as they are.
   const stats = {
@@ -282,13 +281,13 @@ async function main() {
     seats: { scanned: 0, reset: 0, kept: 0, byState: {} },
     requests: { scanned: 0, reset: 0, kept: 0 },
   };
-  const writer = createWriter(db, opts.apply);
+  const writer = createWriter(db, apply, logError);
   let planLines = 0;
   function plan(line) {
     if (planLines < MAX_PLAN_LINES) {
-      console.log(`  ${line}`);
+      log(`  ${line}`);
     } else if (planLines === MAX_PLAN_LINES) {
-      console.log("  … further per-doc detail suppressed");
+      log("  … further per-doc detail suppressed");
     }
     planLines++;
   }
@@ -368,9 +367,9 @@ async function main() {
     .map(([state, count]) => `${state} ${count}`)
     .join(", ");
   const totals = writer.totals;
-  const row = (label, value) => console.log(`${label.padEnd(40)}${value}`);
-  console.log("");
-  console.log("─".repeat(60));
+  const row = (label, value) => log(`${label.padEnd(40)}${value}`);
+  log("");
+  log("─".repeat(60));
   row("user docs scanned:", stats.users.scanned);
   row("  email-address names:", stats.users.reset);
   row('  other names with "@" (kept):', stats.users.kept);
@@ -381,7 +380,7 @@ async function main() {
   row("friend requests scanned:", stats.requests.scanned);
   row("  email-address sender names:", stats.requests.reset);
   row('  other sender names with "@" (kept):', stats.requests.kept);
-  if (opts.apply) {
+  if (apply) {
     row(
       "writes:",
       `${totals.updated} updated, ${totals.skipped} skipped, ${totals.failed} failed (of ${totals.planned})`
@@ -389,18 +388,27 @@ async function main() {
   } else {
     row("writes:", `${totals.planned} planned`);
   }
-  console.log("─".repeat(60));
-  if (!opts.apply) {
-    console.log("DRY RUN — nothing was written. Re-run with --project <id> --apply to reset these names.");
-    return;
+  log("─".repeat(60));
+  if (!apply) {
+    log("DRY RUN — nothing was written. Re-run with --project <id> --apply to reset these names.");
+  } else if (totals.skipped > 0) {
+    log("Skipped documents changed or were deleted after this run read them. Re-run to pick up any that still need it.");
   }
-  if (totals.skipped > 0) {
-    console.log("Skipped documents changed or were deleted after this run read them. Re-run to pick up any that still need it.");
-  }
-  if (totals.failed > 0) {
-    console.log("Some updates failed. Re-run to retry them.");
-    process.exitCode = 1;
-  }
+  if (totals.failed > 0) log("Some updates failed. Re-run to retry them.");
+  return { stats, totals };
+}
+
+async function main() {
+  const opts = parseArgs(process.argv.slice(2));
+  const target = await resolveTarget(opts, process.env);
+  if (target.error) fail(target.error);
+  for (const line of describeTarget(target, opts.apply)) console.log(line);
+  console.log("");
+
+  // The id is always explicit, so Firestore uses the project printed above.
+  initializeApp({ projectId: target.projectId });
+  const { totals } = await resetEmailDisplayNames(getFirestore(), { apply: opts.apply });
+  if (totals.failed > 0) process.exitCode = 1;
 }
 
 if (require.main === module) {
@@ -410,5 +418,5 @@ if (require.main === module) {
   });
 }
 
-// For the emulator rehearsal harness.
-module.exports = { resetName, createWriter };
+// For the emulator rehearsal, test/integration/callables/reset-email-display-names.test.js.
+module.exports = { resolveTarget, describeTarget, resetName, createWriter, resetEmailDisplayNames };
