@@ -19,7 +19,8 @@ writes. Encoded in `firestore-tests/`.
 
 | Issue | Status |
 |---|---|
-| Every user doc world-readable: `email`, `phone_number`, `fcm_token` exposed to any signed-in user. Needs PII split into an owner-only subcollection — rules cannot withhold individual fields | **open — schema fixed, data not migrated.** New writes go to `users/{uid}/private/data` on all three clients and FCM goes via `registerFcmToken`, but every pre-existing doc still holds its `email`/`phone_number`, and `firestore.rules:15` still lets any signed-in user read any `users/{uid}`. Closing it means running `functions/scripts/backfill-user-pii.js --apply` against each project. **Not yet run anywhere.** |
+| Every user doc world-readable: `email`, `phone_number`, `fcm_token` exposed to any signed-in user. Needs PII split into an owner-only subcollection — rules cannot withhold individual fields | **open — schema fixed, data not migrated.** New writes go to `users/{uid}/private/data` on all three clients and FCM goes via `registerFcmToken`, but every pre-existing doc still holds its `email`/`phone_number`, and `firestore.rules:15` still lets any signed-in user read any `users/{uid}`. Closing it means running `functions/scripts/backfill-user-pii.js --project <id> --apply` against each project (`--apply` refuses to run without `--project`; a dry run without `--apply` names the project and prints counts and paths, never the values). **Not yet run anywhere.** |
+| Email addresses published as display names: iOS and Android set a new email account's public `display_name` to its full email address, which a user who skipped the name prompt kept. It is searchable, copied onto every seat in `games/*/players`, and copied into `friend_requests.from_display_name` for the recipient. `backfill-user-pii.js` never touches `display_name` | **open — clients fixed, data not migrated.** New profiles start as "Guest" or "Player"; the name prompt still suggests the email's local part. Closing it means running `functions/scripts/reset-email-display-names.js --project <id> --apply` against each project (`--apply` refuses to run without `--project`; a dry run without `--apply` names the project and prints counts and paths, never names) once the fixed iOS and Android builds are out, because older installed versions keep naming new email accounts after their address. It resets every name that is a whole email address (no whitespace, exactly one "@" with something before it, and a dot in the domain) on profiles, on seats in every game state, and on friend requests' sender name, to the part before the "@" with its first letter capitalized (the prompt's suggestion). Other names containing "@", like "Bob @ Home", are ones players chose: it leaves them as they are, counts them separately, and the dry run lists their document paths (the first 200) after the reset plan. Check those documents by hand before `--apply`: an address the rule doesn't recognise (a dotless domain, stray spaces) shows up there and stays public. It only updates documents unchanged since it read them and reports the rest as skipped, and it is safe to re-run. `functions/test/integration/callables/reset-email-display-names.test.js` rehearses it on the emulator. Push notifications already delivered with an email in them can't be recalled. **Not yet run anywhere.** |
 | Non-participants can inject themselves into `player_ids` of an `in_progress` game, then read every player's hidden role/identity | **fixed — #97** |
 | **Ghost spectator:** a signed-in user (incl. anonymous guest) reads any waiting game doc, appends their uid to `player_ids` via the append-self rule (no player doc, no join code), stays invisible in every lobby UI (all render the subcollection), and after the deal reads every `role`/`identity_card_id` — the read gate is `uid in player_ids`. Bypasses the join code entirely | **fixed** — `startGame` rebuilds `player_ids` from the seated player docs, evicting any uid without a seat at the moment the data turns sensitive |
 | **Ghost spectator**: the append-self join rule requires no player doc, so any signed-in user (incl. anonymous) can add their uid to a *waiting* game's `player_ids`, stay invisible to every lobby UI (all render the subcollection), survive `startGame` (deals from the subcollection only), and
@@ -71,17 +72,20 @@ test-encoded — no CI job builds Swift or Kotlin (see Repo hygiene).
 | **Android has no traitor-ability support whatsoever** — no `resolveMetamorph`/`resolvePuppetMaster`/`resolveWearerOfMasks` in `CloudFunctionsRepository`, no resolver UI. Treachery games are unplayable past an unveil on Android | **fixed** — repository methods, `ability_resolved` gating, `AbilityResolverSheet` mirroring the iOS sheets; 211 unit tests green |
 | `maxTraitorRarity` is plumbed through both native clients but never sent (iOS passes `nil`, Android omits it), so the setting is web-only | **fixed** — create + lobby pickers on iOS/Android; both `Game` models decode `max_traitor_rarity` and the lobby seeds from the live snapshot |
 | Both native lobbies fall back to the `navIsHost` nav param before the first game snapshot, so a demoted host briefly still sees host UI. Cosmetic — the server enforces host actions | **open** |
+| Web and Android can't delete an account in the app; iOS can, from Profile | **open** — deletion on request instead: `functions/scripts/delete-account.js` deletes one account with the iPhone app's own steps (`deleteAccountFor`) once its owner has set the display-name code we send. Runbook, from the request to the reply: [ACCOUNT-DELETION.md](ACCOUNT-DELETION.md) |
 
 ## Lower severity
 
 Not all individually test-encoded; from the audit report.
 
-- ~~Profile win-rate deflated~~ — **fixed**: divides by games with a recorded outcome
+- Profile win-rate deflated — **fixed on iOS and web**: Win % divides by games with a recorded outcome. Android still divides by all finished games
+- Planechase and Life Tracker results differ by client: iOS's Profile and Game History score these games from `winner_user_ids`, as `onGameFinished` does for ELO, but web and Android score a game only when it has a `winning_team`. So they count none of these games as a win or loss, and their History shows no Victory or Defeat for them
+- `auth_method` analytics property: iOS reports `guest`, `phone` or `email`, but web still reports phone accounts as `email`. Android has no phone sign-in, so its `guest` or `email` is right
 - ~~Legacy 12-player lobbies bricked~~ — **fixed**: the stepper decrement clamps into the valid range on all three clients
 - Planar die cost displays the previous roller's count, not the caller's actual (often free) cost
 - Stale/deleted game link → infinite spinner with the web back button trapped
 - Client-side game-code generation is check-then-act racy; duplicate codes make one game unjoinable by code (**fixed** for createGame callable path)
-- New-user onboarding skippable via a `createUserDocumentIfNeeded` double-invocation race
+- New-user onboarding skippable via a `createUserDocumentIfNeeded` double-invocation race — **fixed on iOS** (only the auth state listener provisions the profile, as on Android); web's `useAuth` still provisions from both its listener and its sign-in functions
 - `useConnectionStatus` watches only `navigator.onLine`, never Firestore sync state
 - Wearer of Masks X-cost unenforced server-side; the reveal is also drawn
   client-side, so skip-and-reopen rerolls it (same on web — inherent to the
@@ -108,8 +112,10 @@ Not all individually test-encoded; from the audit report.
   non-callable writer
 - `allocateUniqueJoinCode` is check-then-use rather than transactional, and
   codes are never released — uniqueness is best-effort over 12 attempts
-- `registerFcmToken` will resurrect a deleted user doc (`set(..., {merge:true})`
-  creates the document when absent)
+- ~~`registerFcmToken` will resurrect a deleted user doc (`set(..., {merge:true})`
+  creates the document when absent)~~ — **fixed**: it refuses a deleted
+  account, and it and the notification token cleanup only `update` a profile
+  that exists and still holds `fcm_token`
 - `AuthKey_*.p8` (an APNs auth key) sits untracked in the repo root. Ignored by
   `*.p8`, so not leaked — but it is a live credential on disk
 - `GoogleService-Info.plist` is tracked despite matching `.gitignore`; left that

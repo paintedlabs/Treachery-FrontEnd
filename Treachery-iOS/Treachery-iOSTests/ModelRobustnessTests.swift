@@ -249,12 +249,12 @@ struct TreacheryUserRobustnessTests {
         }
     }
 
-    @Test func missingEmailDecodesAsNil() throws {
+    @Test func profileWithoutContactDetailsDecodes() throws {
         let json = Data("""
         {"id": "u1", "display_name": "Bob", "created_at": 1000000}
         """.utf8)
         let user = try decoder.decode(TreacheryUser.self, from: json)
-        #expect(user.email == nil)
+        #expect(user.displayName == "Bob")
     }
 
     @Test func extraUnknownFieldsIgnored() throws {
@@ -267,8 +267,8 @@ struct TreacheryUserRobustnessTests {
 
     @Test func encodeThenDecodeRoundTrip() throws {
         let original = TreacheryUser(
-            id: "u1", displayName: "Alice", email: "alice@test.com",
-            phoneNumber: nil, friendIds: ["f1"], createdAt: Date(timeIntervalSince1970: 1000000),
+            id: "u1", displayName: "Alice",
+            friendIds: ["f1"], createdAt: Date(timeIntervalSince1970: 1000000),
             elo: 1700
         )
         let encoder = JSONEncoder()

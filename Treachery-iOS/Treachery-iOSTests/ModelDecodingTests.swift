@@ -191,20 +191,43 @@ struct TreacheryUserDecodingTests {
         {
             "id": "u1",
             "display_name": "Alice",
-            "email": "alice@test.com",
-            "phone_number": "+1555",
             "friend_ids": ["f1", "f2"],
             "created_at": 1000000,
-            "elo": 1600
+            "elo": 1600,
+            "deck_stats": {"Krenko": {"elo": 1520, "wins": 2, "losses": 1, "games": 3}}
         }
         """.utf8)
         let user = try decoder.decode(TreacheryUser.self, from: json)
         #expect(user.id == "u1")
         #expect(user.displayName == "Alice")
-        #expect(user.email == "alice@test.com")
-        #expect(user.phoneNumber == "+1555")
         #expect(user.friendIds == ["f1", "f2"])
         #expect(user.elo == 1600)
+        #expect(user.deckStats?["Krenko"]?.games == 3)
+    }
+
+    /// Profiles written before the PII split keep email, phone_number and
+    /// fcm_token until backfill-user-pii.js runs. They still decode, and the
+    /// public model doesn't carry those values any further.
+    @Test func legacyProfileDecodesWithoutKeepingContactDetails() throws {
+        let json = Data("""
+        {
+            "id": "u1",
+            "display_name": "Alice",
+            "email": "alice@test.com",
+            "phone_number": "+1555",
+            "fcm_token": "token-abc",
+            "friend_ids": ["f1"],
+            "created_at": 1000000
+        }
+        """.utf8)
+        let user = try decoder.decode(TreacheryUser.self, from: json)
+        #expect(user.displayName == "Alice")
+        #expect(user.friendIds == ["f1"])
+
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .secondsSince1970
+        let encoded = try #require(try JSONSerialization.jsonObject(with: encoder.encode(user)) as? [String: Any])
+        #expect(Set(encoded.keys).isDisjoint(with: ["email", "phone_number", "fcm_token"]))
     }
 
     @Test func defaultsFriendIdsToEmpty() throws {
@@ -224,11 +247,44 @@ struct TreacheryUserDecodingTests {
     }
 
     @Test func initializerDefaults() {
-        let user = TreacheryUser(id: "u1", displayName: "Test", email: nil,
-                                  phoneNumber: nil, friendIds: [], createdAt: Date())
+        let user = TreacheryUser(id: "u1", displayName: "Test", friendIds: [], createdAt: Date())
         #expect(user.elo == 1500)
         #expect(user.deckStats == nil)
-        #expect(user.fcmToken == nil)
+    }
+
+    /// Servers once wrote a commander name containing "." as a nested map.
+    /// That entry is dropped; the rest of the profile, and the other decks,
+    /// still decode.
+    @Test func malformedDeckStatsEntryIsSkipped() throws {
+        let json = Data("""
+        {
+            "id": "u1",
+            "display_name": "Alice",
+            "friend_ids": ["f1"],
+            "created_at": 1000000,
+            "elo": 1600,
+            "deck_stats": {
+                "Krenko": {"elo": 1520, "wins": 2, "losses": 1, "games": 3},
+                "Mr": {"House, President and CEO": {"elo": 1510, "wins": 1, "losses": 0, "games": 1}},
+                "Atraxa": {"elo": 1490, "wins": 0}
+            }
+        }
+        """.utf8)
+        let user = try decoder.decode(TreacheryUser.self, from: json)
+        #expect(user.elo == 1600)
+        #expect(user.friendIds == ["f1"])
+        #expect(user.deckStats.map { Set($0.keys) } == ["Krenko"])
+        #expect(user.deckStats?["Krenko"]?.wins == 2)
+    }
+
+    @Test(arguments: [#"[1, 2]"#, #""none""#, "null"])
+    func deckStatsThatIsNotAMapIsIgnored(deckStats: String) throws {
+        let json = Data("""
+        {"id": "u1", "display_name": "Bob", "created_at": 1000000, "deck_stats": \(deckStats)}
+        """.utf8)
+        let user = try decoder.decode(TreacheryUser.self, from: json)
+        #expect(user.displayName == "Bob")
+        #expect(user.deckStats == nil)
     }
 }
 

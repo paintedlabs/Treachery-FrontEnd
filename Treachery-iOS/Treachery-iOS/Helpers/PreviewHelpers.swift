@@ -221,8 +221,6 @@ extension TreacheryUser {
     static let sampleUser = TreacheryUser(
         id: "user1",
         displayName: "Luke",
-        email: "luke@example.com",
-        phoneNumber: nil,
         friendIds: ["user2", "user3"],
         createdAt: Date().addingTimeInterval(-604800)
     )
@@ -230,8 +228,6 @@ extension TreacheryUser {
     static let sampleFriend1 = TreacheryUser(
         id: "user2",
         displayName: "Sarah",
-        email: "sarah@example.com",
-        phoneNumber: nil,
         friendIds: ["user1"],
         createdAt: Date().addingTimeInterval(-500000)
     )
@@ -239,8 +235,6 @@ extension TreacheryUser {
     static let sampleFriend2 = TreacheryUser(
         id: "user3",
         displayName: "Marcus",
-        email: nil,
-        phoneNumber: "+15551234567",
         friendIds: ["user1"],
         createdAt: Date().addingTimeInterval(-300000)
     )

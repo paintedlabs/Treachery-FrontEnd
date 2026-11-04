@@ -11,29 +11,52 @@ final class MockFirestoreManager: FirestoreManaging {
     // MARK: - Stub data
 
     var usersToReturn: [String: TreacheryUser] = [:]
+    /// What `getUserDocument(id:)` reports. A user id with no entry is
+    /// `.complete` when `usersToReturn` holds it, else `.missing`.
+    var userDocumentsToReturn: [String: UserDocument] = [:]
     var gamesToReturn: [String: Game] = [:]
     var gameByCodeToReturn: Game?
     var activeGameToReturn: Game?
     var playersToReturn: [Player] = []
+    /// Players per game id for `getPlayers(gameId:)`; a game with no entry
+    /// gets `playersToReturn`.
+    var playersByGameToReturn: [String: [Player]] = [:]
+    /// Thrown by `getPlayers(gameId:)` for these game ids only.
+    var playersErrorsByGame: [String: Error] = [:]
     var finishedGamesToReturn: [Game] = []
     var friendsToReturn: [TreacheryUser] = []
     var pendingRequestsToReturn: [FriendRequest] = []
     var searchResultsToReturn: [TreacheryUser] = []
     var errorToThrow: Error?
+    /// Thrown only by `getUserDocument(id:)`.
+    var userDocumentError: Error?
+    /// Thrown only by the profile writes: `createUser`, `repairUserProfile`
+    /// and `updateDisplayName`.
+    var userWriteError: Error?
+    /// Runs once inside `updateDisplayName` while the write is in flight, so
+    /// a test can act mid-save.
+    var whileUpdatingDisplayName: (@MainActor () async -> Void)?
 
     // MARK: - Call tracking
 
-    var createUserCalls: [TreacheryUser] = []
+    var createUserCalls: [(user: TreacheryUser, email: String?, phoneNumber: String?)] = []
+    private(set) var repairUserProfileCalls: [(id: String, repair: ProfileRepair)] = []
+    private(set) var updateDisplayNameCalls: [(name: String, userId: String)] = []
     var createGameCalls: [Game] = []
     var addPlayerCalls: [(Player, String)] = []
     var updatePlayerColorCalls: [(gameId: String, playerId: String, color: String?)] = []
     var updateCommanderNameCalls: [(gameId: String, playerId: String, name: String?)] = []
 
+    /// How many profile writes were made, so a test can assert there were none.
+    var userWriteCount: Int {
+        createUserCalls.count + repairUserProfileCalls.count + updateDisplayNameCalls.count
+    }
+
     // MARK: - Users
 
-    func createUser(_ user: TreacheryUser) async throws {
-        if let error = errorToThrow { throw error }
-        createUserCalls.append(user)
+    func createUser(_ user: TreacheryUser, email: String?, phoneNumber: String?) async throws {
+        if let error = errorToThrow ?? userWriteError { throw error }
+        createUserCalls.append((user, email, phoneNumber))
     }
 
     func getUser(id: String) async throws -> TreacheryUser? {
@@ -41,8 +64,25 @@ final class MockFirestoreManager: FirestoreManaging {
         return usersToReturn[id]
     }
 
-    func updateUser(_ user: TreacheryUser) async throws {
-        if let error = errorToThrow { throw error }
+    func getUserDocument(id: String) async throws -> UserDocument {
+        if let error = errorToThrow ?? userDocumentError { throw error }
+        if let document = userDocumentsToReturn[id] { return document }
+        return usersToReturn[id].map { .complete($0) } ?? .missing
+    }
+
+    func repairUserProfile(id: String, with repair: ProfileRepair) async throws {
+        if let error = errorToThrow ?? userWriteError { throw error }
+        repairUserProfileCalls.append((id, repair))
+    }
+
+    func updateDisplayName(_ name: String, forUserId userId: String) async throws {
+        if let inFlight = whileUpdatingDisplayName {
+            // One-shot, so a test can't recurse into it by accident.
+            whileUpdatingDisplayName = nil
+            await inFlight()
+        }
+        if let error = errorToThrow ?? userWriteError { throw error }
+        updateDisplayNameCalls.append((name, userId))
     }
 
     func searchUsers(byDisplayName name: String) async throws -> [TreacheryUser] {
@@ -85,7 +125,10 @@ final class MockFirestoreManager: FirestoreManaging {
         addPlayerCalls.append((player, gameId))
     }
 
-    func getPlayers(gameId: String) async throws -> [Player] { playersToReturn }
+    func getPlayers(gameId: String) async throws -> [Player] {
+        if let error = playersErrorsByGame[gameId] { throw error }
+        return playersByGameToReturn[gameId] ?? playersToReturn
+    }
 
     func updatePlayer(_ player: Player, inGame gameId: String) async throws {}
     func removePlayer(id: String, fromGame gameId: String) async throws {}

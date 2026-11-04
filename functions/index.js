@@ -8,6 +8,7 @@
 // Implementations live under src/; this file only wires names to them.
 
 const users = require("./src/callables/users");
+const account = require("./src/callables/account");
 const lobby = require("./src/callables/lobby");
 const gameplay = require("./src/callables/gameplay");
 const turns = require("./src/callables/turns");
@@ -18,6 +19,8 @@ const triggers = require("./src/triggers");
 exports.registerFcmToken = users.registerFcmToken;
 exports.acceptFriendRequest = users.acceptFriendRequest;
 exports.removeFriend = users.removeFriend;
+
+exports.deleteAccount = account.deleteAccount;
 
 exports.createGame = lobby.createGame;
 exports.startGame = lobby.startGame;
