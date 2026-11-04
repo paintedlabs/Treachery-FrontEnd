@@ -31,8 +31,10 @@ extension GameBoardViewModel {
     /// Opens the ability sheet after the reveal when the card just unveiled
     /// has an ability left to use. The unveil may not have reached a players
     /// snapshot yet, so unlike `resolvableAbility` this doesn't wait for it.
+    /// A game that ended during the reveal gets no sheet: Game Over is up,
+    /// and the server would refuse ("Game is not in progress.").
     func presentAbilityAfterUnveil() {
-        guard pendingAbilityResolution == nil,
+        guard pendingAbilityResolution == nil, game?.state == .inProgress,
               let player = currentPlayer, !player.isEliminated, !player.abilityResolved,
               ExecutableAbility(heldBy: player) != nil else { return }
         pendingAbilityResolution = makeAbilityResolution(for: player)

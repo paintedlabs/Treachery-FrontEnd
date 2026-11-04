@@ -44,7 +44,7 @@ struct ActionBar: View {
                     titleVisibility: .visible
                 ) {
                     Button("Unveil") {
-                        Task { await viewModel.unveilCurrentPlayer() }
+                        viewModel.unveilCurrentPlayer()
                     }
                     Button("Cancel", role: .cancel) {}
                 } message: {

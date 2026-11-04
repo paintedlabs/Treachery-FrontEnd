@@ -66,9 +66,28 @@ struct GameBoardViewModelActionTests {
 
     // MARK: - unveilCurrentPlayer
 
+    /// Unveils, then waits for the call and for the reveal it starts, if
+    /// any.
+    private func unveil(_ vm: GameBoardViewModel) async {
+        await vm.unveilCurrentPlayer()?.value
+        await vm.unveilReveal?.value
+    }
+
+    /// makePlayers, with the signed-in u1 holding The Metamorph, still
+    /// hidden.
+    private func metamorphPlayers() -> [Player] {
+        var players = makePlayers()
+        players[1] = Player(
+            id: "p1", orderId: 1, userId: "u1", displayName: "Alice",
+            role: .traitor, identityCardId: "traitor_07", lifeTotal: 40,
+            isEliminated: false, isUnveiled: false, joinedAt: Date()
+        )
+        return players
+    }
+
     @Test func unveilCallsCloudFunction() async {
         let (vm, cf, _) = makeVM()
-        await vm.unveilCurrentPlayer()
+        await unveil(vm)
         #expect(cf.unveilPlayerCalls == ["game1"])
     }
 
@@ -80,13 +99,13 @@ struct GameBoardViewModelActionTests {
             isEliminated: false, isUnveiled: true, joinedAt: Date()
         )
         let (vm, cf, _) = makeVM(players: players)
-        await vm.unveilCurrentPlayer()
+        await unveil(vm)
         #expect(cf.unveilPlayerCalls.isEmpty)
     }
 
     @Test func unveilDoesNothingWhenNoCurrentPlayer() async {
         let (vm, cf, _) = makeVM(currentUserId: nil)
-        await vm.unveilCurrentPlayer()
+        await unveil(vm)
         #expect(cf.unveilPlayerCalls.isEmpty)
     }
 
@@ -94,7 +113,7 @@ struct GameBoardViewModelActionTests {
         let cf = MockCloudFunctions()
         cf.errorToThrow = NSError(domain: "test", code: 1, userInfo: [NSLocalizedDescriptionKey: "network error"])
         let (vm, _, _) = makeVM(cloudFunctions: cf)
-        await vm.unveilCurrentPlayer()
+        await unveil(vm)
         // A plain sentence, never the SDK's description.
         #expect(vm.errorMessage == "Couldn't unveil your identity. Check your connection and try again.")
         #expect(vm.unveilProgress == .idle)
@@ -105,14 +124,14 @@ struct GameBoardViewModelActionTests {
         // a phenomenon was resolving.
         let (vm, cf, _) = makeVM()
         vm.isPending = true
-        await vm.unveilCurrentPlayer()
+        await unveil(vm)
         #expect(cf.unveilPlayerCalls == ["game1"])
     }
 
     @Test func unveilDoesNothingWhenLeader() async {
         // Leaders are always visible, so unveil should be a no-op
         let (vm, cf, _) = makeVM(currentUserId: "host1") // host is leader
-        await vm.unveilCurrentPlayer()
+        await unveil(vm)
         // Leader's isUnveiled is false, but canSeeRole is true because role == .leader
         // The unveil method checks !player.isUnveiled — leader with isUnveiled=false
         // would still attempt the call. But the unveil method also checks role != .leader.
@@ -127,7 +146,7 @@ struct GameBoardViewModelActionTests {
     // MARK: - Unveil reveal
 
     @Test(.timeLimit(.minutes(1)))
-    func revealPlaysOnlyOnceTheServerHasUnveiled() async {
+    func revealPlaysOnlyOnceTheServerHasUnveiled() async throws {
         let clock = TestClock()
         let cf = MockCloudFunctions()
         let gate = CallGate()
@@ -135,13 +154,16 @@ struct GameBoardViewModelActionTests {
         let (vm, _, _) = makeVM(cloudFunctions: cf, clock: clock)
         let progress = UnveilProgressRecorder(vm)
 
-        let unveil = Task { await vm.unveilCurrentPlayer() }
-        await gate.waitForCall(from: unveil)
+        let call = try #require(vm.unveilCurrentPlayer())
+        await gate.waitForCall(from: call)
         // Nothing turns while the call is under way.
         #expect(vm.unveilProgress == .sending)
+        #expect(vm.unveilReveal == nil)
         #expect(clock.pendingDeadlines.isEmpty)
 
         gate.release()
+        await call.value
+        let reveal = try #require(vm.unveilReveal)
         await clock.waitForSleepers()
         #expect(vm.unveilProgress == .flippingAway)
         #expect(clock.pendingDeadlines == [.milliseconds(300)])
@@ -152,7 +174,7 @@ struct GameBoardViewModelActionTests {
         #expect(clock.pendingDeadlines == [.milliseconds(2_300)])
 
         clock.advance(by: .seconds(2))
-        await unveil.value
+        await reveal.value
         #expect(progress.values == [.idle, .sending, .flippingAway, .revealing, .idle])
     }
 
@@ -164,45 +186,43 @@ struct GameBoardViewModelActionTests {
         let (vm, _, _) = makeVM(cloudFunctions: cf, clock: clock)
         let progress = UnveilProgressRecorder(vm)
 
-        await vm.unveilCurrentPlayer()
+        await vm.unveilCurrentPlayer()?.value
 
         // No flip and no banner: only the error says what happened.
         #expect(progress.values == [.idle, .sending, .idle])
+        #expect(vm.unveilReveal == nil)
         #expect(clock.pendingDeadlines.isEmpty)
         #expect(vm.errorMessage == "Couldn't unveil your identity. Check your connection and try again.")
     }
 
     @Test(.timeLimit(.minutes(1)))
-    func repeatUnveilWhileOneIsUnderWayIsIgnored() async {
+    func repeatUnveilWhileOneIsUnderWayIsIgnored() async throws {
         let cf = MockCloudFunctions()
         let gate = CallGate()
         cf.unveilPlayerGate = gate
         let (vm, _, _) = makeVM(cloudFunctions: cf)
 
-        let first = Task { await vm.unveilCurrentPlayer() }
+        let first = try #require(vm.unveilCurrentPlayer())
         await gate.waitForCall(from: first)
         // The gate holds only the first call, so a repeat that slipped
         // through would be counted rather than wait forever.
-        await vm.unveilCurrentPlayer()
+        let repeated = vm.unveilCurrentPlayer()
         gate.release()
         await first.value
+        await repeated?.value
 
+        #expect(repeated == nil)
         #expect(gate.arrivals == 1)
         #expect(cf.unveilPlayerCalls == ["game1"])
     }
 
     @Test(.timeLimit(.minutes(1)))
-    func abilitySheetOpensOnceTheRevealIsOver() async {
+    func abilitySheetOpensOnceTheRevealIsOver() async throws {
         let clock = TestClock()
-        var players = makePlayers()
-        players[1] = Player(
-            id: "p1", orderId: 1, userId: "u1", displayName: "Alice",
-            role: .traitor, identityCardId: "traitor_07", lifeTotal: 40,
-            isEliminated: false, isUnveiled: false, joinedAt: Date()
-        )
-        let (vm, _, _) = makeVM(players: players, clock: clock)
+        let (vm, _, _) = makeVM(players: metamorphPlayers(), clock: clock)
 
-        let unveil = Task { await vm.unveilCurrentPlayer() }
+        await vm.unveilCurrentPlayer()?.value
+        let reveal = try #require(vm.unveilReveal)
         await clock.waitForSleepers()
         clock.advance(by: .milliseconds(300))
         await clock.waitForSleepers()
@@ -211,8 +231,74 @@ struct GameBoardViewModelActionTests {
         #expect(vm.pendingAbilityResolution == nil)
 
         clock.advance(by: .seconds(2))
-        await unveil.value
+        await reveal.value
         #expect(vm.pendingAbilityResolution?.abilityType == .metamorph)
+    }
+
+    @Test(.timeLimit(.minutes(1)))
+    func gameEndingDuringTheRevealOpensNoAbilitySheet() async throws {
+        // Game Over is up by then, and resolveMetamorph would refuse: "Game
+        // is not in progress."
+        let clock = TestClock()
+        let (vm, _, _) = makeVM(players: metamorphPlayers(), clock: clock)
+
+        await vm.unveilCurrentPlayer()?.value
+        let reveal = try #require(vm.unveilReveal)
+        await clock.waitForSleepers()
+        vm.game?.state = .finished
+        clock.advance(by: .milliseconds(300))
+        await clock.waitForSleepers()
+        clock.advance(by: .seconds(2))
+        await reveal.value
+
+        #expect(vm.unveilProgress == .idle)
+        #expect(vm.pendingAbilityResolution == nil)
+    }
+
+    @Test(.timeLimit(.minutes(1)))
+    func boardGoingAwayEndsTheReveal() async {
+        // The reveal ran on GCD timers that outlived the board. The view
+        // model owns it now, and it ends with the view model.
+        let clock = TestClock()
+        weak var weakVM: GameBoardViewModel?
+        var reveal: Task<Void, Never>?
+        do {
+            let (vm, _, _) = makeVM(players: metamorphPlayers(), clock: clock)
+            weakVM = vm
+            await vm.unveilCurrentPlayer()?.value
+            reveal = vm.unveilReveal
+            await clock.waitForSleepers()
+        }
+
+        // Nothing kept the view model alive, the reveal included, and its
+        // going away cancelled the reveal, with its wait on the clock.
+        #expect(weakVM == nil)
+        #expect(reveal?.isCancelled == true)
+        #expect(clock.pendingDeadlines.isEmpty)
+    }
+
+    @Test(.timeLimit(.minutes(1)))
+    func boardCanGoAwayWhileTheUnveilIsSent() async {
+        let clock = TestClock()
+        let cf = MockCloudFunctions()
+        let gate = CallGate()
+        cf.unveilPlayerGate = gate
+        weak var weakVM: GameBoardViewModel?
+        var call: Task<Void, Never>?
+        do {
+            let (vm, _, _) = makeVM(cloudFunctions: cf, clock: clock)
+            weakVM = vm
+            call = vm.unveilCurrentPlayer()
+            if let call { await gate.waitForCall(from: call) }
+        }
+
+        // The call holds what it needs, not the view model.
+        #expect(weakVM == nil)
+        gate.release()
+        await call?.value
+        // It finished, with no board left to play the reveal on.
+        #expect(cf.unveilPlayerCalls == ["game1"])
+        #expect(clock.pendingDeadlines.isEmpty)
     }
 
     @Test func unveilingACardSwappedInOpensNoAbilitySheet() async {
@@ -227,7 +313,7 @@ struct GameBoardViewModelActionTests {
         )
         let (vm, cf, _) = makeVM(players: players)
 
-        await vm.unveilCurrentPlayer()
+        await unveil(vm)
 
         #expect(cf.unveilPlayerCalls == ["game1"])
         #expect(vm.pendingAbilityResolution == nil)

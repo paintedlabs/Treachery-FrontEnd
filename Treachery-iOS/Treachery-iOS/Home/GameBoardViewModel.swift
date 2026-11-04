@@ -27,6 +27,9 @@ final class GameBoardViewModel: ObservableObject {
     /// Unveiling has its own progress, so another action under way can't
     /// make an unveil silently do nothing.
     @Published private(set) var unveilProgress: UnveilProgress = .idle
+    /// The reveal under way; see `playReveal()`. Visible to tests, which
+    /// await it rather than sleep.
+    private(set) var unveilReveal: Task<Void, Never>?
     @Published var pendingAbilityResolution: AbilityResolution?
 
     // Planechase transient state
@@ -200,6 +203,7 @@ final class GameBoardViewModel: ObservableObject {
             echoWait.cancel()
         }
         dieResultClear?.cancel()
+        unveilReveal?.cancel()
     }
 
     // MARK: - Listeners
@@ -217,38 +221,6 @@ final class GameBoardViewModel: ObservableObject {
                 self.recordListenerFailure(failure, listener: "players")
             }
         }
-    }
-
-    // MARK: - Unveil (via Cloud Function)
-
-    /// Unveils the player, then plays the reveal, timed on the injected
-    /// clock: the header turns edge-on and back, under the "IDENTITY
-    /// REVEALED" banner. Nothing plays unless the server has unveiled them.
-    /// Returns once the reveal is over, which opens the ability sheet when
-    /// their card has one.
-    func unveilCurrentPlayer() async {
-        guard let player = currentPlayer, !player.isUnveiled, unveilProgress == .idle else { return }
-        errorMessage = nil
-        unveilProgress = .sending
-        do {
-            try await cloudFunctions.unveilPlayer(gameId: gameId)
-        } catch {
-            logger.error("unveilPlayer failed: \(String(describing: error), privacy: .public)")
-            unveilProgress = .idle
-            errorMessage = "Couldn't unveil your identity. Check your connection and try again."
-            return
-        }
-        AnalyticsService.trackEvent("unveil_identity")
-        unveilProgress = .flippingAway
-        do {
-            try await clock.sleep(for: UnveilProgress.flipDuration)
-            unveilProgress = .revealing
-            try await clock.sleep(for: UnveilProgress.bannerDuration)
-        } catch {
-            // Cancelled part way: the reveal just ends.
-        }
-        unveilProgress = .idle
-        presentAbilityAfterUnveil()
     }
 
     // MARK: - Leave Game (via Cloud Function)
@@ -448,6 +420,63 @@ final class GameBoardViewModel: ObservableObject {
 
     func identityCard(withId cardId: String) -> IdentityCard? {
         cardDatabase.card(withId: cardId)
+    }
+}
+
+// MARK: - Unveil (via Cloud Function)
+//
+// `UnveilProgress` is in GameBoardViewModel+Unveil.swift.
+
+extension GameBoardViewModel {
+
+    /// Unveils the signed-in player, then plays the reveal; see
+    /// `playReveal()`. Nothing plays unless the server has unveiled them.
+    ///
+    /// - Returns: The call, for tests to await, or nil when there's nothing
+    ///   to unveil. Like a life change's send, it holds what it needs, not
+    ///   the view model, and is left to finish if the board goes away.
+    @discardableResult
+    func unveilCurrentPlayer() -> Task<Void, Never>? {
+        guard let player = currentPlayer, !player.isUnveiled, unveilProgress == .idle else { return nil }
+        errorMessage = nil
+        unveilProgress = .sending
+        let cloudFunctions = cloudFunctions
+        let gameId = gameId
+        return Task { [weak self] in
+            do {
+                try await cloudFunctions.unveilPlayer(gameId: gameId)
+                self?.playReveal()
+            } catch {
+                logger.error("unveilPlayer failed: \(String(describing: error), privacy: .public)")
+                self?.unveilProgress = .idle
+                self?.errorMessage = "Couldn't unveil your identity. Check your connection and try again."
+            }
+        }
+    }
+
+    /// Plays the reveal, timed on the injected clock: the header turns
+    /// edge-on, then back face-up under the "IDENTITY REVEALED" banner.
+    /// Then the ability sheet opens, when their card has an ability to use.
+    /// The board owns the reveal: when the board goes away, it ends there.
+    private func playReveal() {
+        AnalyticsService.trackEvent("unveil_identity")
+        unveilProgress = .flippingAway
+        unveilReveal = Task { [weak self, clock] in
+            do {
+                try await clock.sleep(for: UnveilProgress.flipDuration)
+                self?.unveilProgress = .revealing
+                try await clock.sleep(for: UnveilProgress.bannerDuration)
+            } catch {
+                return // The board went away.
+            }
+            self?.revealEnded()
+        }
+    }
+
+    private func revealEnded() {
+        unveilReveal = nil
+        unveilProgress = .idle
+        presentAbilityAfterUnveil()
     }
 }
 
