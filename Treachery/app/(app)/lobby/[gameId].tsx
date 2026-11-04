@@ -251,6 +251,16 @@ export default function LobbyScreen() {
     }
   }, [isGameStarted, gameId, router]);
 
+  // The lobby scrolls as one page, so on a phone or a short window the error
+  // banner, just above the bottom buttons, can sit below the fold, far from
+  // the control that failed. Scroll to the end whenever an error appears. Each
+  // lobby action clears the previous error first, so a repeated failure
+  // scrolls again.
+  const scrollRef = useRef<ScrollView>(null);
+  useEffect(() => {
+    if (errorMessage) scrollRef.current?.scrollToEnd({ animated: true });
+  }, [errorMessage]);
+
   // Disbanded games render the full-screen notice below — no dialog needed
   // (Alert.alert was a no-op on web and duplicated that screen elsewhere).
 
@@ -314,6 +324,7 @@ export default function LobbyScreen() {
 
   return (
     <ScrollView
+      ref={scrollRef}
       style={[styles.container, isDesktop && styles.desktopContainer]}
       contentContainerStyle={styles.content}
       keyboardShouldPersistTaps="handled"

@@ -35,6 +35,8 @@ export function useLobby(
 ): UseLobbyReturn {
   const [game, setGame] = useState<Game | null>(null);
   const [players, setPlayers] = useState<Player[]>([]);
+  // Every action clears this before it runs, so a repeated failure with the
+  // same message still reads as a new error (the lobby scrolls to it).
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isStartingGame, setIsStartingGame] = useState(false);
   const [isGameDisbanded, setIsGameDisbanded] = useState(false);
@@ -110,6 +112,7 @@ export function useLobby(
   const updatePlayerColor = useCallback(
     async (color: string | null) => {
       if (!currentPlayer) return;
+      setErrorMessage(null);
       try {
         await firestoreService.updatePlayerColor(gameId, currentPlayer.id, color);
       } catch (error: unknown) {
@@ -122,6 +125,7 @@ export function useLobby(
   const updateCommanderName = useCallback(
     async (name: string | null) => {
       if (!currentPlayer) return;
+      setErrorMessage(null);
       try {
         await firestoreService.updateCommanderName(gameId, currentPlayer.id, name);
       } catch (error: unknown) {
@@ -141,6 +145,7 @@ export function useLobby(
       maxTraitorRarity?: Rarity;
     }) => {
       if (!game || !currentUserId || game.host_id !== currentUserId) return;
+      setErrorMessage(null);
       try {
         const fn = httpsCallable(functions, 'updateGameSettings');
         await fn({ gameId, ...settings });
