@@ -19,7 +19,7 @@
  *   Dry run (default):
  *     cd functions && node scripts/backfill-user-pii.js --project <project-id>
  *
- *   Apply:
+ *   Apply (only with --project):
  *     cd functions && node scripts/backfill-user-pii.js --project <project-id> --apply
  *
  *   Rehearse against the emulator (no real data touched):
@@ -30,6 +30,12 @@
  * nothing. Interrupting it mid-way is safe too — each user is migrated by a
  * single batched commit, and re-running picks up whatever was not committed.
  *
+ * Before it reads anything it prints the project, where that id came from,
+ * and whether it is the emulator or live Firestore. --apply writes only to a
+ * project named with --project, never to one it would only find in
+ * GOOGLE_CLOUD_PROJECT, GCLOUD_PROJECT or Application Default Credentials.
+ * A dry run may take the project from those.
+ *
  * Credentials come from the usual Application Default Credentials
  * (GOOGLE_APPLICATION_CREDENTIALS or `gcloud auth application-default login`);
  * when FIRESTORE_EMULATOR_HOST is set they are not needed.
@@ -37,6 +43,7 @@
 
 const { initializeApp } = require("firebase-admin/app");
 const { getFirestore, FieldValue, FieldPath } = require("firebase-admin/firestore");
+const { resolveTarget, describeTarget } = require("./lib/target");
 
 // Fields that must live only on users/{uid}/private/data
 const PII_FIELDS = ["email", "phone_number", "fcm_token"];
@@ -50,8 +57,10 @@ function usage() {
     [
       "Usage: node scripts/backfill-user-pii.js [--project <id>] [--apply]",
       "",
-      "  --project <id>   Firestore project to target (defaults to",
-      "                   GOOGLE_CLOUD_PROJECT / GCLOUD_PROJECT).",
+      "  --project <id>   Firestore project to target. --apply requires it; a",
+      "                   dry run without it uses GOOGLE_CLOUD_PROJECT /",
+      "                   GCLOUD_PROJECT, or the Application Default",
+      "                   Credentials' project.",
       "  --apply          Actually write. Without it the script is a dry run.",
       "  --help           Show this message.",
       "",
@@ -177,25 +186,14 @@ async function planPage(db, candidates, stats) {
 
 async function main() {
   const opts = parseArgs(process.argv.slice(2));
-  const projectId =
-    opts.projectId ||
-    process.env.GOOGLE_CLOUD_PROJECT ||
-    process.env.GCLOUD_PROJECT ||
-    null;
-  const emulatorHost = process.env.FIRESTORE_EMULATOR_HOST || null;
-
-  // The emulator infers nothing from credentials, so it needs an explicit id.
-  if (emulatorHost && !projectId) {
-    fail("FIRESTORE_EMULATOR_HOST is set but no project id — pass --project <id>.");
-  }
-
-  initializeApp(projectId ? { projectId } : undefined);
-  const db = getFirestore();
-
-  console.log(`project:  ${projectId || "(from application default credentials)"}`);
-  console.log(`target:   ${emulatorHost ? `emulator ${emulatorHost}` : "LIVE Firestore"}`);
-  console.log(`mode:     ${opts.apply ? "APPLY (writes)" : "DRY RUN (no writes)"}`);
+  const target = await resolveTarget(opts, process.env);
+  if (target.error) fail(target.error);
+  for (const line of describeTarget(target, opts.apply)) console.log(line);
   console.log("");
+
+  // The id is always explicit, so Firestore uses the project printed above.
+  initializeApp({ projectId: target.projectId });
+  const db = getFirestore();
 
   // Per field, moved and preserved are counted apart: "moved" relocates the
   // value into private/data, "preserved" only drops the public copy because
@@ -269,7 +267,7 @@ async function main() {
   );
   console.log("─".repeat(52));
   if (!opts.apply) {
-    console.log("DRY RUN — nothing was written. Re-run with --apply to migrate.");
+    console.log("DRY RUN — nothing was written. Re-run with --project <id> --apply to migrate.");
   }
 }
 
