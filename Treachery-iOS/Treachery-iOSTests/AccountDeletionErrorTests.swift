@@ -38,16 +38,15 @@ struct AccountDeletionErrorTests {
     }
 
     /// The SDK gets the sign-in token before it builds the request, and these
-    /// URL errors come before a connection is made: either way nothing was
-    /// sent. Auth's codes 9 and 4 also show that only Functions' own codes
-    /// mean a refusal or a timeout.
+    /// URL errors come only before a connection to the server is made:
+    /// either way nothing was sent. Auth's codes 9 and 4 also show that only
+    /// Functions' own codes mean a refusal or a timeout.
     @Test("A request that never left the device becomes notSent", arguments: [
         NSError(domain: "FIRAuthErrorDomain", code: 17_020, userInfo: [NSLocalizedDescriptionKey: "Network error"]),
         NSError(domain: "FIRAuthErrorDomain", code: failedPreconditionCode),
         NSError(domain: "FIRAuthErrorDomain", code: deadlineExceededCode),
-        URLError(.notConnectedToInternet),
-        URLError(.dataNotAllowed),
         URLError(.cannotFindHost),
+        URLError(.dnsLookupFailed),
         URLError(.cannotConnectToHost),
     ] as [any Error])
     func requestThatNeverLeftTheDeviceBecomesNotSent(error: any Error) {
@@ -55,10 +54,16 @@ struct AccountDeletionErrorTests {
     }
 
     /// A connection lost once it was made may have delivered the request.
+    /// So may a request that failed as offline or barred from cellular data:
+    /// URLSession also reports these for a request it already wrote, when
+    /// the network drops mid-request.
     @Test("Every other error is left for the caller to treat as retryable", arguments: [
         NSError(domain: functionsErrorDomain, code: 16, userInfo: [NSLocalizedDescriptionKey: "Must be signed in."]),
         NSError(domain: functionsErrorDomain, code: 13, userInfo: [NSLocalizedDescriptionKey: "INTERNAL"]),
         URLError(.networkConnectionLost),
+        URLError(.notConnectedToInternet),
+        URLError(.dataNotAllowed),
+        URLError(.internationalRoamingOff),
     ] as [any Error])
     func otherErrorsAreNotRecognized(error: any Error) {
         #expect(AccountDeletionError(callableError: error) == nil)

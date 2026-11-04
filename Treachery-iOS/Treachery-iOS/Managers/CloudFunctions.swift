@@ -23,15 +23,28 @@ struct PhenomenonResult {
 }
 
 /// The `deleteAccount` failures the app tells apart. Every other failure (a
-/// server error, or a connection lost once the request was sent) propagates
-/// unchanged and is treated as retryable.
+/// server error, or a network failure that can come once the request was
+/// sent, such as a lost connection or going offline) propagates unchanged
+/// and is treated as retryable.
 enum AccountDeletionError: Error, Equatable {
     /// The server refused because the user is in a game that is still in
     /// progress. `message` is the server's sentence telling them they can delete
     /// the account once that game ends; show it verbatim.
     case inProgressGame(message: String)
-    /// The request never left this device: it was offline, or couldn't get
-    /// the sign-in token the request carries. The server deleted nothing.
+    /// The request never left this device, so the server deleted nothing.
+    /// Only failures that can't come after the request was written count:
+    /// - Firebase Auth's: the SDK gets the sign-in token the request
+    ///   carries before it builds the request.
+    /// - The server's name not resolving (`cannotFindHost`,
+    ///   `dnsLookupFailed`), or no connection to it being made
+    ///   (`cannotConnectToHost`).
+    ///
+    /// Being offline (`notConnectedToInternet`) or barred from cellular
+    /// data (`dataNotAllowed`, `internationalRoamingOff`) doesn't count:
+    /// URLSession also fails a request it already wrote with these when the
+    /// network drops mid-request. The server may have that request, so like
+    /// a lost connection (`networkConnectionLost`) they're left unmapped:
+    /// the outcome is unknown.
     case notSent
     /// The request ran out of time, on the server or on the way there. The
     /// server may have finished anyway; deletion is idempotent, so retrying
@@ -268,13 +281,10 @@ extension AccountDeletionError {
         }
     }
 
-    /// The URL errors of a connection that was never made, so the request
-    /// wasn't sent: offline, or the server couldn't be found or reached. A
-    /// connection lost later (`networkConnectionLost`) may have delivered it.
+    /// The URL errors that come only before a connection to the server is
+    /// made, so before the request is written. See `notSent` for those left
+    /// out, and why.
     private static let noConnectionCodes: Set<URLError.Code> = [
-        .notConnectedToInternet,
-        .dataNotAllowed,
-        .internationalRoamingOff,
         .cannotFindHost,
         .dnsLookupFailed,
         .cannotConnectToHost,
