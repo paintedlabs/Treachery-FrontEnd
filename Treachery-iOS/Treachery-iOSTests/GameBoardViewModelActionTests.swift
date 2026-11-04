@@ -114,9 +114,12 @@ struct GameBoardViewModelActionTests {
         cf.errorToThrow = NSError(domain: "test", code: 1, userInfo: [NSLocalizedDescriptionKey: "network error"])
         let (vm, _, _) = makeVM(cloudFunctions: cf)
         await unveil(vm)
-        // A plain sentence, never the SDK's description.
-        #expect(vm.errorMessage == "Couldn't unveil your identity. Check your connection and try again.")
-        #expect(vm.unveilProgress == .idle)
+        // A plain sentence, never the SDK's description, kept apart from
+        // the other actions' errors so a snapshot can settle it.
+        #expect(vm.unveilFailure == "Couldn't unveil your identity. Check your connection and try again.")
+        #expect(vm.errorMessage == nil)
+        // They can try again.
+        #expect(vm.offersUnveil)
     }
 
     @Test func unveilIsNotHeldUpByAnotherAction() async {
@@ -129,18 +132,13 @@ struct GameBoardViewModelActionTests {
     }
 
     @Test func unveilDoesNothingWhenLeader() async {
-        // Leaders are always visible, so unveil should be a no-op
+        // A Leader is always face-up, and unveilPlayer refuses them ("Leader
+        // is always visible."). Only the Action Bar used to hold this back;
+        // the view model sent it.
         let (vm, cf, _) = makeVM(currentUserId: "host1") // host is leader
         await unveil(vm)
-        // Leader's isUnveiled is false, but canSeeRole is true because role == .leader
-        // The unveil method checks !player.isUnveiled — leader with isUnveiled=false
-        // would still attempt the call. But the unveil method also checks role != .leader.
-        // Wait, let me check... the action bar in the view guards against leader, but
-        // does the viewmodel? Let me check the code:
-        // guard !player.isUnveiled else { return }
-        // There's no check for leader in the viewmodel. So it WOULD call the cloud function.
-        // This test documents that behavior — the view prevents it, but the VM doesn't.
-        #expect(cf.unveilPlayerCalls.count == 1)
+        #expect(!vm.offersUnveil)
+        #expect(cf.unveilPlayerCalls.isEmpty)
     }
 
     // MARK: - Unveil reveal
@@ -175,7 +173,9 @@ struct GameBoardViewModelActionTests {
 
         clock.advance(by: .seconds(2))
         await reveal.value
-        #expect(progress.values == [.idle, .sending, .flippingAway, .revealing, .idle])
+        // No players snapshot has shown the unveil here, so Unveil stays
+        // off; see GameBoardUnveilTests.
+        #expect(progress.values == [.idle, .sending, .flippingAway, .revealing, .awaitingSnapshot])
     }
 
     @Test(.timeLimit(.minutes(1)))
@@ -189,10 +189,10 @@ struct GameBoardViewModelActionTests {
         await vm.unveilCurrentPlayer()?.value
 
         // No flip and no banner: only the error says what happened.
-        #expect(progress.values == [.idle, .sending, .idle])
+        let message = "Couldn't unveil your identity. Check your connection and try again."
+        #expect(progress.values == [.idle, .sending, .failed(message: message)])
         #expect(vm.unveilReveal == nil)
         #expect(clock.pendingDeadlines.isEmpty)
-        #expect(vm.errorMessage == "Couldn't unveil your identity. Check your connection and try again.")
     }
 
     @Test(.timeLimit(.minutes(1)))
@@ -251,7 +251,7 @@ struct GameBoardViewModelActionTests {
         clock.advance(by: .seconds(2))
         await reveal.value
 
-        #expect(vm.unveilProgress == .idle)
+        #expect(vm.unveilReveal == nil)
         #expect(vm.pendingAbilityResolution == nil)
     }
 

@@ -432,12 +432,13 @@ extension GameBoardViewModel {
     /// Unveils the signed-in player, then plays the reveal; see
     /// `playReveal()`. Nothing plays unless the server has unveiled them.
     ///
-    /// - Returns: The call, for tests to await, or nil when there's nothing
-    ///   to unveil. Like a life change's send, it holds what it needs, not
-    ///   the view model, and is left to finish if the board goes away.
+    /// - Returns: The call, for tests to await, or nil when Unveil isn't on
+    ///   offer or is being sent. Like a life change's send, the call holds
+    ///   what it needs, not the view model, and is left to finish if the
+    ///   board goes away.
     @discardableResult
     func unveilCurrentPlayer() -> Task<Void, Never>? {
-        guard let player = currentPlayer, !player.isUnveiled, unveilProgress == .idle else { return nil }
+        guard offersUnveil, unveilProgress != .sending else { return nil }
         errorMessage = nil
         unveilProgress = .sending
         let cloudFunctions = cloudFunctions
@@ -447,10 +448,32 @@ extension GameBoardViewModel {
                 try await cloudFunctions.unveilPlayer(gameId: gameId)
                 self?.playReveal()
             } catch {
-                logger.error("unveilPlayer failed: \(String(describing: error), privacy: .public)")
-                self?.unveilProgress = .idle
-                self?.errorMessage = "Couldn't unveil your identity. Check your connection and try again."
+                self?.unveilCallFailed(error)
             }
+        }
+    }
+
+    /// The reply can be lost after the server has unveiled them. A players
+    /// snapshot that shows the unveil, already or later, settles that.
+    private func unveilCallFailed(_ error: any Error) {
+        logger.error("unveilPlayer failed: \(String(describing: error), privacy: .public)")
+        unveilProgress = .failed(message: "Couldn't unveil your identity. Check your connection and try again.")
+        settleUnveil()
+    }
+
+    /// Settles what the call left open, once a players snapshot shows the
+    /// signed-in player unveiled. After a failed call the unveil went
+    /// through after all, unless what marked them unveiled was being
+    /// eliminated; and a reveal that ended first lets Unveil go.
+    private func settleUnveil() {
+        guard let player = currentPlayer, player.isUnveiled else { return }
+        switch unveilProgress {
+        case .failed where !player.isEliminated:
+            playReveal()
+        case .failed, .awaitingSnapshot:
+            unveilProgress = .idle
+        case .idle, .sending, .flippingAway, .revealing:
+            break
         }
     }
 
@@ -475,7 +498,7 @@ extension GameBoardViewModel {
 
     private func revealEnded() {
         unveilReveal = nil
-        unveilProgress = .idle
+        unveilProgress = currentPlayer?.isUnveiled == true ? .idle : .awaitingSnapshot
         presentAbilityAfterUnveil()
     }
 }
@@ -556,7 +579,8 @@ extension GameBoardViewModel {
     }
 
     /// A players snapshot: settles the batches it shows, redraws the board,
-    /// and sends any taps that were waiting on a batch it settled.
+    /// sends any taps that were waiting on a batch it settled, and settles
+    /// an unveil whose call couldn't.
     private func receivePlayers(_ players: [Player]) {
         serverPlayers = players
         lifeLedger.reconcile(with: players)
@@ -571,6 +595,7 @@ extension GameBoardViewModel {
         for playerId in lifeLedger.playersWithPendingTaps {
             sendPendingLifeChange(for: playerId)
         }
+        settleUnveil()
     }
 
     /// Rebuilds `players`: the latest snapshot with the ledger laid over it.

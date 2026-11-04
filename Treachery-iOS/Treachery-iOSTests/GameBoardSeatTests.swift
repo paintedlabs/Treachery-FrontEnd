@@ -134,6 +134,12 @@ struct GameBoardSeatTests {
         #expect(functions.rollPlanarDieCalls == ["game1"])
     }
 
+    @Test(arguments: GameMode.allCases)
+    func unveilIsOfferedOnlyToTreacheryPlayersStillInTheGame(_ mode: GameMode) {
+        #expect(makeVM(gameMode: mode).offersUnveil == mode.includesTreachery)
+        #expect(!makeVM(gameMode: mode, currentUserEliminated: true).offersUnveil)
+    }
+
     // MARK: - Role labels
 
     @Test(arguments: [GameMode.planechase, GameMode.none])

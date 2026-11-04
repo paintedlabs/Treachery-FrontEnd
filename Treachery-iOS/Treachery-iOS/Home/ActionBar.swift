@@ -11,14 +11,11 @@ struct ActionBar: View {
 
     var body: some View {
         VStack(spacing: 12) {
-            if let player = viewModel.currentPlayer,
-               !player.isUnveiled,
-               !player.isEliminated,
-               player.role != .leader {
+            if let player = viewModel.currentPlayer, viewModel.offersUnveil {
                 Button {
                     showUnveilConfirmation = true
                 } label: {
-                    if viewModel.unveilProgress == .sending {
+                    if isSending {
                         HStack(spacing: 8) {
                             ProgressView()
                                 .controlSize(.small)
@@ -29,11 +26,11 @@ struct ActionBar: View {
                         Text("Unveil Identity")
                     }
                 }
-                .buttonStyle(MtgPrimaryButtonStyle(isDisabled: isUnveiling))
-                .disabled(isUnveiling)
+                .buttonStyle(MtgPrimaryButtonStyle(isDisabled: isSending))
+                .disabled(isSending)
                 .padding(.horizontal)
                 .accessibilityLabel(
-                    viewModel.unveilProgress == .sending
+                    isSending
                         ? "Unveiling your identity"
                         : "Unveil your identity as \(player.role?.displayName ?? "unknown")"
                 )
@@ -68,10 +65,10 @@ struct ActionBar: View {
         .padding()
     }
 
-    /// From the confirmation to the end of the reveal. The view model
-    /// ignores a second unveil then too; this keeps the button from looking
-    /// tappable.
-    private var isUnveiling: Bool {
-        viewModel.unveilProgress != .idle
+    /// While the call is under way. The view model ignores a second unveil
+    /// then too; this keeps the button from looking tappable. Once the
+    /// server has unveiled them, the button goes.
+    private var isSending: Bool {
+        viewModel.unveilProgress == .sending
     }
 }

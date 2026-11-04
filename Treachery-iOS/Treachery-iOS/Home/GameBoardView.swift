@@ -192,6 +192,11 @@ struct GameBoardView: View {
                             .padding(.horizontal)
                             .padding(.vertical, 4)
                     }
+                    if let failure = viewModel.unveilFailure {
+                        MtgErrorBanner(message: failure)
+                            .padding(.horizontal)
+                            .padding(.vertical, 4)
+                    }
 
                     // Spectator bar for eliminated players, in every mode:
                     // its Leave is their only way off the board.
@@ -324,9 +329,17 @@ struct GameBoardView: View {
             AccessibilityNotification.Announcement(failure.message).post()
         }
         .onChange(of: viewModel.unveilProgress) { _, progress in
-            // The banner is the only sign the unveil went through.
-            guard progress == .revealing else { return }
-            AccessibilityNotification.Announcement("Identity revealed").post()
+            switch progress {
+            case .revealing:
+                // The banner is the only sign the unveil went through.
+                AccessibilityNotification.Announcement("Identity revealed").post()
+            case .failed(let message):
+                // And the error, away below the players, the only sign it
+                // didn't: the button just goes back to Unveil.
+                AccessibilityNotification.Announcement(message).post()
+            case .idle, .sending, .flippingAway, .awaitingSnapshot:
+                break
+            }
         }
         .onChange(of: viewModel.isGameFinished) { _, finished in
             if finished {
