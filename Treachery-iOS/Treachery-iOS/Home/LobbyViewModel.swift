@@ -63,8 +63,8 @@ final class LobbyViewModel: ObservableObject {
         /// also offers a way home that keeps it: Leave is otherwise the
         /// screen's only way out, and it can keep failing (offline, say).
         case leave(String)
-        /// Starting the game, or changing a setting, the player's color or
-        /// their commander name failed.
+        /// Starting the game, or changing a setting or the player's color
+        /// failed.
         case other(String)
 
         var message: String {
@@ -88,6 +88,11 @@ final class LobbyViewModel: ObservableObject {
 
     @Published private(set) var players: [Player] = []
     @Published private(set) var requestFailure: RequestFailure?
+    /// Why the last commander name save failed, until the next save starts.
+    /// Kept apart from `requestFailure`: saves run by themselves whenever
+    /// typing pauses, so they must neither clear nor replace a failure the
+    /// player is still reading, such as a failed leave's.
+    @Published private(set) var commanderNameFailure: String?
     @Published private(set) var pendingAction: PendingAction?
     /// Host's selected max traitor rarity. Seeded from the live game snapshot
     /// (absent on the doc means the server default, "special") so a lobby
@@ -135,9 +140,10 @@ final class LobbyViewModel: ObservableObject {
         return nil
     }
 
-    /// What went wrong with the last request, in a plain sentence.
+    /// What went wrong, in a plain sentence: the last request's failure, or
+    /// else the last commander name save's.
     var errorMessage: String? {
-        requestFailure?.message
+        requestFailure?.message ?? commanderNameFailure
     }
 
     /// True after a failed leave: the lobby then offers Back to Home, which
@@ -400,12 +406,12 @@ final class LobbyViewModel: ObservableObject {
 
     func updateCommanderName(_ name: String?) async {
         guard let player = currentPlayer else { return }
-        requestFailure = nil
+        commanderNameFailure = nil
         do {
             try await firestoreManager.updateCommanderName(gameId: gameId, playerId: player.id, name: name)
         } catch {
             logger.error("updateCommanderName failed: \(String(describing: error), privacy: .public)")
-            requestFailure = .other("Couldn't save your commander name. Check your connection and try again.")
+            commanderNameFailure = "Couldn't save your commander name. Check your connection and try again."
         }
     }
 
