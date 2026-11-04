@@ -151,7 +151,7 @@ struct FriendsListView: View {
             EmptyView()
         case .loaded(let search) where search.players.isEmpty:
             VStack(alignment: .leading, spacing: 4) {
-                Text("No players named \u{201C}\(search.query)\u{201D}")
+                Text(noMatchesMessage(for: search))
                     .font(.subheadline)
                     .foregroundStyle(Color.mtgTextPrimary)
                 Text("Search matches the start of a name, and capital letters count.")
@@ -186,11 +186,27 @@ struct FriendsListView: View {
     private var searchAnnouncement: String? {
         switch viewModel.search {
         case .loaded(let search) where search.players.isEmpty:
-            "No players named \u{201C}\(search.query)\u{201D}"
+            noMatchesMessage(for: search)
         case .failed(let failure, _):
             "Couldn't search for players. \(failure.message)"
         case .idle, .loading, .loaded:
             nil
+        }
+    }
+
+    /// "No players named “Ada”", or "No other players named “Ada”" when only
+    /// the signed-in user's own name matched: they're left out of results.
+    private func noMatchesMessage(for search: PlayerSearch) -> String {
+        if search.matchedSignedInUser {
+            String(
+                localized: "No other players named \u{201C}\(search.query)\u{201D}",
+                comment: "Friend search result when only the user's own name matched. The argument is what they searched for."
+            )
+        } else {
+            String(
+                localized: "No players named \u{201C}\(search.query)\u{201D}",
+                comment: "Friend search result when no name matched. The argument is what they searched for."
+            )
         }
     }
 
@@ -234,8 +250,15 @@ struct FriendsListView: View {
             LoadFailureCard(title: "Couldn't Load Friends", failure: failure) {
                 Task { await reload() }
             }
-            if let previous, !previous.friends.isEmpty || !previous.pendingRequests.isEmpty {
-                overviewCards(for: previous)
+            // What an earlier load found, but never "No friends yet": under
+            // a failure it would read as the answer.
+            if let previous {
+                if !previous.pendingRequests.isEmpty {
+                    pendingRequestsCard(previous.pendingRequests)
+                }
+                if !previous.friends.isEmpty {
+                    friendsCard(friends: previous.friends)
+                }
             }
         case .loading(previous: let overview?), .loaded(let overview):
             overviewCards(for: overview)

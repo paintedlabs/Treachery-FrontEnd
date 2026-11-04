@@ -19,6 +19,10 @@ struct PlayerSearch {
     let query: String
     /// The players whose names start with `query`, never the signed-in user.
     let players: [TreacheryUser]
+    /// Whether the signed-in user's own name matched too. They're left out
+    /// of `players`, so a search that found no one else says "no other
+    /// players" rather than "no players".
+    let matchedSignedInUser: Bool
 }
 
 /// A friend action that didn't go through, for the alert that says so.
@@ -43,7 +47,9 @@ final class FriendsListViewModel: ObservableObject {
     @Published private(set) var search: Loadable<PlayerSearch, UserFacingError> = .idle
     @Published var searchText = ""
     @Published private(set) var sentRequestUserIds: Set<String> = []
-    /// The last friend action that failed, until its alert is dismissed.
+    /// The last friend action that failed, until its alert is dismissed or
+    /// another action starts. Starting one clears it, so that action's own
+    /// failure always shows, even if an earlier alert never presented.
     @Published private(set) var actionFailure: FriendActionFailure?
 
     // MARK: - Properties
@@ -100,8 +106,9 @@ final class FriendsListViewModel: ObservableObject {
         search.startLoading()
 
         do {
-            let players = try await firestoreManager.searchUsers(byDisplayName: query)
-            search = .loaded(PlayerSearch(query: query, players: players.filter { $0.id != userId }))
+            let matches = try await firestoreManager.searchUsers(byDisplayName: query)
+            let players = matches.filter { $0.id != userId }
+            search = .loaded(PlayerSearch(query: query, players: players, matchedSignedInUser: players.count < matches.count))
         } catch {
             Self.logger.error("Searching for players failed: \(String(describing: error), privacy: .private)")
             search = .failed(UserFacingError(error), previous: nil)
@@ -112,6 +119,7 @@ final class FriendsListViewModel: ObservableObject {
 
     func sendRequest(to user: TreacheryUser) async {
         guard let userId else { return }
+        actionFailure = nil
 
         do {
             let currentUser = try await firestoreManager.getUser(id: userId)
@@ -131,9 +139,12 @@ final class FriendsListViewModel: ObservableObject {
         }
     }
 
-    /// Accepts the request, then reloads so the new friend appears.
+    /// Accepts the request, then reloads so the new friend appears. The
+    /// request leaves the list at once, so a reload that fails can't leave
+    /// it there to be accepted again.
     func acceptRequest(_ request: FriendRequest) async {
         guard let userId else { return }
+        actionFailure = nil
 
         do {
             try await cloudFunctions.acceptFriendRequest(requestId: request.id)
@@ -142,10 +153,12 @@ final class FriendsListViewModel: ObservableObject {
             fail(.acceptRequest, with: error)
             return
         }
+        overview.updateValue { $0.pendingRequests.removeAll { $0.id == request.id } }
         await loadData(userId: userId)
     }
 
     func declineRequest(_ request: FriendRequest) async {
+        actionFailure = nil
         do {
             let updatedRequest = FriendRequest(
                 id: request.id,
@@ -163,6 +176,7 @@ final class FriendsListViewModel: ObservableObject {
     }
 
     func removeFriend(_ friend: TreacheryUser) async {
+        actionFailure = nil
         do {
             try await cloudFunctions.removeFriend(friendId: friend.id)
             trackEvent("remove_friend")

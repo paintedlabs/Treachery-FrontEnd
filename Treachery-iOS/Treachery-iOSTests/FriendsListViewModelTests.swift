@@ -117,6 +117,7 @@ struct FriendsListViewModelTests {
         #expect(viewModel.search.phase == .loaded)
         #expect(viewModel.search.value?.query == "Zed")
         #expect(viewModel.search.value?.players.isEmpty == true)
+        #expect(viewModel.search.value?.matchedSignedInUser == false)
     }
 
     @Test func searchLeavesOutTheSignedInUser() async {
@@ -127,6 +128,21 @@ struct FriendsListViewModelTests {
         await viewModel.searchUsers()
 
         #expect(viewModel.search.value?.players.map(\.id) == ["u2"])
+        #expect(viewModel.search.value?.matchedSignedInUser == true)
+    }
+
+    /// Searching for your own name finds no one else, which the screen says
+    /// as "No other players named", not "No players named".
+    @Test func searchForYourOwnNameFindsNoOtherPlayers() async {
+        await viewModel.loadData(userId: "u1")
+        firestore.searchResultsToReturn = [friend("u1", named: "Ada")]
+        viewModel.searchText = "Ada"
+
+        await viewModel.searchUsers()
+
+        #expect(viewModel.search.phase == .loaded)
+        #expect(viewModel.search.value?.players.isEmpty == true)
+        #expect(viewModel.search.value?.matchedSignedInUser == true)
     }
 
     @Test func blankSearchSendsNothing() async {
@@ -212,6 +228,21 @@ struct FriendsListViewModelTests {
         #expect(viewModel.overview.value?.pendingRequests.isEmpty == true)
     }
 
+    /// Left in the list under a failed reload, the request could be
+    /// accepted again, and the server would refuse it.
+    @Test func acceptedRequestLeavesTheListEvenIfTheReloadFails() async {
+        firestore.pendingRequestsToReturn = [request("r1"), request("r2")]
+        await viewModel.loadData(userId: "u1")
+        firestore.friendsError = unavailable
+
+        await viewModel.acceptRequest(request("r1"))
+
+        #expect(cloudFunctions.acceptFriendRequestCalls == ["r1"])
+        #expect(viewModel.actionFailure == nil)
+        #expect(viewModel.overview.phase == .failed)
+        #expect(viewModel.overview.value?.pendingRequests.map(\.id) == ["r2"])
+    }
+
     /// The server's failed-precondition sentence is written for players.
     @Test func failedAcceptShowsTheServersSentenceAndDoesNotReload() async {
         firestore.pendingRequestsToReturn = [request("r1")]
@@ -271,6 +302,22 @@ struct FriendsListViewModelTests {
         #expect(viewModel.actionFailure == FriendActionFailure(action: .sendRequest, error: .serverUnreachable))
         #expect(viewModel.sentRequestUserIds == ["u2"])
         #expect(analytics.events == ["send_friend_request"])
+    }
+
+    /// A failure whose alert never presented can't hide the next action's:
+    /// each action starts with no failure set.
+    @Test func startingAnActionClearsAFailureLeftFromAnEarlierOne() async {
+        firestore.friendsToReturn = [friend("f1"), friend("f2")]
+        firestore.pendingRequestsToReturn = [request("r1")]
+        await viewModel.loadData(userId: "u1")
+        firestore.friendRequestWriteError = NSError(domain: "FIRFirestoreErrorDomain", code: 14)
+        await viewModel.declineRequest(request("r1"))
+        #expect(viewModel.actionFailure?.action == .declineRequest)
+
+        await viewModel.removeFriend(friend("f1"))
+
+        #expect(viewModel.actionFailure == nil)
+        #expect(viewModel.overview.value?.friends.map(\.id) == ["f2"])
     }
 
     // MARK: - Fixtures
