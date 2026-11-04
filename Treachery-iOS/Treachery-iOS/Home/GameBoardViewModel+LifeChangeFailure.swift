@@ -14,8 +14,10 @@ extension GameBoardViewModel {
             /// No snapshot had shown the change when its call failed, so the
             /// board went back to the server's total. Most likely the change
             /// never reached the server, but a reply lost on its way back
-            /// looks the same; see `revised(by:)`.
-            case notApplied(baseline: Int, amount: Int)
+            /// looks the same; see `revised(by:)`. `sentSince` is what this
+            /// device has sent for the player since, from the same total:
+            /// the taps that were held behind the change.
+            case notApplied(baseline: Int, amount: Int, sentSince: Int = 0)
             /// The board may show the change already, so making it again
             /// could apply it twice.
             case unconfirmed
@@ -60,9 +62,13 @@ extension GameBoardViewModel {
 
         /// What VoiceOver reads out when the failures go from `old` to `new`:
         /// each new or revised failure by itself, so a burst doesn't repeat
-        /// the whole banner, and nothing for a failure that has gone.
+        /// the whole banner, and nothing for a failure that has gone or
+        /// whose message hasn't changed.
         static func announcements(from old: [Self], to new: [Self]) -> [Announcement] {
-            new.filter { !old.contains($0) }.enumerated().map { index, failure in
+            let changed = new.filter { failure in
+                !old.contains { $0.playerId == failure.playerId && $0.message == failure.message }
+            }
+            return changed.enumerated().map { index, failure in
                 Announcement(message: failure.message, interrupts: old.isEmpty && index == 0)
             }
         }
@@ -70,16 +76,36 @@ extension GameBoardViewModel {
         /// This failure once a later snapshot shows the player's total. A
         /// change that wasn't applied as far as the board knew may have
         /// landed after all. A total that moved off the baseline by exactly
-        /// the change means it did, and there's nothing left to explain
-        /// (nil). Any other move can't be told apart from someone else's
-        /// change, so the board can't confirm it, and "try again" could
-        /// apply it twice.
+        /// the change, and what was sent since, means it did, and there's
+        /// nothing left to explain (nil). One that moved by what was sent
+        /// since alone means only that landed: this change still didn't.
+        /// Any other move can't be told apart from someone else's change,
+        /// so the board can't confirm it, and "try again" could apply it
+        /// twice.
         func revised(by player: Player) -> Self? {
-            guard case .notApplied(let baseline, let amount) = kind,
+            guard case .notApplied(let baseline, let amount, let sentSince) = kind,
                   player.lifeTotal != baseline else { return self }
             // The server stops at 0, as the board does.
-            if player.lifeTotal == max(0, baseline + amount) { return nil }
+            if player.lifeTotal == max(0, baseline + amount + sentSince) { return nil }
+            if sentSince != 0, player.lifeTotal == baseline + sentSince {
+                return Self(playerId: playerId, playerName: playerName, kind: .notApplied(baseline: player.lifeTotal, amount: amount))
+            }
             return Self(playerId: playerId, playerName: playerName, kind: .unconfirmed)
+        }
+
+        /// This failure once this device sends `batch`, the taps held behind
+        /// the failed change, for the same player. Should the batch land,
+        /// the total moves by its amount whether or not the failed change
+        /// did, and a snapshot mustn't take one for the other; see
+        /// `revised(by:)`.
+        func followed(bySending batch: LifeLedger.Batch) -> Self {
+            guard case .notApplied(let baseline, let amount, let sentSince) = kind else { return self }
+            // Sent from another total, a snapshot can't tell the two apart.
+            guard batch.baseline == baseline else {
+                return Self(playerId: playerId, playerName: playerName, kind: .unconfirmed)
+            }
+            let carried = Kind.notApplied(baseline: baseline, amount: amount, sentSince: sentSince + batch.amount)
+            return Self(playerId: playerId, playerName: playerName, kind: carried)
         }
 
         /// What the board says once `later`, a failure for the same player,
@@ -90,7 +116,9 @@ extension GameBoardViewModel {
         /// still can't vouch for that player's total.
         func followed(by later: Self) -> Self {
             switch (kind, later.kind) {
-            case let (.notApplied(baseline, amount), .notApplied(laterBaseline, laterAmount)) where baseline == laterBaseline:
+            case let (.notApplied(baseline, amount, _), .notApplied(laterBaseline, laterAmount, _)) where baseline == laterBaseline:
+                // The later change is what was sent since: a tap clears the
+                // failure, so only the taps held behind it can follow it.
                 let sum = Kind.notApplied(baseline: baseline, amount: amount + laterAmount)
                 return Self(playerId: playerId, playerName: later.playerName, kind: sum)
             case (.unconfirmed, _), (_, .unconfirmed), (.notApplied, .notApplied):

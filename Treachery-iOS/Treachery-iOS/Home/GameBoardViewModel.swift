@@ -606,6 +606,10 @@ extension GameBoardViewModel {
         guard !isGameFinished, lifeChangeDebounces[playerId] == nil,
               let serverLife = serverPlayers.first(where: { $0.id == playerId })?.lifeTotal,
               let batch = lifeLedger.beginBatch(for: playerId, serverLife: serverLife) else { return }
+        // Taps held behind a failed change; see LifeChangeFailure.followed(bySending:).
+        if let index = lifeChangeFailures.firstIndex(where: { $0.playerId == playerId }) {
+            lifeChangeFailures[index] = lifeChangeFailures[index].followed(bySending: batch)
+        }
         let cloudFunctions = cloudFunctions
         let gameId = gameId
         // Holds what the call needs, not the view model, so the call still

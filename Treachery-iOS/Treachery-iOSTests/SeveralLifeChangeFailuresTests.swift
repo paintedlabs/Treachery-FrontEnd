@@ -164,6 +164,13 @@ struct LifeChangeFailureWordingTests {
         #expect(Failure.announcements(from: [sarah, tom], to: [tom]).isEmpty)
     }
 
+    @Test func aFailureWhoseMessageStaysTheSameIsNotReadOutAgain() {
+        // Sending the taps held behind Sarah's change changes what the board
+        // keeps track of, not what it says.
+        let held = Failure(playerId: "p0", playerName: "Sarah", kind: .notApplied(baseline: 40, amount: -2, sentSince: -1))
+        #expect(Failure.announcements(from: [sarah, tom], to: [held, tom]).isEmpty)
+    }
+
     // MARK: - A player's failures, one after another
 
     private func sarah(_ kind: Failure.Kind) -> Failure {
