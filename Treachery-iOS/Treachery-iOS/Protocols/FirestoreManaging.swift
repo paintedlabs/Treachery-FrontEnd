@@ -4,8 +4,11 @@ import Foundation
 /// answer would otherwise pass for real data.
 enum FirestoreReadError: Error, Hashable {
     /// The user's own profile, `users/{uid}`, is missing, incomplete or
-    /// can't be decoded: `getUser(id:)` returns nil for it. Signing in
-    /// creates or repairs it, so trying again can help.
+    /// can't be decoded: `getUser(id:)` returns nil for it. A missing or
+    /// incomplete profile is set up after sign-in, which `AuthViewModel`
+    /// retries while it's postponed (offline, say), and Try Again retries it
+    /// at once, so trying again can help. An undecodable profile is never
+    /// repaired, since it may be a newer app's, so trying again won't.
     case profileUnavailable
     /// The read was made offline and the local cache held nothing for it.
     /// Firestore answers such a query with an empty list, which would read

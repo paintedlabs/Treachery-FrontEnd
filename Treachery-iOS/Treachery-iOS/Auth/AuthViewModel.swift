@@ -30,7 +30,19 @@ final class AuthViewModel: ObservableObject {
     private let firebaseManager: AuthManaging
     private let firestoreManager: FirestoreManaging
     private let profileProvisioner: ProfileProvisioner
+    private let clock: any Clock<Duration>
     private var authStateHandle: Any?
+
+    /// Sets up the signed-in account's profile, retrying while that's
+    /// postponed (`startProfileSetup(for:)`). Nil once the profile is set
+    /// up, and while no one is signed in.
+    private var profileSetup: Task<Void, Never>?
+    /// The profile setup's wait before its next retry, while it waits.
+    /// Cancelling it retries at once.
+    private var profileSetupRetryWait: Task<Void, Never>?
+    /// Callers of `retryProfileSetup()`, waiting for the attempt that's
+    /// running or about to start to end.
+    private var profileSetupWaiters: [CheckedContinuation<Void, Never>] = []
 
     private static let logger = Logger(subsystem: "com.Solomon.Treachery-iOS", category: "Auth")
 
@@ -55,20 +67,26 @@ final class AuthViewModel: ObservableObject {
         return false
     }
 
-    /// - Parameter now: The clock profile provisioning reads when Firebase
-    ///   Auth doesn't say when an account was created.
+    /// - Parameters:
+    ///   - now: The clock profile provisioning reads when Firebase Auth
+    ///     doesn't say when an account was created.
+    ///   - clock: Times the retries of a postponed profile setup.
     init(
         firebaseManager: AuthManaging = FirebaseManager(),
         firestoreManager: FirestoreManaging = FirestoreManager(),
-        now: @escaping () -> Date = Date.init
+        now: @escaping () -> Date = Date.init,
+        clock: any Clock<Duration> = ContinuousClock()
     ) {
         self.firebaseManager = firebaseManager
         self.firestoreManager = firestoreManager
         self.profileProvisioner = ProfileProvisioner(firestore: firestoreManager, now: now)
+        self.clock = clock
         listenToAuthState()
     }
 
     deinit {
+        profileSetup?.cancel()
+        profileSetupRetryWait?.cancel()
         if let handle = authStateHandle {
             firebaseManager.removeAuthStateListener(handle)
         }
@@ -76,24 +94,42 @@ final class AuthViewModel: ObservableObject {
 
     // MARK: - Auth State Listener
 
-    /// Profile provisioning runs from here and nowhere else: Firebase Auth
-    /// calls this once per sign-in. When the sign-in methods provisioned
-    /// too, two runs could race, one skipping the name prompt or replacing a
-    /// profile the other had just created.
+    /// Firebase Auth calls the listener when it's added, and then each time
+    /// an account signs in or out; never twice in a row for one account.
     private func listenToAuthState() {
         authStateHandle = firebaseManager.addAuthStateListener { [weak self] user in
+            let account = user.map { SignedInAccount($0) }
             Task { @MainActor in
-                if let user = user {
-                    let account = SignedInAccount(user)
-                    self?.authState = .authenticated(account)
-                    AnalyticsService.setUserId(user.uid)
+                if let account {
+                    AnalyticsService.setUserId(account.uid)
                     AnalyticsService.setUserProperties(["auth_method": account.authMethod.rawValue])
-                    await self?.provisionProfile(for: account)
                 } else {
-                    self?.authState = .unauthenticated
                     AnalyticsService.setUserId(nil)
                 }
+                self?.authStateDidChange(to: account)
             }
+        }
+    }
+
+    /// Shows the screens for `account`, or the signed-out ones for nil, and
+    /// sets up the profile of an account that just signed in. The auth state
+    /// listener calls this; tests call it in its place, since they can't
+    /// build a FirebaseAuth `User`.
+    ///
+    /// Profile provisioning runs from here and nowhere else, one attempt at
+    /// a time. When the sign-in methods provisioned too, two runs could race,
+    /// one skipping the name prompt or replacing a profile the other had just
+    /// created.
+    func authStateDidChange(to account: SignedInAccount?) {
+        guard let account else {
+            stopProfileSetup()
+            authState = .unauthenticated
+            return
+        }
+        let isAnotherAccount = account.uid != currentUserId
+        authState = .authenticated(account)
+        if isAnotherAccount {
+            startProfileSetup(for: account)
         }
     }
 
@@ -190,22 +226,110 @@ final class AuthViewModel: ObservableObject {
         }
     }
 
+    // MARK: - Profile Setup
+
+    /// How long a postponed profile setup waits before each retry: soon at
+    /// first, then less often, and every five minutes from the fourth on.
+    static let profileSetupRetryDelays: [Duration] = [.seconds(5), .seconds(30), .seconds(120), .seconds(300)]
+
+    /// Brings a postponed profile setup's next retry forward to now, as when
+    /// the app becomes active and may be back online. Does nothing while an
+    /// attempt runs, whose answer is fresh, or when nothing needs setting up.
+    func retryPostponedProfileSetup() {
+        profileSetupRetryWait?.cancel()
+    }
+
+    /// Brings a postponed profile setup's next retry forward to now, then
+    /// returns once that attempt, or the one already running, is over. Try
+    /// Again on a screen that needs the profile calls this before reading
+    /// it. Returns at once when nothing needs setting up.
+    func retryProfileSetup() async {
+        guard profileSetup != nil else { return }
+        await withCheckedContinuation { continuation in
+            profileSetupWaiters.append(continuation)
+            retryPostponedProfileSetup()
+        }
+    }
+
+    /// Starts setting up `account`'s profile: provisions it, and while that's
+    /// postponed (offline, say) provisions again after each of
+    /// `profileSetupRetryDelays`, the last one repeating, until it settles.
+    /// Only this task provisions, so attempts never overlap. It holds the
+    /// view model only while an attempt runs, not while it waits.
+    private func startProfileSetup(for account: SignedInAccount) {
+        stopProfileSetup()
+        profileSetup = Task { [weak self] in
+            var retry = 0
+            while let wait = await self?.attemptProfileSetup(for: account, retry: retry) {
+                await wait.value
+                retry += 1
+            }
+        }
+    }
+
+    /// One attempt of the profile setup. Returns the wait before the next one
+    /// if this one was postponed, or nil once the setup is over: the profile
+    /// is set up or can't be, or the setup was stopped.
+    private func attemptProfileSetup(for account: SignedInAccount, retry: Int) async -> Task<Void, Never>? {
+        // Stopped while it waited.
+        guard !Task.isCancelled else { return nil }
+        profileSetupRetryWait = nil
+        let outcome = await provisionProfile(for: account)
+        // Stopped during the attempt, which released the waiters.
+        guard !Task.isCancelled else { return nil }
+        releaseProfileSetupWaiters()
+        guard outcome == .postponed, currentUserId == account.uid else {
+            profileSetup = nil
+            return nil
+        }
+        let delays = Self.profileSetupRetryDelays
+        let delay = delays[min(retry, delays.count - 1)]
+        let wait = Task { [clock] in
+            // Cancelled to retry early or to stop; the next attempt checks which.
+            _ = try? await clock.sleep(for: delay)
+        }
+        profileSetupRetryWait = wait
+        return wait
+    }
+
+    /// Stops the profile setup, if one runs, because its account signed out
+    /// or another signed in. An attempt still running ends without acting on
+    /// its outcome (`provisionProfile(for:)`).
+    private func stopProfileSetup() {
+        profileSetup?.cancel()
+        profileSetup = nil
+        profileSetupRetryWait?.cancel()
+        profileSetupRetryWait = nil
+        releaseProfileSetupWaiters()
+    }
+
+    private func releaseProfileSetupWaiters() {
+        let waiters = profileSetupWaiters
+        profileSetupWaiters = []
+        waiters.forEach { $0.resume() }
+    }
+
     // MARK: - Profile Provisioning
 
-    /// Makes sure the signed-in account has a usable profile (see
-    /// `ProfileProvisioner`), asks for a name when the profile's is a
-    /// placeholder, and signs out if Firebase Auth says the account no
-    /// longer exists. Only the auth state listener calls this in the app.
-    func provisionProfile(for account: SignedInAccount) async {
+    /// One provisioning attempt: makes sure the signed-in account has a
+    /// usable profile (see `ProfileProvisioner`), asks for a name when the
+    /// profile's is a placeholder, and signs out if Firebase Auth says the
+    /// account no longer exists. An attempt whose task was cancelled, because
+    /// the account signed out or another signed in meanwhile, doesn't act on
+    /// its outcome. Only the profile setup calls this in the app.
+    @discardableResult
+    func provisionProfile(for account: SignedInAccount) async -> ProfileProvisioner.Outcome {
         let outcome = await profileProvisioner.provision(account) {
             await firebaseManager.reloadAccount(userId: account.uid)
         }
+        guard !Task.isCancelled else { return outcome }
         if outcome == .accountGone {
             signOutDeletedAccount()
         }
         if outcome.needsName {
             isNewUser = true
         }
+        return outcome
     }
 
     /// Ends a session whose account no longer exists. FirebaseAuth normally

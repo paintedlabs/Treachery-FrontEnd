@@ -16,6 +16,7 @@ struct FriendsListViewModelTests {
 
     init() {
         viewModel = FriendsListViewModel(
+            retryProfileSetup: {},
             firestoreManager: firestore,
             cloudFunctions: cloudFunctions,
             trackEvent: analytics.record
@@ -45,7 +46,7 @@ struct FriendsListViewModelTests {
         #expect(viewModel.overview.phase == .loaded)
         #expect(viewModel.overview.value?.friends.isEmpty == true)
 
-        let failing = FriendsListViewModel(firestoreManager: firestore, cloudFunctions: cloudFunctions, trackEvent: { _ in })
+        let failing = FriendsListViewModel(retryProfileSetup: {}, firestoreManager: firestore, cloudFunctions: cloudFunctions, trackEvent: { _ in })
         firestore.friendsError = unavailable
         await failing.loadData(userId: "u1")
 
@@ -70,20 +71,34 @@ struct FriendsListViewModelTests {
     }
 
     /// Without their own profile there's no friends list to read, which
-    /// used to show "No friends yet" with no error and no Try Again.
-    @Test func unreadableOwnProfileFailsTheLoadThenRetryLoads() async {
+    /// used to show "No friends yet" with no error and no Try Again. Try
+    /// Again first sets up a profile that couldn't be at sign-in.
+    @Test func missingOwnProfileFailsTheLoadThenTryAgainSetsItUp() async {
         firestore.usersToReturn = [:]
         firestore.friendsToReturn = [friend("f1")]
+        var setupAttempts = 0
+        let viewModel = FriendsListViewModel(
+            retryProfileSetup: { [firestore] in
+                setupAttempts += 1
+                firestore.usersToReturn["u1"] = TreacheryUser(
+                    id: "u1", displayName: "Ada", friendIds: [], createdAt: Date(timeIntervalSince1970: 1_000_000)
+                )
+            },
+            firestoreManager: firestore,
+            cloudFunctions: cloudFunctions,
+            trackEvent: { _ in }
+        )
 
         await viewModel.loadData(userId: "u1")
 
         #expect(viewModel.overview.phase == .failed)
-        #expect(viewModel.overview.failure == .unknown)
+        #expect(viewModel.overview.failure == .profileNotSetUp)
         #expect(viewModel.overview.value == nil)
+        #expect(setupAttempts == 0)
 
-        firestore.usersToReturn["u1"] = friend("u1", named: "Ada")
-        await viewModel.loadData(userId: "u1")
+        await viewModel.retry(userId: "u1")
 
+        #expect(setupAttempts == 1)
         #expect(viewModel.overview.phase == .loaded)
         #expect(viewModel.overview.value?.friends.map(\.id) == ["f1"])
     }

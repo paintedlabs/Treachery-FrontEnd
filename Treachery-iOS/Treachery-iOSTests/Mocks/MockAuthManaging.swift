@@ -4,7 +4,8 @@ import FirebaseAuth
 
 /// Stands in for Firebase Auth. Tests can't build a FirebaseAuth `User`, so
 /// the sign-in methods throw and the auth state listener never fires; tests
-/// drive provisioning through `AuthViewModel.provisionProfile(for:)`.
+/// sign in and out through `AuthViewModel.authStateDidChange(to:)`, or
+/// provision once through `AuthViewModel.provisionProfile(for:)`.
 final class MockAuthManaging: AuthManaging {
 
     enum Unsupported: Error {
@@ -18,6 +19,9 @@ final class MockAuthManaging: AuthManaging {
     /// Thrown by the sign-in methods, `verifyPhoneNumber` and
     /// `resetPassword` in place of their usual outcome.
     var signInError: Error?
+    /// Runs once inside `reloadAccount(userId:)`, while a provisioning
+    /// attempt is in flight, so a test can act mid-attempt.
+    var whileReloadingAccount: (@MainActor () async -> Void)?
 
     private(set) var reloadAccountCalls: [String] = []
     private(set) var signOutCallCount = 0
@@ -48,6 +52,11 @@ final class MockAuthManaging: AuthManaging {
 
     func reloadAccount(userId: String) async -> AccountStatus {
         reloadAccountCalls.append(userId)
+        if let inFlight = whileReloadingAccount {
+            // One-shot, so a test can't recurse into it by accident.
+            whileReloadingAccount = nil
+            await inFlight()
+        }
         return accountStatus
     }
 }

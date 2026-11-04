@@ -171,6 +171,12 @@ struct ProfileView: View {
         await viewModel.loadData(userId: userId)
     }
 
+    /// Try Again: sets up a profile that couldn't be at sign-in, then loads.
+    private func retry() async {
+        guard let userId = authViewModel.currentUserId else { return }
+        await viewModel.retry(userId: userId)
+    }
+
     // MARK: - Profile and Stats
 
     /// The profile only once it's loaded, and a failure with Try Again above
@@ -184,7 +190,7 @@ struct ProfileView: View {
                 .padding(.vertical, 40)
         case .failed(let failure, let previous):
             LoadFailureCard(title: "Couldn't Load Your Profile", failure: failure) {
-                Task { await reload() }
+                Task { await retry() }
             }
             if let previous {
                 profileCards(for: previous)
@@ -197,13 +203,13 @@ struct ProfileView: View {
     @ViewBuilder private func profileCards(for user: TreacheryUser) -> some View {
         profileCard(for: user)
         GameStatsCard(stats: viewModel.stats, failureMessage: viewModel.statsFailureMessage, elo: user.elo) {
-            Task { await reload() }
+            Task { await retry() }
         }
         if let deckStats = user.deckStats, !deckStats.isEmpty {
             DeckPerformanceCard(deckStats: deckStats)
         }
         NavigationLink {
-            FriendsListView()
+            FriendsListView(retryProfileSetup: { [authViewModel] in await authViewModel.retryProfileSetup() })
         } label: {
             HStack {
                 Text("Friends")
@@ -760,7 +766,7 @@ private struct ProfileRow<Content: View>: View {
 #Preview {
     let authViewModel = AuthViewModel()
     NavigationStack {
-        ProfileView(viewModel: ProfileViewModel(session: authViewModel))
+        ProfileView(viewModel: ProfileViewModel(session: authViewModel, retryProfileSetup: {}))
     }
     .environmentObject(authViewModel)
 }

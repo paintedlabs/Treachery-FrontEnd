@@ -105,10 +105,11 @@ extension UserFacingError {
     ]
 
     /// An offline read with nothing cached reads the same as Firestore's own
-    /// offline failure, `unavailable`. A profile that can't be read has
-    /// nothing more specific to say than `unknown`.
+    /// offline failure, `unavailable`. The user's own profile is almost
+    /// always unreadable because it couldn't be set up yet, offline say.
     private static let firestoreReadErrors: [FirestoreReadError: Self] = [
         .nothingCachedOffline: .serverUnreachable,
+        .profileUnavailable: .profileNotSetUp,
     ]
 
     /// A failed-precondition never gets here: see `functionsRefusals`.
@@ -198,6 +199,10 @@ extension UserFacingError {
     static let unknown = Self(message: String(
         localized: "Something went wrong. Try again.",
         comment: "Error shown when nothing more specific is known"
+    ))
+    static let profileNotSetUp = Self(message: String(
+        localized: "Your profile isn't set up yet. Check your connection, then try again.",
+        comment: "Error shown when the user's own profile can't be read, usually because it couldn't be created while offline"
     ))
 
     // Signing in

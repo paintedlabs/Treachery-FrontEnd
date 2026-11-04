@@ -9,6 +9,7 @@ import SwiftUI
 
 struct RootView: View {
     @EnvironmentObject var authViewModel: AuthViewModel
+    @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
         Group {
@@ -25,10 +26,15 @@ struct RootView: View {
                     }
                 }
             case .authenticated:
-                if authViewModel.isNewUser {
-                    OnboardingFlow()
-                } else {
+                // The name prompt covers the tabs rather than replacing them:
+                // a profile set up late, by a retry, can need a name while a
+                // game is open, and replacing the tabs would close it.
+                ZStack {
                     HomeView()
+                        .accessibilityHidden(authViewModel.isNewUser)
+                    if authViewModel.isNewUser {
+                        OnboardingFlow()
+                    }
                 }
             case .unauthenticated:
                 NavigationStack {
@@ -37,6 +43,13 @@ struct RootView: View {
             }
         }
         .preferredColorScheme(.dark)
+        // Back in the app, the connection may be back too, so a postponed
+        // profile setup tries again now rather than at its next retry.
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active {
+                authViewModel.retryPostponedProfileSetup()
+            }
+        }
     }
 }
 

@@ -129,10 +129,12 @@ struct UserFacingErrorTests {
     }
 
     /// An offline read with nothing cached says the server couldn't be
-    /// reached, as Firestore's own offline failure does.
+    /// reached, as Firestore's own offline failure does. The user's own
+    /// profile is unreadable almost always because it isn't set up yet.
     @Test func readsThatFoundNothingTrustworthySayWhy() {
         #expect(UserFacingError(FirestoreReadError.nothingCachedOffline) == .serverUnreachable)
-        #expect(UserFacingError(FirestoreReadError.profileUnavailable) == .unknown)
+        #expect(UserFacingError(FirestoreReadError.profileUnavailable) == .profileNotSetUp)
+        #expect(UserFacingError.profileNotSetUp.message == "Your profile isn't set up yet. Check your connection, then try again.")
     }
 
     @Test func anAlreadyMappedErrorIsKept() {

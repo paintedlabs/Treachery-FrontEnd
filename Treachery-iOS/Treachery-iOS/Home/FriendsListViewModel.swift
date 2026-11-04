@@ -55,6 +55,7 @@ final class FriendsListViewModel: ObservableObject {
     // MARK: - Properties
 
     private var userId: String?
+    private let retryProfileSetup: () async -> Void
     private let firestoreManager: FirestoreManaging
     private let cloudFunctions: CloudFunctionsProtocol
     private let trackEvent: (String) -> Void
@@ -63,12 +64,18 @@ final class FriendsListViewModel: ObservableObject {
 
     // MARK: - Init
 
-    /// - Parameter trackEvent: Records an analytics event by name.
+    /// - Parameters:
+    ///   - retryProfileSetup: Gives a postponed profile setup another go and
+    ///     returns once it's over: the friends list is part of the profile.
+    ///     In the app this is `AuthViewModel.retryProfileSetup()`.
+    ///   - trackEvent: Records an analytics event by name.
     init(
+        retryProfileSetup: @escaping () async -> Void,
         firestoreManager: FirestoreManaging = FirestoreManager(),
         cloudFunctions: CloudFunctionsProtocol = CloudFunctions(),
         trackEvent: @escaping (String) -> Void = { AnalyticsService.trackEvent($0) }
     ) {
+        self.retryProfileSetup = retryProfileSetup
         self.firestoreManager = firestoreManager
         self.cloudFunctions = cloudFunctions
         self.trackEvent = trackEvent
@@ -93,6 +100,13 @@ final class FriendsListViewModel: ObservableObject {
             Self.logger.error("Loading friends failed: \(String(describing: error), privacy: .private)")
             overview.fail(with: UserFacingError(error))
         }
+    }
+
+    /// Try Again or pull to refresh. A profile that couldn't be set up at
+    /// sign-in (offline, say) is set up first; it holds the friends list.
+    func retry(userId: String) async {
+        await retryProfileSetup()
+        await loadData(userId: userId)
     }
 
     // MARK: - Search

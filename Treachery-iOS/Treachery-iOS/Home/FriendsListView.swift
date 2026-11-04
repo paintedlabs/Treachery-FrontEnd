@@ -18,8 +18,10 @@ struct FriendsListView: View {
         _viewModel = StateObject(wrappedValue: viewModel())
     }
 
-    init() {
-        self.init(viewModel: FriendsListViewModel())
+    /// - Parameter retryProfileSetup: Gives a postponed profile setup
+    ///   another go: `AuthViewModel.retryProfileSetup()` in the app.
+    init(retryProfileSetup: @escaping () async -> Void) {
+        self.init(viewModel: FriendsListViewModel(retryProfileSetup: retryProfileSetup))
     }
 
     var body: some View {
@@ -75,7 +77,7 @@ struct FriendsListView: View {
         }
         .onAppear { AnalyticsService.trackScreen("Friends") }
         .task { await reload() }
-        .refreshable { await reload() }
+        .refreshable { await retry() }
     }
 
     private var isShowingActionFailure: Binding<Bool> {
@@ -90,6 +92,13 @@ struct FriendsListView: View {
     private func reload() async {
         guard let userId = authViewModel.currentUserId else { return }
         await viewModel.loadData(userId: userId)
+    }
+
+    /// Try Again and pull to refresh: sets up a profile that couldn't be at
+    /// sign-in, then loads.
+    private func retry() async {
+        guard let userId = authViewModel.currentUserId else { return }
+        await viewModel.retry(userId: userId)
     }
 
     // MARK: - Search
@@ -245,7 +254,7 @@ struct FriendsListView: View {
             friendsCard(friends: nil)
         case .failed(let failure, let previous):
             LoadFailureCard(title: "Couldn't Load Friends", failure: failure) {
-                Task { await reload() }
+                Task { await retry() }
             }
             // What an earlier load found, but never "No friends yet": under
             // a failure it would read as the answer.
@@ -444,7 +453,7 @@ private extension FriendActionFailure.Action {
 #if DEBUG
 #Preview {
     NavigationStack {
-        FriendsListView()
+        FriendsListView(retryProfileSetup: {})
     }
     .environmentObject(AuthViewModel())
 }

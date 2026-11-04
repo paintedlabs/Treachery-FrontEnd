@@ -20,6 +20,7 @@ struct ProfileViewModelAccountDeletionTests {
     init() {
         viewModel = ProfileViewModel(
             session: session,
+            retryProfileSetup: {},
             firestoreManager: firestore,
             cloudFunctions: cloudFunctions,
             trackEvent: analytics.record

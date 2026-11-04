@@ -19,6 +19,7 @@ struct ProfileViewModelTests {
         )
         viewModel = ProfileViewModel(
             session: SessionEndingSpy(),
+            retryProfileSetup: {},
             firestoreManager: firestore,
             cloudFunctions: MockCloudFunctions(),
             trackEvent: { _ in }
@@ -186,28 +187,42 @@ struct ProfileViewModelTests {
     }
 
     /// A profile that is missing or unreadable used to leave a spinner
-    /// running for good.
-    @Test func missingProfileIsAFailureThatCanBeRetried() async {
+    /// running for good, and Try Again only read it again. Now Try Again
+    /// first sets up a profile that couldn't be at sign-in, then reads it.
+    @Test func tryAgainSetsUpAMissingProfileThenLoadsIt() async {
         firestore.usersToReturn = [:]
+        var setupAttempts = 0
+        let viewModel = ProfileViewModel(
+            session: SessionEndingSpy(),
+            retryProfileSetup: { [firestore] in
+                setupAttempts += 1
+                // This time the setup creates the profile.
+                firestore.usersToReturn["u1"] = TreacheryUser(
+                    id: "u1",
+                    displayName: "Player",
+                    friendIds: [],
+                    createdAt: Date(timeIntervalSince1970: 1_000_000)
+                )
+            },
+            firestoreManager: firestore,
+            cloudFunctions: MockCloudFunctions(),
+            trackEvent: { _ in }
+        )
 
         await viewModel.loadData(userId: "u1")
 
         #expect(viewModel.profile.phase == .failed)
-        #expect(viewModel.profile.failure == .unknown)
+        #expect(viewModel.profile.failure == .profileNotSetUp)
         #expect(viewModel.user == nil)
+        // Showing the screen doesn't retry the setup; Try Again does.
+        #expect(setupAttempts == 0)
 
-        // Once the profile can be read, Try Again loads it.
-        firestore.usersToReturn["u1"] = TreacheryUser(
-            id: "u1",
-            displayName: "Repaired Name",
-            friendIds: [],
-            createdAt: Date(timeIntervalSince1970: 1_000_000)
-        )
-        await viewModel.loadData(userId: "u1")
+        await viewModel.retry(userId: "u1")
 
+        #expect(setupAttempts == 1)
         #expect(viewModel.profile.phase == .loaded)
         #expect(viewModel.profile.failure == nil)
-        #expect(viewModel.user?.displayName == "Repaired Name")
+        #expect(viewModel.user?.displayName == "Player")
     }
 
     /// Offline with the profile cached but no finished games, Firestore

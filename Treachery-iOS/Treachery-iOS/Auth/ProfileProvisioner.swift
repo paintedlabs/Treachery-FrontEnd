@@ -101,8 +101,8 @@ struct ProfileProvisioner {
         /// written; the caller signs out.
         case accountGone
         /// The profile couldn't be read or written, or the account couldn't
-        /// be confirmed (offline, say). Nothing changed; the next sign-in or
-        /// launch tries again.
+        /// be confirmed (offline, say). Nothing changed; `AuthViewModel`
+        /// tries again later.
         case postponed
 
         /// Whether the profile's name is a placeholder the user should

@@ -15,6 +15,7 @@ struct ProfileSignOutTests {
     init() {
         viewModel = ProfileViewModel(
             session: session,
+            retryProfileSetup: {},
             firestoreManager: MockFirestoreManager(),
             cloudFunctions: cloudFunctions,
             trackEvent: { _ in }
@@ -105,6 +106,7 @@ struct ProfileSignOutTests {
         var announcements: [String] = []
         let viewModel = ProfileViewModel(
             session: session,
+            retryProfileSetup: {},
             firestoreManager: MockFirestoreManager(),
             cloudFunctions: cloudFunctions,
             trackEvent: { _ in },

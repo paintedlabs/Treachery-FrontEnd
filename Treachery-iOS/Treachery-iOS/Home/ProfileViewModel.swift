@@ -197,6 +197,7 @@ final class ProfileViewModel: ObservableObject {
 
     private var userId: String?
     private let session: SessionEnding
+    private let retryProfileSetup: () async -> Void
     private let firestoreManager: FirestoreManaging
     private let cloudFunctions: CloudFunctionsProtocol
     private let trackEvent: (String) -> Void
@@ -211,16 +212,22 @@ final class ProfileViewModel: ObservableObject {
     ///   - session: Ends the signed-in session, for Sign Out and once the
     ///     account is deleted, and says whether it is a guest's. In the app
     ///     this is `AuthViewModel`, the single source of auth state.
+    ///   - retryProfileSetup: Gives a postponed profile setup another go and
+    ///     returns once it's over, so Try Again can find a profile that
+    ///     couldn't be created at sign-in. In the app this is
+    ///     `AuthViewModel.retryProfileSetup()`.
     ///   - trackEvent: Records an analytics event by name.
     ///   - announce: Says a message to VoiceOver.
     init(
         session: SessionEnding,
+        retryProfileSetup: @escaping () async -> Void,
         firestoreManager: FirestoreManaging = FirestoreManager(),
         cloudFunctions: CloudFunctionsProtocol = CloudFunctions(),
         trackEvent: @escaping (String) -> Void = { AnalyticsService.trackEvent($0) },
         announce: @escaping @MainActor (String) -> Void = { FailureMessage.announce($0) }
     ) {
         self.session = session
+        self.retryProfileSetup = retryProfileSetup
         self.firestoreManager = firestoreManager
         self.cloudFunctions = cloudFunctions
         self.trackEvent = trackEvent
@@ -270,6 +277,14 @@ final class ProfileViewModel: ObservableObject {
         case .success(let loaded): stats = .loaded(loaded)
         case .failure(let failure): stats.fail(with: failure)
         }
+    }
+
+    /// Try Again after a failed load. A profile that couldn't be set up at
+    /// sign-in (offline, say) is set up first; without it there's nothing
+    /// to load.
+    func retry(userId: String) async {
+        await retryProfileSetup()
+        await loadData(userId: userId)
     }
 
     // MARK: - Name Editing
