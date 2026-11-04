@@ -10,6 +10,7 @@ struct GameBoardPlayerRow: View {
     @ObservedObject var viewModel: GameBoardViewModel
     @Binding var showColorPicker: Bool
     var onViewCard: ((Player) -> Void)?
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     private var isCurrentUser: Bool {
         player.userId == viewModel.currentUserId
@@ -38,158 +39,21 @@ struct GameBoardPlayerRow: View {
 
                 // Color picker toggle for current user
                 if isCurrentUser {
-                    Button {
-                        withAnimation(.easeInOut(duration: 0.2)) {
-                            showColorPicker.toggle()
-                        }
-                    } label: {
-                        if let hex = player.playerColor {
-                            Circle()
-                                .fill(Color(hex: hex))
-                                .frame(width: 16, height: 16)
-                                .overlay(
-                                    Circle().stroke(Color.mtgTextSecondary.opacity(0.3), lineWidth: 1)
-                                )
-                        } else {
-                            Circle()
-                                .stroke(Color.mtgTextSecondary, lineWidth: 1.5)
-                                .frame(width: 16, height: 16)
-                        }
-                    }
-                    .buttonStyle(.plain)
-                    .padding(.trailing, 6)
-                    .accessibilityLabel("Choose player color")
+                    colorPickerToggle
                 }
 
-                // Player info
-                VStack(alignment: .leading, spacing: 2) {
-                    HStack(spacing: 6) {
-                        Text(player.displayName)
-                            .fontWeight(isCurrentUser ? .bold : .regular)
-                            .strikethrough(player.isEliminated)
-                            .foregroundStyle(player.isEliminated ? Color.mtgTextSecondary : Color.mtgTextPrimary)
-
-                        if isCurrentUser {
-                            MtgBadge(text: "You", foregroundColor: .mtgGold, backgroundColor: Color.mtgGold.opacity(0.15), fontWeight: .regular)
-                        }
-
-                        if player.isEliminated {
-                            Image(systemName: "xmark.circle.fill")
-                                .foregroundStyle(Color.mtgError)
-                                .font(.caption)
-                        }
+                // At the accessibility text sizes the name needs the row's
+                // width, so the life controls go underneath it.
+                if dynamicTypeSize.isAccessibilitySize {
+                    VStack(alignment: .leading, spacing: 8) {
+                        playerInfo
+                        lifeStatus
                     }
-
-                    // Commander name
-                    if let commanderName = player.commanderName, !commanderName.isEmpty {
-                        Text(commanderName)
-                            .font(.system(.caption, design: .serif))
-                            .italic()
-                            .foregroundStyle(Color.mtgTextSecondary)
-                    }
-
-                    // Role visibility — only show for visible players
-                    // Face-down cards (from ability swaps) stay hidden
-                    if viewModel.canSeeRole(of: player) {
-                        if canInspectCard {
-                            Button {
-                                onViewCard?(player)
-                            } label: {
-                                HStack(spacing: 4) {
-                                    Circle()
-                                        .fill(player.role?.color ?? .gray)
-                                        .frame(width: 8, height: 8)
-                                    Text(player.role?.displayName ?? "")
-                                        .font(.caption)
-                                        .foregroundStyle(player.role?.color ?? Color.mtgTextSecondary)
-                                    if player.isUnveiled && player.role != .leader {
-                                        Text("(Unveiled)")
-                                            .font(.caption2)
-                                            .foregroundStyle(Color.mtgTextSecondary)
-                                    }
-                                    Image(systemName: "info.circle")
-                                        .font(.caption2)
-                                        .foregroundStyle(player.role?.color ?? Color.mtgTextSecondary)
-                                }
-                            }
-                            .buttonStyle(.plain)
-                            .accessibilityLabel("View \(player.displayName)'s identity card")
-                            .accessibilityHint("Shows their role ability and card details")
-                        } else {
-                            HStack(spacing: 4) {
-                                Circle()
-                                    .fill(player.role?.color ?? .gray)
-                                    .frame(width: 8, height: 8)
-                                Text(player.role?.displayName ?? "")
-                                    .font(.caption)
-                                    .foregroundStyle(player.role?.color ?? Color.mtgTextSecondary)
-                                if player.isUnveiled && player.role != .leader {
-                                    Text("(Unveiled)")
-                                        .font(.caption2)
-                                        .foregroundStyle(Color.mtgTextSecondary)
-                                }
-                            }
-                        }
-                    } else if viewModel.isTreacheryActive {
-                        Text("Role Hidden")
-                            .font(.caption)
-                            .foregroundStyle(Color.mtgTextSecondary)
-                    }
-                }
-
-                Spacer()
-
-                // Life controls. A spectator sees the totals but can't
-                // change them.
-                if !player.isEliminated {
-                    HStack(spacing: 12) {
-                        Button {
-                            viewModel.adjustLife(for: player.id, by: -1)
-                        } label: {
-                            Image(systemName: "minus.circle.fill")
-                                .font(.system(size: 32))
-                                .foregroundStyle(Color.mtgAssassin)
-                                .background(
-                                    Circle()
-                                        .fill(Color.mtgAssassin.opacity(0.1))
-                                        .frame(width: 40, height: 40)
-                                )
-                        }
-                        .buttonStyle(.plain)
-                        .disabled(!viewModel.canAdjustLife)
-                        .opacity(viewModel.canAdjustLife ? 1 : 0.35)
-                        .accessibilityLabel("Decrease \(player.displayName)'s life")
-
-                        Text("\(player.lifeTotal)")
-                            .font(.system(size: 36, weight: .bold, design: .serif))
-                            .foregroundStyle(Color.mtgTextPrimary)
-                            .frame(minWidth: 52)
-                            .multilineTextAlignment(.center)
-                            .contentTransition(.numericText())
-                            .animation(.spring(response: 0.3, dampingFraction: 0.6), value: player.lifeTotal)
-                            .accessibilityLabel("\(player.lifeTotal) life")
-
-                        Button {
-                            viewModel.adjustLife(for: player.id, by: 1)
-                        } label: {
-                            Image(systemName: "plus.circle.fill")
-                                .font(.system(size: 32))
-                                .foregroundStyle(Color.mtgSuccess)
-                                .background(
-                                    Circle()
-                                        .fill(Color.mtgSuccess.opacity(0.1))
-                                        .frame(width: 40, height: 40)
-                                )
-                        }
-                        .buttonStyle(.plain)
-                        .disabled(!viewModel.canAdjustLife)
-                        .opacity(viewModel.canAdjustLife ? 1 : 0.35)
-                        .accessibilityLabel("Increase \(player.displayName)'s life")
-                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 } else {
-                    Text("Eliminated")
-                        .font(.caption)
-                        .foregroundStyle(Color.mtgError)
+                    playerInfo
+                    Spacer()
+                    lifeStatus
                 }
             }
             .padding(.vertical, 4)
@@ -207,6 +71,163 @@ struct GameBoardPlayerRow: View {
             }
         }
         .accessibilityElement(children: .combine)
+    }
+
+    private var colorPickerToggle: some View {
+        Button {
+            withAnimation(.easeInOut(duration: 0.2)) {
+                showColorPicker.toggle()
+            }
+        } label: {
+            if let hex = player.playerColor {
+                Circle()
+                    .fill(Color(hex: hex))
+                    .frame(width: 16, height: 16)
+                    .overlay(
+                        Circle().stroke(Color.mtgTextSecondary.opacity(0.3), lineWidth: 1)
+                    )
+            } else {
+                Circle()
+                    .stroke(Color.mtgTextSecondary, lineWidth: 1.5)
+                    .frame(width: 16, height: 16)
+            }
+        }
+        .buttonStyle(.plain)
+        .padding(.trailing, 6)
+        .accessibilityLabel("Choose player color")
+    }
+
+    private var playerInfo: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            HStack(spacing: 6) {
+                Text(player.displayName)
+                    .fontWeight(isCurrentUser ? .bold : .regular)
+                    .strikethrough(player.isEliminated)
+                    .foregroundStyle(player.isEliminated ? Color.mtgTextSecondary : Color.mtgTextPrimary)
+
+                if isCurrentUser {
+                    MtgBadge(text: "You", foregroundColor: .mtgGold, backgroundColor: Color.mtgGold.opacity(0.15), fontWeight: .regular)
+                }
+
+                if player.isEliminated {
+                    Image(systemName: "xmark.circle.fill")
+                        .foregroundStyle(Color.mtgError)
+                        .font(.caption)
+                }
+            }
+
+            // Commander name
+            if let commanderName = player.commanderName, !commanderName.isEmpty {
+                Text(commanderName)
+                    .font(.system(.caption, design: .serif))
+                    .italic()
+                    .foregroundStyle(Color.mtgTextSecondary)
+            }
+
+            // Role visibility — only show for visible players
+            // Face-down cards (from ability swaps) stay hidden
+            if viewModel.canSeeRole(of: player) {
+                if canInspectCard {
+                    Button {
+                        onViewCard?(player)
+                    } label: {
+                        HStack(spacing: 4) {
+                            Circle()
+                                .fill(player.role?.color ?? .gray)
+                                .frame(width: 8, height: 8)
+                            Text(player.role?.displayName ?? "")
+                                .font(.caption)
+                                .foregroundStyle(player.role?.color ?? Color.mtgTextSecondary)
+                            if player.isUnveiled && player.role != .leader {
+                                Text("(Unveiled)")
+                                    .font(.caption2)
+                                    .foregroundStyle(Color.mtgTextSecondary)
+                            }
+                            Image(systemName: "info.circle")
+                                .font(.caption2)
+                                .foregroundStyle(player.role?.color ?? Color.mtgTextSecondary)
+                        }
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("View \(player.displayName)'s identity card")
+                    .accessibilityHint("Shows their role ability and card details")
+                } else {
+                    HStack(spacing: 4) {
+                        Circle()
+                            .fill(player.role?.color ?? .gray)
+                            .frame(width: 8, height: 8)
+                        Text(player.role?.displayName ?? "")
+                            .font(.caption)
+                            .foregroundStyle(player.role?.color ?? Color.mtgTextSecondary)
+                        if player.isUnveiled && player.role != .leader {
+                            Text("(Unveiled)")
+                                .font(.caption2)
+                                .foregroundStyle(Color.mtgTextSecondary)
+                        }
+                    }
+                }
+            } else if viewModel.isTreacheryActive {
+                Text("Role Hidden")
+                    .font(.caption)
+                    .foregroundStyle(Color.mtgTextSecondary)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var lifeStatus: some View {
+        // Life controls. A spectator sees the totals but can't
+        // change them.
+        if !player.isEliminated {
+            HStack(spacing: 12) {
+                Button {
+                    viewModel.adjustLife(for: player.id, by: -1)
+                } label: {
+                    Image(systemName: "minus.circle.fill")
+                        .font(.system(size: 32))
+                        .foregroundStyle(Color.mtgAssassin)
+                        .background(
+                            Circle()
+                                .fill(Color.mtgAssassin.opacity(0.1))
+                                .frame(width: 40, height: 40)
+                        )
+                }
+                .buttonStyle(.plain)
+                .disabled(!viewModel.canAdjustLife)
+                .opacity(viewModel.canAdjustLife ? 1 : 0.35)
+                .accessibilityLabel("Decrease \(player.displayName)'s life")
+
+                Text("\(player.lifeTotal)")
+                    .font(.system(size: 36, weight: .bold, design: .serif))
+                    .foregroundStyle(Color.mtgTextPrimary)
+                    .frame(minWidth: 52)
+                    .multilineTextAlignment(.center)
+                    .contentTransition(.numericText())
+                    .animation(.spring(response: 0.3, dampingFraction: 0.6), value: player.lifeTotal)
+                    .accessibilityLabel("\(player.lifeTotal) life")
+
+                Button {
+                    viewModel.adjustLife(for: player.id, by: 1)
+                } label: {
+                    Image(systemName: "plus.circle.fill")
+                        .font(.system(size: 32))
+                        .foregroundStyle(Color.mtgSuccess)
+                        .background(
+                            Circle()
+                                .fill(Color.mtgSuccess.opacity(0.1))
+                                .frame(width: 40, height: 40)
+                        )
+                }
+                .buttonStyle(.plain)
+                .disabled(!viewModel.canAdjustLife)
+                .opacity(viewModel.canAdjustLife ? 1 : 0.35)
+                .accessibilityLabel("Increase \(player.displayName)'s life")
+            }
+        } else {
+            Text("Eliminated")
+                .font(.caption)
+                .foregroundStyle(Color.mtgError)
+        }
     }
 }
 

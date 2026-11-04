@@ -14,7 +14,6 @@ struct GameBoardView: View {
     @Binding var navigationPath: NavigationPath
     @State private var showCardDetail = false
     @State private var showForfeitConfirmation = false
-    @State private var isConfirmingSpectatorLeave = false
     @State private var showEndGameConfirmation = false
     @State private var showWinnerSelection = false
     @State private var selectedWinners: Set<String> = []
@@ -36,11 +35,8 @@ struct GameBoardView: View {
 
     var body: some View {
         ZStack {
-            Color.mtgBackground.ignoresSafeArea()
-
-            if let hex = viewModel.currentPlayer?.playerColor {
-                Color(hex: hex).opacity(0.15).ignoresSafeArea()
-            }
+            boardBackground
+                .ignoresSafeArea()
 
             VStack(spacing: 0) {
                 ConnectionBanner()
@@ -48,254 +44,7 @@ struct GameBoardView: View {
                 if viewModel.status != .ready {
                     statusContent
                 } else {
-                    // The signed-in user's identity card, or why there's none. A
-                    // user without a seat gets this in every mode: it's their way
-                    // home.
-                    switch viewModel.identityArea {
-                    case .notDealt:
-                        EmptyView()
-                    case .card(let card, let player):
-                        ZStack {
-                            Button {
-                                showCardDetail = true
-                            } label: {
-                                IdentityCardHeader(card: card, player: player)
-                            }
-                            .buttonStyle(.plain)
-                            .rotation3DEffect(
-                                .degrees(viewModel.unveilProgress == .flippingAway ? 90 : 0),
-                                axis: (x: 0, y: 1, z: 0),
-                                perspective: 0.5
-                            )
-                            .animation(
-                                viewModel.unveilProgress == .flippingAway ? .easeIn(duration: 0.3) : .easeOut(duration: 0.3),
-                                value: viewModel.unveilProgress
-                            )
-
-                            // Unveiled banner overlay, once the server has
-                            // unveiled the player
-                            if viewModel.unveilProgress == .revealing {
-                                VStack {
-                                    Text("IDENTITY REVEALED")
-                                        .font(.headline)
-                                        .fontWeight(.black)
-                                        .foregroundStyle(Color.mtgBackground)
-                                        .padding(.horizontal, 20)
-                                        .padding(.vertical, 10)
-                                        .background(
-                                            RoundedRectangle(cornerRadius: 8)
-                                                .fill(player.role?.color ?? Color.mtgGuardian)
-                                                .shadow(color: (player.role?.color ?? Color.mtgGuardian).opacity(0.6), radius: 12)
-                                        )
-                                }
-                                .transition(.scale.combined(with: .opacity))
-                                .zIndex(1)
-                            }
-                        }
-                        .animation(
-                            viewModel.unveilProgress == .revealing
-                                ? .spring(response: 0.4, dampingFraction: 0.6)
-                                : .easeOut(duration: 0.5),
-                            value: viewModel.unveilProgress
-                        )
-                    case .taken:
-                        VStack(spacing: 8) {
-                            Image(systemName: "theatermasks.fill")
-                                .font(.title)
-                                .foregroundStyle(Color.mtgGold)
-                                .accessibilityHidden(true)
-                            Text("The Metamorph took your identity card.")
-                                .font(.subheadline)
-                                .foregroundStyle(Color.mtgTextSecondary)
-                                .multilineTextAlignment(.center)
-                        }
-                        .padding()
-                    case .notFound:
-                        // No seat, or a card this build doesn't know. Without
-                        // a seat there's no Forfeit, spectator bar or action
-                        // bar, so this offers its own way out.
-                        VStack(spacing: 8) {
-                            Image(systemName: "exclamationmark.triangle.fill")
-                                .font(.title)
-                                .foregroundStyle(Color.mtgGold)
-                                .accessibilityHidden(true)
-                            Text("Unable to find your player data")
-                                .font(.subheadline)
-                                .foregroundStyle(Color.mtgTextSecondary)
-                            Button {
-                                goHome()
-                            } label: {
-                                Text("Back to Home")
-                                    .font(.subheadline)
-                                    .frame(minHeight: 44)
-                                    .contentShape(Rectangle())
-                            }
-                            .foregroundStyle(Color.mtgGold)
-                        }
-                        .padding()
-                    }
-
-                    // Plane card banner — only when planechase active (and not own-deck)
-                    if viewModel.isPlanechaseActive && !viewModel.isOwnDeckMode {
-                        // Chaotic Aether indicator
-                        if viewModel.isChaoticAetherActive {
-                            ChaoticAetherIndicator()
-                        }
-
-                        if let plane = viewModel.currentPlane {
-                            PlaneCardBanner(plane: plane, secondaryPlane: viewModel.secondaryPlane)
-
-                            // Phenomenon overlay when current plane is a phenomenon.
-                            // Eliminated spectators keep the banner but not the
-                            // resolver — the server rejects their resolve anyway.
-                            if plane.isPhenomenon && viewModel.currentPlayer?.isEliminated != true {
-                                PhenomenonOverlay(plane: plane, viewModel: viewModel)
-                            }
-                        }
-                    }
-
-                    OrnateDivider()
-                        .padding(.horizontal)
-                        .padding(.vertical, 4)
-
-                    // Player list with life controls — always shown
-                    ScrollView {
-                        VStack(spacing: 0) {
-                            MtgSectionHeader(title: "Players")
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .padding(.horizontal, 16)
-                                .padding(.bottom, 8)
-
-                            VStack(spacing: 0) {
-                                ForEach(viewModel.players) { player in
-                                    GameBoardPlayerRow(
-                                        player: player,
-                                        viewModel: viewModel,
-                                        showColorPicker: player.userId == viewModel.currentUserId ? $showColorPicker : .constant(false)
-                                    ) { tappedPlayer in
-                                        inspectedPlayer = tappedPlayer
-                                    }
-                                    .padding(.horizontal, 16)
-                                    .padding(.vertical, 8)
-
-                                    if player.id != viewModel.players.last?.id {
-                                        Rectangle()
-                                            .fill(Color.mtgDivider)
-                                            .frame(height: 1)
-                                            .padding(.horizontal, 16)
-                                    }
-                                }
-                            }
-                            .mtgCardFrame()
-                            .padding(.horizontal)
-                        }
-                    }
-                    .sheet(item: $inspectedPlayer) { player in
-                        if let card = viewModel.identityCard(for: player) {
-                            IdentityCardView(card: card, player: player)
-                        }
-                    }
-
-                    // Error display
-                    if let error = viewModel.errorMessage {
-                        MtgErrorBanner(message: error)
-                            .padding(.horizontal)
-                            .padding(.vertical, 4)
-                    }
-                    if let message = viewModel.lifeChangeMessage {
-                        MtgErrorBanner(message: message)
-                            .padding(.horizontal)
-                            .padding(.vertical, 4)
-                    }
-                    if let failure = viewModel.unveilFailure {
-                        MtgErrorBanner(message: failure)
-                            .padding(.horizontal)
-                            .padding(.vertical, 4)
-                    }
-
-                    // Spectator bar for eliminated players, in every mode:
-                    // its Leave is their only way off the board.
-                    if let leave = viewModel.spectatorLeave {
-                        VStack(spacing: 8) {
-                            HStack(spacing: 8) {
-                                Image(systemName: "person.slash.fill")
-                                    .foregroundStyle(Color.mtgError)
-                                Text("You've Been Eliminated")
-                                    .font(.system(.headline, design: .serif))
-                                    .fontWeight(.bold)
-                                    .foregroundStyle(Color.mtgError)
-                            }
-
-                            Text("You're now spectating. Watch the game unfold or leave.")
-                                .font(.caption)
-                                .foregroundStyle(Color.mtgTextSecondary)
-                                .italic()
-                                .multilineTextAlignment(.center)
-
-                            Button {
-                                switch leave {
-                                case .goHome:
-                                    // Spectators go home — game-over must not reveal identities mid-game.
-                                    goHome()
-                                case .confirmFirst:
-                                    isConfirmingSpectatorLeave = true
-                                }
-                            } label: {
-                                // Every eliminated player's way home: a full-size target.
-                                Text("Leave Game")
-                                    .frame(minHeight: 44)
-                                    .contentShape(Rectangle())
-                            }
-                            .foregroundStyle(Color.mtgError)
-                            .confirmationDialog(
-                                "Leave without ending the game?",
-                                isPresented: $isConfirmingSpectatorLeave,
-                                titleVisibility: .visible
-                            ) {
-                                Button("End Game") { presentWinnerSelection() }
-                                Button("Leave Game", role: .destructive) { goHome() }
-                                Button("Stay", role: .cancel) {}
-                            } message: {
-                                Text("Only you can end this game. If you leave, it stays open for the others until you come back from Home to end it.")
-                            }
-                        }
-                        .padding()
-                        .frame(maxWidth: .infinity)
-                        .background(Color.mtgError.opacity(0.1))
-                        .overlay(
-                            Rectangle()
-                                .fill(Color.mtgError)
-                                .frame(height: 1),
-                            alignment: .top
-                        )
-                    }
-
-                    // Planar die bar — only when planechase active
-                    if viewModel.isPlanechaseActive {
-                        PlanarDieBar(viewModel: viewModel)
-                    }
-
-                    // Action bar (unveil/win) — only when treachery active
-                    if viewModel.isTreacheryActive, viewModel.seat == .playing {
-                        ActionBar(viewModel: viewModel)
-                    }
-
-                    // End Game button — the host's, in every mode but Treachery's,
-                    // eliminated or not
-                    if viewModel.canEndGame {
-                        Button {
-                            presentWinnerSelection()
-                        } label: {
-                            HStack(spacing: 8) {
-                                Image(systemName: "flag.checkered")
-                                Text("End Game")
-                                    .fontWeight(.semibold)
-                            }
-                        }
-                        .buttonStyle(MtgSecondaryButtonStyle())
-                        .padding(.horizontal)
-                        .padding(.vertical, 8)
-                    }
+                    board
                 }
             }
         }
@@ -422,6 +171,188 @@ struct GameBoardView: View {
                 )
             case .wearerOfMasks:
                 WearerOfMasksAbilitySheet(viewModel: viewModel)
+            }
+        }
+    }
+
+    // MARK: - Board
+
+    /// How much of the board the pinned controls may take before they
+    /// scroll by themselves. At the largest text sizes they would otherwise
+    /// leave no room for the players.
+    private static let pinnedControlsShare: CGFloat = 0.5
+
+    /// The identity card, the plane and the players scroll together. The
+    /// controls that act on the game stay pinned below them, so Unveil,
+    /// Roll and End Game are always within reach.
+    private var board: some View {
+        GeometryReader { proxy in
+            ScrollView {
+                VStack(spacing: 0) {
+                    GameBoardIdentityArea(
+                        viewModel: viewModel,
+                        onShowCard: { showCardDetail = true },
+                        onGoHome: { goHome() }
+                    )
+
+                    planechaseArea
+
+                    OrnateDivider()
+                        .padding(.horizontal)
+                        .padding(.vertical, 4)
+
+                    playersSection
+                }
+                .padding(.bottom, 8)
+            }
+            .scrollBounceBehavior(.basedOnSize)
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                pinnedControls(maxHeight: proxy.size.height * Self.pinnedControlsShare)
+            }
+            .sheet(item: $inspectedPlayer) { player in
+                if let card = viewModel.identityCard(for: player) {
+                    IdentityCardView(card: card, player: player)
+                }
+            }
+        }
+    }
+
+    /// The plane card banner, only when Planechase is on and the board deals
+    /// the planes (not with the players' own decks).
+    @ViewBuilder
+    private var planechaseArea: some View {
+        if viewModel.isPlanechaseActive && !viewModel.isOwnDeckMode {
+            if viewModel.isChaoticAetherActive {
+                ChaoticAetherIndicator()
+            }
+
+            if let plane = viewModel.currentPlane {
+                PlaneCardBanner(plane: plane, secondaryPlane: viewModel.secondaryPlane)
+
+                // Phenomenon overlay when current plane is a phenomenon.
+                // Eliminated spectators keep the banner but not the
+                // resolver — the server rejects their resolve anyway.
+                if plane.isPhenomenon && viewModel.currentPlayer?.isEliminated != true {
+                    PhenomenonOverlay(plane: plane, viewModel: viewModel)
+                }
+            }
+        }
+    }
+
+    /// Every player, with their life controls.
+    private var playersSection: some View {
+        VStack(spacing: 0) {
+            MtgSectionHeader(title: "Players")
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 16)
+                .padding(.bottom, 8)
+
+            VStack(spacing: 0) {
+                ForEach(viewModel.players) { player in
+                    GameBoardPlayerRow(
+                        player: player,
+                        viewModel: viewModel,
+                        showColorPicker: player.userId == viewModel.currentUserId ? $showColorPicker : .constant(false)
+                    ) { tappedPlayer in
+                        inspectedPlayer = tappedPlayer
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 8)
+
+                    if player.id != viewModel.players.last?.id {
+                        Rectangle()
+                            .fill(Color.mtgDivider)
+                            .frame(height: 1)
+                            .padding(.horizontal, 16)
+                    }
+                }
+            }
+            .mtgCardFrame()
+            .padding(.horizontal)
+        }
+    }
+
+    /// The errors, and the controls that act on the game: as tall as they
+    /// need, up to `maxHeight`, past which they scroll by themselves.
+    private func pinnedControls(maxHeight: CGFloat) -> some View {
+        ScrollView {
+            VStack(spacing: 0) {
+                errorBanners
+
+                // Spectator bar for eliminated players, in every mode:
+                // its Leave is their only way off the board.
+                if let leave = viewModel.spectatorLeave {
+                    SpectatorBar(leave: leave, onGoHome: { goHome() }, onEndGame: { presentWinnerSelection() })
+                }
+
+                // Planar die bar — only when planechase active
+                if viewModel.isPlanechaseActive {
+                    PlanarDieBar(viewModel: viewModel)
+                }
+
+                // Action bar (unveil/win) — only when treachery active
+                if viewModel.isTreacheryActive, viewModel.seat == .playing {
+                    ActionBar(viewModel: viewModel)
+                }
+
+                // End Game button — the host's, in every mode but Treachery's,
+                // eliminated or not
+                if viewModel.canEndGame {
+                    Button {
+                        presentWinnerSelection()
+                    } label: {
+                        HStack(spacing: 8) {
+                            Image(systemName: "flag.checkered")
+                            Text("End Game")
+                                .fontWeight(.semibold)
+                        }
+                    }
+                    .buttonStyle(MtgSecondaryButtonStyle())
+                    .padding(.horizontal)
+                    .padding(.vertical, 8)
+                }
+            }
+        }
+        .scrollBounceBehavior(.basedOnSize)
+        // Asks the scroll view for its content's height, capped.
+        .frame(maxHeight: maxHeight)
+        .fixedSize(horizontal: false, vertical: true)
+        .background { boardBackground.ignoresSafeArea(edges: .bottom) }
+        .overlay(alignment: .top) {
+            Rectangle()
+                .fill(Color.mtgDivider)
+                .frame(height: 1)
+        }
+    }
+
+    /// The last action's error, failed life changes and a failed unveil.
+    /// They wrap rather than truncate, so they stay readable at the largest
+    /// text sizes; the pinned controls scroll if they need to.
+    @ViewBuilder
+    private var errorBanners: some View {
+        if let error = viewModel.errorMessage {
+            MtgErrorBanner(message: error)
+                .padding(.horizontal)
+                .padding(.vertical, 4)
+        }
+        if let message = viewModel.lifeChangeMessage {
+            MtgErrorBanner(message: message)
+                .padding(.horizontal)
+                .padding(.vertical, 4)
+        }
+        if let failure = viewModel.unveilFailure {
+            MtgErrorBanner(message: failure)
+                .padding(.horizontal)
+                .padding(.vertical, 4)
+        }
+    }
+
+    /// Dark, tinted with the signed-in player's color.
+    private var boardBackground: some View {
+        ZStack {
+            Color.mtgBackground
+            if let hex = viewModel.currentPlayer?.playerColor {
+                Color(hex: hex).opacity(0.15)
             }
         }
     }

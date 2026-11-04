@@ -32,11 +32,15 @@ struct PhenomenonOverlay: View {
                 .fontWeight(.semibold)
                 .foregroundStyle(Color.mtgTextPrimary)
 
+            // The longest phenomena run past 500 characters, which would push
+            // the players far down the board. The plane banner above opens
+            // the whole text.
             Text(plane.oracleText)
                 .font(.subheadline)
                 .foregroundStyle(Color.mtgTextSecondary)
                 .multilineTextAlignment(.center)
                 .lineSpacing(3)
+                .lineLimit(4)
                 .padding(.horizontal)
 
             Button {
