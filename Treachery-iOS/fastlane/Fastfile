@@ -9,10 +9,10 @@ platform :ios do
 
   desc "Run unit tests"
   lane :test do
-    # ScreenshotTests sits in the same synchronized folder as the other UI tests,
-    # so it compiles into Treachery-iOSUITests automatically and the shared scheme
-    # already runs that target. It signs in for real against production Firebase,
-    # so keep it out of the ordinary test run — it belongs to :screenshots only.
+    # Every Treachery-iOSUITests class launches the app against production
+    # Firebase. The shared scheme builds that bundle but selects none of its
+    # tests (new classes stay out too), and only_testing keeps this run to the
+    # mock-based unit tests regardless. :screenshots has a scheme of its own.
     run_tests(
       project: XCODEPROJ,
       scheme: SCHEME,
@@ -20,7 +20,7 @@ platform :ios do
       code_coverage: true,
       result_bundle: true,
       output_directory: "./build/test_output",
-      skip_testing: ["Treachery-iOSUITests/ScreenshotTests"],
+      only_testing: ["Treachery-iOSTests"],
       clean: true
     )
   end
@@ -39,12 +39,17 @@ platform :ios do
     # the app check that argument at startup and point FirebaseManager /
     # FirestoreManager at seeded fixtures or the Firebase emulator instead.
     #
+    # The shared scheme selects none of the UI tests, so Cmd-U never runs them.
+    # This lane runs through its own scheme instead, which selects only
+    # ScreenshotTests and runs it without parallel-testing clones, on the
+    # simulators snapshot prepares; only_testing pins the run to that class even
+    # if the scheme's selection changes. Check that a run actually writes
+    # screenshots: xcodebuild reports success when a filter leaves zero tests.
+    #
     # Remaining config (devices, languages, output) lives in fastlane/Snapfile.
     capture_ios_screenshots(
       project: XCODEPROJ,
-      scheme: SCHEME,
-      # The UI test target also holds Treachery_iOSUITests and PerformanceTests,
-      # so restrict the capture run to the screenshot class.
+      scheme: "Treachery-iOS-Screenshots",
       only_testing: ["Treachery-iOSUITests/ScreenshotTests"]
     )
   end

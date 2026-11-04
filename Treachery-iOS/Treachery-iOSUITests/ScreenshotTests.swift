@@ -13,9 +13,11 @@
 //  argument at startup and point FirebaseManager / FirestoreManager at seeded
 //  fixtures or the Firebase emulator instead of production.
 //
-//  Because of that, `fastlane test` skips this class (skip_testing in the
-//  Fastfile). Running the scheme's tests from Xcode does not, so deselect
-//  ScreenshotTests in the test navigator when running tests locally.
+//  Because of that, the shared Treachery-iOS scheme selects no UI tests, new
+//  classes included (Cmd-U and a plain `xcodebuild test` run none of them), and
+//  `fastlane test` and `make ios-test` run only Treachery-iOSTests.
+//  `fastlane screenshots` runs this class through the Treachery-iOS-Screenshots
+//  scheme, which selects nothing else.
 //
 
 import XCTest

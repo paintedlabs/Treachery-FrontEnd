@@ -2,9 +2,9 @@
 # Docs: https://docs.fastlane.tools/actions/snapshot/
 #
 # Run this through `fastlane screenshots`, not `fastlane snapshot` directly.
-# The project, scheme and test-class filter are passed by that lane so they
-# track the XCODEPROJ/SCHEME constants the other lanes use, and the lane carries
-# the warning about these tests hitting production Firebase.
+# The project, the screenshot scheme and the test-class filter are passed by
+# that lane, which also carries the warning about these tests hitting
+# production Firebase.
 
 # Devices to capture (App Store requires specific display sizes). The app is
 # iPhone-only (TARGETED_DEVICE_FAMILY = 1), so App Store Connect needs no iPad
