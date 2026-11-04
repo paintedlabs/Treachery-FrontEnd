@@ -231,7 +231,7 @@ struct GameBoardView: View {
                                 .italic()
                                 .multilineTextAlignment(.center)
 
-                            Button("Leave Game") {
+                            Button {
                                 switch leave {
                                 case .goHome:
                                     // Spectators go home — game-over must not reveal identities mid-game.
@@ -239,9 +239,13 @@ struct GameBoardView: View {
                                 case .confirmFirst:
                                     isConfirmingSpectatorLeave = true
                                 }
+                            } label: {
+                                // Every eliminated player's way home: a full-size target.
+                                Text("Leave Game")
+                                    .frame(minHeight: 44)
+                                    .contentShape(Rectangle())
                             }
                             .foregroundStyle(Color.mtgError)
-                            .padding(.top, 4)
                             .confirmationDialog(
                                 "Leave without ending the game?",
                                 isPresented: $isConfirmingSpectatorLeave,
@@ -341,6 +345,15 @@ struct GameBoardView: View {
             // the banner is away from the rows: read it out.
             guard let failure else { return }
             AccessibilityNotification.Announcement(failure.message).post()
+        }
+        .onChange(of: viewModel.seat) { oldSeat, newSeat in
+            // Elimination changes the board with no other sign: the life
+            // buttons stop working, and the spectator bar, now the way
+            // home, appears at the bottom.
+            guard oldSeat == .playing, newSeat == .spectating else { return }
+            AccessibilityNotification.Announcement(
+                "You've been eliminated. You can keep watching, or use Leave Game at the bottom of the screen."
+            ).post()
         }
         .onChange(of: viewModel.unveilProgress) { _, progress in
             switch progress {
