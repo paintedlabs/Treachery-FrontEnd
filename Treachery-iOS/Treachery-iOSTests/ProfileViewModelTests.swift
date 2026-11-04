@@ -3,7 +3,7 @@ import Foundation
 @testable import Treachery_iOS
 
 @MainActor
-@Suite("Profile rename and stats")
+@Suite("Profile rename and stats", .timeLimit(.minutes(1)))
 struct ProfileViewModelTests {
 
     private let firestore = MockFirestoreManager()

@@ -3,7 +3,7 @@ import Foundation
 @testable import Treachery_iOS
 
 @MainActor
-@Suite("Friends list")
+@Suite("Friends list", .timeLimit(.minutes(1)))
 struct FriendsListViewModelTests {
 
     private let firestore = MockFirestoreManager()

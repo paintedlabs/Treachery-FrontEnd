@@ -7,8 +7,12 @@ import Foundation
 /// stays signed in: on a schedule, at once when the app becomes active or
 /// the user taps Try Again, and never two attempts at a time. Once it's
 /// finished, Profile and Friends load the profile again.
+///
+/// The tests wait on the setup: for it to sleep, or for an attempt to end.
+/// Should a change stop either, the time limit fails the test, and the waits
+/// end when it does rather than keep the run going.
 @MainActor
-@Suite("Postponed profile setup")
+@Suite("Postponed profile setup", .timeLimit(.minutes(1)))
 struct AuthViewModelProfileSetupTests {
 
     private let auth = MockAuthManaging()
@@ -44,12 +48,12 @@ struct AuthViewModelProfileSetupTests {
         let delays: [Duration] = [.seconds(5), .seconds(30), .seconds(120), .seconds(300), .seconds(300)]
         var elapsed: Duration = .zero
         for delay in delays {
-            await clock.waitForSleepers()
+            await clock.waitForSleepersUnlessCancelled()
             elapsed += delay
             #expect(clock.pendingDeadlines == [elapsed])
             clock.advance(by: delay)
         }
-        await clock.waitForSleepers()
+        await clock.waitForSleepersUnlessCancelled()
 
         // The first attempt and five retries, each postponed again.
         #expect(auth.reloadAccountCalls.count == 6)
@@ -60,7 +64,7 @@ struct AuthViewModelProfileSetupTests {
 
     @Test func signingOutStopsTheRetries() async {
         viewModel.authStateDidChange(to: account())
-        await clock.waitForSleepers()
+        await clock.waitForSleepersUnlessCancelled()
 
         viewModel.authStateDidChange(to: nil)
 
@@ -73,16 +77,16 @@ struct AuthViewModelProfileSetupTests {
 
     @Test func anotherAccountSigningInStopsTheFirstOnesRetries() async {
         viewModel.authStateDidChange(to: account("u1"))
-        await clock.waitForSleepers()
+        await clock.waitForSleepersUnlessCancelled()
         clock.advance(by: .seconds(2))
 
         viewModel.authStateDidChange(to: account("u2"))
-        await clock.waitForSleepers()
+        await clock.waitForSleepersUnlessCancelled()
 
         // Only u2's first retry is pending, 5 seconds after it signed in.
         #expect(clock.pendingDeadlines == [.seconds(7)])
         clock.advance(by: .seconds(5))
-        await clock.waitForSleepers()
+        await clock.waitForSleepersUnlessCancelled()
         #expect(auth.reloadAccountCalls == ["u1", "u2", "u2"])
     }
 
@@ -133,7 +137,7 @@ struct AuthViewModelProfileSetupTests {
 
     @Test func aPendingRetryDoesNotRunWhileTheAccountIsBeingDeleted() async {
         viewModel.authStateDidChange(to: account())
-        await clock.waitForSleepers()
+        await clock.waitForSleepersUnlessCancelled()
         // Online again: a retry now would create the profile.
         auth.accountStatus = .exists
 
@@ -160,7 +164,7 @@ struct AuthViewModelProfileSetupTests {
 
     @Test func becomingActiveWhileTheAccountIsBeingDeletedRetriesNothing() async {
         viewModel.authStateDidChange(to: account())
-        await clock.waitForSleepers()
+        await clock.waitForSleepersUnlessCancelled()
         auth.accountStatus = .exists
         viewModel.accountDeletionWillStart()
 
@@ -179,7 +183,7 @@ struct AuthViewModelProfileSetupTests {
     /// above), and the name prompt can't open over the deletion.
     @Test func theDeletionStopsAnAttemptThatIsRunning() async {
         viewModel.authStateDidChange(to: account())
-        await clock.waitForSleepers()
+        await clock.waitForSleepersUnlessCancelled()
         auth.accountStatus = .exists
         var attemptStopped: Bool?
         auth.whileReloadingAccount = { [viewModel] in
@@ -200,12 +204,12 @@ struct AuthViewModelProfileSetupTests {
     /// that was pending runs: at once, then on the usual schedule.
     @Test func aFailedDeletionResumesThePendingRetry() async {
         viewModel.authStateDidChange(to: account())
-        await clock.waitForSleepers()
+        await clock.waitForSleepersUnlessCancelled()
         clock.advance(by: .seconds(2))
         viewModel.accountDeletionWillStart()
 
         viewModel.accountDeletionDidFail()
-        await clock.waitForSleepers()
+        await clock.waitForSleepersUnlessCancelled()
 
         #expect(viewModel.profileSetupState == .pending)
         #expect(auth.reloadAccountCalls == ["u1", "u1"])
@@ -215,7 +219,7 @@ struct AuthViewModelProfileSetupTests {
 
     @Test func aDeletionFailingAfterTheSessionEndedResumesNothing() async {
         viewModel.authStateDidChange(to: account())
-        await clock.waitForSleepers()
+        await clock.waitForSleepersUnlessCancelled()
         viewModel.accountDeletionWillStart()
         viewModel.authStateDidChange(to: nil)
 
@@ -231,10 +235,10 @@ struct AuthViewModelProfileSetupTests {
 
     @Test func becomingActiveRetriesAtOnce() async {
         viewModel.authStateDidChange(to: account())
-        await clock.waitForSleepers()
+        await clock.waitForSleepersUnlessCancelled()
 
         viewModel.retryPostponedProfileSetup()
-        await clock.waitForSleepers()
+        await clock.waitForSleepersUnlessCancelled()
 
         // Retried without waiting the 5 seconds; the next retry follows the
         // schedule from there.
@@ -244,14 +248,14 @@ struct AuthViewModelProfileSetupTests {
 
     @Test func becomingActiveWhileARetryRunsStartsNoOtherRun() async {
         viewModel.authStateDidChange(to: account())
-        await clock.waitForSleepers()
+        await clock.waitForSleepersUnlessCancelled()
         auth.whileReloadingAccount = { [viewModel] in
             // The app becomes active while the 5-second retry is running.
             viewModel.retryPostponedProfileSetup()
         }
 
         clock.advance(by: .seconds(5))
-        await clock.waitForSleepers()
+        await clock.waitForSleepersUnlessCancelled()
 
         // That retry ran alone, and the next one is due 30 seconds after it,
         // as if the app hadn't become active.
@@ -263,7 +267,7 @@ struct AuthViewModelProfileSetupTests {
 
     @Test func tryAgainSetsUpAPostponedProfileAtOnce() async throws {
         viewModel.authStateDidChange(to: account())
-        await clock.waitForSleepers()
+        await clock.waitForSleepersUnlessCancelled()
         // Back online.
         auth.accountStatus = .exists
 
@@ -286,7 +290,7 @@ struct AuthViewModelProfileSetupTests {
     /// attempt ends. The attempt goes on.
     @Test func aCancelledTryAgainStopsWaitingAtOnce() async {
         viewModel.authStateDidChange(to: account())
-        await clock.waitForSleepers()
+        await clock.waitForSleepersUnlessCancelled()
         var stoppedWaitingMidAttempt = false
         auth.whileReloadingAccount = { [viewModel] in
             // Mid-attempt, a Try Again is cancelled. Were it to wait for the
@@ -298,7 +302,7 @@ struct AuthViewModelProfileSetupTests {
         }
 
         viewModel.retryPostponedProfileSetup()
-        await clock.waitForSleepers()
+        await clock.waitForSleepersUnlessCancelled()
 
         #expect(stoppedWaitingMidAttempt)
         // The attempt went on, postponed again, so the next retry is due
@@ -314,7 +318,7 @@ struct AuthViewModelProfileSetupTests {
     /// screen never reappeared.
     @Test func tryAgainOnProfileSetsUpThePostponedProfileThenShowsTheChosenName() async throws {
         viewModel.authStateDidChange(to: account())
-        await clock.waitForSleepers()
+        await clock.waitForSleepersUnlessCancelled()
         let profileScreen = ProfileViewModel(
             session: SessionEndingSpy(),
             retryProfileSetup: { [viewModel, firestore] in
@@ -361,7 +365,7 @@ struct AuthViewModelProfileSetupTests {
         firestore.userDocumentsToReturn["u1"] = .incomplete(missingFields: [.createdAt])
         firestore.userDocumentError = NSError(domain: "FIRFirestoreErrorDomain", code: 14)
         viewModel.authStateDidChange(to: account())
-        await clock.waitForSleepers()
+        await clock.waitForSleepersUnlessCancelled()
         let profileScreen = ProfileViewModel(
             session: SessionEndingSpy(),
             retryProfileSetup: {},
@@ -399,5 +403,22 @@ struct AuthViewModelProfileSetupTests {
         #expect(profileScreen.profile.phase == .loaded)
         #expect(profileScreen.user?.displayName == "Ada")
         #expect(friendsScreen.overview.phase == .loaded)
+    }
+}
+
+private extension TestClock {
+    /// Waits as `waitForSleepers()` does, but stops waiting once the test is
+    /// cancelled. Swift Testing cancels a test that runs past its time limit,
+    /// and where that's all the runner does, the clock's own wait, which
+    /// ignores cancellation, would keep the run waiting after the test
+    /// failed. (Xcode 27 also ends such a test itself.)
+    func waitForSleepersUnlessCancelled() async {
+        let (asleep, wake) = AsyncStream<Void>.makeStream()
+        Task {
+            await waitForSleepers()
+            wake.finish()
+        }
+        // Ends once a sleeper is waiting, or as soon as the test is cancelled.
+        for await _ in asleep {}
     }
 }
