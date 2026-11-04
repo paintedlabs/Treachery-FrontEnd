@@ -12,6 +12,8 @@ function AuthRedirect({ children }: { children: React.ReactNode }) {
   const router = useRouter();
 
   useEffect(() => {
+    // Public pages (the privacy policy) open signed in or out, and never redirect.
+    if (segments[0] === '(public)') return;
     if (authState === 'loading') return;
 
     const inAuthGroup = segments[0] === '(auth)';
