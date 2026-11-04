@@ -71,9 +71,6 @@
 const { initializeApp, applicationDefault } = require("firebase-admin/app");
 const { getFirestore, FieldPath } = require("firebase-admin/firestore");
 
-// What a name with nothing before its "@" becomes (the prompt's default too).
-const FALLBACK_NAME = "Player";
-
 // A whole email address: no whitespace, exactly one "@" with something
 // before it, and a domain with a dot inside it. Old iOS and Android builds
 // set the account's Auth email itself as the name, so this is all the
@@ -193,8 +190,9 @@ function isOtherNameWithAt(name) {
  */
 function resetName(name) {
   if (!isEmailAddress(name)) return null;
-  const localPart = name.slice(0, name.indexOf("@")).trim();
-  if (localPart === "") return FALLBACK_NAME;
+  // Never empty and never padded: EMAIL_ADDRESS requires something before
+  // the "@", with no whitespace in it.
+  const localPart = name.slice(0, name.indexOf("@"));
   const [first, ...rest] = Array.from(localPart);
   return first.toUpperCase() + rest.join("");
 }
