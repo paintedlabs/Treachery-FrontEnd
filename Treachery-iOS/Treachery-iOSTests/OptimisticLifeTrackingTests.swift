@@ -330,6 +330,26 @@ struct OptimisticLifeTrackingTests {
     }
 
     @Test(.timeLimit(.minutes(1)))
+    func aFailureAfterTheEchoDoesNotAskForTheChangeAgain() async throws {
+        // The server applied the -3 and this device saw it, but the response
+        // was lost: making the change again would take Player 0 to 34.
+        let board = LifeBoard()
+        let gate = board.holdCalls()
+        board.functions.adjustLifeErrors = [NSError(domain: "test", code: 1)]
+        board.vm.adjustLife(for: "p0", by: -3)
+        await board.endDebounces()
+        let send = try board.send()
+        await gate.waitForCall(from: send)
+        board.snapshot([37, 40, 40])
+
+        gate.release()
+        await send.value
+
+        #expect(board.shown() == 37)
+        #expect(board.vm.lifeChangeFailure?.message == "Couldn't confirm Player 0's life change. Check the total before changing it again.")
+    }
+
+    @Test(.timeLimit(.minutes(1)))
     func aFailureStaysExplainedUntilThatPlayerIsChangedAgain() async {
         let board = LifeBoard()
         board.functions.adjustLifeErrors = [NSError(domain: "test", code: 1)]

@@ -553,7 +553,7 @@ extension GameBoardViewModel {
                 do {
                     _ = try await cloudFunctions.adjustLife(gameId: gameId, playerId: playerId, amount: amount)
                 } catch {
-                    self?.reportLifeChangeFailure(for: playerId, error: error)
+                    self?.reportLifeChangeFailure(.reverted, for: playerId, error: error)
                 }
             }
         }
@@ -662,19 +662,26 @@ extension GameBoardViewModel {
     /// as a change of their own.
     private func batchFailed(_ batch: LifeLedger.Batch, error: Error) {
         lifeChangeSends[batch.playerId] = nil
-        lifeLedger.recordFailure(of: batch)
+        // Never nil here: a batch can't settle before its call returns.
+        let outcome = lifeLedger.recordFailure(of: batch) ?? .reverted
         refreshPlayers()
-        reportLifeChangeFailure(for: batch.playerId, error: error)
+        reportLifeChangeFailure(outcome, for: batch.playerId, error: error)
         sendPendingLifeChange(for: batch.playerId)
     }
 
-    private func reportLifeChangeFailure(for playerId: String, error: Error) {
+    private func reportLifeChangeFailure(_ outcome: LifeLedger.FailureOutcome, for playerId: String, error: Error) {
         logger.error("adjustLife failed: \(String(describing: error), privacy: .public)")
         let name = serverPlayers.first { $0.id == playerId }?.displayName ?? "the player"
-        lifeChangeFailure = LifeChangeFailure(
-            playerId: playerId,
-            message: "Couldn't update \(name)'s life. Check your connection and try again."
-        )
+        let message: String
+        switch outcome {
+        case .reverted:
+            message = "Couldn't update \(name)'s life. Check your connection and try again."
+        case .unconfirmed:
+            // The total shown most likely includes the change already, and
+            // "try again" would make it twice.
+            message = "Couldn't confirm \(name)'s life change. Check the total before changing it again."
+        }
+        lifeChangeFailure = LifeChangeFailure(playerId: playerId, message: message)
     }
 }
 

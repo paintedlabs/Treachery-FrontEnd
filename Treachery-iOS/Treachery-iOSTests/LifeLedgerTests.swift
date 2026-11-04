@@ -163,12 +163,28 @@ struct LifeLedgerTests {
         let batch = try beginBatch(in: &ledger)
         ledger.record(-1, for: "p0")
 
-        ledger.recordFailure(of: batch)
+        let outcome = ledger.recordFailure(of: batch)
 
+        #expect(outcome == .reverted)
         #expect(shown(ledger, on: server(40)) == 39)
         // The later tap goes out on its own; the failed -3 never does.
         let next = try beginBatch(in: &ledger)
         #expect(next.amount == -1)
+    }
+
+    @Test func aFailureAfterTheEchoKeepsTheServerTotal() throws {
+        // The server applied the -3 and the snapshot showed it, but the
+        // response was lost.
+        var ledger = LifeLedger()
+        ledger.record(-3, for: "p0")
+        let batch = try beginBatch(in: &ledger)
+        let echo = server(37)
+        ledger.reconcile(with: echo)
+
+        let outcome = ledger.recordFailure(of: batch)
+
+        #expect(outcome == .unconfirmed)
+        #expect(shown(ledger, on: echo) == 37)
     }
 
     // MARK: - One batch at a time
@@ -202,8 +218,9 @@ struct LifeLedgerTests {
         let second = try beginBatch(in: &ledger, serverLife: 39)
         #expect(second != first)
 
-        ledger.recordFailure(of: first)
+        let outcome = ledger.recordFailure(of: first)
 
+        #expect(outcome == nil)
         #expect(shown(ledger, on: server(39)) == 38)
     }
 

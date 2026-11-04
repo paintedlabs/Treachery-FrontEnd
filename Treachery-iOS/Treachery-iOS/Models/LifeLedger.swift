@@ -37,6 +37,18 @@ struct LifeLedger {
         fileprivate let number: Int
     }
 
+    /// What the board shows after a batch's call fails.
+    enum FailureOutcome: Equatable {
+        /// The batch is off the board, which shows the server's total again.
+        case reverted
+        /// A snapshot had already moved the player's life off the baseline,
+        /// so the board was showing the server's total without the batch on
+        /// top, and still does. Usually the server applied the batch and
+        /// only its response failed, but the move may have been another
+        /// device's change, or the late echo of an earlier batch.
+        case unconfirmed
+    }
+
     private var entries: [String: Entry] = [:]
     private var batchCount = 0
 
@@ -130,9 +142,14 @@ struct LifeLedger {
     /// back to the server's total. It isn't queued again: adjustLife adds
     /// whatever it's given, and a call that failed after the server applied
     /// it (the response lost on the way back) would be applied twice.
-    mutating func recordFailure(of batch: Batch) {
-        guard inFlight(of: batch) != nil else { return }
+    ///
+    /// - Returns: What the board shows now, or nil if `batch` had already
+    ///   settled and nothing changed.
+    @discardableResult
+    mutating func recordFailure(of batch: Batch) -> FailureOutcome? {
+        guard let inFlight = inFlight(of: batch) else { return nil }
         settle(batch)
+        return inFlight.progress == .reflected ? .unconfirmed : .reverted
     }
 
     // MARK: - Snapshots
