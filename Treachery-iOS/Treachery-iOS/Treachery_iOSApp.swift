@@ -6,8 +6,8 @@
 //
 
 import SwiftUI
-import FirebaseCore
 import FirebaseAuth
+import FirebaseFirestore
 import FirebaseMessaging
 
 @main
@@ -26,22 +26,36 @@ struct Treachery_iOSApp: App {
 
 // MARK: - AppDelegate
 class AppDelegate: NSObject, UIApplicationDelegate, MessagingDelegate, UNUserNotificationCenterDelegate {
+    /// Keeps this device's FCM token registered to whoever is signed in. Created once
+    /// Firebase is configured, and kept for the app's lifetime.
+    private var pushNotificationRegistrar: PushNotificationRegistrar?
+
     func application(
         _ application: UIApplication,
         didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
     ) -> Bool {
-        FirebaseApp.configure()
+        let processInfo = ProcessInfo.processInfo
+        FirebaseBackend.forLaunch(arguments: processInfo.arguments, environment: processInfo.environment)
+            .configure()
 
         #if targetEnvironment(simulator)
         Auth.auth().settings?.isAppVerificationDisabledForTesting = true
         #endif
 
-        // Push notification setup
+        // Push notification setup. Permission is asked for after sign-in, by the registrar.
         UNUserNotificationCenter.current().delegate = self
+        let registrar = PushNotificationRegistrar(
+            signedInUser: AuthStateUserObserver(authManager: FirebaseManager()),
+            profiles: FirestoreUserProfileObserver(firestore: Firestore.firestore()),
+            tokens: MessagingTokenProvider(messaging: Messaging.messaging()),
+            cloudFunctions: CloudFunctions(),
+            notificationAuthorization: UserNotificationAuthorization(center: UNUserNotificationCenter.current()),
+            notificationCenter: .default,
+            defaults: .standard
+        )
+        registrar.start()
+        pushNotificationRegistrar = registrar
         Messaging.messaging().delegate = self
-
-        // Request notification permission
-        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .badge, .sound]) { _, _ in }
 
         // Register for remote notifications (required for phone auth + FCM)
         application.registerForRemoteNotifications()
@@ -80,30 +94,13 @@ class AppDelegate: NSObject, UIApplicationDelegate, MessagingDelegate, UNUserNot
 
     // MARK: - reCAPTCHA Fallback URL Handling
 
-    func application(
-        _ app: UIApplication,
-        open url: URL,
-        options: [UIApplication.OpenURLOptionsKey: Any] = [:]
-    ) -> Bool {
-        if Auth.auth().canHandle(url) {
-            return true
-        }
-        return false
-    }
+    // No app delegate `open url` handler: with the scene manifest, UIKit delivers opened
+    // URLs to the scene, where FirebaseAuth's own scene-delegate hook handles them.
 
     // MARK: - FCM Token
 
     func messaging(_ messaging: Messaging, didReceiveRegistrationToken fcmToken: String?) {
-        guard let token = fcmToken else { return }
-        // Register token with server when user is authenticated
-        guard Auth.auth().currentUser != nil else { return }
-        Task {
-            do {
-                try await CloudFunctions().registerFcmToken(token)
-            } catch {
-                print("Failed to register FCM token: \(error)")
-            }
-        }
+        pushNotificationRegistrar?.registrationTokenDidChange(fcmToken)
     }
 
     // MARK: - Foreground Notification Display

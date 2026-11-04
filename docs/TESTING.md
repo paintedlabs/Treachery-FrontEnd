@@ -80,6 +80,105 @@ Native browser dialogs (`window.confirm`) are auto-accepted in playground
 windows — Playwright silently *cancels* them otherwise, which reads as
 buttons doing nothing.
 
+## iOS app against local emulators
+
+Debug builds of the iOS app can run against the same local emulators as the
+web playtest instead of the shared production project. Launch the app with
+`-useEmulators` and it:
+
+- configures Firebase with fake options for project `demo-test` instead of
+  `GoogleService-Info.plist`, so anything not pointed at an emulator fails
+  rather than reaching production;
+- points Auth at `localhost:9099`, Firestore at `localhost:8087` (no SSL,
+  in-memory cache) and Functions at `localhost:5001`, the ports in the
+  repo-root `firebase.json`;
+- turns off Analytics, Crashlytics and FCM auto-init. Those switches persist,
+  so the next launch without the argument turns them back on, in any build
+  (including a TestFlight or App Store build installed over a Debug one).
+
+Emulator sign-ins live in their own keychain item, so they don't touch your
+real session. Release builds don't contain this code. The hosted unit tests
+always run this way: the app sees the XCTest host and never configures
+production (`thisTestHostIsKeptOffProduction` checks what was configured).
+
+One unit test needs a signed test host, so CI skips it; see
+[iOS real-keychain test](#ios-real-keychain-test) below.
+
+**1. Start the emulators** the way the web playtest does (Java 21+, see the
+top of this doc), from `Treachery/`:
+
+```bash
+npx --no-install firebase emulators:start --project=demo-test \
+  --only auth,firestore,functions --config=../firebase.json
+```
+
+Or run `npm run playtest`: while the Playwright Inspector is paused, the
+emulators are up and the browser windows are already in a game.
+
+**2. Launch the app with the argument.** In Xcode, Product > Scheme > Edit
+Scheme > Run > Arguments, add `-useEmulators` under Arguments Passed On Launch,
+and untick it when you want production again. From the command line, with
+the app installed on a booted simulator:
+
+```bash
+xcrun simctl launch <simulator-udid> com.Solomon.Treachery-iOS -useEmulators
+```
+
+The console logs "Using the local Firebase emulators for project demo-test".
+
+**3. Play across clients.** The web app in emulator mode
+(`EXPO_PUBLIC_USE_EMULATOR=true npm run web`, or the playtest windows) uses
+the same `demo-test` project, so iOS and web can create and join the same
+games by code.
+
+Limits: push notifications don't work (FCM isn't emulated). Phone sign-in
+uses the Auth emulator's fake codes, which it prints in its log; the
+simulator skips app verification, so no reCAPTCHA page opens. A physical
+device can't reach your Mac's `localhost`, so use a simulator. Use a build
+Xcode signed (any normal Run): a `CODE_SIGNING_ALLOWED=NO` build, like CI's,
+has no keychain access, so Firebase Auth can't keep anyone signed in.
+
+## iOS real-keychain test
+
+`FirebaseAuthKeychainMigrationTests/movedItemIsFoundByFirebaseAuthsOwnQuery`
+is the only test that moves a signed-in session through the real keychain
+and reads it back with FirebaseAuth's own query. The other migration tests
+use an in-memory keychain, so they can't catch a SecItem query that matches
+too much. The test needs a host app with an application identifier, which an
+unsigned build doesn't have, so it skips itself there. CI (`ci-ios.yml`) and
+any other `CODE_SIGNING_ALLOWED=NO` build report it as skipped.
+
+**Run it by hand once on every release candidate**, on a simulator with an
+ad hoc signed host. That needs no Apple account, certificate or provisioning
+profile. From `Treachery-iOS/`:
+
+```bash
+UDID=<simulator-udid>   # from: xcrun simctl list devices available
+DD="$TMPDIR/treachery-keychain-test"
+
+xcodebuild build-for-testing \
+  -project Treachery-iOS.xcodeproj -scheme Treachery-iOS \
+  -destination "platform=iOS Simulator,id=$UDID" \
+  -derivedDataPath "$DD" \
+  CODE_SIGN_IDENTITY=-
+
+xcodebuild test-without-building \
+  -project Treachery-iOS.xcodeproj -scheme Treachery-iOS \
+  -destination "platform=iOS Simulator,id=$UDID" \
+  -derivedDataPath "$DD" \
+  -only-testing:Treachery-iOSTests/FirebaseAuthKeychainMigrationTests
+```
+
+- `CODE_SIGN_IDENTITY=-` signs the simulator build ad hoc (the build log shows
+  `Signing Identity: "Sign to Run Locally"`), which gives the host its
+  application identifier. Don't add `-allowProvisioningUpdates`: nothing here
+  needs the developer account.
+- Keep the `-only-testing` filter. The scheme's test action also runs the UI
+  tests, which use production; for the same reason, don't use Cmd-U.
+- It passed only if the output says
+  `Test case 'FirebaseAuthKeychainMigrationTests/movedItemIsFoundByFirebaseAuthsOwnQuery()' passed`.
+  `skipped` means the host wasn't signed, and the run proved nothing.
+
 ## Known flake
 
 Under heavy machine load, concurrent lobby joins can exceed even the 20s

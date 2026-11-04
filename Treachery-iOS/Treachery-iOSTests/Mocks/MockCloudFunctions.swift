@@ -88,8 +88,11 @@ final class MockCloudFunctions: CloudFunctionsProtocol {
         resolveWearerOfMasksCalls.append((gameId, chosenCardId))
     }
 
+    var registerFcmTokenCalls: [String] = []
+
     func registerFcmToken(_ token: String) async throws {
         if let error = errorToThrow { throw error }
+        registerFcmTokenCalls.append(token)
     }
 
     func rollPlanarDie(gameId: String) async throws -> String {
