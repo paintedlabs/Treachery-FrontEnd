@@ -427,8 +427,8 @@ struct LobbyViewModelActionTests {
     }
 
     @Test func nextRequestClearsTheLastFailure() async {
-        // The banner is pinned above the buttons; it mustn't outlive the
-        // problem it describes.
+        // The banner sits at the end of the scrolling content, just above
+        // the pinned buttons; it mustn't outlive the problem it describes.
         let (mockFS, mockCF) = makeMockSetup(players: makePlayers(count: 4))
         let vm = LobbyViewModel(
             gameId: "game1", isHost: true,

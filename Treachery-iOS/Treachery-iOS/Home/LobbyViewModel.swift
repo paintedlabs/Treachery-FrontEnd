@@ -56,8 +56,8 @@ final class LobbyViewModel: ObservableObject {
         case closesLobby
     }
 
-    /// A request that failed, shown with the lobby's buttons until the next
-    /// request starts.
+    /// A request that failed, shown at the end of the lobby's scrolling
+    /// content, just above its pinned buttons, until the next request starts.
     enum RequestFailure: Equatable {
         /// Leaving failed, so the player still has their seat. The lobby then
         /// also offers a way home that keeps it: Leave is otherwise the
