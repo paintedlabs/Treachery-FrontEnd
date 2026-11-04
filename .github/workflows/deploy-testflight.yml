@@ -25,11 +25,24 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Select latest Xcode
+      # Newest Xcode without "beta" in its name: App Store Connect rejects
+      # binaries built with a beta Xcode or SDK, and runner images can carry
+      # betas that would otherwise sort last. Only real app bundles count: the
+      # images also add version-only symlinks (Xcode_26.0.app) that can point
+      # at a beta.
+      - name: Select latest stable Xcode
         run: |
-          LATEST_XCODE=$(ls -d /Applications/Xcode*.app 2>/dev/null | sort -V | tail -1)
-          echo "Using $LATEST_XCODE"
-          sudo xcode-select -s "$LATEST_XCODE/Contents/Developer"
+          XCODE=$(for app in /Applications/Xcode*.app; do
+            if [ -d "$app" ] && [ ! -L "$app" ]; then echo "$app"; fi
+          done | grep -iv beta | sort -V | tail -1 || true)
+          if [ -z "$XCODE" ]; then
+            echo "::error::No non-beta Xcode found in /Applications. Installed:"
+            ls -ld /Applications/Xcode*.app || true
+            exit 1
+          fi
+          sudo xcode-select -s "$XCODE/Contents/Developer"
+          echo "Using $XCODE"
+          xcodebuild -version
 
       - name: Set up Ruby
         uses: ruby/setup-ruby@v1
