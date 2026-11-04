@@ -392,7 +392,9 @@ private struct CapsuleButtonLabel: View {
         case destructive
     }
 
-    let title: String
+    /// A resource, not a `String`, so the callers' literals are extracted
+    /// and localized.
+    let title: LocalizedStringResource
     let style: Style
 
     var body: some View {

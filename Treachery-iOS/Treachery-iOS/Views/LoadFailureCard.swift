@@ -13,8 +13,9 @@ import SwiftUI
 /// Primary-colored text with a red icon and border: `mtgError` text on
 /// `mtgSurface` is below the 4.5:1 contrast minimum.
 struct LoadFailureCard: View {
-    /// What didn't load, such as "Couldn't Load Game History".
-    let title: String
+    /// What didn't load, such as "Couldn't Load Game History". A resource,
+    /// not a `String`, so the callers' literals are extracted and localized.
+    let title: LocalizedStringResource
     let failure: UserFacingError
     let retry: () -> Void
 
@@ -47,7 +48,10 @@ struct LoadFailureCard: View {
         // The card replaces content after a load, away from wherever
         // VoiceOver focus is, so say what happened.
         .onAppear {
-            let announcement = "\(title). \(failure.message)"
+            let announcement = String(
+                localized: "\(String(localized: title)). \(failure.message)",
+                comment: "VoiceOver announcement when a screen's content didn't load: the failure's title, then why."
+            )
             AccessibilityNotification.Announcement(announcement).post()
         }
     }
