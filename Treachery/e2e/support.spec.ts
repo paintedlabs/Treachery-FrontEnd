@@ -57,6 +57,7 @@ test.describe('Support page', () => {
     await expectSupport(page);
 
     const email = page.getByRole('link', { name: CONTACT_EMAIL, exact: true });
+    await expect(email).toBeVisible();
     await expect(email).toHaveAttribute('href', `mailto:${CONTACT_EMAIL}`);
 
     const policy = page.getByRole('link', { name: 'Privacy Policy', exact: true });
