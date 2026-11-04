@@ -291,6 +291,12 @@ struct GameBoardView: View {
             // Taps still waiting out their debounce would go with the board.
             viewModel.sendPendingLifeChanges()
         }
+        .onChange(of: viewModel.lifeChangeFailure) { _, failure in
+            // A failed change can put a total back with no other sign, and
+            // the banner is away from the rows: read it out.
+            guard let failure else { return }
+            AccessibilityNotification.Announcement(failure.message).post()
+        }
         .onChange(of: viewModel.isGameFinished) { _, finished in
             if finished {
                 navigationPath.append(AppDestination.gameOver(gameId: viewModel.gameId))
