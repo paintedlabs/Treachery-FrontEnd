@@ -68,13 +68,21 @@ pipelines only bump the build number, so the version is yours to manage:
 
    The merge changes `Treachery-iOS/**`, so it also starts a TestFlight run
    (**Deploy to TestFlight** in the Actions tab). Publish only once that run
-   has finished, successfully or not, and no other TestFlight run is in
-   progress or queued. Before building, each lane looks up the newest upload
-   in App Store Connect and numbers its build one higher. The two workflows
-   have different concurrency groups, so neither waits for the other: a
-   TestFlight run and an App Store run that overlap can pick the same number.
-   App Store Connect then rejects the second upload of that version and build
-   number, so that run fails after a full build.
+   has succeeded and no other TestFlight run is in progress or queued. If it
+   failed, fix the cause first: a failure there (signing, the App Store
+   Connect key, a rejected version) would almost certainly fail the App Store
+   run too, after web and Play have already deployed. Until the App Store run
+   has uploaded its build, don't merge anything under `Treachery-iOS/`.
+
+   Why: before building, each lane looks up the newest upload in App Store
+   Connect and numbers its build one higher. The two workflows have different
+   concurrency groups, so neither waits for the other: a TestFlight run and an
+   App Store run that overlap can pick the same number. App Store Connect then
+   rejects the second upload of that version and build number, so that run
+   fails after a full build. If that happens to the App Store run, don't
+   publish the release again: run the App Store workflow by hand on the
+   release's tag, as in step 4 of
+   [When the App Store run stops on the version check](#when-the-app-store-run-stops-on-the-version-check).
 2. **Right after Apple approves a release**, bump `MARKETING_VERSION` again
    (e.g. `1.3.0` → `1.3.1`) in a PR. App Store Connect rejects uploads whose
    version is not higher than the last approved one, so every TestFlight
