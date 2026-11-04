@@ -66,7 +66,9 @@ final class GameBoardViewModel: ObservableObject {
     /// follow.
     @Published var currentUserId: String?
     private let firestoreManager: FirestoreManaging
-    private let cloudFunctions: CloudFunctionsProtocol
+    /// Not private: the ability resolvers in GameBoardViewModel+Abilities.swift
+    /// call it too.
+    let cloudFunctions: CloudFunctionsProtocol
     private let cardDatabase: CardLookupProviding
     private let planeDatabase: PlaneLookupProviding
     private var gameListener: ListenerCancellable?
@@ -342,60 +344,7 @@ final class GameBoardViewModel: ObservableObject {
         }
     }
 
-    // MARK: - Ability Resolution
-
-    func resolveMetamorph(targetPlayerId: String) async {
-        guard currentPlayer != nil else { return }
-        errorMessage = nil
-
-        do {
-            try await cloudFunctions.resolveMetamorph(gameId: gameId, targetPlayerId: targetPlayerId)
-            AnalyticsService.trackEvent("ability_metamorph", params: ["target": targetPlayerId])
-        } catch {
-            errorMessage = error.localizedDescription
-        }
-        pendingAbilityResolution = nil
-    }
-
-    func resolvePuppetMaster(redistributions: [String: String]) async {
-        errorMessage = nil
-
-        // Filter out unchanged assignments
-        let changes = redistributions.filter { playerId, newCardId in
-            players.first(where: { $0.id == playerId })?.identityCardId != newCardId
-        }
-
-        guard !changes.isEmpty else {
-            pendingAbilityResolution = nil
-            return
-        }
-
-        do {
-            try await cloudFunctions.resolvePuppetMaster(gameId: gameId, redistributions: changes)
-            AnalyticsService.trackEvent("ability_puppet_master", params: ["swaps": changes.count])
-        } catch {
-            errorMessage = error.localizedDescription
-        }
-        pendingAbilityResolution = nil
-    }
-
-    func resolveWearerOfMasks(chosenCardId: String?) async {
-        guard currentPlayer != nil else {
-            pendingAbilityResolution = nil
-            return
-        }
-        errorMessage = nil
-
-        do {
-            try await cloudFunctions.resolveWearerOfMasks(gameId: gameId, chosenCardId: chosenCardId)
-            if chosenCardId != nil {
-                AnalyticsService.trackEvent("ability_wearer_of_masks", params: ["chosen_card": chosenCardId ?? ""])
-            }
-        } catch {
-            errorMessage = error.localizedDescription
-        }
-        pendingAbilityResolution = nil
-    }
+    // MARK: - Ability Cards
 
     /// Callable-backed traitors the server refuses to hand out as a copy —
     /// mirrors BLOCKED_COPY_IDS in resolveWearerOfMasks (functions/index.js).

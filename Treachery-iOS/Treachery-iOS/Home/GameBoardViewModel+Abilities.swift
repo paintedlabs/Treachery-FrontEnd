@@ -7,8 +7,8 @@ import Foundation
 
 // MARK: - Traitor Abilities
 //
-// Which traitor ability the signed-in player can use, and the sheet that
-// uses it. The resolvers' calls are in GameBoardViewModel.swift.
+// Which traitor ability the signed-in player can use, the sheet that uses
+// it, and the calls that resolve it.
 
 extension GameBoardViewModel {
 
@@ -41,6 +41,61 @@ extension GameBoardViewModel {
     }
 
     func dismissAbility() {
+        pendingAbilityResolution = nil
+    }
+
+    // MARK: - Resolving
+
+    func resolveMetamorph(targetPlayerId: String) async {
+        guard currentPlayer != nil else { return }
+        errorMessage = nil
+
+        do {
+            try await cloudFunctions.resolveMetamorph(gameId: gameId, targetPlayerId: targetPlayerId)
+            AnalyticsService.trackEvent("ability_metamorph", params: ["target": targetPlayerId])
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+        pendingAbilityResolution = nil
+    }
+
+    func resolvePuppetMaster(redistributions: [String: String]) async {
+        errorMessage = nil
+
+        // Filter out unchanged assignments
+        let changes = redistributions.filter { playerId, newCardId in
+            players.first(where: { $0.id == playerId })?.identityCardId != newCardId
+        }
+
+        guard !changes.isEmpty else {
+            pendingAbilityResolution = nil
+            return
+        }
+
+        do {
+            try await cloudFunctions.resolvePuppetMaster(gameId: gameId, redistributions: changes)
+            AnalyticsService.trackEvent("ability_puppet_master", params: ["swaps": changes.count])
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+        pendingAbilityResolution = nil
+    }
+
+    func resolveWearerOfMasks(chosenCardId: String?) async {
+        guard currentPlayer != nil else {
+            pendingAbilityResolution = nil
+            return
+        }
+        errorMessage = nil
+
+        do {
+            try await cloudFunctions.resolveWearerOfMasks(gameId: gameId, chosenCardId: chosenCardId)
+            if chosenCardId != nil {
+                AnalyticsService.trackEvent("ability_wearer_of_masks", params: ["chosen_card": chosenCardId ?? ""])
+            }
+        } catch {
+            errorMessage = error.localizedDescription
+        }
         pendingAbilityResolution = nil
     }
 
