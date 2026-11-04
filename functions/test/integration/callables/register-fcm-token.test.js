@@ -6,8 +6,9 @@
  * Stores a device's FCM token on the caller's owner-only private doc. A
  * sign-in token stays valid for up to an hour after deleteAccount removes
  * its account, so the callable must not recreate a deleted user's data,
- * while a live account registers exactly as before. Users come from
- * h.createUser() because one of them is deleted.
+ * while a live account registers exactly as before. It must never create
+ * the public profile either: an empty one is unreadable to every client.
+ * Users come from h.createUser() because one of them is deleted.
  */
 
 const { describe, it, after } = require('node:test');
@@ -39,8 +40,9 @@ describe('registerFcmToken', () => {
     assert.equal(profile.display_name, 'Token Owner', 'the rest of the profile is untouched');
   });
 
-  it('registers for a signed-in account whose profile is not written yet', async () => {
-    // Sign-up can race the client's own profile write.
+  it('registers for an account with no profile without creating one', async () => {
+    // Sign-up can race the client's own profile write, and some accounts
+    // never got a profile at all.
     const user = await h.createUser('Brand New');
     await h.db.doc(`users/${user.uid}`).delete();
 
@@ -50,6 +52,28 @@ describe('registerFcmToken', () => {
     );
 
     assert.equal((await getDoc(`users/${user.uid}/private/data`)).fcm_token, 'first-token');
+    assert.equal(
+      await getDoc(`users/${user.uid}`),
+      null,
+      'no public profile may be created; the client creates it'
+    );
+  });
+
+  // Only the profile's data can be compared here: the callable runs in the
+  // Functions emulator, out of reach of a write recorder, and a write that
+  // changes nothing doesn't even move updateTime. The cases that matter,
+  // creating a missing profile and stripping a real leftover, are above.
+  it('leaves the data of a profile with no public token as it was', async () => {
+    const user = await h.createUser('Already Migrated');
+    const before = await getDoc(`users/${user.uid}`);
+
+    assert.deepEqual(
+      await user.call('registerFcmToken', { token: 'fresh-token' }),
+      { success: true }
+    );
+
+    assert.deepEqual(await getDoc(`users/${user.uid}`), before, 'no field of the profile changes');
+    assert.equal((await getDoc(`users/${user.uid}/private/data`)).fcm_token, 'fresh-token');
   });
 
   it("refuses a deleted account's still-valid token and recreates nothing", async () => {

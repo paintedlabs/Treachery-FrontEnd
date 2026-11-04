@@ -108,8 +108,10 @@ Not all individually test-encoded; from the audit report.
   non-callable writer
 - `allocateUniqueJoinCode` is check-then-use rather than transactional, and
   codes are never released — uniqueness is best-effort over 12 attempts
-- `registerFcmToken` will resurrect a deleted user doc (`set(..., {merge:true})`
-  creates the document when absent)
+- ~~`registerFcmToken` will resurrect a deleted user doc (`set(..., {merge:true})`
+  creates the document when absent)~~ — **fixed**: it refuses a deleted
+  account, and it and the notification token cleanup only `update` a profile
+  that exists and still holds `fcm_token`
 - `AuthKey_*.p8` (an APNs auth key) sits untracked in the repo root. Ignored by
   `*.p8`, so not leaked — but it is a live credential on disk
 - `GoogleService-Info.plist` is tracked despite matching `.gitignore`; left that

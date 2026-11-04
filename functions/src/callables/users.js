@@ -43,9 +43,16 @@ exports.registerFcmToken = onCall(callableOptions, async (request) => {
     throw new HttpsError("unauthenticated", "This account has been deleted.");
   }
 
-  // Store on owner-only private doc; strip any leftover public field.
+  // Store on owner-only private doc.
   await privateUserRef(uid).set({ fcm_token: token }, { merge: true });
-  await db.doc(`users/${uid}`).set({ fcm_token: FieldValue.delete() }, { merge: true });
+
+  // Strip a leftover public copy, but only from a profile that exists and
+  // still has one. An update never creates the doc: a set with merge here
+  // used to give a profile-less account an empty public profile, which no
+  // client could read or repair.
+  if (profileSnap.exists && profileSnap.get("fcm_token") !== undefined) {
+    await profileSnap.ref.update({ fcm_token: FieldValue.delete() });
+  }
 
   return { success: true };
 });
