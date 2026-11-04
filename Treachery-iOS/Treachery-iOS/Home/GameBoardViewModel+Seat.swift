@@ -24,6 +24,20 @@ extension GameBoardViewModel {
         case spectating
     }
 
+    /// What the board shows above the plane and the players.
+    enum IdentityArea: Equatable {
+        /// Nothing: only Treachery deals identities.
+        case notDealt
+        /// The signed-in player's identity card.
+        case card(IdentityCard, player: Player)
+        /// Eliminated, and a Metamorph has taken their card: resolveMetamorph
+        /// clears the card of the player it takes one from.
+        case taken
+        /// No seat, or a card this build doesn't know. It offers its own way
+        /// home, since without a seat there's no spectator bar or Forfeit.
+        case notFound
+    }
+
     /// What the spectator bar's Leave button does.
     enum SpectatorLeave: Equatable {
         /// Goes home. The game carries on without them.
@@ -36,6 +50,16 @@ extension GameBoardViewModel {
     var seat: Seat {
         guard let currentPlayer else { return .unseated }
         return currentPlayer.isEliminated ? .spectating : .playing
+    }
+
+    var identityArea: IdentityArea {
+        // In every mode, like the spectator bar: a user without a seat has
+        // no other way off the board.
+        guard let player = currentPlayer else { return .notFound }
+        guard isTreacheryActive else { return .notDealt }
+        if let card = currentIdentityCard { return .card(card, player: player) }
+        if player.isEliminated, player.identityCardId == nil { return .taken }
+        return .notFound
     }
 
     /// Only players still in the game change life totals. The server would

@@ -12,22 +12,27 @@ struct GameBoardSeatTests {
 
     /// u0 hosts unless `hostId` says otherwise. u1 is the signed-in user
     /// unless `currentUserId` says otherwise, eliminated when
-    /// `currentUserEliminated`. u2 went out earlier, and like every
-    /// eliminated player the server has marked them unveiled.
+    /// `currentUserEliminated`, and without a card when a Metamorph took it
+    /// (`currentUserCardTaken`). u2 went out earlier, and like every
+    /// eliminated player the server has marked them unveiled. In Treachery
+    /// modes player i holds "card<i>", which `cards` can make known.
     private func makeVM(
         gameMode: GameMode,
         hostId: String = "u0",
         currentUserId: String? = "u1",
         currentUserEliminated: Bool = false,
+        currentUserCardTaken: Bool = false,
+        cards: [IdentityCard] = [],
         cloudFunctions: MockCloudFunctions = MockCloudFunctions()
     ) -> GameBoardViewModel {
         let dealsRoles = gameMode.includesTreachery
         let players = (0..<4).map { i in
             let isEliminated = i == 2 || (i == 1 && currentUserEliminated)
+            let hasCard = dealsRoles && !(i == 1 && currentUserCardTaken)
             return Player(
                 id: "p\(i)", orderId: i, userId: "u\(i)", displayName: "Player \(i)",
                 role: dealsRoles ? (i == 0 ? .leader : .guardian) : nil,
-                identityCardId: dealsRoles ? "card\(i)" : nil,
+                identityCardId: hasCard ? "card\(i)" : nil,
                 lifeTotal: isEliminated ? 0 : 40,
                 isEliminated: isEliminated, isUnveiled: isEliminated, joinedAt: Date()
             )
@@ -45,7 +50,7 @@ struct GameBoardSeatTests {
             currentUserId: currentUserId,
             firestoreManager: MockFirestoreManager(),
             cloudFunctions: cloudFunctions,
-            cardDatabase: CardDatabase(cards: []),
+            cardDatabase: CardDatabase(cards: cards),
             planeDatabase: PlaneDatabase(cards: []),
             clock: TestClock()
         )
@@ -158,5 +163,49 @@ struct GameBoardSeatTests {
         let eliminated = try #require(vm.players.first { $0.id == "p2" })
         #expect(vm.canSeeRole(of: me))
         #expect(vm.canSeeRole(of: eliminated))
+    }
+
+    // MARK: - Identity area
+
+    @Test(arguments: GameMode.allCases)
+    func userWithoutASeatGetsAWayHomeInEveryMode(_ mode: GameMode) {
+        // With no seat there's no spectator bar or Forfeit. The way home
+        // that offers instead showed only in Treachery games.
+        #expect(makeVM(gameMode: mode, currentUserId: "u9").identityArea == .notFound)
+    }
+
+    @Test(arguments: [GameMode.planechase, GameMode.none])
+    func gamesWithoutTreacheryShowNoIdentity(_ mode: GameMode) {
+        #expect(makeVM(gameMode: mode).identityArea == .notDealt)
+        #expect(makeVM(gameMode: mode, currentUserEliminated: true).identityArea == .notDealt)
+    }
+
+    @Test(arguments: [GameMode.treachery, GameMode.treacheryPlanechase])
+    func treacheryShowsYourIdentityCard(_ mode: GameMode) throws {
+        let card = identityCard(id: "card1")
+        let vm = makeVM(gameMode: mode, cards: [card])
+        let me = try #require(vm.currentPlayer)
+        #expect(vm.identityArea == .card(card, player: me))
+    }
+
+    @Test func metamorphVictimIsToldTheirCardWasTaken() {
+        // They were told their player data couldn't be found.
+        let vm = makeVM(gameMode: .treachery, currentUserEliminated: true, currentUserCardTaken: true)
+        #expect(vm.identityArea == .taken)
+    }
+
+    @Test func cardThisBuildDoesNotKnowIsNotFound() {
+        // No card database entry for "card1": it offers the way home.
+        #expect(makeVM(gameMode: .treachery).identityArea == .notFound)
+    }
+
+    private func identityCard(id: String) -> IdentityCard {
+        IdentityCard(
+            id: id, cardNumber: 14, name: "Shield Bearer", role: .guardian,
+            abilityText: "Whenever the Leader is dealt damage, you may redirect 2 of that damage to yourself instead.",
+            unveilCost: "Pay 5 life", rarity: .rare, hasUndercover: false,
+            undercoverCondition: nil, timingRestriction: nil, lifeModifier: nil,
+            handSizeModifier: nil, flavorText: nil, imageAssetName: nil
+        )
     }
 }
