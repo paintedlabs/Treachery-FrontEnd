@@ -46,23 +46,23 @@ extension AdjustLifeResult {
     }
 }
 
-/// A lobby callable the server turned down for a reason it explains, as
-/// opposed to one that never got an answer. CloudFunctions throws this in
-/// place of the SDK error for these codes, so view models can act on the
-/// reason without knowing about Firebase; any other failure (offline, a
-/// timeout, an internal error) is thrown unchanged.
+/// A callable the server turned down for a reason it explains, as opposed
+/// to one that never got an answer. CloudFunctions throws this in place of
+/// the SDK error for these codes, so view models can act on the reason
+/// without knowing about Firebase; any other failure (offline, a timeout,
+/// an internal error) is thrown unchanged.
 struct CallableRefusal: Error {
     enum Reason: Equatable {
         /// The game, or the player's seat in it, doesn't exist.
         case notFound
         /// The game isn't in a state that allows the request: it has
-        /// started, it's full, and so on.
+        /// started, it's full, it's over, and so on.
         case failedPrecondition
     }
 
     let reason: Reason
-    /// The server's explanation. lobby.js writes these for players, e.g.
-    /// "This game is full."
+    /// The server's explanation. The callables write these for players,
+    /// e.g. "This game is full." or "Player is already eliminated."
     let message: String
 }
 
@@ -81,13 +81,21 @@ extension CallableRefusal {
         default:
             return nil
         }
-        // Only an answer from lobby.js explains itself. A bare HTTP status,
-        // such as a 404 for a function that isn't deployed, carries just the
-        // SDK's placeholder text and must not pass for a refusal: leave()
-        // would take a 404 like that as "already gone".
+        // Only an answer from a callable explains itself. A bare HTTP
+        // status, such as a 404 for a function that isn't deployed, carries
+        // just the SDK's placeholder text and must not pass for a refusal:
+        // leave() would take a 404 like that as "already gone".
         let message = error.localizedDescription
         guard message != sdkPlaceholder else { return nil }
         self.init(reason: reason, message: message)
+    }
+
+    /// The server's own explanation when it turned a request down because
+    /// of the game's state, such as "Game is not in progress."; nil for any
+    /// other failure, which most likely never reached the server.
+    static func explanation(of error: any Error) -> String? {
+        guard let refusal = error as? CallableRefusal, refusal.reason == .failedPrecondition else { return nil }
+        return refusal.message
     }
 }
 
@@ -132,17 +140,17 @@ struct CloudFunctions: CloudFunctionsProtocol {
     }
 
     func joinGame(gameCode: String) async throws -> JoinGameResult {
-        let result = try await callLobbyFunction("joinGame", ["gameCode": gameCode])
+        let result = try await callFunction("joinGame", ["gameCode": gameCode])
         return try JoinGameResult(payload: result.data)
     }
 
     func startGame(gameId: String) async throws {
-        _ = try await callLobbyFunction("startGame", ["gameId": gameId])
+        _ = try await callFunction("startGame", ["gameId": gameId])
     }
 
-    /// Calls a lobby callable, throwing a CallableRefusal when the server
-    /// turns the request down with a reason the lobby screens act on.
-    private func callLobbyFunction(_ name: String, _ data: [String: Any]) async throws -> HTTPSCallableResult {
+    /// Calls a callable, throwing a CallableRefusal when the server turns
+    /// the request down with a reason the screens can act on or show.
+    private func callFunction(_ name: String, _ data: [String: Any]) async throws -> HTTPSCallableResult {
         do {
             return try await functions.httpsCallable(name).call(data)
         } catch {
@@ -153,8 +161,7 @@ struct CloudFunctions: CloudFunctionsProtocol {
     /// Returns the `newLife` adjustLife answers with. A response without it
     /// still means the change was applied, so it isn't treated as a failure.
     func adjustLife(gameId: String, playerId: String, amount: Int) async throws -> Int? {
-        let callable = functions.httpsCallable("adjustLife")
-        let result = try await callable.call([
+        let result = try await callFunction("adjustLife", [
             "gameId": gameId,
             "playerId": playerId,
             "amount": amount,
@@ -173,7 +180,7 @@ struct CloudFunctions: CloudFunctionsProtocol {
     }
 
     func leaveGame(gameId: String) async throws {
-        _ = try await callLobbyFunction("leaveGame", ["gameId": gameId])
+        _ = try await callFunction("leaveGame", ["gameId": gameId])
     }
 
     // MARK: - Traitor Abilities
@@ -261,7 +268,7 @@ struct CloudFunctions: CloudFunctionsProtocol {
         if let startingLife { data["startingLife"] = startingLife }
         if let gameMode { data["gameMode"] = gameMode }
         if let maxTraitorRarity { data["maxTraitorRarity"] = maxTraitorRarity }
-        _ = try await callLobbyFunction("updateGameSettings", data)
+        _ = try await callFunction("updateGameSettings", data)
     }
 
     func acceptFriendRequest(requestId: String) async throws {

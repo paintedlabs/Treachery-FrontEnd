@@ -98,6 +98,23 @@ struct LifeLedgerTests {
         #expect(shown(ledger, on: snapshot) == 37)
     }
 
+    @Test func aPlayerShownEliminatedLosesTheirUnsentTaps() throws {
+        // The server refuses any change to an eliminated player.
+        var ledger = LifeLedger()
+        ledger.record(-3, for: "p0")
+        _ = try beginBatch(in: &ledger, serverLife: 3)
+        ledger.record(-1, for: "p0")
+        ledger.record(2, for: "p1")
+        var echo = server(0, 40)
+        echo[0].isEliminated = true
+
+        ledger.reconcile(with: echo)
+
+        #expect(ledger.playersWithPendingTaps == ["p1"])
+        #expect(shown(ledger, on: echo) == 0)
+        #expect(shown(ledger, on: echo, for: "p1") == 42)
+    }
+
     @Test func theEchoTakesTheBatchOffTheOverlay() throws {
         var ledger = LifeLedger()
         ledger.record(-3, for: "p0")

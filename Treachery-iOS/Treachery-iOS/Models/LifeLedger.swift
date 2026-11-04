@@ -158,8 +158,14 @@ struct LifeLedger {
     /// its baseline is taken to be in the server's total: the server applied
     /// it, or another device changed that life and the server's total is the
     /// one to show.
+    ///
+    /// A player the snapshot shows eliminated loses the taps not sent yet,
+    /// held ones included: the server refuses any change to them.
     mutating func reconcile(with serverPlayers: [Player]) {
         for player in serverPlayers {
+            if player.isEliminated {
+                entries[player.id]?.pending = 0
+            }
             guard var inFlight = entries[player.id]?.inFlight,
                   player.lifeTotal != inFlight.baseline else { continue }
             switch inFlight.progress {

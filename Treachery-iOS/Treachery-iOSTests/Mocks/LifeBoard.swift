@@ -12,26 +12,28 @@ struct LifeBoard {
     let clock = TestClock()
     let vm: GameBoardViewModel
 
-    init() {
-        vm = Self.makeViewModel(firestore: firestore, functions: functions, clock: clock)
+    /// Three players, at 40 unless the test says otherwise.
+    init(lifeTotals: [Int] = [40, 40, 40]) {
+        vm = Self.makeViewModel(firestore: firestore, functions: functions, clock: clock, lifeTotals: lifeTotals)
     }
 
-    /// Player i is "p<i>", named "Player i", with the i-th life total.
+    /// Player i is "p<i>", named "Player i", with the i-th life total. A
+    /// player at 0 is eliminated, as the server has it.
     static func players(_ lifeTotals: [Int]) -> [Player] {
         lifeTotals.enumerated().map { i, life in
             Player(
                 id: "p\(i)", orderId: i, userId: "u\(i)", displayName: "Player \(i)",
                 role: .guardian, identityCardId: nil, lifeTotal: life,
-                isEliminated: false, isUnveiled: false, joinedAt: Date(timeIntervalSince1970: 0)
+                isEliminated: life == 0, isUnveiled: false, joinedAt: Date(timeIntervalSince1970: 0)
             )
         }
     }
 
-    /// Three players at 40.
     static func makeViewModel(
         firestore: MockFirestoreManager = MockFirestoreManager(),
         functions: MockCloudFunctions,
-        clock: TestClock = TestClock()
+        clock: TestClock = TestClock(),
+        lifeTotals: [Int] = [40, 40, 40]
     ) -> GameBoardViewModel {
         firestore.gamesToReturn["game1"] = Game(
             id: "game1", code: "ABCD", hostId: "u0", state: .inProgress,
@@ -39,7 +41,7 @@ struct LifeBoard {
             winningTeam: nil, playerIds: ["u0", "u1", "u2"],
             createdAt: Date(timeIntervalSince1970: 0)
         )
-        firestore.playersToReturn = players([40, 40, 40])
+        firestore.playersToReturn = players(lifeTotals)
         return GameBoardViewModel(
             gameId: "game1",
             currentUserId: "u0",
@@ -54,6 +56,13 @@ struct LifeBoard {
     /// Delivers a players snapshot with these life totals.
     func snapshot(_ lifeTotals: [Int]) {
         firestore.emitPlayers(.success(Self.players(lifeTotals)), gameId: "game1")
+    }
+
+    /// Delivers a game snapshot showing the game over.
+    func finishGame() throws {
+        var game = try #require(firestore.gamesToReturn["game1"])
+        game.state = .finished
+        firestore.emitGame(.loaded(game), gameId: "game1")
     }
 
     /// The life total the board shows for the player.

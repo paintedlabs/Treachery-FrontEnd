@@ -20,8 +20,9 @@ final class GameBoardViewModel: ObservableObject {
     @Published var players: [Player] = []
     @Published var errorMessage: String?
     /// The latest life change whose call failed, shown until that player's
-    /// life is changed again here. Kept apart from `errorMessage`, which any
-    /// tap clears, so tapping someone else doesn't hide it.
+    /// life is changed again here or a snapshot shows them eliminated. Kept
+    /// apart from `errorMessage`, which any tap clears, so tapping someone
+    /// else doesn't hide it.
     @Published private(set) var lifeChangeFailure: LifeChangeFailure?
     @Published var isPending = false
     /// Unveiling has its own progress, so another action under way can't
@@ -500,7 +501,9 @@ extension GameBoardViewModel {
     ///
     /// These sends aren't tracked, since nothing will show them. Nor do they
     /// wait for a call still under way for the same player: adjustLife adds
-    /// whatever it's given, so two calls at once still add up.
+    /// whatever it's given, so two calls at once still add up. Once the game
+    /// is over, as when Game Over replaces the board, the taps are dropped:
+    /// the server refuses any change to a finished game.
     ///
     /// - Returns: The sends, for tests to await.
     @discardableResult
@@ -511,6 +514,7 @@ extension GameBoardViewModel {
         lifeChangeDebounces.removeAll()
         let pendingTaps = lifeLedger.takePendingTaps()
         refreshPlayers()
+        guard !isGameFinished else { return [] }
 
         let cloudFunctions = cloudFunctions
         let gameId = gameId
@@ -529,10 +533,18 @@ extension GameBoardViewModel {
 
     /// A players snapshot: settles the batches it shows, redraws the board,
     /// sends any taps that were waiting on a batch it settled, and settles
-    /// an unveil whose call couldn't.
+    /// an unveil whose call couldn't. A player it shows eliminated loses
+    /// their unsent taps and any failure explained for them: the server
+    /// refuses changes to them, and no tap could clear the message.
     private func receivePlayers(_ players: [Player]) {
         serverPlayers = players
         lifeLedger.reconcile(with: players)
+        for player in players where player.isEliminated {
+            lifeChangeDebounces.removeValue(forKey: player.id)?.cancel()
+            if lifeChangeFailure?.playerId == player.id {
+                lifeChangeFailure = nil
+            }
+        }
         withAnimation(.easeInOut(duration: 0.3)) {
             refreshPlayers()
         }
@@ -575,8 +587,9 @@ extension GameBoardViewModel {
     /// Sends the player's pending taps as one batch once nothing holds them
     /// back: their debounce has ended and their previous batch has settled.
     /// Each of those calls this, and the later one finds the taps pending.
+    /// Nothing goes out once the game is over; the server would refuse it.
     private func sendPendingLifeChange(for playerId: String) {
-        guard lifeChangeDebounces[playerId] == nil,
+        guard !isGameFinished, lifeChangeDebounces[playerId] == nil,
               let serverLife = serverPlayers.first(where: { $0.id == playerId })?.lifeTotal,
               let batch = lifeLedger.beginBatch(for: playerId, serverLife: serverLife) else { return }
         let cloudFunctions = cloudFunctions
@@ -641,15 +654,25 @@ extension GameBoardViewModel {
 
     private func reportLifeChangeFailure(_ outcome: LifeLedger.FailureOutcome, for playerId: String, error: Error) {
         logger.error("adjustLife failed: \(String(describing: error), privacy: .public)")
-        let name = serverPlayers.first { $0.id == playerId }?.displayName ?? "the player"
+        // Once the game is over or the player is out, the board shows that,
+        // and no tap could clear the message.
+        let player = serverPlayers.first { $0.id == playerId }
+        guard !isGameFinished, player?.isEliminated != true else { return }
+        let name = player?.displayName ?? "the player"
         let message: String
-        switch outcome {
-        case .reverted:
-            message = "Couldn't update \(name)'s life. Check your connection and try again."
-        case .unconfirmed:
-            // The total shown most likely includes the change already, and
-            // "try again" would make it twice.
-            message = "Couldn't confirm \(name)'s life change. Check the total before changing it again."
+        if let reason = CallableRefusal.explanation(of: error) {
+            // Turned down, so certainly not applied, whatever the board has
+            // shown since.
+            message = "Couldn't update \(name)'s life. \(reason)"
+        } else {
+            switch outcome {
+            case .reverted:
+                message = "Couldn't update \(name)'s life. Check your connection and try again."
+            case .unconfirmed:
+                // The total shown most likely includes the change already,
+                // and "try again" would make it twice.
+                message = "Couldn't confirm \(name)'s life change. Check the total before changing it again."
+            }
         }
         lifeChangeFailure = LifeChangeFailure(playerId: playerId, message: message)
     }
