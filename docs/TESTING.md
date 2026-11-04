@@ -101,13 +101,8 @@ real session. Release builds don't contain this code. The hosted unit tests
 always run this way: the app sees the XCTest host and never configures
 production (`thisTestHostIsKeptOffProduction` checks what was configured).
 
-One unit test needs a signed test host:
-`FirebaseAuthKeychainMigrationTests/movedItemIsFoundByFirebaseAuthsOwnQuery`
-moves an item through the real keychain. CI and the other
-`CODE_SIGNING_ALLOWED=NO` builds have no keychain access, so they skip it.
-Run it from Xcode's Test navigator with a simulator selected (Xcode signs the
-host). Don't use Cmd-U for this: the scheme's test action also runs the UI
-tests, which use production.
+One unit test needs a signed test host, so CI skips it; see
+[iOS real-keychain test](#ios-real-keychain-test) below.
 
 **1. Start the emulators** the way the web playtest does (Java 21+, see the
 top of this doc), from `Treachery/`:
@@ -142,6 +137,47 @@ simulator skips app verification, so no reCAPTCHA page opens. A physical
 device can't reach your Mac's `localhost`, so use a simulator. Use a build
 Xcode signed (any normal Run): a `CODE_SIGNING_ALLOWED=NO` build, like CI's,
 has no keychain access, so Firebase Auth can't keep anyone signed in.
+
+## iOS real-keychain test
+
+`FirebaseAuthKeychainMigrationTests/movedItemIsFoundByFirebaseAuthsOwnQuery`
+is the only test that moves a signed-in session through the real keychain
+and reads it back with FirebaseAuth's own query. The other migration tests
+use an in-memory keychain, so they can't catch a SecItem query that matches
+too much. The test needs a host app with an application identifier, which an
+unsigned build doesn't have, so it skips itself there. CI (`ci-ios.yml`) and
+any other `CODE_SIGNING_ALLOWED=NO` build report it as skipped.
+
+**Run it by hand once on every release candidate**, on a simulator with an
+ad hoc signed host. That needs no Apple account, certificate or provisioning
+profile. From `Treachery-iOS/`:
+
+```bash
+UDID=<simulator-udid>   # from: xcrun simctl list devices available
+DD="$TMPDIR/treachery-keychain-test"
+
+xcodebuild build-for-testing \
+  -project Treachery-iOS.xcodeproj -scheme Treachery-iOS \
+  -destination "platform=iOS Simulator,id=$UDID" \
+  -derivedDataPath "$DD" \
+  CODE_SIGN_IDENTITY=-
+
+xcodebuild test-without-building \
+  -project Treachery-iOS.xcodeproj -scheme Treachery-iOS \
+  -destination "platform=iOS Simulator,id=$UDID" \
+  -derivedDataPath "$DD" \
+  -only-testing:Treachery-iOSTests/FirebaseAuthKeychainMigrationTests
+```
+
+- `CODE_SIGN_IDENTITY=-` signs the simulator build ad hoc (the build log shows
+  `Signing Identity: "Sign to Run Locally"`), which gives the host its
+  application identifier. Don't add `-allowProvisioningUpdates`: nothing here
+  needs the developer account.
+- Keep the `-only-testing` filter. The scheme's test action also runs the UI
+  tests, which use production; for the same reason, don't use Cmd-U.
+- It passed only if the output says
+  `Test case 'FirebaseAuthKeychainMigrationTests/movedItemIsFoundByFirebaseAuthsOwnQuery()' passed`.
+  `skipped` means the host wasn't signed, and the run proved nothing.
 
 ## Known flake
 

@@ -178,8 +178,9 @@ final class FirebaseAuthKeychainMigrationTests {
     /// through the real keychain, and reads it back with FirebaseAuth's exact query.
     /// Uses unique test-only services and accounts, removed afterwards.
     ///
-    /// Runs only in a signed test host, such as Xcode's own test runs. The gate script and
-    /// CI build the host with CODE_SIGNING_ALLOWED=NO, so it is skipped there.
+    /// Runs only in a signed test host. CI builds the host with CODE_SIGNING_ALLOWED=NO, so
+    /// it is skipped there; docs/TESTING.md ("iOS real-keychain test") shows how to run it
+    /// with an ad hoc signed simulator host, which a person does once per release candidate.
     @Test(.enabled(if: TestHostKeychain.isAvailable, "the test host has no keychain entitlement (built with CODE_SIGNING_ALLOWED=NO, as in CI)"))
     func movedItemIsFoundByFirebaseAuthsOwnQuery() throws {
         let id = UUID().uuidString
