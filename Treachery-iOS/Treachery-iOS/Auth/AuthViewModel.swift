@@ -66,8 +66,8 @@ final class AuthViewModel: ObservableObject {
     /// Cancelling it retries at once.
     private var profileSetupRetryWait: Task<Void, Never>?
     /// Callers of `retryProfileSetup()`, waiting for the attempt that's
-    /// running or about to start to end.
-    private var profileSetupWaiters: [CheckedContinuation<Void, Never>] = []
+    /// running or about to start to end. Finishing one ends that wait.
+    private var profileSetupWaiters: [AsyncStream<Void>.Continuation] = []
 
     private static let logger = Logger(subsystem: "com.Solomon.Treachery-iOS", category: "Auth")
 
@@ -279,13 +279,17 @@ final class AuthViewModel: ObservableObject {
     /// returns once that attempt, or the one already running, is over. Try
     /// Again on a screen that needs the profile calls this before reading
     /// it. Returns at once when nothing needs setting up, and while the
-    /// setup is on hold for the account's deletion.
+    /// setup is on hold for the account's deletion. A caller whose task is
+    /// cancelled, as when the user leaves Friends during a pull to refresh,
+    /// stops waiting then; the attempt goes on.
     func retryProfileSetup() async {
         guard profileSetup != nil else { return }
-        await withCheckedContinuation { continuation in
-            profileSetupWaiters.append(continuation)
-            retryPostponedProfileSetup()
-        }
+        let (attemptOver, waiter) = AsyncStream<Void>.makeStream()
+        profileSetupWaiters.append(waiter)
+        retryPostponedProfileSetup()
+        // Ends once the waiter is finished, or as soon as this task is
+        // cancelled.
+        for await _ in attemptOver {}
     }
 
     /// Starts setting up `account`'s profile: provisions it, and while that's
@@ -345,7 +349,7 @@ final class AuthViewModel: ObservableObject {
     private func releaseProfileSetupWaiters() {
         let waiters = profileSetupWaiters
         profileSetupWaiters = []
-        waiters.forEach { $0.resume() }
+        waiters.forEach { $0.finish() }
     }
 
     // MARK: - Profile Provisioning

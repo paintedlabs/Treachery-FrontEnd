@@ -199,6 +199,9 @@ final class ProfileViewModel: ObservableObject {
     /// Numbers the loads, so one can tell whether a newer one started while
     /// it ran (`loadData(userId:)`).
     private var newestLoad = 0
+    /// Whether a Try Again is running (`retry(userId:)`), which can take a
+    /// while: it first waits for the profile setup's attempt.
+    private var isRetrying = false
     private let session: SessionEnding
     private let retryProfileSetup: () async -> Void
     private let firestoreManager: FirestoreManaging
@@ -292,9 +295,18 @@ final class ProfileViewModel: ObservableObject {
 
     /// Try Again after a failed load. A profile that couldn't be set up at
     /// sign-in (offline, say) is set up first; without it there's nothing
-    /// to load.
+    /// to load. That can take a while, about 10 seconds or until the
+    /// connection is back, so the screen shows it's loading from the tap,
+    /// and another tap meanwhile is ignored. A retry whose task is cancelled
+    /// stops waiting and loads nothing.
     func retry(userId: String) async {
+        guard !isRetrying else { return }
+        isRetrying = true
+        defer { isRetrying = false }
+        profile.startLoading()
+        stats.startLoading()
         await retryProfileSetup()
+        guard !Task.isCancelled else { return }
         await loadData(userId: userId)
     }
 

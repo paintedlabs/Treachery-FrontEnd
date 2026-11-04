@@ -121,6 +121,10 @@ final class FriendsListViewModel: ObservableObject {
     private var overviewRevision = 0
     /// The revision the newest load started at.
     private var newestLoadRevision = 0
+    /// Whether a Try Again or pull to refresh is running (`retry(userId:)`),
+    /// which can take a while: it first waits for the profile setup's
+    /// attempt.
+    private var isRetrying = false
     private let retryProfileSetup: () async -> Void
     private let firestoreManager: FirestoreManaging
     private let cloudFunctions: CloudFunctionsProtocol
@@ -203,8 +207,17 @@ final class FriendsListViewModel: ObservableObject {
 
     /// Try Again or pull to refresh. A profile that couldn't be set up at
     /// sign-in (offline, say) is set up first; it holds the friends list.
+    /// That can take a while, so the list shows it's loading from the
+    /// start, and another tap or pull meanwhile is ignored. A retry whose
+    /// task is cancelled, as when the user leaves during a pull to refresh,
+    /// stops waiting and loads nothing.
     func retry(userId: String) async {
+        guard !isRetrying else { return }
+        isRetrying = true
+        defer { isRetrying = false }
+        overview.startLoading()
         await retryProfileSetup()
+        guard !Task.isCancelled else { return }
         await loadData(userId: userId)
     }
 

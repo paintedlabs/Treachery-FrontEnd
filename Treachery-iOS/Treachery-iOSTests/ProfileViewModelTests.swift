@@ -225,6 +225,38 @@ struct ProfileViewModelTests {
         #expect(viewModel.user?.displayName == "Player")
     }
 
+    /// The setup Try Again waits for can take a while: about 10 seconds, or
+    /// until the connection is back. The screen shows it's loading from the
+    /// tap, and another tap meanwhile doesn't wait on the setup again.
+    @Test func tryAgainShowsLoadingWhileTheSetupRunsAndIgnoresAnotherTap() async {
+        firestore.usersToReturn = [:]
+        let setup = ProfileSetupRetrySpy()
+        let viewModel = ProfileViewModel(
+            session: SessionEndingSpy(),
+            retryProfileSetup: { await setup.retry() },
+            firestoreManager: firestore,
+            cloudFunctions: MockCloudFunctions(),
+            trackEvent: { _ in }
+        )
+        await viewModel.loadData(userId: "u1")
+        let created = TreacheryUser(id: "u1", displayName: "Player", friendIds: [], createdAt: Date(timeIntervalSince1970: 1_000_000))
+        var phasesMidSetup: [LoadablePhase]?
+        setup.whileRetrying = { [viewModel, firestore] in
+            phasesMidSetup = [viewModel.profile.phase, viewModel.stats.phase]
+            // Another tap while the setup runs.
+            await viewModel.retry(userId: "u1")
+            // The setup creates the profile.
+            firestore.usersToReturn["u1"] = created
+        }
+
+        await viewModel.retry(userId: "u1")
+
+        #expect(phasesMidSetup == [.loading, .loading])
+        #expect(setup.retryCount == 1)
+        #expect(viewModel.profile.phase == .loaded)
+        #expect(viewModel.user?.displayName == "Player")
+    }
+
     /// The profile setup can finish while Profile is open, as when the name
     /// prompt over it closes. Only then does Profile read the profile again:
     /// before, it may not exist, or still have its placeholder name.

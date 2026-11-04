@@ -105,6 +105,70 @@ struct FriendsListViewModelTests {
         #expect(viewModel.overview.value?.friends.map(\.id) == ["f1"])
     }
 
+    /// The setup Try Again and pull to refresh wait for can take a while:
+    /// about 10 seconds, or until the connection is back. The list shows
+    /// it's loading from the start, and another tap or pull meanwhile
+    /// neither waits on the setup again nor loads again.
+    @Test func retryShowsLoadingWhileTheSetupRunsAndIgnoresAnotherPull() async {
+        let ownProfile = firestore.usersToReturn["u1"]
+        firestore.usersToReturn = [:]
+        firestore.friendsToReturn = [friend("f1")]
+        let setup = ProfileSetupRetrySpy()
+        let viewModel = FriendsListViewModel(
+            retryProfileSetup: { await setup.retry() },
+            firestoreManager: firestore,
+            cloudFunctions: cloudFunctions,
+            trackEvent: { _ in },
+            announce: { _ in }
+        )
+        await viewModel.loadData(userId: "u1")
+        var phaseMidSetup: LoadablePhase?
+        setup.whileRetrying = { [viewModel, firestore] in
+            phaseMidSetup = viewModel.overview.phase
+            // Another pull while the setup runs.
+            await viewModel.retry(userId: "u1")
+            // The setup creates the profile.
+            firestore.usersToReturn["u1"] = ownProfile
+        }
+
+        await viewModel.retry(userId: "u1")
+
+        #expect(phaseMidSetup == .loading)
+        #expect(setup.retryCount == 1)
+        // The first load and the retry's: none for the second pull.
+        #expect(firestore.getFriendsCallCount == 2)
+        #expect(viewModel.overview.phase == .loaded)
+        #expect(viewModel.overview.value?.friends.map(\.id) == ["f1"])
+    }
+
+    /// Leaving Friends during a pull to refresh cancels it. It loads nothing
+    /// then, and the next pull runs as usual.
+    @Test func cancelledPullToRefreshLoadsNothing() async {
+        firestore.usersToReturn = [:]
+        let setup = ProfileSetupRetrySpy()
+        let viewModel = FriendsListViewModel(
+            retryProfileSetup: { await setup.retry() },
+            firestoreManager: firestore,
+            cloudFunctions: cloudFunctions,
+            trackEvent: { _ in },
+            announce: { _ in }
+        )
+        await viewModel.loadData(userId: "u1")
+        var pull: Task<Void, Never>?
+        setup.whileRetrying = { pull?.cancel() }
+
+        pull = Task { await viewModel.retry(userId: "u1") }
+        await pull?.value
+
+        #expect(setup.retryCount == 1)
+        #expect(firestore.getFriendsCallCount == 1)
+
+        await viewModel.retry(userId: "u1")
+
+        #expect(setup.retryCount == 2)
+        #expect(firestore.getFriendsCallCount == 2)
+    }
+
     @Test func failedRefreshKeepsFriendsOnScreen() async {
         firestore.friendsToReturn = [friend("f1")]
         await viewModel.loadData(userId: "u1")

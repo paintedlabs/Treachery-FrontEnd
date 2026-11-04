@@ -281,6 +281,32 @@ struct AuthViewModelProfileSetupTests {
         #expect(firestore.createUserCalls.count == 1)
     }
 
+    /// A Try Again whose task is cancelled, as when the user leaves Friends
+    /// during a pull to refresh, stops waiting at once rather than when the
+    /// attempt ends. The attempt goes on.
+    @Test func aCancelledTryAgainStopsWaitingAtOnce() async {
+        viewModel.authStateDidChange(to: account())
+        await clock.waitForSleepers()
+        var stoppedWaitingMidAttempt = false
+        auth.whileReloadingAccount = { [viewModel] in
+            // Mid-attempt, a Try Again is cancelled. Were it to wait for the
+            // attempt to end, the attempt would never end.
+            let tryAgain = Task { await viewModel.retryProfileSetup() }
+            tryAgain.cancel()
+            await tryAgain.value
+            stoppedWaitingMidAttempt = true
+        }
+
+        viewModel.retryPostponedProfileSetup()
+        await clock.waitForSleepers()
+
+        #expect(stoppedWaitingMidAttempt)
+        // The attempt went on, postponed again, so the next retry is due
+        // 30 seconds on.
+        #expect(auth.reloadAccountCalls.count == 2)
+        #expect(clock.pendingDeadlines == [.seconds(30)])
+    }
+
     /// The whole path: Try Again on Profile gives the postponed setup another
     /// go, which creates the profile, and only then reads it. That read finds
     /// the placeholder name, under the name prompt. Once the prompt has saved
