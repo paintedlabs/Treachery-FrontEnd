@@ -22,6 +22,7 @@ struct GameBoardView: View {
     /// Counts changes to the pinned controls' height, to flash their scroll
     /// indicators when there's more of them than fits.
     @State private var pinnedControlsChanges = 0
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     init(gameId: String, currentUserId: String? = nil, navigationPath: Binding<NavigationPath>) {
         _viewModel = StateObject(wrappedValue: GameBoardViewModel(gameId: gameId, currentUserId: currentUserId))
@@ -192,32 +193,53 @@ struct GameBoardView: View {
     /// leave no room for the players.
     private static let pinnedControlsShare: CGFloat = 0.5
 
+    /// The parts of the board that its own actions bring into view.
+    private enum ScrollTarget: Hashable {
+        case identity, plane
+    }
+
     /// The identity card, the plane and the players scroll together. The
     /// controls that act on the game stay pinned below them, so Unveil,
     /// Roll and End Game are always within reach.
     private var board: some View {
         GeometryReader { proxy in
-            ScrollView {
-                VStack(spacing: 0) {
-                    GameBoardIdentityArea(
-                        viewModel: viewModel,
-                        onShowCard: { showCardDetail = true },
-                        onGoHome: { goHome() }
-                    )
+            ScrollViewReader { scroll in
+                ScrollView {
+                    VStack(spacing: 0) {
+                        GameBoardIdentityArea(
+                            viewModel: viewModel,
+                            onShowCard: { showCardDetail = true },
+                            onGoHome: { goHome() }
+                        )
+                        .id(ScrollTarget.identity)
 
-                    planechaseArea
+                        planechaseArea
+                            .id(ScrollTarget.plane)
 
-                    OrnateDivider()
-                        .padding(.horizontal)
-                        .padding(.vertical, 4)
+                        OrnateDivider()
+                            .padding(.horizontal)
+                            .padding(.vertical, 4)
 
-                    playersSection
+                        playersSection
+                    }
+                    .padding(.bottom, 8)
                 }
-                .padding(.bottom, 8)
-            }
-            .scrollBounceBehavior(.basedOnSize)
-            .safeAreaInset(edge: .bottom, spacing: 0) {
-                pinnedControls(maxHeight: proxy.size.height * Self.pinnedControlsShare)
+                .scrollBounceBehavior(.basedOnSize)
+                .safeAreaInset(edge: .bottom, spacing: 0) {
+                    pinnedControls(maxHeight: proxy.size.height * Self.pinnedControlsShare)
+                }
+                // The reveal plays in the identity card, and a roll is about
+                // the plane: when the player unveils or rolls from further
+                // down the board, bring it into view. Only on their own
+                // tap, so the rows never move under a finger.
+                .onChange(of: viewModel.unveilProgress) { _, progress in
+                    guard progress == .sending else { return }
+                    bringIntoView(.identity, with: scroll)
+                }
+                .onChange(of: viewModel.isRollingDie) { _, isRolling in
+                    guard isRolling else { return }
+                    bringIntoView(.plane, with: scroll)
+                }
             }
             .sheet(item: $inspectedPlayer) { player in
                 if let card = viewModel.identityCard(for: player) {
@@ -227,23 +249,32 @@ struct GameBoardView: View {
         }
     }
 
+    /// Scrolls just far enough to show `target`, at once with Reduce Motion.
+    private func bringIntoView(_ target: ScrollTarget, with scroll: ScrollViewProxy) {
+        withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.3)) {
+            scroll.scrollTo(target)
+        }
+    }
+
     /// The plane card banner, only when Planechase is on and the board deals
     /// the planes (not with the players' own decks).
     @ViewBuilder
     private var planechaseArea: some View {
         if viewModel.isPlanechaseActive && !viewModel.isOwnDeckMode {
-            if viewModel.isChaoticAetherActive {
-                ChaoticAetherIndicator()
-            }
+            VStack(spacing: 0) {
+                if viewModel.isChaoticAetherActive {
+                    ChaoticAetherIndicator()
+                }
 
-            if let plane = viewModel.currentPlane {
-                PlaneCardBanner(plane: plane, secondaryPlane: viewModel.secondaryPlane)
+                if let plane = viewModel.currentPlane {
+                    PlaneCardBanner(plane: plane, secondaryPlane: viewModel.secondaryPlane)
 
-                // Phenomenon overlay when current plane is a phenomenon.
-                // Eliminated spectators keep the banner but not the
-                // resolver — the server rejects their resolve anyway.
-                if plane.isPhenomenon && viewModel.currentPlayer?.isEliminated != true {
-                    PhenomenonOverlay(plane: plane, viewModel: viewModel)
+                    // Phenomenon overlay when current plane is a phenomenon.
+                    // Eliminated spectators keep the banner but not the
+                    // resolver — the server rejects their resolve anyway.
+                    if plane.isPhenomenon && viewModel.currentPlayer?.isEliminated != true {
+                        PhenomenonOverlay(plane: plane, viewModel: viewModel)
+                    }
                 }
             }
         }
