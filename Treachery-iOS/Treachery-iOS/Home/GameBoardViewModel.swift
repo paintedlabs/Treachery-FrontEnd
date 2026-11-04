@@ -31,6 +31,9 @@ final class GameBoardViewModel: ObservableObject {
 
     // Planechase transient state
     @Published var dieRollResult: String?
+    /// Takes the die result down; see `showDieResult(_:)`. Visible to tests,
+    /// which await it rather than sleep.
+    private(set) var dieResultClear: Task<Void, Never>?
     @Published var isRollingDie = false
     @Published var tunnelOptions: [PlaneCard]?
 
@@ -207,6 +210,7 @@ final class GameBoardViewModel: ObservableObject {
         for echoWait in lifeChangeEchoWaits.values {
             echoWait.cancel()
         }
+        dieResultClear?.cancel()
     }
 
     // MARK: - Listeners
@@ -334,18 +338,36 @@ final class GameBoardViewModel: ObservableObject {
 
         do {
             let result = try await cloudFunctions.rollPlanarDie(gameId: gameId)
-            dieRollResult = result
+            showDieResult(result)
             AnalyticsService.trackEvent("roll_planar_die", params: ["result": result])
-
-            // Auto-clear the die result after a delay so the animation resets
-            Task {
-                try? await Task.sleep(nanoseconds: 3_000_000_000)
-                dieRollResult = nil
-            }
         } catch {
-            errorMessage = error.localizedDescription
+            logger.error("rollPlanarDie failed: \(String(describing: error), privacy: .public)")
+            errorMessage = "Couldn't roll the planar die. Check your connection and try again."
         }
         isRollingDie = false
+    }
+
+    /// How long a die result stays up, so its animation can play again.
+    static let dieResultDuration: Duration = .seconds(3)
+
+    /// Shows `result` for `dieResultDuration`. It cancels the clear still
+    /// waiting for the previous result, which would otherwise take this one
+    /// down early.
+    private func showDieResult(_ result: String) {
+        dieResultClear?.cancel()
+        dieRollResult = result
+        dieResultClear = Task { [weak self, clock] in
+            do {
+                try await clock.sleep(for: Self.dieResultDuration)
+            } catch {
+                return // A newer result replaced this one, or the board went away.
+            }
+            // Cancelled after waking but before getting here: the newer
+            // result's clear takes over.
+            guard !Task.isCancelled else { return }
+            self?.dieRollResult = nil
+            self?.dieResultClear = nil
+        }
     }
 
     func resolvePhenomenon() async {

@@ -261,7 +261,8 @@ struct GameBoardViewModelActionTests {
         let game = makeSampleGame(gameMode: .treacheryPlanechase)
         let cf = MockCloudFunctions()
         cf.rollPlanarDieResult = "planeswalk"
-        let (vm, _, _) = makeVM(game: game, cloudFunctions: cf)
+        // A clock that never moves keeps the result up.
+        let (vm, _, _) = makeVM(game: game, cloudFunctions: cf, clock: TestClock())
         await vm.rollDie()
         #expect(vm.dieRollResult == "planeswalk")
     }
@@ -281,7 +282,55 @@ struct GameBoardViewModelActionTests {
         cf.errorToThrow = NSError(domain: "test", code: 1, userInfo: [NSLocalizedDescriptionKey: "die error"])
         let (vm, _, _) = makeVM(cloudFunctions: cf)
         await vm.rollDie()
-        #expect(vm.errorMessage == "die error")
+        // A plain sentence, never the SDK's description.
+        #expect(vm.errorMessage == "Couldn't roll the planar die. Check your connection and try again.")
+    }
+
+    @Test(.timeLimit(.minutes(1)))
+    func dieResultClearsAfterThreeSeconds() async throws {
+        let clock = TestClock()
+        let cf = MockCloudFunctions()
+        cf.rollPlanarDieResult = "chaos"
+        let (vm, _, _) = makeVM(game: makeSampleGame(gameMode: .planechase), cloudFunctions: cf, clock: clock)
+
+        await vm.rollDie()
+        let clear = try #require(vm.dieResultClear)
+        await clock.waitForSleepers()
+        #expect(vm.dieRollResult == "chaos")
+        #expect(clock.pendingDeadlines == [.seconds(3)])
+
+        clock.advance(by: .seconds(3))
+        await clear.value
+        #expect(vm.dieRollResult == nil)
+    }
+
+    @Test(.timeLimit(.minutes(1)))
+    func quickSecondRollKeepsItsResultForItsOwnThreeSeconds() async throws {
+        // The first roll's clear used to run regardless, and took the second
+        // result down a second after it appeared.
+        let clock = TestClock()
+        let cf = MockCloudFunctions()
+        let (vm, _, _) = makeVM(game: makeSampleGame(gameMode: .planechase), cloudFunctions: cf, clock: clock)
+
+        cf.rollPlanarDieResult = "chaos"
+        await vm.rollDie()
+        let firstClear = try #require(vm.dieResultClear)
+        await clock.waitForSleepers()
+        clock.advance(by: .seconds(2))
+
+        cf.rollPlanarDieResult = "planeswalk"
+        await vm.rollDie()
+        let secondClear = try #require(vm.dieResultClear)
+        await clock.waitForSleepers()
+        // When the first result would have come down.
+        clock.advance(by: .seconds(1))
+        await firstClear.value
+        #expect(vm.dieRollResult == "planeswalk")
+        #expect(clock.pendingDeadlines == [.seconds(5)])
+
+        clock.advance(by: .seconds(2))
+        await secondClear.value
+        #expect(vm.dieRollResult == nil)
     }
 
     @Test func rollDieClearsErrorBeforeCall() async {
