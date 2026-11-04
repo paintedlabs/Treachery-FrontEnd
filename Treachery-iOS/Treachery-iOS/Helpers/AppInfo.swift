@@ -11,6 +11,11 @@ enum AppInfo {
     /// and App Store Connect lists the same URL.
     static let privacyPolicyURL = URL(string: "https://treachery-71922.web.app/privacy")!
 
+    /// Help, reporting a player, and deleting an account on request. App
+    /// Review asks for an easy way to contact the developer, and App Store
+    /// Connect lists the same page as the Support URL.
+    static let supportURL = URL(string: "https://treachery-71922.web.app/support")!
+
     /// The notice the Wizards of the Coast Fan Content Policy requires, word
     /// for word. Shown verbatim and never localized.
     static let fanContentNotice = "Treachery is unofficial Fan Content permitted under the Fan Content Policy. "

@@ -5,9 +5,9 @@
 
 import SwiftUI
 
-/// The bottom of the Profile screen: the app's version, the privacy policy,
-/// credits for the card content, and the notice the Wizards of the Coast Fan
-/// Content Policy requires.
+/// The bottom of the Profile screen: the app's version, links to support and
+/// the privacy policy, credits for the card content, and the notice the
+/// Wizards of the Coast Fan Content Policy requires.
 struct AboutSection: View {
     /// The version and build, such as "1.2 (34)".
     let version: String
@@ -37,21 +37,8 @@ struct AboutSection: View {
             .padding(.vertical, 10)
             .accessibilityElement(children: .combine)
 
-            Link(destination: AppInfo.privacyPolicyURL) {
-                HStack {
-                    Text("Privacy Policy")
-                        .foregroundStyle(Color.mtgGold)
-                        .multilineTextAlignment(.leading)
-                    Spacer()
-                    Image(systemName: "arrow.up.right.square")
-                        .foregroundStyle(Color.mtgTextSecondary)
-                        .accessibilityHidden(true)
-                }
-                .padding(.horizontal, 16)
-                .frame(minHeight: 44)
-                .contentShape(Rectangle())
-            }
-            .accessibilityHint("Opens in your browser.")
+            webLink("Support", to: AppInfo.supportURL)
+            webLink("Privacy Policy", to: AppInfo.privacyPolicyURL)
 
             VStack(alignment: .leading, spacing: 4) {
                 Text("Credits")
@@ -77,6 +64,25 @@ struct AboutSection: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .mtgCardFrame()
+    }
+
+    /// A row that opens a page of the Treachery website in the browser.
+    private func webLink(_ title: LocalizedStringKey, to url: URL) -> some View {
+        Link(destination: url) {
+            HStack {
+                Text(title)
+                    .foregroundStyle(Color.mtgGold)
+                    .multilineTextAlignment(.leading)
+                Spacer()
+                Image(systemName: "arrow.up.right.square")
+                    .foregroundStyle(Color.mtgTextSecondary)
+                    .accessibilityHidden(true)
+            }
+            .padding(.horizontal, 16)
+            .frame(minHeight: 44)
+            .contentShape(Rectangle())
+        }
+        .accessibilityHint("Opens in your browser.")
     }
 }
 

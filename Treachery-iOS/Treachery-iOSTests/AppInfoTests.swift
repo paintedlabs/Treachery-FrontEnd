@@ -23,6 +23,11 @@ struct AppInfoTests {
         #expect(AppInfo.privacyPolicyURL.absoluteString == "https://treachery-71922.web.app/privacy")
     }
 
+    /// App Store Connect's Support URL names the same page.
+    @Test func supportLinksToTheHostedPage() {
+        #expect(AppInfo.supportURL.absoluteString == "https://treachery-71922.web.app/support")
+    }
+
     /// The Fan Content Policy asks for this notice word for word.
     @Test func fanContentNoticeIsWordForWord() {
         #expect(AppInfo.fanContentNotice == """
