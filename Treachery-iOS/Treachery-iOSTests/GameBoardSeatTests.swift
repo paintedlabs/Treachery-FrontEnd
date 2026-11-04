@@ -112,6 +112,24 @@ struct GameBoardSeatTests {
     }
 
     @Test(arguments: [GameMode.planechase, GameMode.none])
+    func livingHostCanEndTheGame(_ mode: GameMode) {
+        // In these modes nothing else ends the game.
+        let vm = makeVM(gameMode: mode, hostId: "u1")
+        #expect(vm.seat == .playing)
+        #expect(vm.canEndGame)
+        #expect(vm.spectatorLeave == nil)
+    }
+
+    @Test(arguments: [GameMode.treachery, GameMode.treacheryPlanechase])
+    func livingHostOfATreacheryGameHasNoEndGame(_ mode: GameMode) {
+        // Its win conditions end it.
+        let vm = makeVM(gameMode: mode, hostId: "u1")
+        #expect(vm.seat == .playing)
+        #expect(!vm.canEndGame)
+        #expect(vm.spectatorLeave == nil)
+    }
+
+    @Test(arguments: [GameMode.planechase, GameMode.none])
     func eliminatedHostKeepsEndGameAndConfirmsLeaving(_ mode: GameMode) {
         let vm = makeVM(gameMode: mode, hostId: "u1", currentUserEliminated: true)
         #expect(vm.canEndGame)
