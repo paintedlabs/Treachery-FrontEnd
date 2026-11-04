@@ -178,6 +178,9 @@ struct ProfileView: View {
     }
 
     /// Try Again: sets up a profile that couldn't be at sign-in, then loads.
+    /// While the setup is on hold after a deletion
+    /// (`ProfileSetupState.onHoldUntilRelaunch`), it only checks whether the
+    /// account is gone first; see `AuthViewModel.retryProfileSetup()`.
     private func retry() async {
         guard let userId = authViewModel.currentUserId else { return }
         await viewModel.retry(userId: userId)

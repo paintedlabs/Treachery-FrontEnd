@@ -20,7 +20,9 @@ struct FriendsListView: View {
 
     /// - Parameters:
     ///   - retryProfileSetup: Gives a postponed profile setup another go:
-    ///     `AuthViewModel.retryProfileSetup()` in the app.
+    ///     `AuthViewModel.retryProfileSetup()` in the app. While the setup is
+    ///     on hold after a deletion (`ProfileSetupState.onHoldUntilRelaunch`),
+    ///     it only checks whether the account is gone.
     ///   - profileSetupState: How far the profile setup has got:
     ///     `AuthViewModel.profileSetupState` in the app.
     init(retryProfileSetup: @escaping () async -> Void, profileSetupState: @escaping () -> ProfileSetupState) {
@@ -105,7 +107,9 @@ struct FriendsListView: View {
     }
 
     /// Try Again and pull to refresh: sets up a profile that couldn't be at
-    /// sign-in, then loads.
+    /// sign-in, then loads. While the setup is on hold after a deletion
+    /// (`ProfileSetupState.onHoldUntilRelaunch`), they only check whether the
+    /// account is gone first; see `AuthViewModel.retryProfileSetup()`.
     private func retry() async {
         guard let userId = authViewModel.currentUserId else { return }
         await viewModel.retry(userId: userId)

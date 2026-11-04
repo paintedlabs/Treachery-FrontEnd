@@ -231,7 +231,9 @@ final class ProfileViewModel: ObservableObject {
     ///     app this is `AuthViewModel`, the single source of auth state.
     ///   - retryProfileSetup: Gives a postponed profile setup another go and
     ///     returns once it's over, so Try Again can find a profile that
-    ///     couldn't be created at sign-in. In the app this is
+    ///     couldn't be created at sign-in. While the setup is on hold after
+    ///     a deletion (`ProfileSetupState.onHoldUntilRelaunch`), it only
+    ///     checks whether the account is gone. In the app this is
     ///     `AuthViewModel.retryProfileSetup()`.
     ///   - profileSetupState: How far the profile setup has got, read
     ///     whenever the screen shows a failure (`profileFailureShown`). In
@@ -321,7 +323,10 @@ final class ProfileViewModel: ObservableObject {
     /// connection is back, so the screen shows it's loading from the tap,
     /// even if it reappears meanwhile, and another tap while it waits is
     /// ignored. A retry whose task is cancelled stops waiting and loads
-    /// nothing.
+    /// nothing. While the setup is on hold after a deletion
+    /// (`ProfileSetupState.onHoldUntilRelaunch`), Try Again only checks
+    /// whether the account is gone before it loads; see
+    /// `AuthViewModel.retryProfileSetup()`.
     func retry(userId: String) async {
         guard retryPhase == .idle else { return }
         retryPhase = .waitingForProfileSetup

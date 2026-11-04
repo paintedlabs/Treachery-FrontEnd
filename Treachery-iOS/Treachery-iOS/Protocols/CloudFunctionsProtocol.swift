@@ -29,9 +29,11 @@ protocol CloudFunctionsProtocol {
     /// Permanently deletes the signed-in user's account and data on the
     /// server. Returns only once the server confirms. Throws
     /// `AccountDeletionError.inProgressGame` while the user is in a game that
-    /// is still in progress, `.notSent` when the request never left this
-    /// device, `.timedOut` when the outcome is unknown, and
-    /// `.unexpectedResponse` for any answer but success. Safe to retry: the
+    /// is still in progress, `.notSent` only when the request certainly never
+    /// left this device (see `AccountDeletionError.notSent`: Auth token
+    /// failures and DNS or connect failures, not being offline), `.timedOut`
+    /// when it ran out of time, and `.unexpectedResponse` for any answer but
+    /// success. Any other error leaves the outcome unknown. Safe to retry: the
     /// server side is idempotent.
     func deleteAccount() async throws
 }

@@ -148,7 +148,10 @@ final class FriendsListViewModel: ObservableObject {
     /// - Parameters:
     ///   - retryProfileSetup: Gives a postponed profile setup another go and
     ///     returns once it's over: the friends list is part of the profile.
-    ///     In the app this is `AuthViewModel.retryProfileSetup()`.
+    ///     While the setup is on hold after a deletion
+    ///     (`ProfileSetupState.onHoldUntilRelaunch`), it only checks whether
+    ///     the account is gone. In the app this is
+    ///     `AuthViewModel.retryProfileSetup()`.
     ///   - profileSetupState: How far the profile setup has got, read
     ///     whenever the screen shows a failure (`overviewFailureShown`). In
     ///     the app this is `AuthViewModel.profileSetupState`;
@@ -235,7 +238,10 @@ final class FriendsListViewModel: ObservableObject {
     /// start, even if the screen reappears meanwhile, and another tap or
     /// pull while it waits is ignored. A retry whose task is cancelled, as
     /// when the user leaves during a pull to refresh, stops waiting and
-    /// loads nothing.
+    /// loads nothing. While the setup is on hold after a deletion
+    /// (`ProfileSetupState.onHoldUntilRelaunch`), a retry only checks
+    /// whether the account is gone before it loads; see
+    /// `AuthViewModel.retryProfileSetup()`.
     func retry(userId: String) async {
         guard retryPhase == .idle else { return }
         retryPhase = .waitingForProfileSetup
