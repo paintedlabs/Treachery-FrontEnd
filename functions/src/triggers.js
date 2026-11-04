@@ -8,67 +8,129 @@ const { sanitizeCommanderKey } = require("./validation");
 const { isTreacheryMode } = require("./rules");
 const { notifyPlayers } = require("./notifications");
 
+// gRPC status code Firestore uses when an update targets a missing document.
+const FIRESTORE_NOT_FOUND = 5;
+
 // ════════════════════════════════════════════════════════════════
 // CLOUD FUNCTION: cleanupStaleGames (Scheduled)
 // Runs every hour. Deletes games stuck in "waiting" or
 // "in_progress" with no activity for 24 hours.
 // ════════════════════════════════════════════════════════════════
 
-exports.cleanupStaleGames = onSchedule("every 1 hours", async () => {
-  const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000);
+/**
+ * Up to `limit` games in `state` whose `field` is older than `cutoff`,
+ * oldest first.
+ *
+ * Equality on state plus a range on `field` is served only by the composite
+ * index (state ASC, field ASC) in firestore.indexes.json. Without it the
+ * query fails with FAILED_PRECONDITION; the emulator never enforces indexes,
+ * so test/game-logic.test.js checks the declarations. The error is rethrown
+ * naming the query, so the log says which one failed.
+ */
+async function findGamesOlderThan(state, field, cutoff, limit) {
+  try {
+    const snap = await db
+      .collection("games")
+      .where("state", "==", state)
+      .where(field, "<", cutoff)
+      .limit(limit)
+      .get();
+    return snap.docs;
+  } catch (error) {
+    throw new Error(
+      `query games where state == "${state}" and ${field} < ${cutoff.toISOString()} failed: ${error.message}`,
+      { cause: error }
+    );
+  }
+}
+
+/**
+ * One pass of the sweep: deletes every game stuck in "waiting" or
+ * "in_progress" with no activity in the 24 hours before `now`, with its
+ * players subcollection. Each query reads at most `limit` games, so a large
+ * backlog drains over several runs.
+ *
+ * A failure while sweeping one state is logged and skips that state for
+ * this run only; the other state still runs. Returns { deleted, failedStates }.
+ *
+ * Exported for the emulator integration test, which runs it with a fixed
+ * clock. index.js does not export it, so it is never deployed as a function.
+ */
+async function sweepStaleGames({ now = new Date(), limit = 100 } = {}) {
+  const cutoff = new Date(now.getTime() - 24 * 60 * 60 * 1000);
 
   // Find stale games: last_activity_at (or created_at as fallback) older than 24h
   // We query "waiting" and "in_progress" separately since Firestore
   // doesn't support != on state and inequality on timestamp in one query.
 
   const staleStates = ["waiting", "in_progress"];
-  let totalDeleted = 0;
+  let deleted = 0;
+  const failedStates = [];
 
   for (const state of staleStates) {
-    // First try games with last_activity_at
-    const withActivitySnap = await db
-      .collection("games")
-      .where("state", "==", state)
-      .where("last_activity_at", "<", cutoff)
-      .limit(100)
-      .get();
+    try {
+      // First try games with last_activity_at
+      const withActivity = await findGamesOlderThan(state, "last_activity_at", cutoff, limit);
 
-    // Also find games without last_activity_at (legacy) using created_at
-    const withoutActivitySnap = await db
-      .collection("games")
-      .where("state", "==", state)
-      .where("created_at", "<", cutoff)
-      .limit(100)
-      .get();
+      // Also find games without last_activity_at (legacy) using created_at
+      const withoutActivity = await findGamesOlderThan(state, "created_at", cutoff, limit);
 
-    // Merge, deduplicate
-    const gameIds = new Set();
-    const gameDocs = [];
+      // Merge, deduplicate
+      const gameIds = new Set();
+      const gameDocs = [];
 
-    for (const doc of [...withActivitySnap.docs, ...withoutActivitySnap.docs]) {
-      if (gameIds.has(doc.id)) continue;
-      // Double-check: if it has last_activity_at and it's recent, skip
-      const data = doc.data();
-      if (data.last_activity_at && data.last_activity_at.toDate() >= cutoff) continue;
-      gameIds.add(doc.id);
-      gameDocs.push(doc);
-    }
+      for (const doc of [...withActivity, ...withoutActivity]) {
+        if (gameIds.has(doc.id)) continue;
+        // Double-check: if it has last_activity_at and it's recent, skip.
+        // Only a Timestamp counts: it is the only value Firestore hands back
+        // with a toDate() method. Clients can write any value there
+        // (firestore.rules doesn't type-check it), and anything else is
+        // treated as absent, as on a legacy game, so the game falls back to
+        // its created_at. Calling toDate() on such a value used to throw,
+        // and one bad game made every run skip its whole state.
+        const lastActivity = doc.get("last_activity_at");
+        const isTimestamp = lastActivity != null && typeof lastActivity.toDate === "function";
+        if (isTimestamp && lastActivity.toDate() >= cutoff) continue;
+        gameIds.add(doc.id);
+        gameDocs.push(doc);
+      }
 
-    // Delete each stale game and its players subcollection
-    for (const gameDoc of gameDocs) {
-      const playersSnap = await db
-        .collection(`games/${gameDoc.id}/players`)
-        .get();
+      // Delete each stale game and its players subcollection
+      for (const gameDoc of gameDocs) {
+        const playersSnap = await db
+          .collection(`games/${gameDoc.id}/players`)
+          .get();
 
-      const batch = db.batch();
-      playersSnap.docs.forEach((pDoc) => batch.delete(pDoc.ref));
-      batch.delete(gameDoc.ref);
-      await batch.commit();
-      totalDeleted++;
+        const batch = db.batch();
+        playersSnap.docs.forEach((pDoc) => batch.delete(pDoc.ref));
+        batch.delete(gameDoc.ref);
+        await batch.commit();
+        deleted++;
+      }
+    } catch (error) {
+      // Typically FAILED_PRECONDITION while an index is missing or still
+      // building.
+      failedStates.push(state);
+      console.error(`cleanupStaleGames: skipped "${state}" games this run:`, error);
     }
   }
 
-  console.log(`cleanupStaleGames: deleted ${totalDeleted} stale games.`);
+  return { deleted, failedStates };
+}
+
+exports.sweepStaleGames = sweepStaleGames;
+
+exports.cleanupStaleGames = onSchedule("every 1 hours", async () => {
+  const { deleted, failedStates } = await sweepStaleGames();
+  console.log(`cleanupStaleGames: deleted ${deleted} stale games.`);
+
+  // A failure still fails the run, as it always has, so it shows up as a
+  // failed invocation and not only as a log line.
+  if (failedStates.length > 0) {
+    throw new Error(
+      `cleanupStaleGames: could not sweep ${failedStates.join(", ")} games; see the errors above.`
+    );
+  }
 });
 
 // ════════════════════════════════════════════════════════════════
@@ -85,10 +147,19 @@ exports.onPlayerJoined = onDocumentCreated(
     const gameId = event.params.gameId;
     const displayName = player.display_name || "Someone";
 
-    // Update last_activity_at on the game
-    await db.doc(`games/${gameId}`).update({
-      last_activity_at: FieldValue.serverTimestamp(),
-    });
+    // Update last_activity_at on the game. The game can already be gone:
+    // a lobby closed, swept or left by its last player right after this
+    // join. Then there is no one to notify, and an unhandled NOT_FOUND
+    // would only fail this invocation (and, in the emulator, kill the
+    // worker and drop other functions' requests).
+    try {
+      await db.doc(`games/${gameId}`).update({
+        last_activity_at: FieldValue.serverTimestamp(),
+      });
+    } catch (error) {
+      if (error.code === FIRESTORE_NOT_FOUND) return;
+      throw error;
+    }
 
     // Notify other players
     await notifyPlayers(

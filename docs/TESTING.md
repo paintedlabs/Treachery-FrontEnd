@@ -8,7 +8,7 @@ belongs.
 | Layer | Where | Command | Speed | Catches what nothing else can |
 |---|---|---|---|---|
 | Functions unit | `functions/test/game-logic.test.js` | `cd functions && npm test` | ~2s | Pure logic regressions (fast feedback) |
-| Functions integration | `functions/test/integration/callables/` | `cd functions && npm run test:integration` | ~70s | Bugs in the **real** exported callables — the unit suite re-implements the logic it checks, so it validates a copy |
+| Functions integration | `functions/test/integration/` (`callables/`, `triggers/`) | `cd functions && npm run test:integration` | ~70s | Bugs in the **real** exported callables and the stale-game sweep — the unit suite re-implements the logic it checks, so it validates a copy |
 | Firestore rules | `firestore-tests/` | `cd firestore-tests && npm test` | ~3s | Security-rule holes. The Playwright suite drives the UI, which only takes legitimate paths, so a rule permitting a hostile direct SDK write is invisible to it |
 | Web E2E + simulation | `Treachery/e2e/` | `cd Treachery && npm run test:e2e` | ~2min | Full-stack behaviour through real browsers, plus randomized multi-player play |
 

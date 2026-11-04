@@ -122,9 +122,9 @@ trap cleanup EXIT
 CMD="node --test --test-concurrency=1 --test-reporter=spec"
 CMD="$CMD --test-reporter-destination=$(printf '%q' "$RESULTS")"
 for arg in "$@"; do CMD="$CMD $(printf '%q' "$arg")"; done
-# Explicit glob rather than the directory, so helpers.js is never mistaken
-# for a test file.
-CMD="$CMD test/integration/callables/*.test.js"
+# Explicit globs rather than the directories, so helpers.js is never mistaken
+# for a test file. triggers/ holds the non-callable functions' tests.
+CMD="$CMD test/integration/callables/*.test.js test/integration/triggers/*.test.js"
 
 set +e
 firebase emulators:exec \

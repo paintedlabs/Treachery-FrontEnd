@@ -211,13 +211,27 @@ export async function getFinishedGames(userId: string): Promise<Game[]> {
   return snap.docs.map((d) => ({ ...d.data(), id: d.id }) as Game);
 }
 
-export function listenToGame(id: string, onChange: (game: Game | null) => void): Unsubscribe {
-  return onSnapshot(doc(gamesCol(), id), (snap) => {
+/**
+ * Calls `onChange` with the game, or with null while it doesn't exist.
+ * `fromCache` is true when that answer came only from the local cache. A
+ * null from the cache isn't proof the game is gone: the client may be
+ * offline, or may never have fetched it.
+ */
+export function listenToGame(
+  id: string,
+  onChange: (game: Game | null, fromCache: boolean) => void,
+): Unsubscribe {
+  // When the server later confirms what the cache said, often only
+  // metadata.fromCache changes, and Firestore delivers such a snapshot only
+  // to listeners that opt into metadata changes. Without this, a game first
+  // reported missing by the cache (opened offline) would never be reported
+  // gone once the server confirms it.
+  return onSnapshot(doc(gamesCol(), id), { includeMetadataChanges: true }, (snap) => {
     if (!snap.exists()) {
-      onChange(null);
+      onChange(null, snap.metadata.fromCache);
       return;
     }
-    onChange({ ...snap.data(), id: snap.id } as Game);
+    onChange({ ...snap.data(), id: snap.id } as Game, snap.metadata.fromCache);
   });
 }
 

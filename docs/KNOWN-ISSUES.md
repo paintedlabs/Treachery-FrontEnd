@@ -79,7 +79,11 @@ Not all individually test-encoded; from the audit report.
 - ~~Profile win-rate deflated~~ — **fixed**: divides by games with a recorded outcome
 - ~~Legacy 12-player lobbies bricked~~ — **fixed**: the stepper decrement clamps into the valid range on all three clients
 - Planar die cost displays the previous roller's count, not the caller's actual (often free) cost
-- Stale/deleted game link → infinite spinner with the web back button trapped
+- ~~Stale/deleted game link → infinite spinner with the web back button trapped~~
+  — **fixed** (web): a game the server reports missing on first load gets the
+  board's or results screen's *Game Unavailable*, or the lobby's closed notice,
+  each with a way Home (`e2e/deleted-game.spec.ts`). Android's `LobbyViewModel`
+  and `GameBoardViewModel` still count a missing game only after a first snapshot
 - Client-side game-code generation is check-then-act racy; duplicate codes make one game unjoinable by code (**fixed** for createGame callable path)
 - New-user onboarding skippable via a `createUserDocumentIfNeeded` double-invocation race
 - `useConnectionStatus` watches only `navigator.onLine`, never Firestore sync state
@@ -106,6 +110,13 @@ Not all individually test-encoded; from the audit report.
   arbitrary `code`/`max_players`/`game_mode`. The `createGame` callable is
   preferred, not enforced, so the duplicate-join-code race survives for any
   non-callable writer
+- `firestore.rules` doesn't type-check a game's `created_at` or
+  `last_activity_at`: `isValidClientGameCreate` allows extra keys, and
+  `isHostLobbySettingsUpdate` and `isOnlyAddingSelfToPlayerIds` accept any
+  `last_activity_at`. The stale-game sweep treats a `last_activity_at` that
+  isn't a Timestamp as absent, so a bad value can no longer stall it, but a
+  client can still keep a lobby out of the sweep, e.g. with a far-future
+  `last_activity_at`. Needs `is timestamp` checks, bounded by `request.time`
 - `allocateUniqueJoinCode` is check-then-use rather than transactional, and
   codes are never released — uniqueness is best-effort over 12 attempts
 - `registerFcmToken` will resurrect a deleted user doc (`set(..., {merge:true})`

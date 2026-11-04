@@ -293,7 +293,9 @@ export default function LobbyScreen() {
       <View style={styles.centerContainer}>
         <Ionicons name="close-circle" size={48} color={colors.error} />
         <Text style={styles.disbandedTitle}>Game Disbanded</Text>
-        <Text style={styles.disbandedText}>The host has left and the game was closed.</Text>
+        <Text style={styles.disbandedText}>
+          This lobby has closed. You can create or join another game from Home.
+        </Text>
         <TouchableOpacity
           style={styles.primaryButton}
           onPress={() => router.replace('/(app)')}
