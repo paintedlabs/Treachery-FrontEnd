@@ -347,8 +347,10 @@ final class ProfileViewModel: ObservableObject {
         /// Again's own too: a newer one, as when the name prompt closes,
         /// still overtakes it.
         case idle
-        /// Waiting for the profile setup's attempt, with the screen showing
-        /// it's loading. Try Again loads once the attempt is over.
+        /// Waiting for the profile setup's attempt or, while the setup is on
+        /// hold after a deletion (`ProfileSetupState.onHoldUntilRelaunch`),
+        /// for the check of whether the account is gone, with the screen
+        /// showing it's loading. Try Again loads once that's over.
         case waitingForProfileSetup
     }
 

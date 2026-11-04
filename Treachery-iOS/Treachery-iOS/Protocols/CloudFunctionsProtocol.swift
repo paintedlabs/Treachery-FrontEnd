@@ -32,8 +32,9 @@ protocol CloudFunctionsProtocol {
     /// is still in progress, `.notSent` only when the request certainly never
     /// left this device (see `AccountDeletionError.notSent`: Auth token
     /// failures and DNS or connect failures, not being offline), `.timedOut`
-    /// when it ran out of time, and `.unexpectedResponse` for any answer but
-    /// success. Any other error leaves the outcome unknown. Safe to retry: the
-    /// server side is idempotent.
+    /// when it ran out of time, and `.unexpectedResponse` when the call
+    /// returns a result other than `{ success: true }`. Any other error,
+    /// including the server's own error answers, leaves the outcome unknown.
+    /// Safe to retry: the server side is idempotent.
     func deleteAccount() async throws
 }
