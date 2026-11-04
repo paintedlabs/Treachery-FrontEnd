@@ -78,17 +78,6 @@ final class GameBoardViewModel: ObservableObject {
         return players.first { $0.userId == userId }
     }
 
-    /// Unveiled traitor ability that has not been resolved yet.
-    /// Decline/Skip leaves `ability_resolved` unset on the server, so this
-    /// stays non-nil and the Action Bar can reopen the sheet.
-    var resolvableAbility: ExecutableAbility? {
-        guard let player = currentPlayer,
-              player.isUnveiled,
-              !player.isEliminated,
-              !player.abilityResolved else { return nil }
-        return ExecutableAbility(heldBy: player)
-    }
-
     var currentIdentityCard: IdentityCard? {
         guard let cardId = currentPlayer?.identityCardId else { return nil }
         return cardDatabase.card(withId: cardId)
@@ -262,55 +251,6 @@ final class GameBoardViewModel: ObservableObject {
         presentAbilityAfterUnveil()
     }
 
-    func presentAbilityResolver() {
-        guard let player = currentPlayer, resolvableAbility != nil else { return }
-        pendingAbilityResolution = makeAbilityResolution(for: player)
-    }
-
-    /// Opens the ability sheet after the reveal when the card just unveiled
-    /// has an ability left to use. The unveil may not have reached a players
-    /// snapshot yet, so unlike `resolvableAbility` this doesn't wait for it.
-    private func presentAbilityAfterUnveil() {
-        guard pendingAbilityResolution == nil,
-              let player = currentPlayer, !player.isEliminated, !player.abilityResolved,
-              ExecutableAbility(heldBy: player) != nil else { return }
-        pendingAbilityResolution = makeAbilityResolution(for: player)
-    }
-
-    private func makeAbilityResolution(for player: Player) -> AbilityResolution? {
-        guard let ability = ExecutableAbility(heldBy: player) else { return nil }
-
-        switch ability {
-        case .metamorph:
-            // resolveMetamorph's target checks; a card another Metamorph
-            // has already taken leaves nothing to steal.
-            let eliminated = players.filter {
-                $0.isEliminated && $0.role != .leader && $0.userId != player.userId && $0.identityCardId != nil
-            }
-            return AbilityResolution(
-                abilityType: .metamorph,
-                actingPlayerId: player.id,
-                candidateCards: [],
-                candidatePlayers: eliminated
-            )
-        case .puppetMaster:
-            let otherAlive = players.filter { !$0.isEliminated && $0.userId != player.userId }
-            return AbilityResolution(
-                abilityType: .puppetMaster,
-                actingPlayerId: player.id,
-                candidateCards: [],
-                candidatePlayers: otherAlive
-            )
-        case .wearerOfMasks:
-            return AbilityResolution(
-                abilityType: .wearerOfMasks,
-                actingPlayerId: player.id,
-                candidateCards: [],
-                candidatePlayers: []
-            )
-        }
-    }
-
     // MARK: - Leave Game (via Cloud Function)
 
     func eliminateAndLeave() async {
@@ -482,10 +422,6 @@ final class GameBoardViewModel: ObservableObject {
         } catch {
             errorMessage = error.localizedDescription
         }
-        pendingAbilityResolution = nil
-    }
-
-    func dismissAbility() {
         pendingAbilityResolution = nil
     }
 
