@@ -11,10 +11,13 @@
  * email / phone_number / fcm_token but never touches display_name, so it
  * does not catch these.
  *
- * This script resets every name containing "@" to the name the clients'
- * name prompt suggests for that address: the part before the first "@",
- * trimmed, with its first letter capitalized; "Player" if that part is
- * empty. It covers:
+ * This script resets every name that is a whole email address (no
+ * whitespace, exactly one "@" with something before it, and a dot in the
+ * domain), which is what those builds set, to the name the clients' name
+ * prompt suggests for that address: the part before the "@" with its first
+ * letter capitalized. Any other name containing "@", like "Bob @ Home" or
+ * "@sol", is one a player chose. It is left as it is and counted apart, so
+ * the dry run shows how many there are. It covers:
  *
  *   users/{uid}.display_name                          public profiles
  *   games/{gameId}/players/{playerId}.display_name    seats, in every game state
@@ -58,6 +61,12 @@ const { getFirestore, FieldPath } = require("firebase-admin/firestore");
 
 // What a name with nothing before its "@" becomes (the prompt's default too).
 const FALLBACK_NAME = "Player";
+
+// A whole email address: no whitespace, exactly one "@" with something
+// before it, and a domain with a dot inside it. Old iOS and Android builds
+// set the account's Auth email itself as the name, so this is all the
+// script resets.
+const EMAIL_ADDRESS = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 const PAGE_SIZE = 200; // docs read per page
 const MAX_PLAN_LINES = 20; // per-doc detail lines before we go quiet
@@ -109,13 +118,23 @@ function parseArgs(argv) {
   return opts;
 }
 
+/** True when `name` is a whole email address. */
+function isEmailAddress(name) {
+  return typeof name === "string" && EMAIL_ADDRESS.test(name);
+}
+
+/** True for a name with an "@" that isn't an email address: it stays. */
+function isOtherNameWithAt(name) {
+  return typeof name === "string" && name.includes("@") && !isEmailAddress(name);
+}
+
 /**
- * The name that replaces `name`, or null when `name` holds no "@". Matches
- * the name prompt's suggestion on iOS and Android: the part before the first
- * "@" with its first letter capitalized.
+ * The name that replaces `name`, or null when `name` isn't a whole email
+ * address. Matches the name prompt's suggestion on iOS and Android: the
+ * part before the "@" with its first letter capitalized.
  */
 function resetName(name) {
-  if (typeof name !== "string" || !name.includes("@")) return null;
+  if (!isEmailAddress(name)) return null;
   const localPart = name.slice(0, name.indexOf("@")).trim();
   if (localPart === "") return FALLBACK_NAME;
   const [first, ...rest] = Array.from(localPart);
@@ -216,10 +235,12 @@ async function main() {
   console.log(`mode:     ${opts.apply ? "APPLY (writes)" : "DRY RUN (no writes)"}`);
   console.log("");
 
+  // Per collection: email-address names to reset, and other names with an
+  // "@" that stay as they are.
   const stats = {
-    users: { scanned: 0, reset: 0, fallback: 0 },
-    seats: { scanned: 0, reset: 0, fallback: 0, byState: {} },
-    requests: { scanned: 0, reset: 0, fallback: 0 },
+    users: { scanned: 0, reset: 0, kept: 0 },
+    seats: { scanned: 0, reset: 0, kept: 0, byState: {} },
+    requests: { scanned: 0, reset: 0, kept: 0 },
   };
   const writer = createWriter(db, opts.apply);
   let planLines = 0;
@@ -235,10 +256,15 @@ async function main() {
   // 1. Public profiles.
   stats.users.scanned = await forEachPage(db.collection("users"), "display_name", async (docs) => {
     for (const doc of docs) {
-      const name = resetName(doc.get("display_name"));
+      const current = doc.get("display_name");
+      if (isOtherNameWithAt(current)) {
+        stats.users.kept++;
+        plan(`users/${doc.id}: keep display_name (has "@", not an email address)`);
+        continue;
+      }
+      const name = resetName(current);
       if (name === null) continue;
       stats.users.reset++;
-      if (name === FALLBACK_NAME) stats.users.fallback++;
       plan(`users/${doc.id}: reset display_name`);
       writer.update(doc, { display_name: name });
     }
@@ -247,8 +273,13 @@ async function main() {
   // 2. Seats, in every game state. A collection-group query also reaches
   //    seats whose game doc is gone; they are reported as "no game doc".
   stats.seats.scanned = await forEachPage(db.collectionGroup("players"), "display_name", async (docs) => {
-    const resets = docs
-      .filter((doc) => isSeat(doc.ref))
+    const seats = docs.filter((doc) => isSeat(doc.ref));
+    for (const doc of seats) {
+      if (!isOtherNameWithAt(doc.get("display_name"))) continue;
+      stats.seats.kept++;
+      plan(`${doc.ref.path}: keep display_name (has "@", not an email address)`);
+    }
+    const resets = seats
       .map((doc) => ({ doc, name: resetName(doc.get("display_name")) }))
       .filter(({ name }) => name !== null);
     if (resets.length === 0) return;
@@ -264,7 +295,6 @@ async function main() {
     for (const { doc, name } of resets) {
       const state = stateByPath.get(doc.ref.parent.parent.path);
       stats.seats.reset++;
-      if (name === FALLBACK_NAME) stats.seats.fallback++;
       stats.seats.byState[state] = (stats.seats.byState[state] || 0) + 1;
       plan(`${doc.ref.path} (${state}): reset display_name`);
       writer.update(doc, { display_name: name });
@@ -277,10 +307,15 @@ async function main() {
     "from_display_name",
     async (docs) => {
       for (const doc of docs) {
-        const name = resetName(doc.get("from_display_name"));
+        const current = doc.get("from_display_name");
+        if (isOtherNameWithAt(current)) {
+          stats.requests.kept++;
+          plan(`friend_requests/${doc.id}: keep from_display_name (has "@", not an email address)`);
+          continue;
+        }
+        const name = resetName(current);
         if (name === null) continue;
         stats.requests.reset++;
-        if (name === FALLBACK_NAME) stats.requests.fallback++;
         plan(`friend_requests/${doc.id}: reset from_display_name`);
         writer.update(doc, { from_display_name: name });
       }
@@ -293,30 +328,28 @@ async function main() {
     .map(([state, count]) => `${state} ${count}`)
     .join(", ");
   const totals = writer.totals;
+  const row = (label, value) => console.log(`${label.padEnd(40)}${value}`);
   console.log("");
-  console.log("─".repeat(56));
-  console.log(`user docs scanned:              ${stats.users.scanned}`);
-  console.log(
-    `  display names with "@":       ${stats.users.reset} (${stats.users.fallback} become "${FALLBACK_NAME}")`
-  );
-  console.log(`seat docs scanned:              ${stats.seats.scanned}`);
-  console.log(
-    `  display names with "@":       ${stats.seats.reset} (${stats.seats.fallback} become "${FALLBACK_NAME}")`
-  );
-  if (byState) console.log(`  by game state:                ${byState}`);
-  console.log(`friend requests scanned:        ${stats.requests.scanned}`);
-  console.log(
-    `  sender names with "@":        ${stats.requests.reset} (${stats.requests.fallback} become "${FALLBACK_NAME}")`
-  );
+  console.log("─".repeat(60));
+  row("user docs scanned:", stats.users.scanned);
+  row("  email-address names:", stats.users.reset);
+  row('  other names with "@" (kept):', stats.users.kept);
+  row("seat docs scanned:", stats.seats.scanned);
+  row("  email-address names:", stats.seats.reset);
+  if (byState) row("    by game state:", byState);
+  row('  other names with "@" (kept):', stats.seats.kept);
+  row("friend requests scanned:", stats.requests.scanned);
+  row("  email-address sender names:", stats.requests.reset);
+  row('  other sender names with "@" (kept):', stats.requests.kept);
   if (opts.apply) {
-    console.log(
-      `writes:                         ${totals.updated} updated, ${totals.skipped} skipped, ` +
-        `${totals.failed} failed (of ${totals.planned})`
+    row(
+      "writes:",
+      `${totals.updated} updated, ${totals.skipped} skipped, ${totals.failed} failed (of ${totals.planned})`
     );
   } else {
-    console.log(`writes:                         ${totals.planned} planned`);
+    row("writes:", `${totals.planned} planned`);
   }
-  console.log("─".repeat(56));
+  console.log("─".repeat(60));
   if (!opts.apply) {
     console.log("DRY RUN — nothing was written. Re-run with --apply to reset these names.");
     return;
