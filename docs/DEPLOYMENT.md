@@ -120,8 +120,9 @@ and nothing else, and the Update Required screen has no way past it. So
 **The App Store URL.** In App Store Connect, open Treachery > App Information
 and copy the **Apple ID**, a number. The URL is
 `https://apps.apple.com/app/id<Apple ID>`. Or open Treachery in the App Store
-on an iPhone, tap Share and copy the link. The app only accepts `https://` and
-`itms-apps://` links; anything else, `http://` included, hides the button.
+on an iPhone, tap Share and copy the link. The app accepts only `https://`,
+`itms-apps://` and `itms-appss://` links that name a host, such as
+`apps.apple.com`; anything else, `http://` included, hides the button.
 
 ### Undo
 
@@ -147,10 +148,18 @@ gate ignore the document.
    build 1 already.
 3. Quit the app from the app switcher and open it again. Check that the
    Update Required screen appears and that **Update** opens Treachery's App
-   Store page. On a phone, also turn VoiceOver on and check that focus moves
-   to "Update Required" when the screen appears.
-4. Delete `min_build` (skip this if you left a real minimum in step 2), then
-   switch to another app and back. Treachery should open as normal.
+   Store page. Check the button on a phone: a simulator has no App Store
+   app, so an `itms-apps://` or `itms-appss://` link opens nothing there.
+   On a phone, also turn VoiceOver on and check that focus moves to "Update
+   Required" when the screen appears.
+4. What switching to another app and back should do depends on step 2:
+   - If you set `min_build` to `2`, delete it, then switch to another app
+     and back. Treachery should open as normal.
+   - If you left a real minimum in place, keep it, and switch to another
+     app and back. The Update Required screen should stay up: build 1 is
+     still below the minimum, so that's the right result. Don't delete the
+     real minimum to make the app open; that would let every build below
+     it back in.
 
 ### What the gate doesn't stop
 
