@@ -96,6 +96,23 @@ struct ProfileSignOutTests {
         #expect(viewModel.signOutFailureMessage == nil)
     }
 
+    /// The screen announces a failed sign-out after every attempt, because a
+    /// repeated failure changes nothing on screen; each attempt still leaves
+    /// the message for it to say.
+    @Test func repeatedFailedSignOutStillHasAMessageToAnnounce() {
+        session.isGuest = true
+        session.errorToThrow = NSError(domain: "FIRAuthErrorDomain", code: 17_995)
+        viewModel.requestSignOut()
+        viewModel.confirmGuestSignOut()
+        #expect(viewModel.signOutFailureMessage == "Couldn't sign out. Something went wrong. Try again.")
+
+        viewModel.requestSignOut()
+        viewModel.confirmGuestSignOut()
+
+        #expect(session.endSessionCallCount == 2)
+        #expect(viewModel.signOutFailureMessage == "Couldn't sign out. Something went wrong. Try again.")
+    }
+
     // MARK: - Account deletion
 
     @Test func signOutIsIgnoredWhileTheAccountIsBeingDeleted() async {

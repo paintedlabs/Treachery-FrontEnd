@@ -47,7 +47,7 @@ struct ForgotPasswordView: View {
                 .multilineTextAlignment(.center)
 
             if let error = authViewModel.errorMessage {
-                MtgErrorBanner(message: error)
+                FailureMessage(message: error)
             }
 
             TextField("Email", text: $email)
@@ -107,6 +107,8 @@ struct ForgotPasswordView: View {
             if authViewModel.errorMessage == nil {
                 didSend = true
             }
+            // The failure appears above the form, away from the button.
+            FailureMessage.announce(authViewModel.errorMessage)
         }
     }
 }

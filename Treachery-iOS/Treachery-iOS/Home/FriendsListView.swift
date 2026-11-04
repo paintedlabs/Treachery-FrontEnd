@@ -167,18 +167,8 @@ struct FriendsListView: View {
                 searchResultRow(for: user)
             }
         case .failed(let failure, _):
-            Label {
-                Text("Couldn't search for players. \(failure.message)")
-            } icon: {
-                Image(systemName: "exclamationmark.triangle.fill")
-                    .foregroundStyle(Color.mtgError)
-            }
-            .font(.footnote)
-            .foregroundStyle(Color.mtgTextPrimary)
-            .fixedSize(horizontal: false, vertical: true)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal, 16)
-            .accessibilityElement(children: .combine)
+            FailureMessage(message: searchFailureMessage(failure))
+                .padding(.horizontal, 16)
         }
     }
 
@@ -188,10 +178,17 @@ struct FriendsListView: View {
         case .loaded(let search) where search.players.isEmpty:
             noMatchesMessage(for: search)
         case .failed(let failure, _):
-            "Couldn't search for players. \(failure.message)"
+            searchFailureMessage(failure)
         case .idle, .loading, .loaded:
             nil
         }
+    }
+
+    private func searchFailureMessage(_ failure: UserFacingError) -> String {
+        String(
+            localized: "Couldn't search for players. \(failure.message)",
+            comment: "Shown under the friend search when it failed. The argument says why."
+        )
     }
 
     /// "No players named “Ada”", or "No other players named “Ada”" when only
@@ -363,7 +360,7 @@ struct FriendsListView: View {
                 Button {
                     friendToRemove = friend
                 } label: {
-                    CapsuleButtonLabel(title: "Remove", style: .outlined(Color.mtgError))
+                    CapsuleButtonLabel(title: "Remove", style: .destructive)
                 }
                 .accessibilityLabel("Remove \(friend.displayName) from friends")
             }
@@ -386,8 +383,13 @@ struct FriendsListView: View {
 /// 44 points tall: the capsule stays compact, the target doesn't.
 private struct CapsuleButtonLabel: View {
     enum Style {
+        /// Dark text on a capsule filled with the color.
         case filled(Color)
+        /// Text in the color, in a plain outline.
         case outlined(Color)
+        /// Light text in a red outline. Red text itself, `mtgError` on these
+        /// cards, is below the 4.5:1 contrast minimum.
+        case destructive
     }
 
     let title: String
@@ -408,6 +410,12 @@ private struct CapsuleButtonLabel: View {
                     .padding(.horizontal, 12)
                     .padding(.vertical, 4)
                     .overlay(Capsule().stroke(Color.mtgDivider, lineWidth: 1))
+            case .destructive:
+                Text(title)
+                    .foregroundStyle(Color.mtgTextPrimary)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 4)
+                    .overlay(Capsule().stroke(Color.mtgError, lineWidth: 1))
             }
         }
         .font(.caption)

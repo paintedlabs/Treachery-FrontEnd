@@ -3,7 +3,6 @@
 //  Treachery-iOS
 //
 
-import Accessibility
 import SwiftUI
 
 struct DisplayNamePromptView: View {
@@ -73,7 +72,7 @@ struct DisplayNamePromptView: View {
                 }
 
             if let error = validationError {
-                MtgErrorBanner(message: error)
+                FailureMessage(message: error)
             }
 
             Button {
@@ -128,6 +127,7 @@ struct DisplayNamePromptView: View {
         let trimmed = displayName.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else {
             validationError = "Please enter a display name."
+            FailureMessage.announce(validationError)
             return
         }
         validationError = nil
@@ -146,7 +146,7 @@ struct DisplayNamePromptView: View {
                     comment: "Shown on the name prompt when saving the chosen display name failed. The argument says why."
                 )
                 validationError = message
-                AccessibilityNotification.Announcement(message).post()
+                FailureMessage.announce(message)
             }
         }
     }

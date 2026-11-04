@@ -47,7 +47,7 @@ struct PhoneAuthView: View {
                 .multilineTextAlignment(.center)
 
             if let error = authViewModel.errorMessage {
-                MtgErrorBanner(message: error)
+                FailureMessage(message: error)
             }
 
             if !isCodeStep {
@@ -146,8 +146,10 @@ struct PhoneAuthView: View {
     private func sendCode() {
         let formatted = phoneNumber.trimmingCharacters(in: .whitespaces)
         let number = formatted.hasPrefix("+") ? formatted : "+1\(formatted)"
+        // Each failure appears above the form, away from the button.
         guard number.count >= 10 else {
             authViewModel.errorMessage = "Please enter a valid phone number."
+            FailureMessage.announce(authViewModel.errorMessage)
             return
         }
 
@@ -156,6 +158,7 @@ struct PhoneAuthView: View {
             let id = await authViewModel.verifyPhoneNumber(number)
             verificationID = id
             isLoading = false
+            FailureMessage.announce(authViewModel.errorMessage)
         }
     }
 
@@ -165,6 +168,7 @@ struct PhoneAuthView: View {
         Task {
             await authViewModel.signInWithPhoneCode(verificationID: id, code: verificationCode)
             isLoading = false
+            FailureMessage.announce(authViewModel.errorMessage)
         }
     }
 }

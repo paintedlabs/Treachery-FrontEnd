@@ -38,12 +38,15 @@ struct ProfileView: View {
 
                     // Sign Out, About and Delete Account stay reachable even
                     // when the profile can't load.
+                    // A failed sign-out is announced after every attempt: a
+                    // repeated failure changes nothing on screen.
                     SignOutSection(
                         isEnabled: !isAccountDeletionUnderway,
                         isGuest: authViewModel.isGuest,
                         failureMessage: viewModel.signOutFailureMessage
                     ) {
                         viewModel.requestSignOut()
+                        FailureMessage.announce(viewModel.signOutFailureMessage)
                     }
                     .confirmationDialog(
                         "Sign Out of Guest Account?",
@@ -52,6 +55,7 @@ struct ProfileView: View {
                     ) {
                         Button("Sign Out", role: .destructive) {
                             viewModel.confirmGuestSignOut()
+                            FailureMessage.announce(viewModel.signOutFailureMessage)
                         }
                         Button("Cancel", role: .cancel) {
                             viewModel.cancelSignOut()
@@ -157,14 +161,7 @@ struct ProfileView: View {
         // VoiceOver doesn't read a failure that appears after its button was
         // tapped (the rename one appears away from Save), so announce it.
         .onChange(of: viewModel.renameFailureMessage) { _, message in
-            if let message {
-                AccessibilityNotification.Announcement(message).post()
-            }
-        }
-        .onChange(of: viewModel.signOutFailureMessage) { _, message in
-            if let message {
-                AccessibilityNotification.Announcement(message).post()
-            }
+            FailureMessage.announce(message)
         }
         .task { await reload() }
     }
@@ -242,21 +239,10 @@ struct ProfileView: View {
                 }
             }
 
-            // Primary-colored text: mtgError text on this card is
-            // below the 4.5:1 contrast minimum (see DeleteAccountSection).
             if let renameFailure = viewModel.renameFailureMessage {
-                Label {
-                    Text(renameFailure)
-                } icon: {
-                    Image(systemName: "exclamationmark.triangle.fill")
-                        .foregroundStyle(Color.mtgError)
-                }
-                .font(.footnote)
-                .foregroundStyle(Color.mtgTextPrimary)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, 16)
-                .padding(.bottom, 4)
-                .accessibilityElement(children: .combine)
+                FailureMessage(message: renameFailure)
+                    .padding(.horizontal, 16)
+                    .padding(.bottom, 4)
             }
 
             ProfileRow(label: "Member Since") {
@@ -480,9 +466,10 @@ private struct DeckPerformanceCard: View {
 
 // MARK: - Sign Out Section
 
-/// Sign Out and, if it failed, why. Primary-colored text on a red-bordered
-/// card, with the whole card as its target: `mtgError` text on `mtgSurface`
-/// is below the 4.5:1 contrast minimum (see DeleteAccountSection).
+/// Sign Out and, if it failed, why (`FailureMessage`). Primary-colored text
+/// on a red-bordered card, with the whole card as its target: `mtgError`
+/// text on `mtgSurface` is below the 4.5:1 contrast minimum (see
+/// DeleteAccountSection).
 private struct SignOutSection: View {
     let isEnabled: Bool
     let isGuest: Bool
@@ -505,16 +492,7 @@ private struct SignOutSection: View {
             .accessibilityHint(isGuest ? "Asks you to confirm first, because a guest account can't be signed back into." : "")
 
             if let failureMessage {
-                Label {
-                    Text(failureMessage)
-                } icon: {
-                    Image(systemName: "exclamationmark.triangle.fill")
-                        .foregroundStyle(Color.mtgError)
-                }
-                .font(.footnote)
-                .foregroundStyle(Color.mtgTextPrimary)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .accessibilityElement(children: .combine)
+                FailureMessage(message: failureMessage)
             }
         }
     }

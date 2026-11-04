@@ -61,7 +61,7 @@ struct LoginView: View {
             // Form content with fade-in animation
             Group {
                 if let error = authViewModel.errorMessage {
-                    MtgErrorBanner(message: error)
+                    FailureMessage(message: error)
                 }
 
                 // Email/Password fields
@@ -222,6 +222,8 @@ struct LoginView: View {
         Task {
             await authViewModel.signIn(email: email, password: password)
             isLoading = false
+            // The failure appears above the form, away from Sign In.
+            FailureMessage.announce(authViewModel.errorMessage)
         }
     }
 
@@ -230,6 +232,7 @@ struct LoginView: View {
         Task {
             await authViewModel.signInAsGuest()
             isGuestLoading = false
+            FailureMessage.announce(authViewModel.errorMessage)
         }
     }
 }

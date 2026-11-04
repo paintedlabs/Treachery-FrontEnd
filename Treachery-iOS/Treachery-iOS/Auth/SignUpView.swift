@@ -43,7 +43,7 @@ struct SignUpView: View {
                 .foregroundStyle(Color.mtgTextSecondary)
 
             if let error = localError ?? authViewModel.errorMessage {
-                MtgErrorBanner(message: error)
+                FailureMessage(message: error)
             }
 
             TextField("Email", text: $email)
@@ -125,12 +125,15 @@ struct SignUpView: View {
 
         guard !email.isEmpty, !password.isEmpty else { return }
 
+        // Each failure appears above the form, away from Create Account.
         guard password == confirmPassword else {
             localError = "Passwords do not match."
+            FailureMessage.announce(localError)
             return
         }
         guard password.count >= 6 else {
             localError = "Password must be at least 6 characters."
+            FailureMessage.announce(localError)
             return
         }
 
@@ -138,6 +141,7 @@ struct SignUpView: View {
         Task {
             await authViewModel.signUp(email: email, password: password)
             isLoading = false
+            FailureMessage.announce(authViewModel.errorMessage)
         }
     }
 }
