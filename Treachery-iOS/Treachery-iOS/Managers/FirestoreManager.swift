@@ -183,7 +183,9 @@ final class FirestoreManager: FirestoreManaging {
     }
 
     func getFriends(forUserId userId: String) async throws -> [TreacheryUser] {
-        guard let user = try await getUser(id: userId) else { return [] }
+        // Without the profile there's no friends list to read, which is not
+        // the same as having no friends.
+        guard let user = try await getUser(id: userId) else { throw FirestoreReadError.profileUnavailable }
         guard !user.friendIds.isEmpty else { return [] }
 
         // Run all batch queries in parallel

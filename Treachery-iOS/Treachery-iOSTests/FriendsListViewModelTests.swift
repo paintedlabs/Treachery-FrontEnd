@@ -20,6 +20,8 @@ struct FriendsListViewModelTests {
             cloudFunctions: cloudFunctions,
             trackEvent: analytics.record
         )
+        // The signed-in user's own profile, which holds their friends list.
+        firestore.usersToReturn["u1"] = friend("u1", named: "Ada")
     }
 
     // MARK: - Loading
@@ -61,6 +63,25 @@ struct FriendsListViewModelTests {
         #expect(viewModel.overview.value == nil)
 
         firestore.friendsError = nil
+        await viewModel.loadData(userId: "u1")
+
+        #expect(viewModel.overview.phase == .loaded)
+        #expect(viewModel.overview.value?.friends.map(\.id) == ["f1"])
+    }
+
+    /// Without their own profile there's no friends list to read, which
+    /// used to show "No friends yet" with no error and no Try Again.
+    @Test func unreadableOwnProfileFailsTheLoadThenRetryLoads() async {
+        firestore.usersToReturn = [:]
+        firestore.friendsToReturn = [friend("f1")]
+
+        await viewModel.loadData(userId: "u1")
+
+        #expect(viewModel.overview.phase == .failed)
+        #expect(viewModel.overview.failure == .unknown)
+        #expect(viewModel.overview.value == nil)
+
+        firestore.usersToReturn["u1"] = friend("u1", named: "Ada")
         await viewModel.loadData(userId: "u1")
 
         #expect(viewModel.overview.phase == .loaded)

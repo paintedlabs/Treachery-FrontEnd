@@ -1,5 +1,14 @@
 import Foundation
 
+/// A read that found nothing it could show, where an empty or missing
+/// answer would otherwise pass for real data.
+enum FirestoreReadError: Error, Equatable {
+    /// The user's own profile, `users/{uid}`, is missing, incomplete or
+    /// can't be decoded: `getUser(id:)` returns nil for it. Signing in
+    /// creates or repairs it, so trying again can help.
+    case profileUnavailable
+}
+
 protocol FirestoreManaging {
     // Users
 
@@ -29,6 +38,9 @@ protocol FirestoreManaging {
     func updateFriendRequest(_ request: FriendRequest) async throws
     func addFriend(userId: String, friendId: String) async throws
     func removeFriend(userId: String, friendId: String) async throws
+    /// The user's friends, by name. Throws
+    /// `FirestoreReadError.profileUnavailable` when the user's own profile
+    /// is missing or can't be read, rather than report no friends.
     func getFriends(forUserId userId: String) async throws -> [TreacheryUser]
 
     // Games

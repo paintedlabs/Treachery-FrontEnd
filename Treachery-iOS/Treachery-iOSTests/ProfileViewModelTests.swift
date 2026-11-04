@@ -192,6 +192,19 @@ struct ProfileViewModelTests {
         #expect(viewModel.overview.phase == .failed)
         #expect(viewModel.overview.failure == .unknown)
         #expect(viewModel.user == nil)
+
+        // Once the profile can be read, Try Again loads it.
+        firestore.usersToReturn["u1"] = TreacheryUser(
+            id: "u1",
+            displayName: "Repaired Name",
+            friendIds: [],
+            createdAt: Date(timeIntervalSince1970: 1_000_000)
+        )
+        await viewModel.loadData(userId: "u1")
+
+        #expect(viewModel.overview.phase == .loaded)
+        #expect(viewModel.overview.failure == nil)
+        #expect(viewModel.user?.displayName == "Repaired Name")
     }
 
     @Test func statsFailingFailsTheLoadInsteadOfShowingAPartialProfile() async {

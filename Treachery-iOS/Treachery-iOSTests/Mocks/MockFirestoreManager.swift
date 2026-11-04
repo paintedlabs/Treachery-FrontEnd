@@ -129,6 +129,8 @@ final class MockFirestoreManager: FirestoreManaging {
 
     private(set) var getFriendsCallCount = 0
 
+    /// Like the real one, fails when `usersToReturn` has no profile for
+    /// `userId`; otherwise returns `friendsToReturn`.
     func getFriends(forUserId userId: String) async throws -> [TreacheryUser] {
         getFriendsCallCount += 1
         if let inFlight = whileGettingFriends {
@@ -137,6 +139,7 @@ final class MockFirestoreManager: FirestoreManaging {
             await inFlight()
         }
         if let friendsError { throw friendsError }
+        guard usersToReturn[userId] != nil else { throw FirestoreReadError.profileUnavailable }
         return friendsToReturn
     }
 

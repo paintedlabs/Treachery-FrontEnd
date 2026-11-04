@@ -211,12 +211,10 @@ final class ProfileViewModel: ObservableObject {
 
     // MARK: - Data Loading
 
-    /// A profile that is missing or can't be read: `getUser` returns nil for
-    /// it. Signing in creates or repairs it, so trying again can help.
-    private struct ProfileUnavailable: Error {}
-
     /// Loads the profile and the stats over the user's finished games
     /// together. What's already shown stays while this runs and if it fails.
+    /// A profile that is missing or can't be read fails the load, rather
+    /// than leave a spinner running.
     func loadData(userId: String) async {
         self.userId = userId
         overview.startLoading()
@@ -225,7 +223,7 @@ final class ProfileViewModel: ObservableObject {
             async let userTask = firestoreManager.getUser(id: userId)
             async let gamesTask = firestoreManager.getFinishedGames(forUserId: userId)
 
-            guard let user = try await userTask else { throw ProfileUnavailable() }
+            guard let user = try await userTask else { throw FirestoreReadError.profileUnavailable }
             let games = try await gamesTask
             let playersByGame = await firestoreManager.playersByGame(for: games)
 
