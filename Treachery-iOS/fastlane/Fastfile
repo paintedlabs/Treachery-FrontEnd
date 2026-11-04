@@ -225,6 +225,29 @@ platform :ios do
   lane :release do
     ensure_version_matches_release_tag
 
+    # Ahead of the keychain setup, which it doesn't need: the phased-release
+    # query below uses the Spaceship token this sets.
+    api_key = app_store_connect_api_key(
+      key_id: ENV["APP_STORE_CONNECT_KEY_ID"],
+      issuer_id: ENV["APP_STORE_CONNECT_ISSUER_ID"],
+      key_content: ENV["APP_STORE_CONNECT_KEY"],
+      is_key_content_base64: true
+    )
+
+    # Phased release only paces automatic updates for people who already have
+    # the app, so App Store Connect has none for an app's first version, and
+    # deliver fails if asked to create one. Request it only once a version is
+    # live: the first version goes to everyone when approved, and later ones
+    # roll out over Apple's 7 days. Pause or finish a rollout in App Store
+    # Connect (see docs/DEPLOYMENT.md). Decided before anything builds, so an
+    # App Store Connect error here costs no archive.
+    use_phased_release = app_store_version_live
+    if use_phased_release
+      UI.message("Phased release: on. A version is live on the App Store, so this update rolls out over 7 days.")
+    else
+      UI.message("Phased release: off. No version is live on the App Store yet, so this one goes to everyone when approved.")
+    end
+
     setup_ci if is_ci
 
     # Import distribution certificate into Fastlane's temp keychain
@@ -236,13 +259,6 @@ platform :ios do
         keychain_password: ""
       )
     end
-
-    api_key = app_store_connect_api_key(
-      key_id: ENV["APP_STORE_CONNECT_KEY_ID"],
-      issuer_id: ENV["APP_STORE_CONNECT_ISSUER_ID"],
-      key_content: ENV["APP_STORE_CONNECT_KEY"],
-      is_key_content_base64: true
-    )
 
     # Increment build number
     current = latest_testflight_build_number(api_key: api_key)
@@ -282,17 +298,12 @@ platform :ios do
       cloned_source_packages_path: SOURCE_PACKAGES
     )
 
-    # Upload and submit for review. Phased release only paces automatic updates
-    # for people who already have the app, so App Store Connect has none for an
-    # app's first version, and deliver fails if asked to create one. Request it
-    # only once a version is live: the first version goes to everyone when
-    # approved, and later ones roll out over Apple's 7 days. Pause or finish a
-    # rollout in App Store Connect (see docs/DEPLOYMENT.md).
+    # Upload and submit for review, phased as decided at the top of the lane.
     upload_to_app_store(
       api_key: api_key,
       submit_for_review: true,
       automatic_release: true,
-      phased_release: app_store_version_live,
+      phased_release: use_phased_release,
       force: true,
       precheck_include_in_app_purchases: false,
       submission_information: {

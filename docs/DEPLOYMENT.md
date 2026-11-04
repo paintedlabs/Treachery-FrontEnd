@@ -74,8 +74,10 @@ Once a version of the app is live, the App Store lane submits each update with
 Apple's 7-day phased release: automatic updates reach 1%, 2%, 5%, 10%, 20%,
 50% and then 100% of users. App Store Connect offers phased release only for
 updates, so the app's first version goes to everyone as soon as it is
-approved. Phased release only paces automatic updates; anyone can still
-download the new version from the App Store.
+approved. The lane asks App Store Connect for a live version before it builds
+and logs the answer as "Phased release: on" or "Phased release: off". Phased
+release only paces automatic updates; anyone can still download the new
+version from the App Store.
 
 Whoever published the release checks Crashlytics (or Xcode Organizer) and
 player reports every day of the rollout, and pauses it from the version's
