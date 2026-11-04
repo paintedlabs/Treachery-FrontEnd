@@ -73,9 +73,17 @@ final class MockFirestoreManager: FirestoreManaging {
     func getActiveGame(forUserId userId: String) async throws -> Game? { activeGameToReturn }
     func getFinishedGames(forUserId userId: String) async throws -> [Game] { finishedGamesToReturn }
 
-    func listenToGame(id: String, onChange: @escaping (Game?) -> Void) -> ListenerCancellable {
-        onChange(gamesToReturn[id])
-        return MockListenerCancellable()
+    /// Delivers `gamesToReturn[id]` straight away when it is set, like a
+    /// cached document. Leave it unset to start with nothing delivered, then
+    /// drive the listener with `emitGame`.
+    func listenToGame(id: String, onChange: @escaping @MainActor (DocumentEvent<Game>) -> Void) -> ListenerCancellable {
+        let registration = MockListenerCancellable()
+        gameListeners.append(GameListener(gameId: id, registration: registration, onChange: onChange))
+        if let game = gamesToReturn[id] {
+            // Tests run on the main actor, where the real SDK calls back too.
+            MainActor.assumeIsolated { onChange(.loaded(game)) }
+        }
+        return registration
     }
 
     // MARK: - Players
@@ -90,9 +98,60 @@ final class MockFirestoreManager: FirestoreManaging {
     func updatePlayer(_ player: Player, inGame gameId: String) async throws {}
     func removePlayer(id: String, fromGame gameId: String) async throws {}
 
-    func listenToPlayers(gameId: String, onChange: @escaping ([Player]) -> Void) -> ListenerCancellable {
-        onChange(playersToReturn)
-        return MockListenerCancellable()
+    /// Delivers `playersToReturn` straight away, then whatever `emitPlayers` sends.
+    func listenToPlayers(gameId: String, onChange: @escaping @MainActor (Result<[Player], ListenerFailure>) -> Void) -> ListenerCancellable {
+        let registration = MockListenerCancellable()
+        playersListeners.append(PlayersListener(gameId: gameId, registration: registration, onChange: onChange))
+        let players = playersToReturn
+        MainActor.assumeIsolated { onChange(.success(players)) }
+        return registration
+    }
+
+    // MARK: - Driving Listeners
+    //
+    // Listeners stay registered, as in the real SDK, so tests can deliver
+    // later snapshots, a deleted game and listener failures. A removed
+    // registration receives nothing more.
+
+    private struct GameListener {
+        let gameId: String
+        let registration: MockListenerCancellable
+        let onChange: @MainActor (DocumentEvent<Game>) -> Void
+    }
+
+    private struct PlayersListener {
+        let gameId: String
+        let registration: MockListenerCancellable
+        let onChange: @MainActor (Result<[Player], ListenerFailure>) -> Void
+    }
+
+    private var gameListeners: [GameListener] = []
+    private var playersListeners: [PlayersListener] = []
+
+    /// Game listeners attached for `gameId` and not removed since.
+    func activeGameListenerCount(gameId: String) -> Int {
+        gameListeners.filter { $0.gameId == gameId && !$0.registration.removeCalled }.count
+    }
+
+    /// Players listeners attached for `gameId` and not removed since.
+    func activePlayersListenerCount(gameId: String) -> Int {
+        playersListeners.filter { $0.gameId == gameId && !$0.registration.removeCalled }.count
+    }
+
+    /// Sends `event` to every active game listener for `gameId`.
+    @MainActor
+    func emitGame(_ event: DocumentEvent<Game>, gameId: String) {
+        for listener in gameListeners where listener.gameId == gameId && !listener.registration.removeCalled {
+            listener.onChange(event)
+        }
+    }
+
+    /// Sends `result` to every active players listener for `gameId`.
+    @MainActor
+    func emitPlayers(_ result: Result<[Player], ListenerFailure>, gameId: String) {
+        for listener in playersListeners where listener.gameId == gameId && !listener.registration.removeCalled {
+            listener.onChange(result)
+        }
     }
 
     // MARK: - Batch Updates

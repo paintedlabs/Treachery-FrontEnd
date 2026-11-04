@@ -98,8 +98,17 @@ struct HomeView: View {
 /// The main Play tab — contains the game flow NavigationStack.
 private struct HomeTab: View {
     @EnvironmentObject var authViewModel: AuthViewModel
+    @Environment(\.scenePhase) private var scenePhase
     @State private var path = NavigationPath()
     @StateObject private var viewModel = HomeViewModel()
+
+    /// What decides when Home re-checks for a game to rejoin: every time it
+    /// is showing again, whether back from a game screen or back from the
+    /// background.
+    private struct ActiveGameCheck: Equatable {
+        let isShowingHome: Bool
+        let isAppActive: Bool
+    }
 
     var body: some View {
         NavigationStack(path: $path) {
@@ -219,9 +228,10 @@ private struct HomeTab: View {
             .navigationBarHidden(true)
             .toolbarColorScheme(.dark, for: .navigationBar)
             .onAppear { AnalyticsService.trackScreen("Home") }
-            .task(id: path.count) {
-                // Re-check every time we return to the home screen (path becomes empty)
-                guard path.isEmpty,
+            .task(id: ActiveGameCheck(isShowingHome: path.isEmpty, isAppActive: scenePhase == .active)) {
+                // A banner fetched before the app went to the background may
+                // point at a game that has since finished or been cleaned up.
+                guard path.isEmpty, scenePhase == .active,
                       let userId = authViewModel.currentUserId else { return }
                 await viewModel.checkForActiveGame(userId: userId)
             }

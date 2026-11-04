@@ -15,7 +15,6 @@ struct GameBoardView: View {
     @State private var cardFlipDegrees: Double = 0
     @State private var showUnveiledBanner = false
     @State private var showForfeitConfirmation = false
-    @State private var showGameUnavailableAlert = false
     @State private var showEndGameConfirmation = false
     @State private var showWinnerSelection = false
     @State private var selectedWinners: Set<String> = []
@@ -46,35 +45,8 @@ struct GameBoardView: View {
             VStack(spacing: 0) {
                 ConnectionBanner()
 
-                if viewModel.isGameUnavailable {
-                    // Game was deleted or became unavailable
-                    Spacer()
-                    VStack(spacing: 12) {
-                        Image(systemName: "wifi.exclamationmark")
-                            .font(.system(size: 48))
-                            .foregroundStyle(Color.mtgGold)
-                        Text("Game Unavailable")
-                            .font(.system(.title2, design: .serif))
-                            .fontWeight(.bold)
-                            .foregroundStyle(Color.mtgTextPrimary)
-                        Text("This game is no longer available. It may have been deleted by the host.")
-                            .font(.subheadline)
-                            .foregroundStyle(Color.mtgTextSecondary)
-                            .multilineTextAlignment(.center)
-                        Button("Return to Home") {
-                            navigationPath.removeLast(navigationPath.count)
-                        }
-                        .buttonStyle(MtgPrimaryButtonStyle())
-                        .padding(.top)
-                        .padding(.horizontal, 40)
-                    }
-                    .padding()
-                    Spacer()
-                } else if viewModel.players.isEmpty {
-                    // Loading state
-                    Spacer()
-                    MtgLoadingView(message: "Loading game...")
-                    Spacer()
+                if viewModel.status != .ready {
+                    statusContent
                 } else {
                     // Identity card header — only when treachery active
                     if viewModel.isTreacheryActive {
@@ -113,14 +85,26 @@ struct GameBoardView: View {
                                 }
                             }
                         } else {
-                            // Current player not found (reconnection case)
+                            // Current player not found (reconnection case).
+                            // Forfeit and the action bar need that player, so
+                            // this state offers its own way out.
                             VStack(spacing: 8) {
                                 Image(systemName: "exclamationmark.triangle.fill")
                                     .font(.title)
                                     .foregroundStyle(Color.mtgGold)
+                                    .accessibilityHidden(true)
                                 Text("Unable to find your player data")
                                     .font(.subheadline)
                                     .foregroundStyle(Color.mtgTextSecondary)
+                                Button {
+                                    goHome()
+                                } label: {
+                                    Text("Back to Home")
+                                        .font(.subheadline)
+                                        .frame(minHeight: 44)
+                                        .contentShape(Rectangle())
+                                }
+                                .foregroundStyle(Color.mtgGold)
                             }
                             .padding()
                         }
@@ -190,6 +174,11 @@ struct GameBoardView: View {
                     // Error display
                     if let error = viewModel.errorMessage {
                         MtgErrorBanner(message: error)
+                            .padding(.horizontal)
+                            .padding(.vertical, 4)
+                    }
+                    if let failure = viewModel.lifeChangeFailure {
+                        MtgErrorBanner(message: failure.message)
                             .padding(.horizontal)
                             .padding(.vertical, 4)
                     }
@@ -267,7 +256,7 @@ struct GameBoardView: View {
         .onAppear { AnalyticsService.trackScreen("GameBoard") }
         .toolbar {
             // Forfeit button — available in all game modes so players can always leave
-            if !viewModel.isGameUnavailable && !(viewModel.currentPlayer?.isEliminated ?? true) {
+            if viewModel.status == .ready && !(viewModel.currentPlayer?.isEliminated ?? true) {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {
                         showForfeitConfirmation = true
@@ -298,14 +287,19 @@ struct GameBoardView: View {
         .onAppear {
             viewModel.currentUserId = authViewModel.currentUserId
         }
+        .onDisappear {
+            // Taps still waiting out their debounce would go with the board.
+            viewModel.sendPendingLifeChanges()
+        }
+        .onChange(of: viewModel.lifeChangeFailure) { _, failure in
+            // A failed change can put a total back with no other sign, and
+            // the banner is away from the rows: read it out.
+            guard let failure else { return }
+            AccessibilityNotification.Announcement(failure.message).post()
+        }
         .onChange(of: viewModel.isGameFinished) { _, finished in
             if finished {
                 navigationPath.append(AppDestination.gameOver(gameId: viewModel.gameId))
-            }
-        }
-        .onChange(of: viewModel.isGameUnavailable) { _, unavailable in
-            if unavailable {
-                showGameUnavailableAlert = true
             }
         }
         .sheet(isPresented: $showCardDetail) {
@@ -354,6 +348,41 @@ struct GameBoardView: View {
                 WearerOfMasksAbilitySheet(viewModel: viewModel)
             }
         }
+    }
+
+    // MARK: - Status
+
+    /// Everything but the board itself. Each state offers a way home, since
+    /// this screen hides the back button and the tab bar.
+    @ViewBuilder
+    private var statusContent: some View {
+        switch viewModel.status {
+        case .ready:
+            EmptyView() // the board itself is shown instead
+        case .loading:
+            GameLoadingView(message: "Loading game...", onGoHome: { goHome() })
+        case .unavailable:
+            GameStatusView(
+                systemImage: "wifi.exclamationmark",
+                title: "Game Unavailable",
+                message: "This game has closed and is no longer available.",
+                onGoHome: { goHome() }
+            )
+        case .failed:
+            GameStatusView(
+                systemImage: "exclamationmark.triangle.fill",
+                title: "Couldn't Load the Game",
+                message: "Check your connection and try again.",
+                action: .tryAgain { viewModel.retry() },
+                onGoHome: { goHome() }
+            )
+        case .needsNewerVersion:
+            GameStatusView.needsNewerVersion(onGoHome: { goHome() })
+        }
+    }
+
+    private func goHome() {
+        navigationPath.removeLast(navigationPath.count)
     }
 
     // MARK: - Unveil Animation

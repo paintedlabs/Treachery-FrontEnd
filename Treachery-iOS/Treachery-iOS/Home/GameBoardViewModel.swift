@@ -6,7 +6,10 @@
 //
 
 import Foundation
+import os
 import SwiftUI
+
+private let logger = Logger(subsystem: "com.Solomon.Treachery-iOS", category: "GameBoard")
 
 @MainActor
 final class GameBoardViewModel: ObservableObject {
@@ -16,7 +19,10 @@ final class GameBoardViewModel: ObservableObject {
     @Published var game: Game?
     @Published var players: [Player] = []
     @Published var errorMessage: String?
-    @Published var isGameUnavailable = false
+    /// The latest life change whose call failed, shown until that player's
+    /// life is changed again here. Kept apart from `errorMessage`, which any
+    /// tap clears, so tapping someone else doesn't hide it.
+    @Published private(set) var lifeChangeFailure: LifeChangeFailure?
     @Published var isPending = false
     @Published var pendingAbilityResolution: AbilityResolution?
 
@@ -27,9 +33,21 @@ final class GameBoardViewModel: ObservableObject {
 
     // MARK: - Optimistic Life Tracking
 
-    private var lifeDeltas: [String: Int] = [:]
-    private var debounceTimers: [String: Task<Void, Never>] = [:]
+    /// This device's life changes the server hasn't confirmed yet. `players`
+    /// is `serverPlayers` with these laid over it.
+    private var lifeLedger = LifeLedger()
+    /// Per player: the debounce running since their latest tap. Visible to
+    /// tests, which await it rather than sleep.
+    private(set) var lifeChangeDebounces: [String: Task<Void, Never>] = [:]
+    /// Per player: the adjustLife call under way. Visible to tests, which
+    /// await it rather than sleep.
+    private(set) var lifeChangeSends: [String: Task<Void, Never>] = [:]
+    /// Per player: the wait for a confirmed change to show up in a
+    /// snapshot. Visible to tests, which await it rather than sleep.
+    private(set) var lifeChangeEchoWaits: [String: Task<Void, Never>] = [:]
     private var serverPlayers: [Player] = []
+    /// Times the debounce and the wait for a confirmed change's echo.
+    private let clock: any Clock<Duration>
 
     // MARK: - Properties
 
@@ -41,7 +59,8 @@ final class GameBoardViewModel: ObservableObject {
     private let planeDatabase: PlaneLookupProviding
     private var gameListener: ListenerCancellable?
     private var playersListener: ListenerCancellable?
-    private var hasReceivedFirstGameSnapshot = false
+    /// A listener outcome that leaves nothing to show; see `status`.
+    @Published private var interruption: ListenerInterruption?
 
     // MARK: - Computed Properties
 
@@ -135,7 +154,8 @@ final class GameBoardViewModel: ObservableObject {
         firestoreManager: FirestoreManaging = FirestoreManager(),
         cloudFunctions: CloudFunctionsProtocol = CloudFunctions(),
         cardDatabase: CardLookupProviding = CardDatabase.shared,
-        planeDatabase: PlaneLookupProviding = PlaneDatabase.shared
+        planeDatabase: PlaneLookupProviding = PlaneDatabase.shared,
+        clock: any Clock<Duration> = ContinuousClock()
     ) {
         self.gameId = gameId
         self.currentUserId = currentUserId
@@ -143,6 +163,7 @@ final class GameBoardViewModel: ObservableObject {
         self.cloudFunctions = cloudFunctions
         self.cardDatabase = cardDatabase
         self.planeDatabase = planeDatabase
+        self.clock = clock
         startListening()
     }
 
@@ -156,100 +177,48 @@ final class GameBoardViewModel: ObservableObject {
         firestoreManager: FirestoreManaging = FirestoreManager(),
         cloudFunctions: CloudFunctionsProtocol = CloudFunctions(),
         cardDatabase: CardLookupProviding = CardDatabase.shared,
-        planeDatabase: PlaneLookupProviding = PlaneDatabase.shared
+        planeDatabase: PlaneLookupProviding = PlaneDatabase.shared,
+        clock: any Clock<Duration> = ContinuousClock()
     ) {
         self.gameId = gameId
         self.firestoreManager = firestoreManager
         self.cloudFunctions = cloudFunctions
         self.cardDatabase = cardDatabase
         self.planeDatabase = planeDatabase
+        self.clock = clock
         self.currentUserId = currentUserId
         self.serverPlayers = previewPlayers
         self.players = previewPlayers
         self.game = previewGame
-        self.hasReceivedFirstGameSnapshot = true
     }
     #endif
 
     deinit {
         gameListener?.remove()
         playersListener?.remove()
-        for timer in debounceTimers.values {
-            timer.cancel()
+        // Sends under way don't hold the view model and are left to finish.
+        for debounce in lifeChangeDebounces.values {
+            debounce.cancel()
+        }
+        for echoWait in lifeChangeEchoWaits.values {
+            echoWait.cancel()
         }
     }
 
     // MARK: - Listeners
 
     private func startListening() {
-        gameListener = firestoreManager.listenToGame(id: gameId) { [weak self] game in
-            Task { @MainActor in
-                guard let self else { return }
-                if game == nil && self.hasReceivedFirstGameSnapshot {
-                    // Game was deleted mid-game
-                    self.isGameUnavailable = true
-                }
-                self.game = game
-                self.hasReceivedFirstGameSnapshot = true
+        gameListener = firestoreManager.listenToGame(id: gameId) { [weak self] event in
+            self?.receiveGame(event)
+        }
+        playersListener = firestoreManager.listenToPlayers(gameId: gameId) { [weak self] result in
+            guard let self else { return }
+            switch result {
+            case .success(let players):
+                self.receivePlayers(players)
+            case .failure(let failure):
+                self.recordListenerFailure(failure, listener: "players")
             }
-        }
-        playersListener = firestoreManager.listenToPlayers(gameId: gameId) { [weak self] players in
-            Task { @MainActor in
-                guard let self else { return }
-                self.serverPlayers = players
-                withAnimation(.easeInOut(duration: 0.3)) {
-                    self.applyOptimisticDeltas()
-                }
-            }
-        }
-    }
-
-    // MARK: - Optimistic Helpers
-
-    private func applyOptimisticDeltas() {
-        players = serverPlayers.map { player in
-            guard let delta = lifeDeltas[player.id], delta != 0 else { return player }
-            var p = player
-            p.lifeTotal = max(0, p.lifeTotal + delta)
-            return p
-        }
-    }
-
-    // MARK: - Life Adjustment (optimistic + debounced)
-
-    func adjustLife(for playerId: String, by amount: Int) {
-        guard let player = serverPlayers.first(where: { $0.id == playerId }) else { return }
-        guard !player.isEliminated else { return }
-        errorMessage = nil
-
-        // Accumulate optimistic delta
-        lifeDeltas[playerId, default: 0] += amount
-        applyOptimisticDeltas()
-
-        // Cancel existing debounce timer for this player
-        debounceTimers[playerId]?.cancel()
-
-        // Flush after 500ms of inactivity
-        debounceTimers[playerId] = Task { [weak self] in
-            try? await Task.sleep(nanoseconds: 500_000_000)
-            guard !Task.isCancelled else { return }
-            await self?.flushLifeDelta(for: playerId)
-        }
-    }
-
-    private func flushLifeDelta(for playerId: String) async {
-        guard let delta = lifeDeltas[playerId], delta != 0 else { return }
-
-        // Clear delta before sending so new taps start fresh
-        lifeDeltas[playerId] = 0
-
-        do {
-            try await cloudFunctions.adjustLife(gameId: gameId, playerId: playerId, amount: delta)
-        } catch {
-            // Revert on failure
-            lifeDeltas[playerId, default: 0] += delta
-            applyOptimisticDeltas()
-            errorMessage = error.localizedDescription
         }
     }
 
@@ -513,5 +482,290 @@ final class GameBoardViewModel: ObservableObject {
             return true
         }
         return false
+    }
+}
+
+// MARK: - Life Tracking (optimistic + debounced)
+//
+// A tap shows at once and goes to the server in a batch with the taps that
+// follow it. LifeLedger decides what the board shows until the server
+// confirms a batch; this extension feeds it taps, snapshots and call
+// outcomes, and times and makes the calls.
+
+extension GameBoardViewModel {
+
+    /// How long a player's taps must pause before they're sent as one call.
+    static let lifeChangeDebounce: Duration = .milliseconds(500)
+
+    /// How long a change the server has confirmed stays on screen waiting
+    /// for a snapshot to show it; see `LifeLedger.recordEchoTimeout(of:)`.
+    /// The echo usually comes within moments of the response, often before
+    /// it. This is far longer, because ending the wait while snapshots are
+    /// slow shows the old total again until they catch up.
+    static let lifeChangeEchoTimeout: Duration = .seconds(5)
+
+    /// A life change whose call failed.
+    struct LifeChangeFailure: Equatable {
+        let playerId: String
+        /// What the board says, naming the player.
+        let message: String
+    }
+
+    /// Shows the tap at once, then sends it with any taps on the same player
+    /// that follow within `lifeChangeDebounce`, as one adjustLife call.
+    func adjustLife(for playerId: String, by amount: Int) {
+        guard let player = serverPlayers.first(where: { $0.id == playerId }) else { return }
+        guard !player.isEliminated else { return }
+        errorMessage = nil
+        if lifeChangeFailure?.playerId == playerId {
+            lifeChangeFailure = nil
+        }
+
+        lifeLedger.record(amount, for: playerId)
+        refreshPlayers()
+        restartLifeChangeDebounce(for: playerId)
+    }
+
+    /// Sends every tap still waiting out its debounce, straight away. The
+    /// board calls this as it goes away: the debounce ends with the view
+    /// model, and would take those taps with it.
+    ///
+    /// These sends aren't tracked, since nothing will show them. Nor do they
+    /// wait for a call still under way for the same player: adjustLife adds
+    /// whatever it's given, so two calls at once still add up.
+    ///
+    /// - Returns: The sends, for tests to await.
+    @discardableResult
+    func sendPendingLifeChanges() -> [Task<Void, Never>] {
+        for debounce in lifeChangeDebounces.values {
+            debounce.cancel()
+        }
+        lifeChangeDebounces.removeAll()
+        let pendingTaps = lifeLedger.takePendingTaps()
+        refreshPlayers()
+
+        let cloudFunctions = cloudFunctions
+        let gameId = gameId
+        return pendingTaps.map { playerId, amount in
+            // Holds what the call needs, not the view model, which is
+            // usually gone before the call returns.
+            Task { [weak self] in
+                do {
+                    _ = try await cloudFunctions.adjustLife(gameId: gameId, playerId: playerId, amount: amount)
+                } catch {
+                    self?.reportLifeChangeFailure(.reverted, for: playerId, error: error)
+                }
+            }
+        }
+    }
+
+    /// A players snapshot: settles the batches it shows, redraws the board,
+    /// and sends any taps that were waiting on a batch it settled.
+    private func receivePlayers(_ players: [Player]) {
+        serverPlayers = players
+        lifeLedger.reconcile(with: players)
+        withAnimation(.easeInOut(duration: 0.3)) {
+            refreshPlayers()
+        }
+        // A snapshot that settles a confirmed batch ends its wait.
+        let settled = lifeChangeEchoWaits.keys.filter { !lifeLedger.isWaitingForEcho(for: $0) }
+        for playerId in settled {
+            lifeChangeEchoWaits.removeValue(forKey: playerId)?.cancel()
+        }
+        for playerId in lifeLedger.playersWithPendingTaps {
+            sendPendingLifeChange(for: playerId)
+        }
+    }
+
+    /// Rebuilds `players`: the latest snapshot with the ledger laid over it.
+    private func refreshPlayers() {
+        players = lifeLedger.displayedPlayers(from: serverPlayers)
+    }
+
+    private func restartLifeChangeDebounce(for playerId: String) {
+        lifeChangeDebounces[playerId]?.cancel()
+        lifeChangeDebounces[playerId] = Task { [weak self, clock] in
+            do {
+                try await clock.sleep(for: Self.lifeChangeDebounce)
+            } catch {
+                return // A later tap restarted it, or the board went away.
+            }
+            // Cancelled after waking but before getting here: the later
+            // tap's debounce takes over.
+            guard !Task.isCancelled else { return }
+            self?.lifeChangeDebounceEnded(for: playerId)
+        }
+    }
+
+    private func lifeChangeDebounceEnded(for playerId: String) {
+        lifeChangeDebounces[playerId] = nil
+        sendPendingLifeChange(for: playerId)
+    }
+
+    /// Sends the player's pending taps as one batch once nothing holds them
+    /// back: their debounce has ended and their previous batch has settled.
+    /// Each of those calls this, and the later one finds the taps pending.
+    private func sendPendingLifeChange(for playerId: String) {
+        guard lifeChangeDebounces[playerId] == nil,
+              let serverLife = serverPlayers.first(where: { $0.id == playerId })?.lifeTotal,
+              let batch = lifeLedger.beginBatch(for: playerId, serverLife: serverLife) else { return }
+        let cloudFunctions = cloudFunctions
+        let gameId = gameId
+        // Holds what the call needs, not the view model, so the call still
+        // completes if the board closes first.
+        lifeChangeSends[playerId] = Task { [weak self] in
+            do {
+                let newLife = try await cloudFunctions.adjustLife(gameId: gameId, playerId: playerId, amount: batch.amount)
+                self?.batchSucceeded(batch, newLife: newLife)
+            } catch {
+                self?.batchFailed(batch, error: error)
+            }
+        }
+    }
+
+    private func batchSucceeded(_ batch: LifeLedger.Batch, newLife: Int?) {
+        lifeChangeSends[batch.playerId] = nil
+        lifeLedger.recordSuccess(of: batch, newLife: newLife)
+        refreshPlayers()
+        if lifeLedger.isWaitingForEcho(for: batch.playerId) {
+            waitForEcho(of: batch)
+        }
+        sendPendingLifeChange(for: batch.playerId)
+    }
+
+    /// Gives a confirmed batch `lifeChangeEchoTimeout` to show up in a
+    /// snapshot. A snapshot that shows it ends the wait early.
+    private func waitForEcho(of batch: LifeLedger.Batch) {
+        lifeChangeEchoWaits[batch.playerId]?.cancel()
+        lifeChangeEchoWaits[batch.playerId] = Task { [weak self, clock] in
+            do {
+                try await clock.sleep(for: Self.lifeChangeEchoTimeout)
+            } catch {
+                return // A snapshot showed the batch, or the board went away.
+            }
+            guard !Task.isCancelled else { return }
+            self?.echoWaitEnded(for: batch)
+        }
+    }
+
+    /// The batch comes off the board, which shows the latest snapshot's
+    /// total, and taps held behind it go out.
+    private func echoWaitEnded(for batch: LifeLedger.Batch) {
+        lifeChangeEchoWaits[batch.playerId] = nil
+        lifeLedger.recordEchoTimeout(of: batch)
+        refreshPlayers()
+        sendPendingLifeChange(for: batch.playerId)
+    }
+
+    /// The batch comes off the board and is never resent; see
+    /// `LifeLedger.recordFailure(of:)`. Taps made since it was sent go out
+    /// as a change of their own.
+    private func batchFailed(_ batch: LifeLedger.Batch, error: Error) {
+        lifeChangeSends[batch.playerId] = nil
+        // Never nil here: a batch can't settle before its call returns.
+        let outcome = lifeLedger.recordFailure(of: batch) ?? .reverted
+        refreshPlayers()
+        reportLifeChangeFailure(outcome, for: batch.playerId, error: error)
+        sendPendingLifeChange(for: batch.playerId)
+    }
+
+    private func reportLifeChangeFailure(_ outcome: LifeLedger.FailureOutcome, for playerId: String, error: Error) {
+        logger.error("adjustLife failed: \(String(describing: error), privacy: .public)")
+        let name = serverPlayers.first { $0.id == playerId }?.displayName ?? "the player"
+        let message: String
+        switch outcome {
+        case .reverted:
+            message = "Couldn't update \(name)'s life. Check your connection and try again."
+        case .unconfirmed:
+            // The total shown most likely includes the change already, and
+            // "try again" would make it twice.
+            message = "Couldn't confirm \(name)'s life change. Check the total before changing it again."
+        }
+        lifeChangeFailure = LifeChangeFailure(playerId: playerId, message: message)
+    }
+}
+
+// MARK: - Listener Status
+
+extension GameBoardViewModel {
+
+    /// What the board and Game Over can show, given what the listeners have
+    /// reported. The data itself lives in `game` and `players`.
+    enum Status: Equatable {
+        /// Waiting for the game and its players.
+        case loading
+        /// The game and its players are here to show.
+        case ready
+        /// The game's state or mode is one this build doesn't know, or its
+        /// data can't be read. Playing it here could show the wrong controls
+        /// or hide the right ones.
+        case needsNewerVersion
+        /// The server confirmed the game no longer exists.
+        case unavailable
+        /// A listener failed; `retry()` re-attaches.
+        case failed
+    }
+
+    /// Outcomes that come with nothing to show. All of them stick: Firestore
+    /// stops delivering after a listener error, unreadable data would only
+    /// arrive again, and nothing re-creates a deleted game. Ordered by
+    /// precedence, lowest first; see `interrupt(_:)`.
+    private enum ListenerInterruption: Comparable {
+        case failed
+        case unreadable
+        case gameMissing
+    }
+
+    var status: Status {
+        switch interruption {
+        case .gameMissing: return .unavailable
+        case .unreadable: return .needsNewerVersion
+        case .failed: return .failed
+        case nil: break
+        }
+        guard let game else { return .loading }
+        if game.state.isUnknown || game.gameMode.isUnknown { return .needsNewerVersion }
+        return players.isEmpty ? .loading : .ready
+    }
+
+    /// Re-attaches both listeners after a failure.
+    func retry() {
+        guard interruption == .failed else { return }
+        interruption = nil
+        // Show loading, not the stale game, until the new listener reports.
+        game = nil
+        gameListener?.remove()
+        playersListener?.remove()
+        startListening()
+    }
+
+    private func receiveGame(_ event: DocumentEvent<Game>) {
+        switch event {
+        case .loaded(let game):
+            self.game = game
+        case .missing:
+            interrupt(.gameMissing)
+        case .failed(let failure):
+            recordListenerFailure(failure, listener: "game")
+        }
+    }
+
+    private func recordListenerFailure(_ failure: ListenerFailure, listener: String) {
+        switch failure {
+        case .listenerStopped(let error):
+            logger.error("Game board \(listener, privacy: .public) listener failed: \(String(describing: error), privacy: .public)")
+            interrupt(.failed)
+        case .unreadable(let error):
+            logger.error("Game board \(listener, privacy: .public) data unreadable: \(String(describing: error), privacy: .public)")
+            interrupt(.unreadable)
+        }
+    }
+
+    /// Keeps the more telling interruption. A missing game wins, because once
+    /// it's deleted the players read is denied too, in whichever order the
+    /// two arrive; unreadable data beats a listener failure, because retrying
+    /// can't fix it.
+    private func interrupt(_ new: ListenerInterruption) {
+        interruption = max(interruption ?? new, new)
     }
 }

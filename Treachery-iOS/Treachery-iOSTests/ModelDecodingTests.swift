@@ -15,6 +15,15 @@ struct GameStateTests {
         let state = try JSONDecoder().decode(GameState.self, from: json)
         #expect(state == .inProgress)
     }
+
+    @Test func unrecognisedRawValueBecomesUnknown() throws {
+        let json = Data(#""abandoned""#.utf8)
+        let state = try JSONDecoder().decode(GameState.self, from: json)
+        #expect(state == .unknown("abandoned"))
+        #expect(state.rawValue == "abandoned")
+        #expect(state.isUnknown)
+        #expect(!GameState.inProgress.isUnknown)
+    }
 }
 
 struct GameDecodingTests {
