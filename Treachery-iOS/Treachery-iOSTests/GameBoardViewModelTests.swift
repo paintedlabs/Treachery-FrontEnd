@@ -257,4 +257,21 @@ struct GameBoardViewModelTests {
         vm.presentAbilityResolver()
         #expect(vm.pendingAbilityResolution == nil)
     }
+
+    @Test func metamorphIsNotOfferedACardAlreadyTaken() {
+        // A Metamorph leaves its victim without a card, and resolveMetamorph
+        // refuses such a target: "Target has no identity to steal."
+        let players = [
+            abilityPlayer(),
+            Player(id: "p2", orderId: 2, userId: "u2", displayName: "Bob",
+                   role: .assassin, identityCardId: "assassin_01", lifeTotal: 0,
+                   isEliminated: true, isUnveiled: true, joinedAt: Date()),
+            Player(id: "p3", orderId: 3, userId: "u3", displayName: "Carol",
+                   role: .guardian, identityCardId: nil, lifeTotal: 0,
+                   isEliminated: true, isUnveiled: true, joinedAt: Date()),
+        ]
+        let vm = makeVM(players: players)
+        vm.presentAbilityResolver()
+        #expect(vm.pendingAbilityResolution?.candidatePlayers.map(\.id) == ["p2"])
+    }
 }

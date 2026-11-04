@@ -40,11 +40,11 @@ struct PlanarDieBar: View {
                     .padding(.vertical, 12)
                     .background(
                         RoundedRectangle(cornerRadius: 10)
-                            .fill(viewModel.isRollingDie ? Color.mtgGold.opacity(0.4) : Color.mtgGold)
+                            .fill(canTapRoll ? Color.mtgGold : Color.mtgGold.opacity(0.4))
                     )
                 }
                 .buttonStyle(.plain)
-                .disabled(viewModel.isRollingDie)
+                .disabled(!canTapRoll)
                 .accessibilityLabel("Roll planar die")
 
                 // Mana cost indicator
@@ -79,6 +79,13 @@ struct PlanarDieBar: View {
             alignment: .top
         )
         .animation(.spring(response: 0.4, dampingFraction: 0.7), value: viewModel.dieRollResult)
+    }
+
+    /// Spectators can't roll, and nobody can while a roll is under way.
+    /// The view model refuses those rolls as well; this keeps the button
+    /// from looking tappable.
+    private var canTapRoll: Bool {
+        viewModel.canRollDie && !viewModel.isRollingDie
     }
 
     @ViewBuilder

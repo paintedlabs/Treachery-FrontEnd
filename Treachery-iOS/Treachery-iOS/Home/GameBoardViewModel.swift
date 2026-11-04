@@ -52,7 +52,10 @@ final class GameBoardViewModel: ObservableObject {
     // MARK: - Properties
 
     let gameId: String
-    var currentUserId: String?
+    /// Published because the board sets it as it appears, possibly after
+    /// the first snapshots: the seat, and with it the life controls, must
+    /// follow.
+    @Published var currentUserId: String?
     private let firestoreManager: FirestoreManaging
     private let cloudFunctions: CloudFunctionsProtocol
     private let cardDatabase: CardLookupProviding
@@ -258,7 +261,11 @@ final class GameBoardViewModel: ObservableObject {
 
         switch ability {
         case .metamorph:
-            let eliminated = players.filter { $0.isEliminated && $0.role != .leader && $0.userId != player.userId }
+            // resolveMetamorph's target checks; a card another Metamorph
+            // has already taken leaves nothing to steal.
+            let eliminated = players.filter {
+                $0.isEliminated && $0.role != .leader && $0.userId != player.userId && $0.identityCardId != nil
+            }
             return AbilityResolution(
                 abilityType: .metamorph,
                 actingPlayerId: player.id,
@@ -303,7 +310,7 @@ final class GameBoardViewModel: ObservableObject {
     // MARK: - Planechase Actions
 
     func rollDie() async {
-        guard !isRollingDie else { return }
+        guard canRollDie, !isRollingDie else { return }
         errorMessage = nil
         isRollingDie = true
         dieRollResult = nil
@@ -467,22 +474,6 @@ final class GameBoardViewModel: ObservableObject {
     func identityCard(withId cardId: String) -> IdentityCard? {
         cardDatabase.card(withId: cardId)
     }
-
-    func canSeeRole(of player: Player) -> Bool {
-        // You can always see your own role
-        if player.userId == currentUserId { return true }
-        // Leaders are always face-up (visible to everyone)
-        if player.role == .leader { return true }
-        // Unveiled but face-down cards are hidden (Puppet Master / Metamorph swap)
-        if player.isUnveiled && !player.isFaceDown { return true }
-        // Puppet Master can peek at all face-down cards
-        if let myCardId = currentPlayer?.identityCardId,
-           myCardId == ExecutableAbility.puppetMaster.rawValue,
-           currentPlayer?.isUnveiled == true {
-            return true
-        }
-        return false
-    }
 }
 
 // MARK: - Life Tracking (optimistic + debounced)
@@ -514,7 +505,8 @@ extension GameBoardViewModel {
     /// Shows the tap at once, then sends it with any taps on the same player
     /// that follow within `lifeChangeDebounce`, as one adjustLife call.
     func adjustLife(for playerId: String, by amount: Int) {
-        guard let player = serverPlayers.first(where: { $0.id == playerId }) else { return }
+        guard canAdjustLife,
+              let player = serverPlayers.first(where: { $0.id == playerId }) else { return }
         guard !player.isEliminated else { return }
         errorMessage = nil
         if lifeChangeFailure?.playerId == playerId {

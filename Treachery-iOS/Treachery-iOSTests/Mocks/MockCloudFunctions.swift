@@ -35,6 +35,7 @@ final class MockCloudFunctions: CloudFunctionsProtocol {
     var adjustLifeCalls: [(gameId: String, playerId: String, amount: Int)] = []
     var eliminatePlayerCalls: [String] = []
     var unveilPlayerCalls: [String] = []
+    var rollPlanarDieCalls: [String] = []
     var leaveGameCalls: [String] = []
     var endGameCalls: [(gameId: String, winnerUserIds: [String]?)] = []
     var acceptFriendRequestCalls: [String] = []
@@ -122,6 +123,7 @@ final class MockCloudFunctions: CloudFunctionsProtocol {
 
     func rollPlanarDie(gameId: String) async throws -> String {
         if let error = errorToThrow { throw error }
+        rollPlanarDieCalls.append(gameId)
         return rollPlanarDieResult
     }
 

@@ -15,6 +15,7 @@ struct GameBoardView: View {
     @State private var cardFlipDegrees: Double = 0
     @State private var showUnveiledBanner = false
     @State private var showForfeitConfirmation = false
+    @State private var isConfirmingSpectatorLeave = false
     @State private var showEndGameConfirmation = false
     @State private var showWinnerSelection = false
     @State private var selectedWinners: Set<String> = []
@@ -183,9 +184,9 @@ struct GameBoardView: View {
                             .padding(.vertical, 4)
                     }
 
-                    // Spectator overlay for eliminated players (treachery only)
-                    if viewModel.isTreacheryActive,
-                       let player = viewModel.currentPlayer, player.isEliminated {
+                    // Spectator bar for eliminated players, in every mode:
+                    // its Leave is their only way off the board.
+                    if let leave = viewModel.spectatorLeave {
                         VStack(spacing: 8) {
                             HStack(spacing: 8) {
                                 Image(systemName: "person.slash.fill")
@@ -203,11 +204,27 @@ struct GameBoardView: View {
                                 .multilineTextAlignment(.center)
 
                             Button("Leave Game") {
-                                // Spectators go home — game-over must not reveal identities mid-game.
-                                navigationPath.removeLast(navigationPath.count)
+                                switch leave {
+                                case .goHome:
+                                    // Spectators go home — game-over must not reveal identities mid-game.
+                                    goHome()
+                                case .confirmFirst:
+                                    isConfirmingSpectatorLeave = true
+                                }
                             }
                             .foregroundStyle(Color.mtgError)
                             .padding(.top, 4)
+                            .confirmationDialog(
+                                "Leave without ending the game?",
+                                isPresented: $isConfirmingSpectatorLeave,
+                                titleVisibility: .visible
+                            ) {
+                                Button("End Game") { presentWinnerSelection() }
+                                Button("Leave Game", role: .destructive) { goHome() }
+                                Button("Stay", role: .cancel) {}
+                            } message: {
+                                Text("Only you can end this game. If you leave, it stays open for the others until you come back from Home to end it.")
+                            }
                         }
                         .padding()
                         .frame(maxWidth: .infinity)
@@ -226,16 +243,15 @@ struct GameBoardView: View {
                     }
 
                     // Action bar (unveil/win) — only when treachery active
-                    if viewModel.isTreacheryActive,
-                       !(viewModel.currentPlayer?.isEliminated ?? true) {
+                    if viewModel.isTreacheryActive, viewModel.seat == .playing {
                         ActionBar(viewModel: viewModel, onUnveil: playUnveilAnimation)
                     }
 
-                    // End Game button — only when NOT treachery (host only)
-                    if !viewModel.isTreacheryActive && viewModel.isHost {
+                    // End Game button — the host's, in every mode but Treachery's,
+                    // eliminated or not
+                    if viewModel.canEndGame {
                         Button {
-                            selectedWinners = []
-                            showWinnerSelection = true
+                            presentWinnerSelection()
                         } label: {
                             HStack(spacing: 8) {
                                 Image(systemName: "flag.checkered")
@@ -255,8 +271,9 @@ struct GameBoardView: View {
         .navigationBarBackButtonHidden(true)
         .onAppear { AnalyticsService.trackScreen("GameBoard") }
         .toolbar {
-            // Forfeit button — available in all game modes so players can always leave
-            if viewModel.status == .ready && !(viewModel.currentPlayer?.isEliminated ?? true) {
+            // Forfeit button — available in all game modes so players can always
+            // leave: a forfeit brings up the spectator bar, whose Leave goes home
+            if viewModel.status == .ready && viewModel.seat == .playing {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {
                         showForfeitConfirmation = true
@@ -383,6 +400,11 @@ struct GameBoardView: View {
 
     private func goHome() {
         navigationPath.removeLast(navigationPath.count)
+    }
+
+    private func presentWinnerSelection() {
+        selectedWinners = []
+        showWinnerSelection = true
     }
 
     // MARK: - Unveil Animation
