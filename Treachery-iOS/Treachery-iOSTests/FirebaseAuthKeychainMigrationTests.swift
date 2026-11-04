@@ -55,6 +55,14 @@ final class FirebaseAuthKeychainMigrationTests {
         defaults.bool(forKey: FirebaseAuthKeychainMigration.completionKey)
     }
 
+    /// Posts the unlock notification with the completion record cleared. A completed
+    /// migration returns before touching the keychain, which would hide an observer left
+    /// registered; without the record, any observer still there reaches the keychain.
+    private func postUnlockWithoutCompletionRecord(on notificationCenter: NotificationCenter) {
+        defaults.removeObject(forKey: FirebaseAuthKeychainMigration.completionKey)
+        notificationCenter.post(name: UIApplication.protectedDataDidBecomeAvailableNotification, object: nil)
+    }
+
     /// The keychain minus the neighbors, after checking the neighbors are untouched.
     private func sessionItems() -> [FakeKeychain.Key: Data] {
         for (key, data) in Self.neighbors {
@@ -124,7 +132,7 @@ final class FirebaseAuthKeychainMigrationTests {
 
         // Done, so it stops observing.
         let callsAfterRetry = keychain.callCount
-        notificationCenter.post(name: UIApplication.protectedDataDidBecomeAvailableNotification, object: nil)
+        postUnlockWithoutCompletionRecord(on: notificationCenter)
         #expect(keychain.callCount == callsAfterRetry)
     }
 
@@ -134,7 +142,7 @@ final class FirebaseAuthKeychainMigrationTests {
 
         #expect(makeMigration().runIfNeeded(retryingWhenUnlockedOn: notificationCenter) == .moved)
         let callsAfterRun = keychain.callCount
-        notificationCenter.post(name: UIApplication.protectedDataDidBecomeAvailableNotification, object: nil)
+        postUnlockWithoutCompletionRecord(on: notificationCenter)
         #expect(keychain.callCount == callsAfterRun)
     }
 
