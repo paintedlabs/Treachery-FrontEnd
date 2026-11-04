@@ -192,6 +192,25 @@ struct GameBoardView: View {
     private enum ScrollTarget: Hashable {
         case identity, plane
         case error, lifeChanges, unveilFailure, dieResult
+        /// The end of the pinned controls, where they rest.
+        case controlsEnd
+    }
+
+    /// Feedback showing in the pinned controls, and what it says.
+    private struct Feedback: Equatable {
+        let target: ScrollTarget
+        let text: String
+    }
+
+    /// The feedback showing in the pinned controls, top to bottom.
+    private var feedback: [Feedback] {
+        let shown: [(ScrollTarget, String?)] = [
+            (.error, viewModel.errorMessage),
+            (.lifeChanges, viewModel.lifeChangeMessage),
+            (.unveilFailure, viewModel.unveilFailure),
+            (.dieResult, viewModel.dieRollResult),
+        ]
+        return shown.compactMap { target, text in text.map { Feedback(target: target, text: $0) } }
     }
 
     /// The identity card, the plane and the players scroll together. The
@@ -238,22 +257,24 @@ struct GameBoardView: View {
                 }
                 // Feedback appears at the top of the pinned controls. When
                 // there's more of them than fits, as at large text sizes,
-                // that's above the part in view: bring it into view.
-                .onChange(of: viewModel.errorMessage) { _, message in
-                    guard message != nil else { return }
-                    bringIntoView(.error, anchor: .top, with: scroll)
+                // that's above the part in view: bring new feedback into
+                // view, the highest if there's more than one. Once feedback
+                // goes, and none is new, bring back the controls' end,
+                // where they rest.
+                .onChange(of: feedback) { old, new in
+                    if let shown = new.first(where: { !old.contains($0) }) {
+                        bringIntoView(shown.target, anchor: .top, with: scroll)
+                    } else if new.count < old.count {
+                        bringIntoView(.controlsEnd, anchor: .bottom, with: scroll)
+                    }
                 }
-                .onChange(of: viewModel.lifeChangeMessage) { _, message in
-                    guard message != nil else { return }
-                    bringIntoView(.lifeChanges, anchor: .top, with: scroll)
-                }
-                .onChange(of: viewModel.unveilFailure) { _, failure in
-                    guard failure != nil else { return }
-                    bringIntoView(.unveilFailure, anchor: .top, with: scroll)
-                }
-                .onChange(of: viewModel.dieRollResult) { _, result in
-                    guard result != nil else { return }
-                    bringIntoView(.dieResult, anchor: .top, with: scroll)
+                // A new seat changes the controls, as when an eliminated
+                // player's spectator bar replaces Unveil: show their end,
+                // where Leave Game is. Feedback showing keeps its place, and
+                // the end comes back once it goes.
+                .onChange(of: viewModel.seat) {
+                    guard feedback.isEmpty else { return }
+                    bringIntoView(.controlsEnd, anchor: .bottom, with: scroll)
                 }
             }
             .sheet(item: $inspectedPlayer) { player in
@@ -375,6 +396,12 @@ struct GameBoardView: View {
                 if let leave = viewModel.spectatorLeave {
                     SpectatorBar(leave: leave, onGoHome: { goHome() }, onEndGame: { presentWinnerSelection() })
                 }
+
+                // Where the controls end, for the board to bring back into
+                // view. An id on the stack itself would change its layout.
+                Color.clear
+                    .frame(height: 0)
+                    .id(ScrollTarget.controlsEnd)
             }
         }
         .scrollBounceBehavior(.basedOnSize)
