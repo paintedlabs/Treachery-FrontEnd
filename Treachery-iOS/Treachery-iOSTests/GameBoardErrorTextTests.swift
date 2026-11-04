@@ -142,6 +142,21 @@ struct GameBoardErrorTextTests {
         #expect(vm.errorMessage == "Couldn't change your color. Check your connection and try again.")
     }
 
+    /// A spectator's only action is changing color, so a later attempt must
+    /// clear the last failure, as every other action does.
+    @Test func aLaterColorChangeClearsTheLastFailure() async {
+        let firestore = MockFirestoreManager()
+        firestore.errorToThrow = NSError(domain: "FIRFirestoreErrorDomain", code: 14)
+        let vm = makeVM(firestoreManager: firestore)
+        await vm.updatePlayerColor("#e74c3c")
+        #expect(vm.errorMessage != nil)
+
+        firestore.errorToThrow = nil
+        await vm.updatePlayerColor("#3498db")
+
+        #expect(vm.errorMessage == nil)
+    }
+
     @Test func failedAbilitiesArePlain() async {
         let functions = MockCloudFunctions()
         functions.errorToThrow = unreachable

@@ -350,6 +350,9 @@ final class GameBoardViewModel: ObservableObject {
 
     func updatePlayerColor(_ hex: String?) async {
         guard let player = currentPlayer else { return }
+        // Like every other action, a new attempt clears the last failure. A
+        // spectator has no other action that would.
+        errorMessage = nil
         do {
             try await firestoreManager.updatePlayerColor(gameId: gameId, playerId: player.id, color: hex)
         } catch {
