@@ -58,7 +58,7 @@ struct PlanarDieBar: View {
                         .foregroundStyle(Color.mtgTextSecondary)
                 }
                 .frame(width: 50)
-                .accessibilityLabel("Roll cost: \(viewModel.dieRollCost) mana")
+                .accessibilityLabel("Your next roll costs \(viewModel.dieRollCost) mana")
             }
 
             // Last roller info

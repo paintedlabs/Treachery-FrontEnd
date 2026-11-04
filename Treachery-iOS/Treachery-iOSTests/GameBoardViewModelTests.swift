@@ -169,35 +169,45 @@ struct GameBoardViewModelTests {
     }
 
     // MARK: - Die Roll Cost
+    //
+    // rollPlanarDie (planechase.js) charges whoever rolled last as many mana
+    // as they've rolled so far, and anyone else nothing.
 
-    @Test func dieRollCostFirstRollFree() {
+    private func makePlanechaseVM(
+        lastDieRollerId: String?,
+        dieRollCount: Int,
+        currentUserId: String? = "u1"
+    ) -> GameBoardViewModel {
         var game = makeSampleGame(gameMode: .treacheryPlanechase)
         game.planechase = PlanechaseState(
             useOwnDeck: false, currentPlaneId: "p1", usedPlaneIds: [],
-            lastDieRollerId: nil, dieRollCount: 0
+            lastDieRollerId: lastDieRollerId, dieRollCount: dieRollCount
         )
-        let vm = makeVM(game: game)
+        return makeVM(game: game, currentUserId: currentUserId)
+    }
+
+    @Test func firstRollIsFree() {
+        let vm = makePlanechaseVM(lastDieRollerId: nil, dieRollCount: 0)
         #expect(vm.dieRollCost == 0)
     }
 
-    @Test func dieRollCostSecondRollFree() {
-        var game = makeSampleGame(gameMode: .treacheryPlanechase)
-        game.planechase = PlanechaseState(
-            useOwnDeck: false, currentPlaneId: "p1", usedPlaneIds: [],
-            lastDieRollerId: nil, dieRollCount: 1
-        )
-        let vm = makeVM(game: game)
+    @Test(arguments: [1, 2, 3])
+    func rollingAgainCostsTheRollsSoFar(rollsSoFar: Int) {
+        // After one roll the next costs 1 mana; this used to show 0.
+        let vm = makePlanechaseVM(lastDieRollerId: "u1", dieRollCount: rollsSoFar)
+        #expect(vm.dieRollCost == rollsSoFar)
+    }
+
+    @Test func someoneElsesRollLeavesYoursFree() {
+        // This used to show their cost, 2, to everyone.
+        let vm = makePlanechaseVM(lastDieRollerId: "u2", dieRollCount: 3)
         #expect(vm.dieRollCost == 0)
     }
 
-    @Test func dieRollCostThirdRollCostsOne() {
-        var game = makeSampleGame(gameMode: .treacheryPlanechase)
-        game.planechase = PlanechaseState(
-            useOwnDeck: false, currentPlaneId: "p1", usedPlaneIds: [],
-            lastDieRollerId: nil, dieRollCount: 2
-        )
-        let vm = makeVM(game: game)
-        #expect(vm.dieRollCost == 1)
+    @Test func noSignedInUserIsNotTheLastRoller() {
+        // nil == nil must not make a missing user the roller.
+        let vm = makePlanechaseVM(lastDieRollerId: nil, dieRollCount: 2, currentUserId: nil)
+        #expect(vm.dieRollCost == 0)
     }
 
     // MARK: - Traitor Ability Retry

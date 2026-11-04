@@ -137,11 +137,10 @@ final class GameBoardViewModel: ObservableObject {
         game?.planechase?.chaoticAetherActive ?? false
     }
 
-    /// The mana cost for the next planar die roll.
-    /// First roll each turn is free, each subsequent costs 1 more.
+    /// The mana the signed-in user's next planar die roll costs; see
+    /// `PlanechaseState.nextRollCost(for:)`.
     var dieRollCost: Int {
-        let count = game?.planechase?.dieRollCount ?? 0
-        return max(0, count - 1)
+        game?.planechase?.nextRollCost(for: currentUserId) ?? 0
     }
 
     var lastDieRollerName: String? {

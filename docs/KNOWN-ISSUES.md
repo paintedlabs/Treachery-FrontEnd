@@ -78,7 +78,7 @@ Not all individually test-encoded; from the audit report.
 
 - ~~Profile win-rate deflated~~ — **fixed**: divides by games with a recorded outcome
 - ~~Legacy 12-player lobbies bricked~~ — **fixed**: the stepper decrement clamps into the valid range on all three clients
-- Planar die cost displays the previous roller's count, not the caller's actual (often free) cost
+- Planar die cost displays the previous roller's count, not the caller's actual (often free) cost — **fixed (iOS)**: the next roll costs `die_roll_count` to whoever rolled last and nothing to anyone else, as `rollPlanarDie` charges; web still shows `die_roll_count` to everyone, and Android shows `die_roll_count - 1`
 - Stale/deleted game link → infinite spinner with the web back button trapped
 - Client-side game-code generation is check-then-act racy; duplicate codes make one game unjoinable by code (**fixed** for createGame callable path)
 - New-user onboarding skippable via a `createUserDocumentIfNeeded` double-invocation race
