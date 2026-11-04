@@ -32,6 +32,7 @@ struct IdentityCardHeader: View {
                 Image(systemName: "eye.slash.fill")
                     .font(.title3)
                     .foregroundStyle(Color.mtgGold)
+                    .accessibilityHidden(true)
 
                 Spacer()
 
@@ -39,10 +40,12 @@ struct IdentityCardHeader: View {
                     Image(systemName: "heart.fill")
                         .font(.caption)
                         .foregroundStyle(Color.mtgError)
+                        .accessibilityHidden(true)
                     Text("\(player.lifeTotal)")
                         .font(.system(size: 28, weight: .bold, design: .serif))
                         .foregroundStyle(Color.mtgTextPrimary)
                         .contentTransition(reduceMotion ? .opacity : .numericText())
+                        .accessibilityLabel("\(player.lifeTotal) life")
                 }
             }
 
@@ -80,11 +83,13 @@ struct IdentityCardHeader: View {
                     Image(systemName: "heart.fill")
                         .font(.caption)
                         .foregroundStyle(Color.mtgError)
+                        .accessibilityHidden(true)
                     Text("\(player.lifeTotal)")
                         .font(.system(size: 30, weight: .bold, design: .serif))
                         .foregroundStyle(Color.mtgTextPrimary)
                         .contentTransition(reduceMotion ? .opacity : .numericText())
                         .animation(reduceMotion ? .easeInOut(duration: 0.2) : .spring(response: 0.3, dampingFraction: 0.6), value: player.lifeTotal)
+                        .accessibilityLabel("\(player.lifeTotal) life")
                 }
             }
 
@@ -97,6 +102,7 @@ struct IdentityCardHeader: View {
                 Image(systemName: "chevron.right")
                     .font(.caption)
                     .foregroundStyle(Color.mtgTextSecondary)
+                    .accessibilityHidden(true)
             }
 
             Text(card.abilityText)

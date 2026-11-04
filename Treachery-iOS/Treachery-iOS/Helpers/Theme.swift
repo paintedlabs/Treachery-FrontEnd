@@ -235,6 +235,8 @@ struct OrnateDivider: View {
                 .fill(Color.mtgDivider)
                 .frame(height: 1)
         }
+        // Decoration: VoiceOver read the diamond aloud.
+        .accessibilityHidden(true)
     }
 }
 

@@ -17,6 +17,7 @@ struct PhenomenonOverlay: View {
                 Image(systemName: "sparkles")
                     .font(.title2)
                     .foregroundStyle(Color.mtgGoldBright)
+                    .accessibilityHidden(true)
                 Text("PHENOMENON")
                     .font(.system(.headline, design: .serif))
                     .fontWeight(.bold)
@@ -25,6 +26,7 @@ struct PhenomenonOverlay: View {
                 Image(systemName: "sparkles")
                     .font(.title2)
                     .foregroundStyle(Color.mtgGoldBright)
+                    .accessibilityHidden(true)
             }
 
             Text(plane.name)

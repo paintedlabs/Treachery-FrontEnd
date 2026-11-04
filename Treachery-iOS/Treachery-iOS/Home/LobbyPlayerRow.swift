@@ -33,24 +33,29 @@ struct LobbyPlayerRow: View {
                     colorPickerToggle
                 }
 
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(player.displayName)
-                        .fontWeight(isHost ? .semibold : .regular)
-                        .foregroundStyle(Color.mtgTextPrimary)
+                // VoiceOver reads these as one, "Luke, Host"; the color
+                // button and the commander name field stay apart.
+                HStack(spacing: 0) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(player.displayName)
+                            .fontWeight(isHost ? .semibold : .regular)
+                            .foregroundStyle(Color.mtgTextPrimary)
 
-                    if !isMe, let commanderName = player.commanderName, !commanderName.isEmpty {
-                        Text(commanderName)
-                            .font(.system(.caption, design: .serif))
-                            .italic()
-                            .foregroundStyle(Color.mtgTextSecondary)
+                        if !isMe, let commanderName = player.commanderName, !commanderName.isEmpty {
+                            Text(commanderName)
+                                .font(.system(.caption, design: .serif))
+                                .italic()
+                                .foregroundStyle(Color.mtgTextSecondary)
+                        }
+                    }
+
+                    Spacer()
+
+                    if isHost {
+                        MtgBadge(text: "Host", foregroundColor: .mtgGold, backgroundColor: Color.mtgGold.opacity(0.15), font: .caption)
                     }
                 }
-
-                Spacer()
-
-                if isHost {
-                    MtgBadge(text: "Host", foregroundColor: .mtgGold, backgroundColor: Color.mtgGold.opacity(0.15), font: .caption)
-                }
+                .accessibilityElement(children: .combine)
             }
 
             if isMe {
@@ -70,7 +75,6 @@ struct LobbyPlayerRow: View {
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 14)
-        .accessibilityLabel("\(player.displayName)\(isHost ? ", Host" : "")")
     }
 
     private var colorPickerToggle: some View {

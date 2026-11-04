@@ -18,6 +18,7 @@ struct SpectatorBar: View {
             HStack(spacing: 8) {
                 Image(systemName: "person.slash.fill")
                     .foregroundStyle(Color.mtgError)
+                    .accessibilityHidden(true)
                 Text("You've Been Eliminated")
                     .font(.system(.headline, design: .serif))
                     .fontWeight(.bold)

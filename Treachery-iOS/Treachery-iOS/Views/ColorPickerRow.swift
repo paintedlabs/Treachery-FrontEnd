@@ -35,6 +35,7 @@ struct ColorPickerRow: View {
                     }
                     .buttonStyle(.plain)
                     .accessibilityLabel(playerColor.name)
+                    .accessibilityAddTraits(selectedHex == playerColor.hex ? .isSelected : [])
                 }
 
                 Button {

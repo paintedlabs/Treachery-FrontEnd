@@ -59,6 +59,7 @@ struct PlanarDieBar: View {
                         .foregroundStyle(Color.mtgTextSecondary)
                 }
                 .frame(width: 50)
+                .accessibilityElement(children: .ignore)
                 .accessibilityLabel("Your next roll costs \(viewModel.dieRollCost) mana")
             }
 
@@ -113,6 +114,7 @@ struct PlanarDieBar: View {
                         .stroke(dieColor(for: result).opacity(0.3), lineWidth: 1)
                 )
         )
+        .accessibilityElement(children: .ignore)
         .accessibilityLabel("Die result: \(dieLabel(for: result))")
     }
 

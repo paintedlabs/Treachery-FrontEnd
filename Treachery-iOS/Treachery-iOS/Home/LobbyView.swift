@@ -338,8 +338,13 @@ struct LobbyView: View {
                                 Image(systemName: "chevron.up.chevron.down")
                                     .foregroundStyle(Color.mtgGold)
                                     .font(.caption2)
+                                    .accessibilityHidden(true)
                             }
+                            .frame(minWidth: 44, minHeight: 44, alignment: .trailing)
+                            .contentShape(Rectangle())
                         }
+                        .accessibilityLabel("Game mode")
+                        .accessibilityValue(game.gameMode.displayName)
                     }
 
                     // Max Traitor Rarity — only meaningful in treachery modes
@@ -365,8 +370,13 @@ struct LobbyView: View {
                                     Image(systemName: "chevron.up.chevron.down")
                                         .foregroundStyle(Color.mtgGold)
                                         .font(.caption2)
+                                        .accessibilityHidden(true)
                                 }
+                                .frame(minWidth: 44, minHeight: 44, alignment: .trailing)
+                                .contentShape(Rectangle())
                             }
+                            .accessibilityLabel("Max traitor rarity")
+                            .accessibilityValue(viewModel.maxTraitorRarity.displayName)
                         }
                     }
                 }
