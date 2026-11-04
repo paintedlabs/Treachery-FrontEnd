@@ -5,7 +5,8 @@ import Foundation
 /// A profile setup that's postponed, for an account with no profile that
 /// Firebase Auth can't confirm (offline, say), is retried while that account
 /// stays signed in: on a schedule, at once when the app becomes active or
-/// the user taps Try Again, and never two attempts at a time.
+/// the user taps Try Again, and never two attempts at a time. Once it's
+/// finished, Profile and Friends load the profile again.
 @MainActor
 @Suite("Postponed profile setup")
 struct AuthViewModelProfileSetupTests {
@@ -53,6 +54,7 @@ struct AuthViewModelProfileSetupTests {
         // The first attempt and five retries, each postponed again.
         #expect(auth.reloadAccountCalls.count == 6)
         #expect(firestore.userWriteCount == 0)
+        #expect(viewModel.profileSetupState == .pending)
         #expect(!viewModel.isNewUser)
     }
 
@@ -62,6 +64,7 @@ struct AuthViewModelProfileSetupTests {
 
         viewModel.authStateDidChange(to: nil)
 
+        #expect(viewModel.profileSetupState == .noAccount)
         #expect(clock.pendingDeadlines.isEmpty)
         // With nothing left to set up, Try Again provisions nothing.
         await viewModel.retryProfileSetup()
@@ -100,6 +103,21 @@ struct AuthViewModelProfileSetupTests {
 
         #expect(!viewModel.isNewUser)
         #expect(auth.signOutCallCount == 0)
+    }
+
+    /// The prompt asks for a name for the account that signed out. The next
+    /// account to sign in is asked only if its own profile needs a name.
+    @Test func signingOutClosesTheNamePrompt() async {
+        auth.accountStatus = .exists
+        viewModel.authStateDidChange(to: account())
+        // Waits for the first attempt, which creates the profile.
+        await viewModel.retryProfileSetup()
+        #expect(viewModel.isNewUser)
+
+        viewModel.authStateDidChange(to: nil)
+
+        #expect(viewModel.profileSetupState == .noAccount)
+        #expect(!viewModel.isNewUser)
     }
 
     // MARK: - Becoming active
@@ -157,8 +175,11 @@ struct AuthViewModelProfileSetupTests {
     }
 
     /// The whole path: Try Again on Profile gives the postponed setup another
-    /// go, which creates the profile, and only then reads it.
-    @Test func tryAgainOnProfileSetsUpThePostponedProfileThenShowsIt() async {
+    /// go, which creates the profile, and only then reads it. That read finds
+    /// the placeholder name, under the name prompt. Once the prompt has saved
+    /// the user's own name and closed, Profile shows that name, though the
+    /// screen never reappeared.
+    @Test func tryAgainOnProfileSetsUpThePostponedProfileThenShowsTheChosenName() async throws {
         viewModel.authStateDidChange(to: account())
         await clock.waitForSleepers()
         let profileScreen = ProfileViewModel(
@@ -184,5 +205,66 @@ struct AuthViewModelProfileSetupTests {
         #expect(profileScreen.profile.phase == .loaded)
         #expect(profileScreen.user?.displayName == "Player")
         #expect(viewModel.isNewUser)
+
+        // The prompt saves the user's name, then closes. ProfileView passes
+        // on the change of the setup.
+        try await viewModel.updateDisplayName("Ada")
+        firestore.usersToReturn["u1"]?.displayName = "Ada"
+        viewModel.completeOnboarding()
+        await profileScreen.profileSetupDidChange(to: viewModel.profileSetupState, userId: "u1")
+
+        #expect(viewModel.profileSetupState == .finished)
+        #expect(!viewModel.isNewUser)
+        #expect(profileScreen.user?.displayName == "Ada")
+    }
+
+    /// A retry can finish the setup while Profile and Friends say the
+    /// profile isn't set up yet, here by filling in a field the profile
+    /// lacked, which needs no name prompt. Neither screen reappears or is
+    /// tapped, but both load the profile once the setup is finished.
+    @Test func profileAndFriendsLoadAProfileThatARetrySetsUpWithoutAPrompt() async {
+        // A profile without created_at can't be shown, and the first attempt
+        // to repair it couldn't read it from the server.
+        firestore.userDocumentsToReturn["u1"] = .incomplete(missingFields: [.createdAt])
+        firestore.userDocumentError = NSError(domain: "FIRFirestoreErrorDomain", code: 14)
+        viewModel.authStateDidChange(to: account())
+        await clock.waitForSleepers()
+        let profileScreen = ProfileViewModel(
+            session: SessionEndingSpy(),
+            retryProfileSetup: {},
+            firestoreManager: firestore,
+            cloudFunctions: MockCloudFunctions(),
+            trackEvent: { _ in }
+        )
+        let friendsScreen = FriendsListViewModel(
+            retryProfileSetup: {},
+            firestoreManager: firestore,
+            cloudFunctions: MockCloudFunctions(),
+            trackEvent: { _ in },
+            announce: { _ in }
+        )
+        await profileScreen.loadData(userId: "u1")
+        await friendsScreen.loadData(userId: "u1")
+        #expect(profileScreen.profile.failure == .profileNotSetUp)
+        #expect(friendsScreen.overview.failure == .profileNotSetUp)
+
+        // Back online, the next retry repairs the profile. retryProfileSetup()
+        // runs it now, as the app becoming active would, and waits for it.
+        firestore.userDocumentError = nil
+        await viewModel.retryProfileSetup()
+        // The mock doesn't serve what's written; Firestore would.
+        firestore.usersToReturn["u1"] = TreacheryUser(
+            id: "u1", displayName: "Ada", friendIds: [], createdAt: Date(timeIntervalSince1970: 1_000_000)
+        )
+        // Each screen passes on the change of the setup.
+        await profileScreen.profileSetupDidChange(to: viewModel.profileSetupState, userId: "u1")
+        await friendsScreen.profileSetupDidChange(to: viewModel.profileSetupState, userId: "u1")
+
+        #expect(firestore.repairUserProfileCalls.count == 1)
+        #expect(viewModel.profileSetupState == .finished)
+        #expect(!viewModel.isNewUser)
+        #expect(profileScreen.profile.phase == .loaded)
+        #expect(profileScreen.user?.displayName == "Ada")
+        #expect(friendsScreen.overview.phase == .loaded)
     }
 }

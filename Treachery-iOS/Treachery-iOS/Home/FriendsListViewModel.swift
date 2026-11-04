@@ -208,6 +208,16 @@ final class FriendsListViewModel: ObservableObject {
         await loadData(userId: userId)
     }
 
+    /// Loads again once the profile setup is finished, which can happen
+    /// while this screen is open: when the name prompt over it closes, or
+    /// when a retry sets the profile up in the background. What's shown was
+    /// read before then, maybe before the profile, which holds the friends
+    /// list, existed.
+    func profileSetupDidChange(to state: ProfileSetupState, userId: String) async {
+        guard state == .finished else { return }
+        await loadData(userId: userId)
+    }
+
     // MARK: - Search
 
     /// Searches for players whose names start with `searchText`. A failed

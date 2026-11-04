@@ -28,6 +28,10 @@ final class MockFirestoreManager: FirestoreManaging {
     var pendingRequestsToReturn: [FriendRequest] = []
     var searchResultsToReturn: [TreacheryUser] = []
     var errorToThrow: Error?
+    /// Runs once inside `getUser(id:)` after the profile is read and before
+    /// it's returned, so a test can change things while an answer that is
+    /// now out of date is on its way.
+    var whileReturningUser: (@MainActor () async -> Void)?
     /// Thrown only by `getUserDocument(id:)`.
     var userDocumentError: Error?
     /// Thrown only by the profile writes: `createUser`, `repairUserProfile`
@@ -79,7 +83,13 @@ final class MockFirestoreManager: FirestoreManaging {
 
     func getUser(id: String) async throws -> TreacheryUser? {
         if let error = errorToThrow { throw error }
-        return usersToReturn[id]
+        let user = usersToReturn[id]
+        if let inFlight = whileReturningUser {
+            // One-shot, so a test can't recurse into it by accident.
+            whileReturningUser = nil
+            await inFlight()
+        }
+        return user
     }
 
     func getUserDocument(id: String) async throws -> UserDocument {

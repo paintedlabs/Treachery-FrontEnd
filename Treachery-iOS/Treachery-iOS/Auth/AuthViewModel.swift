@@ -20,12 +20,33 @@ enum AuthState {
     case unauthenticated
 }
 
+/// How far setting up the signed-in account's profile has got. One enum
+/// rather than flags, so states like "asking for a name while no one is
+/// signed in" can't be represented.
+enum ProfileSetupState: Equatable, Sendable {
+    /// No account is signed in.
+    case noAccount
+    /// Not set up yet: an attempt is running, or the last one was postponed
+    /// (offline, say) and the next is due.
+    case pending
+    /// Set up with a placeholder name. The name prompt asks for the user's
+    /// own until they save one or skip.
+    case needsName
+    /// Over: the profile is set up, or can't be (it's undecodable, or the
+    /// account is gone).
+    case finished
+}
+
 @MainActor
 final class AuthViewModel: ObservableObject {
 
     @Published var authState: AuthState = .loading
     @Published var errorMessage: String?
-    @Published var isNewUser: Bool = false
+    /// How far setting up the signed-in account's profile has got. It can
+    /// finish while the tabs are open, when a retry sets the profile up late
+    /// or the name prompt over them closes, so Profile and Friends load
+    /// again when it does.
+    @Published private(set) var profileSetupState: ProfileSetupState = .noAccount
 
     private let firebaseManager: AuthManaging
     private let firestoreManager: FirestoreManaging
@@ -49,6 +70,12 @@ final class AuthViewModel: ObservableObject {
     var isAuthenticated: Bool {
         if case .authenticated = authState { return true }
         return false
+    }
+
+    /// Whether the name prompt shows: the profile was just set up with a
+    /// placeholder name.
+    var isNewUser: Bool {
+        profileSetupState == .needsName
     }
 
     var currentUserId: String? {
@@ -123,6 +150,7 @@ final class AuthViewModel: ObservableObject {
     func authStateDidChange(to account: SignedInAccount?) {
         guard let account else {
             stopProfileSetup()
+            profileSetupState = .noAccount
             authState = .unauthenticated
             return
         }
@@ -209,8 +237,11 @@ final class AuthViewModel: ObservableObject {
 
     // MARK: - Onboarding
 
+    /// Closes the name prompt once a name is saved or skipped, which
+    /// finishes the profile setup.
     func completeOnboarding() {
-        isNewUser = false
+        guard profileSetupState == .needsName else { return }
+        profileSetupState = .finished
     }
 
     /// Saves the name chosen during onboarding, writing only `display_name`.
@@ -258,6 +289,7 @@ final class AuthViewModel: ObservableObject {
     /// view model only while an attempt runs, not while it waits.
     private func startProfileSetup(for account: SignedInAccount) {
         stopProfileSetup()
+        profileSetupState = .pending
         profileSetup = Task { [weak self] in
             var retry = 0
             while let wait = await self?.attemptProfileSetup(for: account, retry: retry) {
@@ -314,7 +346,8 @@ final class AuthViewModel: ObservableObject {
     /// One provisioning attempt: makes sure the signed-in account has a
     /// usable profile (see `ProfileProvisioner`), asks for a name when the
     /// profile's is a placeholder, and signs out if Firebase Auth says the
-    /// account no longer exists. An attempt whose task was cancelled, because
+    /// account no longer exists. Unless it's postponed, it ends the setup
+    /// (`profileSetupState`). An attempt whose task was cancelled, because
     /// the account signed out or another signed in meanwhile, doesn't act on
     /// its outcome. Only the profile setup calls this in the app.
     @discardableResult
@@ -326,8 +359,9 @@ final class AuthViewModel: ObservableObject {
         if outcome == .accountGone {
             signOutDeletedAccount()
         }
-        if outcome.needsName {
-            isNewUser = true
+        // Postponed, the setup is still pending: it tries again.
+        if outcome != .postponed {
+            profileSetupState = outcome.needsName ? .needsName : .finished
         }
         return outcome
     }

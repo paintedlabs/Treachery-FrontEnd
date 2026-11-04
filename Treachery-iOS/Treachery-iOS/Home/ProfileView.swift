@@ -164,6 +164,12 @@ struct ProfileView: View {
             FailureMessage.announce(message)
         }
         .task { await reload() }
+        // The profile setup can finish while this screen is open, as when
+        // the name prompt over it closes, and this screen doesn't reappear.
+        .onChange(of: authViewModel.profileSetupState) { _, state in
+            guard let userId = authViewModel.currentUserId else { return }
+            Task { await viewModel.profileSetupDidChange(to: state, userId: userId) }
+        }
     }
 
     private func reload() async {

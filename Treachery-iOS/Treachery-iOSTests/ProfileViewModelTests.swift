@@ -225,6 +225,41 @@ struct ProfileViewModelTests {
         #expect(viewModel.user?.displayName == "Player")
     }
 
+    /// The profile setup can finish while Profile is open, as when the name
+    /// prompt over it closes. Only then does Profile read the profile again:
+    /// before, it may not exist, or still have its placeholder name.
+    @Test("Loads again only once the profile setup is finished", arguments: [
+        (ProfileSetupState.noAccount, false),
+        (ProfileSetupState.pending, false),
+        (ProfileSetupState.needsName, false),
+        (ProfileSetupState.finished, true),
+    ])
+    func loadsAgainOnlyOnceTheProfileSetupIsFinished(state: ProfileSetupState, loadsAgain: Bool) async {
+        await viewModel.loadData(userId: "u1")
+        firestore.usersToReturn["u1"]?.displayName = "New Name"
+
+        await viewModel.profileSetupDidChange(to: state, userId: "u1")
+
+        #expect(viewModel.user?.displayName == (loadsAgain ? "New Name" : "Old Name"))
+    }
+
+    /// Only the newest load shows what it read. Try Again's load, say, can
+    /// still be on its way when the name prompt closes and Profile loads
+    /// again; arriving last, it mustn't bring back the name it read.
+    @Test func aLoadThatANewerOneOvertookChangesNothing() async {
+        firestore.whileReturningUser = { [viewModel, firestore] in
+            // While this load's answer is on its way, the name changes and a
+            // newer load shows it.
+            firestore.usersToReturn["u1"]?.displayName = "New Name"
+            await viewModel.loadData(userId: "u1")
+        }
+
+        await viewModel.loadData(userId: "u1")
+
+        #expect(viewModel.profile.phase == .loaded)
+        #expect(viewModel.user?.displayName == "New Name")
+    }
+
     /// Offline with the profile cached but no finished games, Firestore
     /// answers the games with nothing it can vouch for. The profile still
     /// shows, and only the stats say they need a connection: stale beats

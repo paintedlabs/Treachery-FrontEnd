@@ -196,6 +196,9 @@ final class ProfileViewModel: ObservableObject {
     // MARK: - Properties
 
     private var userId: String?
+    /// Numbers the loads, so one can tell whether a newer one started while
+    /// it ran (`loadData(userId:)`).
+    private var newestLoad = 0
     private let session: SessionEnding
     private let retryProfileSetup: () async -> Void
     private let firestoreManager: FirestoreManaging
@@ -242,8 +245,12 @@ final class ProfileViewModel: ObservableObject {
     /// stats say why they're missing, since stale beats blank. What's
     /// already shown stays while this runs and if it fails. A profile that
     /// is missing or can't be read fails, rather than leave a spinner running.
+    /// Only the newest load shows what it read: one that a newer load
+    /// overtook ends without changing anything.
     func loadData(userId: String) async {
         self.userId = userId
+        newestLoad += 1
+        let load = newestLoad
         profile.startLoading()
         stats.startLoading()
 
@@ -269,6 +276,9 @@ final class ProfileViewModel: ObservableObject {
             statsResult = .failure(UserFacingError(error))
         }
 
+        // Try Again's load, say, can still be on its way when the name
+        // prompt closes and a newer one starts; it read the placeholder name.
+        guard load == newestLoad else { return }
         switch profileResult {
         case .success(let user): profile = .loaded(user)
         case .failure(let failure): profile.fail(with: failure)
@@ -284,6 +294,16 @@ final class ProfileViewModel: ObservableObject {
     /// to load.
     func retry(userId: String) async {
         await retryProfileSetup()
+        await loadData(userId: userId)
+    }
+
+    /// Loads again once the profile setup is finished, which can happen
+    /// while this screen is open: when the name prompt over it closes, or
+    /// when a retry sets the profile up in the background. What's shown was
+    /// read before then, with the placeholder name or before the profile
+    /// existed.
+    func profileSetupDidChange(to state: ProfileSetupState, userId: String) async {
+        guard state == .finished else { return }
         await loadData(userId: userId)
     }
 

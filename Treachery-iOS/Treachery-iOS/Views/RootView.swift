@@ -28,7 +28,9 @@ struct RootView: View {
             case .authenticated:
                 // The name prompt covers the tabs rather than replacing them:
                 // a profile set up late, by a retry, can need a name while a
-                // game is open, and replacing the tabs would close it.
+                // game is open, and replacing the tabs would close it. So
+                // the tabs stay as they were, and Profile and Friends load
+                // again once the setup is finished.
                 ZStack {
                     HomeView()
                         .accessibilityHidden(authViewModel.isNewUser)
