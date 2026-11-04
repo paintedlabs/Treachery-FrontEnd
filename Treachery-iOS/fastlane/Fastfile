@@ -143,8 +143,40 @@ platform :ios do
 
   # ── Release (App Store) ──────────────────────────────
 
+  # A published GitHub release runs the release lane with GITHUB_REF_NAME set
+  # to its tag, which Release Drafter writes as vX.Y.Z. The App Store version
+  # comes from MARKETING_VERSION, so stop before anything builds when a
+  # release's tag has another shape or names another version. Runs started by
+  # hand (workflow_dispatch) on a branch carry its name instead and skip the
+  # check.
+  private_lane :ensure_version_matches_release_tag do
+    tag = ENV["GITHUB_REF_NAME"].to_s
+    unless tag.match?(/\Av\d+\.\d+\.\d+\z/)
+      next unless ENV["GITHUB_EVENT_NAME"] == "release"
+
+      UI.user_error!(
+        "Release tag #{tag.inspect} is not vX.Y.Z, so it can't be checked against " \
+        "MARKETING_VERSION. Publish the release with a tag such as v1.3.0. " \
+        "See docs/DEPLOYMENT.md."
+      )
+    end
+
+    expected = tag.delete_prefix("v")
+    actual = get_version_number(xcodeproj: XCODEPROJ, target: "Treachery-iOS", configuration: "Release")
+    next if actual == expected
+
+    UI.user_error!(
+      "Release #{tag} expects version #{expected}, but MARKETING_VERSION of the " \
+      "Treachery-iOS target is #{actual}. Set it to #{expected} (Debug and Release) " \
+      "in a PR, merge it, then publish the release from a commit that includes the " \
+      "bump. See docs/DEPLOYMENT.md."
+    )
+  end
+
   desc "Build and submit to App Store review"
   lane :release do
+    ensure_version_matches_release_tag
+
     setup_ci if is_ci
 
     # Import distribution certificate into Fastlane's temp keychain

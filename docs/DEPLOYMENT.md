@@ -50,6 +50,24 @@ hosting, App Store submission, and Play production. There is no partial
 promote — cut the release when *all three* clients are ready for what's on
 `main`.
 
+## iOS version numbers
+
+The App Store version is `MARKETING_VERSION` on the `Treachery-iOS` target
+(Xcode → target → General → Version sets Debug and Release together). The
+pipelines only bump the build number, so the version is yours to manage:
+
+1. **Before publishing a release**, bump `MARKETING_VERSION` to the release's
+   version in a PR and merge it. A release tagged `v1.3.0` must build version
+   `1.3.0`; the App Store lane checks this and stops before building if they
+   differ, or if the release's tag isn't `vX.Y.Z`. Release Drafter picks the
+   tag from PR labels, so edit the draft's tag if it doesn't match. (Runs
+   started by hand from the Actions tab on a branch carry no tag and skip the
+   check.)
+2. **Right after Apple approves a release**, bump `MARKETING_VERSION` again
+   (e.g. `1.3.0` → `1.3.1`) in a PR. App Store Connect rejects uploads whose
+   version is not higher than the last approved one, so every TestFlight
+   upload from `main` fails until the bump lands.
+
 ## Rules changes
 
 `firestore.rules` in the repo is the source of truth. **Never edit rules in
