@@ -153,19 +153,19 @@ it, rather than finding a problem during an incident. It blocks no real user:
 every build CI uploads is numbered 2 or higher, and builds from before the
 gate ignore the document.
 
-1. Run a Release build of the candidate on a simulator or your phone. In
-   Xcode, Product > Profile builds Release. Or set Product > Scheme > Edit
-   Scheme > Run > Build Configuration to Release, and set it back afterwards,
-   since the scheme is in git. Builds made this way are build 1.
+1. Run a Release build of the candidate on your phone. A simulator can show
+   the screen, but it has no App Store app for the **Update** button to open
+   and no VoiceOver, and step 3 checks both. In Xcode, Product > Profile
+   builds Release. Or set Product > Scheme > Edit Scheme > Run > Build
+   Configuration to Release, and set it back afterwards, since the scheme is
+   in git. Builds made this way are build 1.
 2. In `config/ios`, set `min_build` to `2` (number), and set `store_url` if it
    isn't set yet. If a real minimum is already set, leave it alone: it blocks
    build 1 already.
-3. Quit the app from the app switcher and open it again. Check that the
-   Update Required screen appears and that **Update** opens Treachery's App
-   Store page. Check the button on a phone: a simulator has no App Store
-   app, so an `itms-apps://` or `itms-appss://` link opens nothing there.
-   On a phone, also turn VoiceOver on and check that focus moves to "Update
-   Required" when the screen appears.
+3. Quit the app from the app switcher. Turn VoiceOver on, then open the app
+   again. Check that the Update Required screen appears and that VoiceOver
+   reads "Update Required" as soon as it does, without you touching the
+   phone. Then check that **Update** opens Treachery's App Store page.
 4. What switching to another app and back should do depends on step 2:
    - If you set `min_build` to `2`, delete it, then switch to another app
      and back. Treachery should open as normal.
