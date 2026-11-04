@@ -70,7 +70,6 @@ struct GameBoardPlayerRow: View {
                 ))
             }
         }
-        .accessibilityElement(children: .combine)
     }
 
     private var colorPickerToggle: some View {
@@ -99,79 +98,88 @@ struct GameBoardPlayerRow: View {
 
     private var playerInfo: some View {
         VStack(alignment: .leading, spacing: 2) {
-            HStack(spacing: 6) {
-                Text(player.displayName)
-                    .fontWeight(isCurrentUser ? .bold : .regular)
-                    .strikethrough(player.isEliminated)
-                    .foregroundStyle(player.isEliminated ? Color.mtgTextSecondary : Color.mtgTextPrimary)
+            // VoiceOver reads these as one: name, commander and role.
+            VStack(alignment: .leading, spacing: 2) {
+                HStack(spacing: 6) {
+                    Text(player.displayName)
+                        .fontWeight(isCurrentUser ? .bold : .regular)
+                        .strikethrough(player.isEliminated)
+                        .foregroundStyle(player.isEliminated ? Color.mtgTextSecondary : Color.mtgTextPrimary)
 
-                if isCurrentUser {
-                    MtgBadge(text: "You", foregroundColor: .mtgGold, backgroundColor: Color.mtgGold.opacity(0.15), fontWeight: .regular)
-                }
-
-                if player.isEliminated {
-                    Image(systemName: "xmark.circle.fill")
-                        .foregroundStyle(Color.mtgError)
-                        .font(.caption)
-                }
-            }
-
-            // Commander name
-            if let commanderName = player.commanderName, !commanderName.isEmpty {
-                Text(commanderName)
-                    .font(.system(.caption, design: .serif))
-                    .italic()
-                    .foregroundStyle(Color.mtgTextSecondary)
-            }
-
-            // Role visibility — only show for visible players
-            // Face-down cards (from ability swaps) stay hidden
-            if viewModel.canSeeRole(of: player) {
-                if canInspectCard {
-                    Button {
-                        onViewCard?(player)
-                    } label: {
-                        HStack(spacing: 4) {
-                            Circle()
-                                .fill(player.role?.color ?? .gray)
-                                .frame(width: 8, height: 8)
-                            Text(player.role?.displayName ?? "")
-                                .font(.caption)
-                                .foregroundStyle(player.role?.color ?? Color.mtgTextSecondary)
-                            if player.isUnveiled && player.role != .leader {
-                                Text("(Unveiled)")
-                                    .font(.caption2)
-                                    .foregroundStyle(Color.mtgTextSecondary)
-                            }
-                            Image(systemName: "info.circle")
-                                .font(.caption2)
-                                .foregroundStyle(player.role?.color ?? Color.mtgTextSecondary)
-                        }
+                    if isCurrentUser {
+                        MtgBadge(text: "You", foregroundColor: .mtgGold, backgroundColor: Color.mtgGold.opacity(0.15), fontWeight: .regular)
                     }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel("View \(player.displayName)'s identity card")
-                    .accessibilityHint("Shows their role ability and card details")
-                } else {
-                    HStack(spacing: 4) {
-                        Circle()
-                            .fill(player.role?.color ?? .gray)
-                            .frame(width: 8, height: 8)
-                        Text(player.role?.displayName ?? "")
+
+                    if player.isEliminated {
+                        Image(systemName: "xmark.circle.fill")
+                            .foregroundStyle(Color.mtgError)
                             .font(.caption)
-                            .foregroundStyle(player.role?.color ?? Color.mtgTextSecondary)
-                        if player.isUnveiled && player.role != .leader {
-                            Text("(Unveiled)")
-                                .font(.caption2)
-                                .foregroundStyle(Color.mtgTextSecondary)
-                        }
+                            .accessibilityLabel("Eliminated")
                     }
                 }
-            } else if viewModel.isTreacheryActive {
-                Text("Role Hidden")
-                    .font(.caption)
-                    .foregroundStyle(Color.mtgTextSecondary)
+
+                // Commander name
+                if let commanderName = player.commanderName, !commanderName.isEmpty {
+                    Text(commanderName)
+                        .font(.system(.caption, design: .serif))
+                        .italic()
+                        .foregroundStyle(Color.mtgTextSecondary)
+                }
+
+                // Role visibility — only show for visible players
+                // Face-down cards (from ability swaps) stay hidden
+                if viewModel.canSeeRole(of: player) {
+                    if !canInspectCard {
+                        roleLabel(showsInfoIcon: false)
+                    }
+                } else if viewModel.isTreacheryActive {
+                    Text("Role Hidden")
+                        .font(.caption)
+                        .foregroundStyle(Color.mtgTextSecondary)
+                }
+            }
+            .accessibilityElement(children: .combine)
+
+            // A role whose card can be opened is a button of its own.
+            if canInspectCard {
+                Button {
+                    onViewCard?(player)
+                } label: {
+                    roleLabel(showsInfoIcon: true)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("View \(player.displayName)'s identity card")
+                .accessibilityValue(roleDescription)
+                .accessibilityHint("Shows their role ability and card details")
             }
         }
+    }
+
+    private func roleLabel(showsInfoIcon: Bool) -> some View {
+        HStack(spacing: 4) {
+            Circle()
+                .fill(player.role?.color ?? .gray)
+                .frame(width: 8, height: 8)
+            Text(player.role?.displayName ?? "")
+                .font(.caption)
+                .foregroundStyle(player.role?.color ?? Color.mtgTextSecondary)
+            if player.isUnveiled && player.role != .leader {
+                Text("(Unveiled)")
+                    .font(.caption2)
+                    .foregroundStyle(Color.mtgTextSecondary)
+            }
+            if showsInfoIcon {
+                Image(systemName: "info.circle")
+                    .font(.caption2)
+                    .foregroundStyle(player.role?.color ?? Color.mtgTextSecondary)
+            }
+        }
+    }
+
+    /// The role as the view-card button gives it to VoiceOver.
+    private var roleDescription: String {
+        let role = player.role?.displayName ?? ""
+        return player.isUnveiled && player.role != .leader ? "\(role), unveiled" : role
     }
 
     @ViewBuilder
@@ -195,7 +203,6 @@ struct GameBoardPlayerRow: View {
                 .buttonStyle(.plain)
                 .disabled(!viewModel.canAdjustLife)
                 .opacity(viewModel.canAdjustLife ? 1 : 0.35)
-                .accessibilityLabel("Decrease \(player.displayName)'s life")
 
                 Text("\(player.lifeTotal)")
                     .font(.system(size: 36, weight: .bold, design: .serif))
@@ -204,7 +211,6 @@ struct GameBoardPlayerRow: View {
                     .multilineTextAlignment(.center)
                     .contentTransition(.numericText())
                     .animation(.spring(response: 0.3, dampingFraction: 0.6), value: player.lifeTotal)
-                    .accessibilityLabel("\(player.lifeTotal) life")
 
                 Button {
                     viewModel.adjustLife(for: player.id, by: 1)
@@ -221,12 +227,39 @@ struct GameBoardPlayerRow: View {
                 .buttonStyle(.plain)
                 .disabled(!viewModel.canAdjustLife)
                 .opacity(viewModel.canAdjustLife ? 1 : 0.35)
-                .accessibilityLabel("Increase \(player.displayName)'s life")
             }
+            // One element for VoiceOver: the total, which a swipe up or
+            // down changes by 1, as the buttons do.
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("\(player.displayName) life")
+            .accessibilityValue("\(player.lifeTotal)")
+            .modifier(LifeAdjustment(isEnabled: viewModel.canAdjustLife) { direction in
+                viewModel.adjustLife(for: player.id, direction)
+            })
         } else {
+            // VoiceOver says so with their name already: the mark beside it
+            // reads "Eliminated".
             Text("Eliminated")
                 .font(.caption)
                 .foregroundStyle(Color.mtgError)
+                .accessibilityHidden(true)
+        }
+    }
+}
+
+/// Lets VoiceOver change a life total with a swipe up or down, only while
+/// the signed-in player can change it. Otherwise it's read but not offered
+/// as adjustable.
+private struct LifeAdjustment: ViewModifier {
+    let isEnabled: Bool
+    let adjust: (AccessibilityAdjustmentDirection) -> Void
+
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        if isEnabled {
+            content.accessibilityAdjustableAction(adjust)
+        } else {
+            content
         }
     }
 }
