@@ -9,7 +9,8 @@ private let deadlineExceededCode = 4
 private let failedPreconditionCode = 9
 
 /// The live `CloudFunctions.deleteAccount` relies on this mapping to tell the
-/// server's in-game refusal and a timeout apart from every other failure.
+/// server's in-game refusal, a timeout and a request that never left the
+/// device apart from every other failure.
 @Suite("deleteAccount callable error mapping")
 struct AccountDeletionErrorTests {
 
@@ -36,12 +37,28 @@ struct AccountDeletionErrorTests {
         #expect(AccountDeletionError(callableError: callableError) == .timedOut)
     }
 
-    @Test("Every other error is left for the caller to treat as retryable", arguments: [
-        NSError(domain: functionsErrorDomain, code: 16, userInfo: [NSLocalizedDescriptionKey: "Must be signed in."]),
-        NSError(domain: functionsErrorDomain, code: 13, userInfo: [NSLocalizedDescriptionKey: "INTERNAL"]),
+    /// The SDK gets the sign-in token before it builds the request, and these
+    /// URL errors come before a connection is made: either way nothing was
+    /// sent. Auth's codes 9 and 4 also show that only Functions' own codes
+    /// mean a refusal or a timeout.
+    @Test("A request that never left the device becomes notSent", arguments: [
+        NSError(domain: "FIRAuthErrorDomain", code: 17_020, userInfo: [NSLocalizedDescriptionKey: "Network error"]),
         NSError(domain: "FIRAuthErrorDomain", code: failedPreconditionCode),
         NSError(domain: "FIRAuthErrorDomain", code: deadlineExceededCode),
         URLError(.notConnectedToInternet),
+        URLError(.dataNotAllowed),
+        URLError(.cannotFindHost),
+        URLError(.cannotConnectToHost),
+    ] as [any Error])
+    func requestThatNeverLeftTheDeviceBecomesNotSent(error: any Error) {
+        #expect(AccountDeletionError(callableError: error) == .notSent)
+    }
+
+    /// A connection lost once it was made may have delivered the request.
+    @Test("Every other error is left for the caller to treat as retryable", arguments: [
+        NSError(domain: functionsErrorDomain, code: 16, userInfo: [NSLocalizedDescriptionKey: "Must be signed in."]),
+        NSError(domain: functionsErrorDomain, code: 13, userInfo: [NSLocalizedDescriptionKey: "INTERNAL"]),
+        URLError(.networkConnectionLost),
     ] as [any Error])
     func otherErrorsAreNotRecognized(error: any Error) {
         #expect(AccountDeletionError(callableError: error) == nil)

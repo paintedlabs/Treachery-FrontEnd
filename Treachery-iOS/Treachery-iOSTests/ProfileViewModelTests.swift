@@ -264,6 +264,7 @@ struct ProfileViewModelTests {
         (ProfileSetupState.noAccount, false),
         (ProfileSetupState.pending, false),
         (ProfileSetupState.onHold, false),
+        (ProfileSetupState.onHoldUntilRelaunch, false),
         (ProfileSetupState.needsName, false),
         (ProfileSetupState.finished, true),
     ])

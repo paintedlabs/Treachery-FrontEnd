@@ -458,19 +458,34 @@ final class ProfileViewModel: ObservableObject {
         do {
             try await cloudFunctions.deleteAccount()
         } catch AccountDeletionError.inProgressGame(let message) {
+            // The server refuses at deleteAccount's step 1 or 2, before it
+            // deletes any of the account, and that run is over.
             let serverMessage = message.trimmingCharacters(in: .whitespacesAndNewlines)
             failAccountDeletion(
                 message: serverMessage.isEmpty ? AccountDeletionMessage.inProgressGameFallback : serverMessage,
-                isRetryable: false
+                isRetryable: false,
+                failure: .nothingDeleted
             )
             return
+        } catch AccountDeletionError.notSent {
+            // The request never left this device.
+            Self.logger.error("deleteAccount wasn't sent")
+            failAccountDeletion(message: AccountDeletionMessage.retry, isRetryable: true, failure: .nothingDeleted)
+            return
         } catch AccountDeletionError.timedOut {
+            // The server may have stopped anywhere, or still be running: with
+            // the profile deleted (step 5) and the sign-in account not yet
+            // (step 6), a setup attempt would create the profile again.
             Self.logger.error("deleteAccount timed out")
-            failAccountDeletion(message: AccountDeletionMessage.timedOut, isRetryable: true)
+            failAccountDeletion(message: AccountDeletionMessage.timedOut, isRetryable: true, failure: .outcomeUnknown)
             return
         } catch {
+            // The request may have reached the server. A run can fail after
+            // deleting the profile (at step 6, say), a lost connection can
+            // leave it running, and an answer this app doesn't understand
+            // (`unexpectedResponse`) can come from one that finished.
             Self.logger.error("deleteAccount failed: \(error.localizedDescription, privacy: .private)")
-            failAccountDeletion(message: AccountDeletionMessage.retry, isRetryable: true)
+            failAccountDeletion(message: AccountDeletionMessage.retry, isRetryable: true, failure: .outcomeUnknown)
             return
         }
 
@@ -479,10 +494,11 @@ final class ProfileViewModel: ObservableObject {
     }
 
     /// Ends a deletion the server didn't confirm. This device stays signed
-    /// in, so the session can go on setting up the profile.
-    private func failAccountDeletion(message: String, isRetryable: Bool) {
+    /// in; `failure` tells the session whether it can go on setting up the
+    /// profile.
+    private func failAccountDeletion(message: String, isRetryable: Bool, failure: AccountDeletionFailure) {
         accountDeletionState = .failed(message: message, isRetryable: isRetryable)
-        session.accountDeletionDidFail()
+        session.accountDeletionDidFail(failure)
     }
 
     /// Signs out again after the server deleted the account but the first

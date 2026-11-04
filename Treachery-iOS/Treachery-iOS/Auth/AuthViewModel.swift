@@ -31,8 +31,15 @@ enum ProfileSetupState: Equatable, Sendable {
     case pending
     /// Not set up yet, and on hold while the account is being deleted: an
     /// attempt then could create the profile again just after the server
-    /// deleted it. Pending again if the deletion fails.
+    /// deleted it. Pending again if the deletion fails having deleted
+    /// nothing.
     case onHold
+    /// Not set up yet, and on hold until the app relaunches or the account
+    /// signs out: a deletion failed without the server saying how far it
+    /// got (it timed out, say). The server may have deleted the profile and
+    /// still be about to delete the sign-in account, and an attempt then
+    /// would create the profile again to outlive the account.
+    case onHoldUntilRelaunch
     /// Set up with a placeholder name. The name prompt asks for the user's
     /// own until they save one or skip.
     case needsName
@@ -404,19 +411,26 @@ extension AuthViewModel: SessionEnding {
     /// Puts a pending profile setup on hold (`ProfileSetupState.onHold`),
     /// stopping an attempt that's running before it creates anything.
     /// Retries, the app becoming active and Try Again then set nothing up
-    /// until the session ends or the deletion fails.
+    /// until the session ends, or the deletion fails having deleted nothing.
     func accountDeletionWillStart() {
         guard profileSetupState == .pending else { return }
         stopProfileSetup()
         profileSetupState = .onHold
     }
 
-    /// Takes the profile setup off hold, if it's on hold and this device is
-    /// still signed in. It tries at once, then on the usual schedule. If a
-    /// deletion that timed out finished after all, that attempt finds the
-    /// account gone and signs out.
-    func accountDeletionDidFail() {
+    /// Takes the profile setup off hold if the server deleted nothing and
+    /// this device is still signed in: it tries at once, then on the usual
+    /// schedule. If the server may have deleted something, the setup stays
+    /// on hold until the app relaunches or the account signs out
+    /// (`ProfileSetupState.onHoldUntilRelaunch`), even when a later deletion
+    /// is refused: the run that failed may still be deleting the account.
+    func accountDeletionDidFail(_ failure: AccountDeletionFailure) {
         guard profileSetupState == .onHold, case .authenticated(let account) = authState else { return }
-        startProfileSetup(for: account)
+        switch failure {
+        case .nothingDeleted:
+            startProfileSetup(for: account)
+        case .outcomeUnknown:
+            profileSetupState = .onHoldUntilRelaunch
+        }
     }
 }

@@ -39,6 +39,20 @@ struct AuthViewModelProfileSetupTests {
         )
     }
 
+    /// The Profile screen, deleting the account through `cloudFunctions`
+    /// with this view model as its session, as in the app. Only deletions
+    /// that fail run here: one that succeeds signs out through
+    /// `endSession()`, which logs to Analytics.
+    private func profileScreen(deletingWith cloudFunctions: MockCloudFunctions) -> ProfileViewModel {
+        ProfileViewModel(
+            session: viewModel,
+            retryProfileSetup: { [viewModel] in await viewModel.retryProfileSetup() },
+            firestoreManager: firestore,
+            cloudFunctions: cloudFunctions,
+            trackEvent: { _ in }
+        )
+    }
+
     // MARK: - Retries
 
     @Test func retriesSoonThenLessOftenWhileTheAccountStaysSignedIn() async {
@@ -132,8 +146,10 @@ struct AuthViewModelProfileSetupTests {
     // in between could find the profile gone but the account still there,
     // and create the profile again, with the email and phone number, to
     // outlive the account. So nothing sets up the profile while the account
-    // is being deleted. ProfileViewModel's deletion tells the session when
-    // the deletion starts and if it fails; these tests stand in for it.
+    // is being deleted, nor after a deletion whose outcome is unknown.
+    // ProfileViewModel's deletion tells the session when the deletion starts
+    // and how it failed. Most of these tests stand in for it; the ones about
+    // how a deletion failed run it.
 
     @Test func aPendingRetryDoesNotRunWhileTheAccountIsBeingDeleted() async {
         viewModel.authStateDidChange(to: account())
@@ -200,15 +216,18 @@ struct AuthViewModelProfileSetupTests {
         #expect(!viewModel.isNewUser)
     }
 
-    /// The account is still there, and still has no profile, so the retry
-    /// that was pending runs: at once, then on the usual schedule.
-    @Test func aFailedDeletionResumesThePendingRetry() async {
+    /// The server refuses a deletion, here for a game in progress, before it
+    /// deletes any of the account, and that run is over. The account still
+    /// has no profile, so the retry that was pending runs: at once, then on
+    /// the usual schedule.
+    @Test func aRefusedDeletionResumesThePendingRetry() async {
         viewModel.authStateDidChange(to: account())
         await clock.waitForSleepersUnlessCancelled()
         clock.advance(by: .seconds(2))
-        viewModel.accountDeletionWillStart()
+        let cloudFunctions = MockCloudFunctions()
+        cloudFunctions.errorToThrow = AccountDeletionError.inProgressGame(message: "You're in a game that's still in progress.")
 
-        viewModel.accountDeletionDidFail()
+        await profileScreen(deletingWith: cloudFunctions).deleteAccount()
         await clock.waitForSleepersUnlessCancelled()
 
         #expect(viewModel.profileSetupState == .pending)
@@ -217,13 +236,50 @@ struct AuthViewModelProfileSetupTests {
         #expect(clock.pendingDeadlines == [.seconds(7)])
     }
 
+    /// A deletion that timed out may have stopped anywhere on the server, or
+    /// still be running there, between deleting the profile and deleting the
+    /// sign-in account. So the setup stays on hold until the app relaunches
+    /// or the account signs out, however long that is, and even if Try Again
+    /// on the deletion is refused: that says only that the second run
+    /// deleted nothing.
+    @Test func aTimedOutDeletionKeepsTheSetupOnHold() async {
+        viewModel.authStateDidChange(to: account())
+        await clock.waitForSleepersUnlessCancelled()
+        // Online again: an attempt now would create the profile.
+        auth.accountStatus = .exists
+        let cloudFunctions = MockCloudFunctions()
+        cloudFunctions.errorToThrow = AccountDeletionError.timedOut
+        let profileScreen = profileScreen(deletingWith: cloudFunctions)
+
+        await profileScreen.deleteAccount()
+
+        #expect(viewModel.profileSetupState == .onHoldUntilRelaunch)
+        #expect(clock.pendingDeadlines.isEmpty)
+        // The retry would have been due long ago, and the app becomes
+        // active: nothing runs, and Try Again on Profile returns at once.
+        clock.advance(by: .seconds(300))
+        viewModel.retryPostponedProfileSetup()
+        await viewModel.retryProfileSetup()
+        #expect(auth.reloadAccountCalls == ["u1"])
+
+        cloudFunctions.errorToThrow = AccountDeletionError.inProgressGame(message: "You're in a game that's still in progress.")
+        await profileScreen.deleteAccount()
+        await viewModel.retryProfileSetup()
+
+        #expect(cloudFunctions.deleteAccountCallCount == 2)
+        #expect(viewModel.profileSetupState == .onHoldUntilRelaunch)
+        #expect(auth.reloadAccountCalls == ["u1"])
+        #expect(firestore.createUserCalls.isEmpty)
+        #expect(!viewModel.isNewUser)
+    }
+
     @Test func aDeletionFailingAfterTheSessionEndedResumesNothing() async {
         viewModel.authStateDidChange(to: account())
         await clock.waitForSleepersUnlessCancelled()
         viewModel.accountDeletionWillStart()
         viewModel.authStateDidChange(to: nil)
 
-        viewModel.accountDeletionDidFail()
+        viewModel.accountDeletionDidFail(.nothingDeleted)
 
         #expect(viewModel.profileSetupState == .noAccount)
         #expect(clock.pendingDeadlines.isEmpty)

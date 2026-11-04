@@ -8,7 +8,8 @@ final class SessionEndingSpy: SessionEnding {
     var isGuest = false
     private(set) var endSessionCallCount = 0
     private(set) var accountDeletionWillStartCallCount = 0
-    private(set) var accountDeletionDidFailCallCount = 0
+    /// What each `accountDeletionDidFail(_:)` call said, in order.
+    private(set) var accountDeletionFailures: [AccountDeletionFailure] = []
     var errorToThrow: Error?
     /// Runs on every `endSession()` call, before any error is thrown.
     var whileEndingSession: (() -> Void)?
@@ -23,7 +24,7 @@ final class SessionEndingSpy: SessionEnding {
         accountDeletionWillStartCallCount += 1
     }
 
-    func accountDeletionDidFail() {
-        accountDeletionDidFailCallCount += 1
+    func accountDeletionDidFail(_ failure: AccountDeletionFailure) {
+        accountDeletionFailures.append(failure)
     }
 }

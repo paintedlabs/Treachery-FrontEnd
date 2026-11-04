@@ -137,6 +137,7 @@ struct ProfileViewModelAccountDeletionTests {
     }
 
     @Test("Other failures show a human message and can be retried", arguments: [
+        AccountDeletionError.notSent,
         URLError(.notConnectedToInternet),
         NSError(domain: "com.firebase.functions", code: 14, userInfo: [NSLocalizedDescriptionKey: "UNAVAILABLE"]),
         AccountDeletionError.unexpectedResponse,
@@ -237,25 +238,42 @@ struct ProfileViewModelAccountDeletionTests {
         await viewModel.deleteAccount()
 
         #expect(heldWhileInFlight == 1)
-        #expect(session.accountDeletionDidFailCallCount == 0)
+        #expect(session.accountDeletionFailures.isEmpty)
         #expect(viewModel.accountDeletionState == .deleted)
     }
 
-    /// Whatever the failure, this device stays signed in, so setting up the
-    /// profile goes on.
-    @Test("A failed deletion lets the profile setup go on", arguments: [
+    /// The server refused before deleting any of the account, or never got
+    /// the request, so setting up the profile can go on.
+    @Test("A deletion that deleted nothing says so", arguments: [
         AccountDeletionError.inProgressGame(message: "You're in a game that's still in progress."),
-        AccountDeletionError.timedOut,
-        URLError(.notConnectedToInternet),
-    ] as [any Error])
-    func failedDeletionLetsTheProfileSetupGoOn(error: any Error) async {
+        AccountDeletionError.notSent,
+    ])
+    func deletionThatDeletedNothingSaysSo(error: AccountDeletionError) async {
         cloudFunctions.errorToThrow = error
 
         await viewModel.deleteAccount()
 
         #expect(!viewModel.accountDeletionState.isUnderway)
         #expect(session.accountDeletionWillStartCallCount == 1)
-        #expect(session.accountDeletionDidFailCallCount == 1)
+        #expect(session.accountDeletionFailures == [.nothingDeleted])
+    }
+
+    /// Any other failure may come after the server started deleting, or
+    /// while it still is, so the profile setup stays on hold.
+    @Test("A deletion whose outcome is unknown says so", arguments: [
+        AccountDeletionError.timedOut,
+        AccountDeletionError.unexpectedResponse,
+        URLError(.networkConnectionLost),
+        NSError(domain: "com.firebase.functions", code: 13, userInfo: [NSLocalizedDescriptionKey: "INTERNAL"]),
+    ] as [any Error])
+    func deletionWhoseOutcomeIsUnknownSaysSo(error: any Error) async {
+        cloudFunctions.errorToThrow = error
+
+        await viewModel.deleteAccount()
+
+        #expect(!viewModel.accountDeletionState.isUnderway)
+        #expect(session.accountDeletionWillStartCallCount == 1)
+        #expect(session.accountDeletionFailures == [.outcomeUnknown])
     }
 
     // MARK: - Repeat taps

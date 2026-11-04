@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import FirebaseAuth
 import FirebaseFunctions
 
 struct JoinGameResult {
@@ -21,13 +22,17 @@ struct PhenomenonResult {
     let secondaryPlaneId: String? // For Spatial Merging
 }
 
-/// The `deleteAccount` failures the app tells apart. Every other failure
-/// (network, server) propagates unchanged and is treated as retryable.
+/// The `deleteAccount` failures the app tells apart. Every other failure (a
+/// server error, or a connection lost once the request was sent) propagates
+/// unchanged and is treated as retryable.
 enum AccountDeletionError: Error, Equatable {
     /// The server refused because the user is in a game that is still in
     /// progress. `message` is the server's sentence telling them they can delete
     /// the account once that game ends; show it verbatim.
     case inProgressGame(message: String)
+    /// The request never left this device: it was offline, or couldn't get
+    /// the sign-in token the request carries. The server deleted nothing.
+    case notSent
     /// The request ran out of time, on the server or on the way there. The
     /// server may have finished anyway; deletion is idempotent, so retrying
     /// completes it either way.
@@ -237,19 +242,41 @@ struct CloudFunctions: CloudFunctionsProtocol {
 extension AccountDeletionError {
     /// Recognizes the callable errors the app tells apart: the server's
     /// refusal during a live game (`failed-precondition`, whose localized
-    /// description is the server's message) and a timeout
+    /// description is the server's message), a timeout
     /// (`deadline-exceeded`, which the SDK also reports when the request
-    /// itself times out). Returns nil for any other error.
+    /// itself times out), and a request that never left this device.
+    /// Returns nil for any other error.
     init?(callableError error: Error) {
         let nsError = error as NSError
-        guard nsError.domain == FunctionsErrorDomain else { return nil }
-        switch FunctionsErrorCode(rawValue: nsError.code) {
-        case .failedPrecondition:
-            self = .inProgressGame(message: nsError.localizedDescription)
-        case .deadlineExceeded:
-            self = .timedOut
+        switch nsError.domain {
+        case FunctionsErrorDomain:
+            switch FunctionsErrorCode(rawValue: nsError.code) {
+            case .failedPrecondition:
+                self = .inProgressGame(message: nsError.localizedDescription)
+            case .deadlineExceeded:
+                self = .timedOut
+            default:
+                return nil
+            }
+        case AuthErrors.domain:
+            // The SDK gets the sign-in token before it builds the request.
+            self = .notSent
+        case NSURLErrorDomain where Self.noConnectionCodes.contains(URLError.Code(rawValue: nsError.code)):
+            self = .notSent
         default:
             return nil
         }
     }
+
+    /// The URL errors of a connection that was never made, so the request
+    /// wasn't sent: offline, or the server couldn't be found or reached. A
+    /// connection lost later (`networkConnectionLost`) may have delivered it.
+    private static let noConnectionCodes: Set<URLError.Code> = [
+        .notConnectedToInternet,
+        .dataNotAllowed,
+        .internationalRoamingOff,
+        .cannotFindHost,
+        .dnsLookupFailed,
+        .cannotConnectToHost,
+    ]
 }
