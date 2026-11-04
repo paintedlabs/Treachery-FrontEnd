@@ -81,9 +81,11 @@ also blocks TestFlight testers on older builds.
 ### Force an update
 
 **A minimum can lock people out for good.** The gate compares build numbers
-and nothing else, and the Update Required screen has no way past it. So
-`min_build` must be the build number of an App Store release that the App
-Store actually offers to every blocked user, whatever iOS version they run:
+and nothing else, and the Update Required screen has no way past it. So pick
+`min_build` so that everyone it blocks can install, from the App Store, a
+release whose build number is at least `min_build`. Phones on different iOS
+versions may be offered different releases, and that's fine as long as each
+one is offered some release at or above the minimum:
 
 - Never use a build that's only on TestFlight, in review or waiting for
   release, even one numbered below the live release. The App Store doesn't
