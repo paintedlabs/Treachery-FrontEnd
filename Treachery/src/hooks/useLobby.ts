@@ -82,7 +82,10 @@ export function useLobby(
     try {
       const startGameFn = httpsCallable(functions, 'startGame');
       await startGameFn({ gameId });
-      trackEvent('start_game', { player_count: players.length, game_mode: game.game_mode ?? 'unknown' });
+      trackEvent('start_game', {
+        player_count: players.length,
+        game_mode: game.game_mode ?? 'unknown',
+      });
     } catch (error: unknown) {
       setErrorMessage(error instanceof Error ? error.message : 'Failed to start game.');
     }
