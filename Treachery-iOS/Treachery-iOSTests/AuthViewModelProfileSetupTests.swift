@@ -571,6 +571,29 @@ extension AuthViewModelProfileSetupTests {
         #expect(firestore.createUserCalls.isEmpty)
     }
 
+    /// The session ends while the check waits for Auth, here by signing out;
+    /// another account signing in stops it the same way. Try Again stops
+    /// waiting then, and the check doesn't act on Auth's answer, here that
+    /// the account is gone: it would sign out a session that already ended,
+    /// and could end the wait of a Try Again in the next session before that
+    /// session's own setup attempt is over.
+    @Test func onHoldACheckStoppedBySigningOutDoesNotActOnItsOutcome() async {
+        await holdTheSetupWithATimedOutDeletion()
+        auth.accountStatus = .gone
+        auth.whileReloadingAccount = { [viewModel] in
+            viewModel.authStateDidChange(to: nil)
+        }
+
+        await viewModel.retryProfileSetup()
+
+        // The double's reload runs on the main actor, so the stopped check
+        // has gone on from it before Try Again's caller resumes.
+        #expect(auth.reloadAccountCalls == ["u1", "u1"])
+        #expect(auth.signOutCallCount == 0)
+        #expect(viewModel.profileSetupState == .noAccount)
+        #expect(firestore.getUserDocumentCallCount == 1)
+    }
+
     /// Without a profile, Profile and Friends fail to load. On hold, "check
     /// your connection" would be untrue. Their failure cards say why instead,
     /// as ProfileView and FriendsListView put it (`whileProfileSetup(is:)`),

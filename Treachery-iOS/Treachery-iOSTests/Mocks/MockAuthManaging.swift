@@ -20,7 +20,8 @@ final class MockAuthManaging: AuthManaging {
     /// `resetPassword` in place of their usual outcome.
     var signInError: Error?
     /// Runs once inside `reloadAccount(userId:)`, while a provisioning
-    /// attempt is in flight, so a test can act mid-attempt.
+    /// attempt or a check of a deletion's outcome is in flight, so a test
+    /// can act mid-reload.
     var whileReloadingAccount: (@MainActor () async -> Void)?
 
     private(set) var reloadAccountCalls: [String] = []
@@ -50,6 +51,13 @@ final class MockAuthManaging: AuthManaging {
     func addAuthStateListener(_ callback: @escaping (User?) -> Void) -> Any { NSObject() }
     func removeAuthStateListener(_ handle: Any) {}
 
+    /// On the main actor, as its callers and `whileReloadingAccount` are, so
+    /// a caller goes on from the reload in the main-actor job the hook ran
+    /// in. A test that the hook let go of, by stopping the caller, resumes
+    /// after that job and sees what the stopped caller did next. Off the
+    /// main actor, as FirebaseManager's reload runs, the caller would go on
+    /// in a later job, after the test's checks.
+    @MainActor
     func reloadAccount(userId: String) async -> AccountStatus {
         reloadAccountCalls.append(userId)
         if let inFlight = whileReloadingAccount {
