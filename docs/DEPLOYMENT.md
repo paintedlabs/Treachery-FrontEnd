@@ -80,9 +80,26 @@ also blocks TestFlight testers on older builds.
 
 ### Force an update
 
+**A minimum can lock people out for good.** The gate compares build numbers
+and nothing else, and the Update Required screen has no way past it. So
+`min_build` must be a build that every affected user can actually install:
+
+- Never set it above the newest build available to everyone on the App
+  Store. A build that's still in review, waiting for release or only on
+  TestFlight doesn't count.
+- Before you set it, check that build's minimum iOS version against the iOS
+  versions your users run. The App Store offers each phone only the builds
+  its iOS can run, so people on an older iOS than that build needs have
+  nothing to update to and can never get past the screen.
+
 1. In App Store Connect, open the iOS version that is live on the App Store
-   and note its build number. Never set a minimum above the newest build
-   people can download, or they'll have nothing to update to.
+   and note its build number. Check its minimum iOS version, which the App
+   Store page lists under Compatibility, against the iOS versions people run
+   (Firebase Analytics, which the app uses, reports them). If some people
+   still run an older iOS than that, use the newest build that supports
+   their iOS instead, unless you mean to lock them out. An older release's
+   minimum iOS is `IPHONEOS_DEPLOYMENT_TARGET` in the Xcode project at its
+   release tag.
 2. In the Firebase console, open Firestore Database > Data. Open the `config`
    collection (start it if it doesn't exist), then the document `ios`.
 3. Set the fields:
