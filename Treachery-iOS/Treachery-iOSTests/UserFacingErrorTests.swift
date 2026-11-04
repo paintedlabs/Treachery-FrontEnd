@@ -121,6 +121,13 @@ struct UserFacingErrorTests {
         #expect(UserFacingError(FirebaseManager.AuthError.notAuthenticated) == .notSignedIn)
     }
 
+    /// An offline read with nothing cached says the server couldn't be
+    /// reached, as Firestore's own offline failure does.
+    @Test func readsThatFoundNothingTrustworthySayWhy() {
+        #expect(UserFacingError(FirestoreReadError.nothingCachedOffline) == .serverUnreachable)
+        #expect(UserFacingError(FirestoreReadError.profileUnavailable) == .unknown)
+    }
+
     @Test func anAlreadyMappedErrorIsKept() {
         let mapped = UserFacingError(message: "This game is full.")
 

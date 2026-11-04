@@ -2,11 +2,15 @@ import Foundation
 
 /// A read that found nothing it could show, where an empty or missing
 /// answer would otherwise pass for real data.
-enum FirestoreReadError: Error, Equatable {
+enum FirestoreReadError: Error, Hashable {
     /// The user's own profile, `users/{uid}`, is missing, incomplete or
     /// can't be decoded: `getUser(id:)` returns nil for it. Signing in
     /// creates or repairs it, so trying again can help.
     case profileUnavailable
+    /// The read was made offline and the local cache held nothing for it.
+    /// Firestore answers such a query with an empty list, which would read
+    /// as "no games" or "no friends" rather than "couldn't load".
+    case nothingCachedOffline
 }
 
 protocol FirestoreManaging {
@@ -30,6 +34,9 @@ protocol FirestoreManaging {
     /// Renames the user by writing `display_name` and nothing else. Fails,
     /// rather than create the document, if the profile doesn't exist.
     func updateDisplayName(_ name: String, forUserId userId: String) async throws
+    /// Players whose names start with `name`. Throws
+    /// `FirestoreReadError.nothingCachedOffline`, rather than report none,
+    /// when offline with no match in the local cache.
     func searchUsers(byDisplayName name: String) async throws -> [TreacheryUser]
 
     // Friend Requests
@@ -38,9 +45,10 @@ protocol FirestoreManaging {
     func updateFriendRequest(_ request: FriendRequest) async throws
     func addFriend(userId: String, friendId: String) async throws
     func removeFriend(userId: String, friendId: String) async throws
-    /// The user's friends, by name. Throws
+    /// The user's friends, by name. Rather than report no friends, throws
     /// `FirestoreReadError.profileUnavailable` when the user's own profile
-    /// is missing or can't be read, rather than report no friends.
+    /// is missing or can't be read, and `.nothingCachedOffline` when
+    /// offline with none of the friends' profiles in the local cache.
     func getFriends(forUserId userId: String) async throws -> [TreacheryUser]
 
     // Games
@@ -51,6 +59,9 @@ protocol FirestoreManaging {
     func deleteGame(id: String) async throws
     func addPlayerIdToGame(gameId: String, userId: String) async throws
     func getActiveGame(forUserId userId: String) async throws -> Game?
+    /// The user's finished games, newest first. Throws
+    /// `FirestoreReadError.nothingCachedOffline`, rather than report none,
+    /// when offline with none of them in the local cache.
     func getFinishedGames(forUserId userId: String) async throws -> [Game]
     func listenToGame(id: String, onChange: @escaping (Game?) -> Void) -> ListenerCancellable
 

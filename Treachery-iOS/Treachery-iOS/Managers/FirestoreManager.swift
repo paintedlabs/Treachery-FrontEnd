@@ -29,6 +29,21 @@ final class FirestoreManager: FirestoreManaging {
         gamesCollection.document(gameId).collection("players")
     }
 
+    // MARK: - List Reads
+
+    /// The documents of a list read whose empty answer a screen shows as
+    /// "none", such as "No games yet". Offline, Firestore answers a query
+    /// from the local cache, where an empty answer only means that nothing
+    /// was cached, so that throws `FirestoreReadError.nothingCachedOffline`
+    /// instead. A cached answer that isn't empty is returned: stale beats
+    /// blank.
+    private static func documents(of snapshot: QuerySnapshot) throws -> [QueryDocumentSnapshot] {
+        if snapshot.isEmpty && snapshot.metadata.isFromCache {
+            throw FirestoreReadError.nothingCachedOffline
+        }
+        return snapshot.documents
+    }
+
     // MARK: - Users
 
     /// Allowlist of public profile fields — PII (email/phone_number/fcm_token)
@@ -133,7 +148,7 @@ final class FirestoreManager: FirestoreManaging {
             .whereField("display_name", isLessThan: end)
             .limit(to: 20)
             .getDocuments()
-        return snapshot.documents.compactMap { doc -> TreacheryUser? in
+        return try Self.documents(of: snapshot).compactMap { doc -> TreacheryUser? in
             guard var user = try? doc.data(as: TreacheryUser.self) else { return nil }
             user.id = doc.documentID
             return user
@@ -199,7 +214,7 @@ final class FirestoreManager: FirestoreManaging {
                     let snapshot = try await self.usersCollection
                         .whereField(FieldPath.documentID(), in: ids)
                         .getDocuments()
-                    return snapshot.documents.compactMap { doc -> TreacheryUser? in
+                    return try Self.documents(of: snapshot).compactMap { doc -> TreacheryUser? in
                         guard var user = try? doc.data(as: TreacheryUser.self) else { return nil }
                         user.id = doc.documentID
                         return user
@@ -289,7 +304,7 @@ final class FirestoreManager: FirestoreManaging {
             .order(by: "created_at", descending: true)
             .limit(to: 50)
             .getDocuments()
-        return snapshot.documents.compactMap { doc -> Game? in
+        return try Self.documents(of: snapshot).compactMap { doc -> Game? in
             guard var game = try? doc.data(as: Game.self) else { return nil }
             game.id = doc.documentID
             return game

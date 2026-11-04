@@ -30,6 +30,11 @@ struct GameHistoryView: View {
                 }
                 .padding(.top)
             }
+            // Offline, what's shown may be out of date; this says so.
+            .safeAreaInset(edge: .top, spacing: 0) {
+                ConnectionBanner()
+                    .background(Color.mtgBackground)
+            }
         }
         .navigationBarTitleDisplayMode(.inline)
         .toolbarColorScheme(.dark, for: .navigationBar)

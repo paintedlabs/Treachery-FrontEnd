@@ -70,6 +70,16 @@ struct GameHistoryViewModelTests {
         #expect(viewModel.history == .loaded(GameHistory(games: [game("g1")], playersByGame: ["g1": []])))
     }
 
+    /// Offline, Firestore answers from the local cache, and an empty answer
+    /// from there isn't "No games yet".
+    @Test func offlineWithNothingCachedIsAFailureNotAnEmptyHistory() async {
+        firestore.finishedGamesError = FirestoreReadError.nothingCachedOffline
+
+        await viewModel.loadHistory(userId: "u1")
+
+        #expect(viewModel.history == .failed(.serverUnreachable, previous: nil))
+    }
+
     @Test func failedRefreshKeepsTheGamesOnScreen() async {
         firestore.finishedGamesToReturn = [game("g1")]
         firestore.playersByGameToReturn = ["g1": [seat("g1")]]

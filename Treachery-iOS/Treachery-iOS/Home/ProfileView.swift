@@ -75,6 +75,11 @@ struct ProfileView: View {
                 }
                 .padding()
             }
+            // Offline, what's shown may be out of date; this says so.
+            .safeAreaInset(edge: .top, spacing: 0) {
+                ConnectionBanner()
+                    .background(Color.mtgBackground)
+            }
             .accessibilityHidden(isAccountDeletionUnderway)
         }
         .overlay {

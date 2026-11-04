@@ -154,6 +154,18 @@ struct FriendsListViewModelTests {
         #expect(viewModel.search.value == nil)
     }
 
+    /// Offline with no match cached, a search can't say "No players named".
+    @Test func offlineSearchWithNothingCachedSaysWhyInsteadOfNoMatches() async {
+        await viewModel.loadData(userId: "u1")
+        firestore.searchError = FirestoreReadError.nothingCachedOffline
+        viewModel.searchText = "Zed"
+
+        await viewModel.searchUsers()
+
+        #expect(viewModel.search.phase == .failed)
+        #expect(viewModel.search.failure == .serverUnreachable)
+    }
+
     // MARK: - Friend Actions
 
     @Test func removeFriendCallsCloudFunctionAndRemovesLocally() async {

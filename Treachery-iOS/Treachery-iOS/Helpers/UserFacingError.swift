@@ -41,13 +41,17 @@ extension UserFacingError {
             return error
         case is FirebaseManager.AuthError:
             return .notSignedIn
+        case let error as FirestoreReadError:
+            return firestoreReadErrors[error]
         case let error as URLError:
             return urlErrors[error.code]
         default:
-            break
+            return recognizedFirebaseError(error as NSError)
         }
+    }
 
-        let error = error as NSError
+    /// Firebase's errors, which arrive as NSErrors told apart by domain.
+    private static func recognizedFirebaseError(_ error: NSError) -> Self? {
         switch error.domain {
         case FunctionsErrorDomain:
             guard let code = FunctionsErrorCode(rawValue: error.code) else { return nil }
@@ -89,6 +93,13 @@ extension UserFacingError {
         .cannotConnectToHost: .serverUnreachable,
         .dnsLookupFailed: .serverUnreachable,
         .timedOut: .timedOut,
+    ]
+
+    /// An offline read with nothing cached reads the same as Firestore's own
+    /// offline failure, `unavailable`. A profile that can't be read has
+    /// nothing more specific to say than `unknown`.
+    private static let firestoreReadErrors: [FirestoreReadError: Self] = [
+        .nothingCachedOffline: .serverUnreachable,
     ]
 
     /// A failed-precondition with a usable message never gets here.
