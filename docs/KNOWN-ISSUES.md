@@ -78,11 +78,12 @@ test-encoded — no CI job builds Swift or Kotlin (see Repo hygiene).
 Not all individually test-encoded; from the audit report.
 
 - ~~Profile win-rate deflated~~ — **fixed**: divides by games with a recorded outcome
+- `auth_method` analytics property: iOS reports `guest`, `phone` or `email`, but Android and web still report phone accounts as `email`
 - ~~Legacy 12-player lobbies bricked~~ — **fixed**: the stepper decrement clamps into the valid range on all three clients
 - Planar die cost displays the previous roller's count, not the caller's actual (often free) cost
 - Stale/deleted game link → infinite spinner with the web back button trapped
 - Client-side game-code generation is check-then-act racy; duplicate codes make one game unjoinable by code (**fixed** for createGame callable path)
-- New-user onboarding skippable via a `createUserDocumentIfNeeded` double-invocation race
+- New-user onboarding skippable via a `createUserDocumentIfNeeded` double-invocation race — **fixed on iOS** (only the auth state listener provisions the profile, as on Android); web's `useAuth` still provisions from both its listener and its sign-in functions
 - `useConnectionStatus` watches only `navigator.onLine`, never Firestore sync state
 - Wearer of Masks X-cost unenforced server-side; the reveal is also drawn
   client-side, so skip-and-reopen rerolls it (same on web — inherent to the

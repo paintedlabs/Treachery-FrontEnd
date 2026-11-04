@@ -7,6 +7,7 @@
 
 import Foundation
 import FirebaseFirestore
+import os
 
 /// Wraps a Firebase ListenerRegistration as a ListenerCancellable.
 private struct FirestoreListenerHandle: ListenerCancellable {
@@ -16,6 +17,8 @@ private struct FirestoreListenerHandle: ListenerCancellable {
 
 final class FirestoreManager: FirestoreManaging {
     private let db = Firestore.firestore()
+
+    private static let logger = Logger(subsystem: "com.Solomon.Treachery-iOS", category: "Profile")
 
     // MARK: - Collection References
 
@@ -45,13 +48,12 @@ final class FirestoreManager: FirestoreManaging {
         return publicData
     }
 
-    func createUser(_ user: TreacheryUser) async throws {
+    func createUser(_ user: TreacheryUser, email: String?, phoneNumber: String?) async throws {
         try await usersCollection.document(user.id).setData(publicUserData(user))
 
         var privateData: [String: Any] = [:]
-        if let email = user.email { privateData["email"] = email }
-        if let phone = user.phoneNumber { privateData["phone_number"] = phone }
-        if let fcm = user.fcmToken { privateData["fcm_token"] = fcm }
+        if let email { privateData["email"] = email }
+        if let phoneNumber { privateData["phone_number"] = phoneNumber }
         if !privateData.isEmpty {
             try await usersCollection.document(user.id)
                 .collection("private").document("data")
@@ -61,24 +63,67 @@ final class FirestoreManager: FirestoreManaging {
 
     func getUser(id: String) async throws -> TreacheryUser? {
         let snapshot = try await usersCollection.document(id).getDocument()
-        guard snapshot.exists else { return nil }
-        guard var user = try? snapshot.data(as: TreacheryUser.self) else { return nil }
-        user.id = snapshot.documentID
+        guard case .complete(let user) = userDocument(from: snapshot) else { return nil }
         return user
     }
 
-    func updateUser(_ user: TreacheryUser) async throws {
-        // Explicit field list rather than encoding the whole model: on a legacy
-        // doc that still holds PII, re-encoding echoes those values straight back
-        // onto the public doc. Rules allow it (an unchanged value is not in
-        // diff().affectedKeys(), so doesNotWritePii() passes) — which is exactly
-        // why the allowlist has to do the withholding.
-        //
-        // Deliberately not awaited: the completion handler for a write does not
-        // fire while the client is offline, so awaiting it would wedge the
-        // Profile and onboarding rename screens on their spinner until the
-        // network came back. The local write applies immediately regardless.
-        usersCollection.document(user.id).setData(publicUserData(user), merge: true, completion: nil)
+    func getUserDocument(id: String) async throws -> UserDocument {
+        let snapshot = try await usersCollection.document(id).getDocument(source: .server)
+        return userDocument(from: snapshot)
+    }
+
+    func repairUserProfile(id: String, with repair: ProfileRepair) async throws {
+        var fields: [String: Any] = [:]
+        if let displayName = repair.displayName { fields[ProfileField.displayName.rawValue] = displayName }
+        if let createdAt = repair.createdAt { fields[ProfileField.createdAt.rawValue] = Timestamp(date: createdAt) }
+        if let elo = repair.elo { fields[ProfileField.elo.rawValue] = elo }
+        guard !fields.isEmpty else { return }
+        // updateData, not setData(merge:): it fails instead of creating the
+        // document if the profile was deleted after it was read.
+        try await usersCollection.document(id).updateData(fields)
+    }
+
+    func updateDisplayName(_ name: String, forUserId userId: String) async throws {
+        // One field, never a copy of the whole profile: elo, deck_stats and
+        // friend_ids change on the server, and writing them back from an
+        // earlier read would roll them back. An update also never creates the
+        // document, so a rename still queued when the account is deleted
+        // can't bring the profile back.
+        try await usersCollection.document(userId).updateData([ProfileField.displayName.rawValue: name])
+    }
+
+    private func userDocument(from snapshot: DocumentSnapshot) -> UserDocument {
+        Self.userDocument(fromData: snapshot.data(), id: snapshot.documentID)
+    }
+
+    /// Sorts the fields of a `users/{uid}` document into the states
+    /// provisioning tells apart, logging any document that isn't a complete
+    /// profile. Only `.missing` may lead to a new profile, so a document
+    /// that exists is never reported as missing, however broken it is.
+    /// - Parameters:
+    ///   - data: The document's fields, or nil when there is no document.
+    ///   - id: The document id, which becomes the profile's `id`.
+    static func userDocument(fromData data: [String: Any]?, id: String) -> UserDocument {
+        guard let data else { return .missing }
+
+        let missingFields = Set(ProfileField.allCases.filter { field in
+            guard let value = data[field.rawValue] else { return true }
+            return value is NSNull
+        })
+        if missingFields.contains(.displayName) || missingFields.contains(.createdAt) {
+            logger.notice("Profile \(id, privacy: .private) lacks display_name or created_at")
+            return .incomplete(missingFields: missingFields)
+        }
+
+        do {
+            // What `DocumentSnapshot.data(as:)` does with the same fields.
+            var user = try Firestore.Decoder().decode(TreacheryUser.self, from: data)
+            user.id = id
+            return .complete(user)
+        } catch {
+            logger.error("Profile \(id, privacy: .private) can't be decoded: \(String(describing: error), privacy: .private)")
+            return .undecodable
+        }
     }
 
     func searchUsers(byDisplayName name: String) async throws -> [TreacheryUser] {

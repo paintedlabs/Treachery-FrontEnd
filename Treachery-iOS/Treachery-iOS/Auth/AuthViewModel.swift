@@ -7,6 +7,7 @@
 
 import Foundation
 import FirebaseAuth
+import os
 
 enum AuthState {
     case loading
@@ -23,7 +24,10 @@ final class AuthViewModel: ObservableObject {
 
     private let firebaseManager: AuthManaging
     private let firestoreManager: FirestoreManaging
+    private let profileProvisioner: ProfileProvisioner
     private var authStateHandle: Any?
+
+    private static let logger = Logger(subsystem: "com.Solomon.Treachery-iOS", category: "Auth")
 
     var isAuthenticated: Bool {
         if case .authenticated = authState { return true }
@@ -37,12 +41,16 @@ final class AuthViewModel: ObservableObject {
         return nil
     }
 
+    /// - Parameter now: The clock profile provisioning reads when Firebase
+    ///   Auth doesn't say when an account was created.
     init(
         firebaseManager: AuthManaging = FirebaseManager(),
-        firestoreManager: FirestoreManaging = FirestoreManager()
+        firestoreManager: FirestoreManaging = FirestoreManager(),
+        now: @escaping () -> Date = Date.init
     ) {
         self.firebaseManager = firebaseManager
         self.firestoreManager = firestoreManager
+        self.profileProvisioner = ProfileProvisioner(firestore: firestoreManager, now: now)
         listenToAuthState()
     }
 
@@ -54,15 +62,19 @@ final class AuthViewModel: ObservableObject {
 
     // MARK: - Auth State Listener
 
+    /// Profile provisioning runs from here and nowhere else: Firebase Auth
+    /// calls this once per sign-in. When the sign-in methods provisioned
+    /// too, two runs could race, one skipping the name prompt or replacing a
+    /// profile the other had just created.
     private func listenToAuthState() {
         authStateHandle = firebaseManager.addAuthStateListener { [weak self] user in
             Task { @MainActor in
                 if let user = user {
+                    let account = SignedInAccount(user)
                     self?.authState = .authenticated(user)
                     AnalyticsService.setUserId(user.uid)
-                    AnalyticsService.setUserProperties(["auth_method": user.isAnonymous ? "guest" : "email"])
-                    let isNew = await self?.createUserDocumentIfNeeded(for: user) ?? false
-                    if isNew { self?.isNewUser = true }
+                    AnalyticsService.setUserProperties(["auth_method": account.authMethod.rawValue])
+                    await self?.provisionProfile(for: account)
                 } else {
                     self?.authState = .unauthenticated
                     AnalyticsService.setUserId(nil)
@@ -76,8 +88,7 @@ final class AuthViewModel: ObservableObject {
     func signInAsGuest() async {
         errorMessage = nil
         do {
-            let user = try await firebaseManager.signInAnonymously()
-            await createUserDocumentIfNeeded(for: user)
+            _ = try await firebaseManager.signInAnonymously()
             AnalyticsService.trackEvent("sign_in", params: ["method": "guest"])
         } catch {
             errorMessage = error.localizedDescription
@@ -89,8 +100,7 @@ final class AuthViewModel: ObservableObject {
     func signIn(email: String, password: String) async {
         errorMessage = nil
         do {
-            let user = try await firebaseManager.signIn(email: email, password: password)
-            await createUserDocumentIfNeeded(for: user)
+            _ = try await firebaseManager.signIn(email: email, password: password)
             AnalyticsService.trackEvent("sign_in", params: ["method": "email"])
         } catch {
             errorMessage = error.localizedDescription
@@ -100,8 +110,7 @@ final class AuthViewModel: ObservableObject {
     func signUp(email: String, password: String) async {
         errorMessage = nil
         do {
-            let user = try await firebaseManager.signUp(email: email, password: password)
-            await createUserDocumentIfNeeded(for: user)
+            _ = try await firebaseManager.signUp(email: email, password: password)
             AnalyticsService.trackEvent("sign_up", params: ["method": "email"])
         } catch {
             errorMessage = error.localizedDescription
@@ -132,8 +141,7 @@ final class AuthViewModel: ObservableObject {
     func signInWithPhoneCode(verificationID: String, code: String) async {
         errorMessage = nil
         do {
-            let user = try await firebaseManager.signInWithPhoneCode(verificationID: verificationID, code: code)
-            await createUserDocumentIfNeeded(for: user)
+            _ = try await firebaseManager.signInWithPhoneCode(verificationID: verificationID, code: code)
             AnalyticsService.trackEvent("sign_in", params: ["method": "phone"])
         } catch {
             errorMessage = error.localizedDescription
@@ -157,41 +165,45 @@ final class AuthViewModel: ObservableObject {
         isNewUser = false
     }
 
-    func updateDisplayName(_ name: String) async {
-        guard let userId = currentUserId else { return }
+    /// Saves the name chosen during onboarding, writing only `display_name`.
+    /// Returns once the server has it; throws if it couldn't be saved, for
+    /// the caller to report.
+    func updateDisplayName(_ name: String) async throws {
+        guard let userId = currentUserId else { throw FirebaseManager.AuthError.notAuthenticated }
         do {
-            if var user = try await firestoreManager.getUser(id: userId) {
-                user.displayName = name
-                try await firestoreManager.updateUser(user)
-            }
+            try await firestoreManager.updateDisplayName(name, forUserId: userId)
         } catch {
-            errorMessage = "Failed to save display name."
+            Self.logger.error("Saving the chosen display name failed: \(String(describing: error), privacy: .private)")
+            throw error
         }
     }
 
-    // MARK: - User Document Creation
+    // MARK: - Profile Provisioning
 
-    @discardableResult
-    private func createUserDocumentIfNeeded(for user: User) async -> Bool {
+    /// Makes sure the signed-in account has a usable profile (see
+    /// `ProfileProvisioner`), asks for a name when the profile's is a
+    /// placeholder, and signs out if Firebase Auth says the account no
+    /// longer exists. Only the auth state listener calls this in the app.
+    func provisionProfile(for account: SignedInAccount) async {
+        let outcome = await profileProvisioner.provision(account) {
+            await firebaseManager.reloadAccount(userId: account.uid)
+        }
+        if outcome == .accountGone {
+            signOutDeletedAccount()
+        }
+        if outcome.needsName {
+            isNewUser = true
+        }
+    }
+
+    /// Ends a session whose account no longer exists. FirebaseAuth normally
+    /// has already signed it out; this makes sure, and the auth state
+    /// listener then shows the signed-out screen.
+    private func signOutDeletedAccount() {
         do {
-            let existingUser = try await firestoreManager.getUser(id: user.uid)
-            if existingUser == nil {
-                let displayName = user.displayName ?? user.email ?? "Guest"
-                let newUser = TreacheryUser(
-                    id: user.uid,
-                    displayName: displayName,
-                    email: user.email,
-                    phoneNumber: user.phoneNumber,
-                    friendIds: [],
-                    createdAt: Date()
-                )
-                try await firestoreManager.createUser(newUser)
-                return true
-            }
-            return false
+            try firebaseManager.signOut()
         } catch {
-            print("Failed to create user document: \(error)")
-            return false
+            Self.logger.error("Couldn't sign out an account that no longer exists: \(String(describing: error), privacy: .private)")
         }
     }
 }

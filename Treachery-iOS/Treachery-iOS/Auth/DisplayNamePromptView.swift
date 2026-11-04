@@ -3,18 +3,26 @@
 //  Treachery-iOS
 //
 
+import Accessibility
 import SwiftUI
 
 struct DisplayNamePromptView: View {
     @EnvironmentObject var authViewModel: AuthViewModel
     @State private var displayName: String = ""
-    @State private var isSaving = false
+    /// The save in flight, if any. Skip cancels it so a late result can't
+    /// act on a screen the user has left.
+    @State private var saveTask: Task<Void, Never>?
     @State private var validationError: String?
 
     let onContinue: () -> Void
 
+    private var isSaving: Bool { saveTask != nil }
+
     var body: some View {
         VStack(spacing: 16) {
+            // Offline, a save waits for the connection; this says why.
+            ConnectionBanner()
+
             Spacer()
 
             Text("Choose Your Name")
@@ -68,14 +76,18 @@ struct DisplayNamePromptView: View {
             .buttonStyle(MtgPrimaryButtonStyle())
             .disabled(isSaving)
 
+            // Never disabled: offline, a save never finishes, and this is the
+            // only way forward. A save already sent still lands once the
+            // device is back online.
             Button {
-                onContinue()
+                skip()
             } label: {
                 Text("Skip")
                     .foregroundColor(.mtgGold)
                     .font(.system(.body, design: .serif))
+                    .frame(minWidth: 44, minHeight: 44)
+                    .contentShape(Rectangle())
             }
-            .disabled(isSaving)
 
             Spacer()
         }
@@ -107,11 +119,31 @@ struct DisplayNamePromptView: View {
             return
         }
         validationError = nil
-        isSaving = true
-        Task {
-            await authViewModel.updateDisplayName(trimmed)
-            isSaving = false
-            onContinue()
+        saveTask = Task {
+            do {
+                try await authViewModel.updateDisplayName(trimmed)
+                guard !Task.isCancelled else { return }
+                saveTask = nil
+                onContinue()
+            } catch {
+                guard !Task.isCancelled else { return }
+                // Stay on the prompt so the user can try again or skip.
+                saveTask = nil
+                let message = String(
+                    localized: "We couldn't save your name. Check your connection and try again.",
+                    comment: "Shown on the name prompt when saving the chosen display name failed"
+                )
+                validationError = message
+                AccessibilityNotification.Announcement(message).post()
+            }
         }
+    }
+
+    /// Moves on without waiting for a save in flight. Firestore keeps that
+    /// write queued, so the name is still saved once the device is online.
+    private func skip() {
+        saveTask?.cancel()
+        saveTask = nil
+        onContinue()
     }
 }

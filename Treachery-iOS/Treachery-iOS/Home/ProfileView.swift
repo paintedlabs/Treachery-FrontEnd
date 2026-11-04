@@ -55,6 +55,23 @@ struct ProfileView: View {
                                 }
                             }
 
+                            // Primary-colored text: mtgError text on this card is
+                            // below the 4.5:1 contrast minimum (see DeleteAccountSection).
+                            if let renameFailure = viewModel.renameFailureMessage {
+                                Label {
+                                    Text(renameFailure)
+                                } icon: {
+                                    Image(systemName: "exclamationmark.triangle.fill")
+                                        .foregroundStyle(Color.mtgError)
+                                }
+                                .font(.footnote)
+                                .foregroundStyle(Color.mtgTextPrimary)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(.horizontal, 16)
+                                .padding(.bottom, 4)
+                                .accessibilityElement(children: .combine)
+                            }
+
                             ProfileRow(label: "Member Since") {
                                 Text(user.createdAt, style: .date)
                                     .foregroundStyle(Color.mtgTextSecondary)
@@ -93,6 +110,17 @@ struct ProfileView: View {
                             }
                             .padding(.horizontal, 16)
                             .padding(.bottom, 12)
+
+                            // Partial stats say so rather than pass for complete ones.
+                            if stats.unknownResults > 0 {
+                                Text("Results for some games couldn't be loaded, so they're left out of wins, losses and Win %.")
+                                    .font(.footnote)
+                                    .foregroundStyle(Color.mtgTextSecondary)
+                                    .fixedSize(horizontal: false, vertical: true)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .padding(.horizontal, 16)
+                                    .padding(.bottom, 12)
+                            }
 
                             // Role breakdown
                             if !stats.roleBreakdown.isEmpty {
@@ -271,11 +299,11 @@ struct ProfileView: View {
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 if viewModel.isEditingName {
-                    Button(viewModel.isSaving ? "Saving..." : "Save") {
+                    Button(viewModel.isSavingName ? "Saving..." : "Save") {
                         Task { await viewModel.saveName() }
                     }
                     .foregroundStyle(Color.mtgGold)
-                    .disabled(viewModel.editedName.isEmpty || viewModel.isSaving || isAccountDeletionUnderway)
+                    .disabled(viewModel.editedName.isEmpty || viewModel.isSavingName || isAccountDeletionUnderway)
                 } else {
                     Button("Edit") {
                         viewModel.startEditing()
@@ -325,6 +353,12 @@ struct ProfileView: View {
         } message: { failure in
             // Verbatim: for an in-progress game this is the server's own sentence.
             Text(verbatim: failure.message)
+        }
+        // The failure appears away from the Save button that caused it.
+        .onChange(of: viewModel.renameFailureMessage) { _, message in
+            if let message {
+                AccessibilityNotification.Announcement(message).post()
+            }
         }
         .task {
             guard let userId = authViewModel.currentUserId else { return }

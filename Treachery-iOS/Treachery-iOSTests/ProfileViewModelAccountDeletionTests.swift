@@ -7,6 +7,7 @@ import Foundation
 struct ProfileViewModelAccountDeletionTests {
 
     private let cloudFunctions = MockCloudFunctions()
+    private let firestore = MockFirestoreManager()
     private let session = SessionEndingSpy()
     private let analytics = AnalyticsEventSpy()
     private let viewModel: ProfileViewModel
@@ -19,7 +20,7 @@ struct ProfileViewModelAccountDeletionTests {
     init() {
         viewModel = ProfileViewModel(
             session: session,
-            firestoreManager: MockFirestoreManager(),
+            firestoreManager: firestore,
             cloudFunctions: cloudFunctions,
             trackEvent: analytics.record
         )
@@ -59,17 +60,31 @@ struct ProfileViewModelAccountDeletionTests {
 
     // MARK: - Renaming
 
-    @Test func deletionCannotBeRequestedWhileARenameIsSaving() {
-        viewModel.isSaving = true
+    @Test func deletionCannotBeRequestedWhileARenameIsSaving() async {
+        firestore.usersToReturn["u1"] = TreacheryUser(
+            id: "u1", displayName: "Old Name", friendIds: [], createdAt: Date(timeIntervalSince1970: 1_000_000)
+        )
+        await viewModel.loadData(userId: "u1")
+        viewModel.startEditing()
+        viewModel.editedName = "New Name"
+        var canRequestMidSave: Bool?
+        var stateMidSave: AccountDeletionState?
+        firestore.whileUpdatingDisplayName = { [viewModel] in
+            viewModel.requestAccountDeletion()
+            canRequestMidSave = viewModel.canRequestAccountDeletion
+            stateMidSave = viewModel.accountDeletionState
+        }
 
-        viewModel.requestAccountDeletion()
+        await viewModel.saveName()
 
-        #expect(!viewModel.canRequestAccountDeletion)
-        #expect(viewModel.accountDeletionState == .idle)
+        #expect(canRequestMidSave == false)
+        #expect(stateMidSave == .idle)
+        #expect(viewModel.canRequestAccountDeletion)
     }
 
     @Test func confirmingDeletionLeavesNameEditing() async {
-        viewModel.isEditingName = true
+        viewModel.startEditing()
+        #expect(viewModel.isEditingName)
 
         await viewModel.deleteAccount()
 

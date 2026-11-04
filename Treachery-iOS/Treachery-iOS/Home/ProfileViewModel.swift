@@ -10,12 +10,60 @@ struct GameStats {
     let totalGames: Int
     let wins: Int
     let losses: Int
+    /// Games that had a winner but whose result for this user isn't known,
+    /// usually because their seat didn't load. They count toward
+    /// `totalGames` but not as wins or losses, so the stats are partial.
+    let unknownResults: Int
     let roleBreakdown: [Role: Int]
 
+    /// The share of decided games won, from 0 to 1, or nil when no game had
+    /// a winner. Finished games without a winner count toward `totalGames`
+    /// but not here, as on web.
+    var winRate: Double? {
+        let decidedGames = wins + losses
+        guard decidedGames > 0 else { return nil }
+        return Double(wins) / Double(decidedGames)
+    }
+
     var winRateText: String {
-        guard totalGames > 0 else { return "--" }
-        let rate = Double(wins) / Double(totalGames) * 100
-        return "\(Int(rate))%"
+        guard let winRate else { return "--" }
+        return "\(Int((winRate * 100).rounded()))%"
+    }
+}
+
+extension GameStats {
+    /// The stats for `userId` over their finished `games`, scored with the
+    /// shared win rule, `Game.outcome(forUserId:role:)`.
+    /// - Parameter playersByGame: Each game's players by game id. A game
+    ///   whose players didn't load is absent, which leaves it out of the role
+    ///   breakdown and, for a Treachery game with a winner, counts it in
+    ///   `unknownResults` instead of wins or losses.
+    init(games: [Game], playersByGame: [String: [Player]], userId: String) {
+        var wins = 0
+        var losses = 0
+        var unknownResults = 0
+        var roleBreakdown: [Role: Int] = [:]
+
+        for game in games {
+            let role = playersByGame[game.id]?.first { $0.userId == userId }?.role
+            if let role {
+                roleBreakdown[role, default: 0] += 1
+            }
+            switch game.outcome(forUserId: userId, role: role) {
+            case .won: wins += 1
+            case .lost: losses += 1
+            case .unknown: unknownResults += 1
+            case .noWinner: break
+            }
+        }
+
+        self.init(
+            totalGames: games.count,
+            wins: wins,
+            losses: losses,
+            unknownResults: unknownResults,
+            roleBreakdown: roleBreakdown
+        )
     }
 }
 
@@ -51,6 +99,21 @@ enum AccountDeletionState: Equatable {
     }
 }
 
+/// Where renaming is. One enum rather than Bool flags, so states like
+/// "saving while not editing" cannot be represented.
+enum RenameState: Equatable {
+    /// The name is shown, not being edited.
+    case idle
+    /// The name field is open; `ProfileViewModel.editedName` holds the draft.
+    case editing
+    /// The draft is being saved. The field stays open until the server
+    /// answers.
+    case saving
+    /// The last rename didn't save and the old name stays. `message` says
+    /// why, under the name, until the next edit.
+    case failed(message: String)
+}
+
 @MainActor
 final class ProfileViewModel: ObservableObject {
 
@@ -58,11 +121,26 @@ final class ProfileViewModel: ObservableObject {
 
     @Published var user: TreacheryUser?
     @Published var gameStats: GameStats?
+    /// The name being typed while renaming.
     @Published var editedName = ""
-    @Published var isEditingName = false
-    @Published var isSaving = false
+    @Published private(set) var renameState: RenameState = .idle
     @Published var errorMessage: String?
     @Published private(set) var accountDeletionState: AccountDeletionState = .idle
+
+    /// Whether the name field is open, including while its draft is saved.
+    var isEditingName: Bool {
+        renameState == .editing || renameState == .saving
+    }
+
+    var isSavingName: Bool {
+        renameState == .saving
+    }
+
+    /// Why the last rename didn't save, if it didn't.
+    var renameFailureMessage: String? {
+        guard case .failed(let message) = renameState else { return nil }
+        return message
+    }
 
     // MARK: - Properties
 
@@ -73,6 +151,7 @@ final class ProfileViewModel: ObservableObject {
     private let trackEvent: (String) -> Void
 
     private static let logger = Logger(subsystem: "com.Solomon.Treachery-iOS", category: "AccountDeletion")
+    private static let profileLogger = Logger(subsystem: "com.Solomon.Treachery-iOS", category: "Profile")
 
     // MARK: - Init
 
@@ -92,6 +171,18 @@ final class ProfileViewModel: ObservableObject {
         self.trackEvent = trackEvent
     }
 
+    /// User-facing text for loading and renaming failures, kept in one place.
+    enum ProfileMessage {
+        static let loadFailed = String(
+            localized: "Check your connection and try again.",
+            comment: "Shown under 'Error loading profile' when the profile or its stats failed to load"
+        )
+        static let renameFailed = String(
+            localized: "We couldn't save your new name. Check your connection and try again.",
+            comment: "Shown under the display name when renaming failed; the old name is kept"
+        )
+    }
+
     // MARK: - Data Loading
 
     func loadData(userId: String) async {
@@ -107,32 +198,39 @@ final class ProfileViewModel: ObservableObject {
 
             await calculateStats(games: games)
         } catch {
-            errorMessage = error.localizedDescription
+            Self.profileLogger.error("Loading the profile failed: \(String(describing: error), privacy: .private)")
+            errorMessage = ProfileMessage.loadFailed
         }
     }
 
     // MARK: - Name Editing
 
+    /// Opens the name field with the current name. Ignored while a rename
+    /// is being saved.
     func startEditing() {
+        guard renameState != .saving else { return }
         editedName = user?.displayName ?? ""
-        isEditingName = true
+        renameState = .editing
     }
 
+    /// Saves the edited name, writing only `display_name`, and waits for the
+    /// server to confirm it. While offline that wait lasts until the
+    /// connection returns, and the Save button shows it's still saving.
+    /// On failure the old name stays and `renameState` says why.
     func saveName() async {
-        guard var updatedUser = user, userId != nil else { return }
-        guard !editedName.trimmingCharacters(in: .whitespaces).isEmpty else { return }
-        isSaving = true
-        errorMessage = nil
+        guard renameState == .editing, user != nil, let userId else { return }
+        let newName = editedName.trimmingCharacters(in: .whitespaces)
+        guard !newName.isEmpty else { return }
+        renameState = .saving
 
-        updatedUser.displayName = editedName.trimmingCharacters(in: .whitespaces)
         do {
-            try await firestoreManager.updateUser(updatedUser)
-            user = updatedUser
-            isEditingName = false
+            try await firestoreManager.updateDisplayName(newName, forUserId: userId)
+            user?.displayName = newName
+            renameState = .idle
         } catch {
-            errorMessage = error.localizedDescription
+            Self.profileLogger.error("Renaming failed: \(String(describing: error), privacy: .private)")
+            renameState = .failed(message: ProfileMessage.renameFailed)
         }
-        isSaving = false
     }
 
     // MARK: - Account Deletion
@@ -155,10 +253,12 @@ final class ProfileViewModel: ObservableObject {
     }
 
     /// Whether Delete Account can be used: not while a deletion is under way,
-    /// and not while a rename is being saved, which could land after the
-    /// server's delete and recreate the profile.
+    /// and not while a rename is being saved, so the user never sees that
+    /// rename fail after their account is gone. (A rename can't bring a
+    /// deleted profile back: it is an update, which fails on a missing
+    /// document.)
     var canRequestAccountDeletion: Bool {
-        !accountDeletionState.isUnderway && !isSaving
+        !accountDeletionState.isUnderway && renameState != .saving
     }
 
     /// Opens the confirmation. Ignored while Delete Account can't be used.
@@ -184,8 +284,11 @@ final class ProfileViewModel: ObservableObject {
         guard !accountDeletionState.isUnderway else { return }
         accountDeletionState = .deleting
         // Leave name editing: an unsaved rename is dropped, not left pending
-        // underneath a deletion.
-        isEditingName = false
+        // underneath a deletion. (No rename can be saving here: Delete
+        // Account is unavailable until it finishes.)
+        if renameState == .editing {
+            renameState = .idle
+        }
 
         do {
             try await cloudFunctions.deleteAccount()
@@ -232,39 +335,16 @@ final class ProfileViewModel: ObservableObject {
 
     private func calculateStats(games: [Game]) async {
         guard let userId else { return }
-        var wins = 0
-        var losses = 0
-        var roleBreakdown: [Role: Int] = [:]
+        var playersByGame: [String: [Player]] = [:]
 
         for game in games {
-            if let players = try? await firestoreManager.getPlayers(gameId: game.id),
-               let myPlayer = players.first(where: { $0.userId == userId }),
-               let myRole = myPlayer.role {
-
-                roleBreakdown[myRole, default: 0] += 1
-
-                if let winTeamString = game.winningTeam,
-                   let winRole = Role(rawValue: winTeamString) {
-                    let didWin: Bool
-                    if winRole == .leader {
-                        didWin = myRole == .leader || myRole == .guardian
-                    } else {
-                        didWin = myRole == winRole
-                    }
-                    if didWin {
-                        wins += 1
-                    } else {
-                        losses += 1
-                    }
-                }
+            do {
+                playersByGame[game.id] = try await firestoreManager.getPlayers(gameId: game.id)
+            } catch {
+                Self.profileLogger.error("Loading players for stats failed: \(String(describing: error), privacy: .private)")
             }
         }
 
-        gameStats = GameStats(
-            totalGames: games.count,
-            wins: wins,
-            losses: losses,
-            roleBreakdown: roleBreakdown
-        )
+        gameStats = GameStats(games: games, playersByGame: playersByGame, userId: userId)
     }
 }

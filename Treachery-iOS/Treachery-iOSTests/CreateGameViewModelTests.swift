@@ -12,7 +12,7 @@ struct CreateGameViewModelTests {
         let mockCF = MockCloudFunctions()
 
         mockFS.usersToReturn = ["u1": TreacheryUser(
-            id: "u1", displayName: "Host", email: nil, phoneNumber: nil,
+            id: "u1", displayName: "Host",
             friendIds: [], createdAt: Date()
         )]
 
