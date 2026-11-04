@@ -37,6 +37,11 @@ const MODE_DISPLAY: Record<string, string> = {
   none: 'Life Tracker',
 };
 
+// Every starting life createGame and updateGameSettings accept (20 to 60 in
+// steps of 5, parseStartingLife in functions/src/validation.js). The create
+// screen offers the same range, so the game's value always has a chip.
+const STARTING_LIFE_OPTIONS = [20, 25, 30, 35, 40, 45, 50, 55, 60];
+
 function LobbyPlayerRow({
   item,
   isCurrentUser,
@@ -395,16 +400,23 @@ export default function LobbyScreen() {
           <View style={styles.settingsRow}>
             <Text style={styles.settingsLabel}>Starting Life</Text>
             <View style={styles.settingsChips}>
-              {[20, 25, 30, 40, 50].map((life) => (
-                <TouchableOpacity
-                  key={life}
-                  style={[styles.chip, game.starting_life === life && styles.chipActive]}
-                  onPress={() => updateGameSettings({ startingLife: life })}
-                  accessibilityLabel={`Set starting life to ${life}`}
-                >
-                  <Text style={[styles.chipText, game.starting_life === life && styles.chipTextActive]}>{life}</Text>
-                </TouchableOpacity>
-              ))}
+              {STARTING_LIFE_OPTIONS.map((life) => {
+                const active = game.starting_life === life;
+                return (
+                  <TouchableOpacity
+                    key={life}
+                    style={styles.lifeChipTarget}
+                    onPress={() => updateGameSettings({ startingLife: life })}
+                    // RN-web ignores accessibilityState; the label carries the selection.
+                    accessibilityLabel={`Set starting life to ${life}${active ? ', selected' : ''}`}
+                    accessibilityRole="button"
+                  >
+                    <View style={[styles.chip, styles.lifeChip, active && styles.chipActive]}>
+                      <Text style={[styles.chipText, active && styles.chipTextActive]}>{life}</Text>
+                    </View>
+                  </TouchableOpacity>
+                );
+              })}
             </View>
           </View>
 
@@ -715,6 +727,15 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
     backgroundColor: colors.background,
+  },
+  // 44px tap target around a starting-life chip; lifeChip sets its width.
+  lifeChipTarget: {
+    minHeight: 44,
+    justifyContent: 'center',
+  },
+  lifeChip: {
+    minWidth: 44,
+    alignItems: 'center',
   },
   chipActive: {
     borderColor: colors.primary,

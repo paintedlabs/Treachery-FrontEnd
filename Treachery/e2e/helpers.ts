@@ -15,8 +15,11 @@ const MODE_BUTTON_LABEL: Record<GameMode, string> = {
   none: 'Life Tracker',
 };
 
-/** Starting-life values the lobby's updateGameSettings accepts. */
-export const STARTING_LIFE_VALUES = [20, 25, 30, 40, 50] as const;
+/**
+ * Starting-life values createGame and updateGameSettings accept (20 to 60 in
+ * steps of 5): the create screen's stepper range and the lobby's chips.
+ */
+export const STARTING_LIFE_VALUES = [20, 25, 30, 35, 40, 45, 50, 55, 60] as const;
 export type StartingLife = (typeof STARTING_LIFE_VALUES)[number];
 
 /** The create-game screen's default, used whenever a test doesn't override it. */
