@@ -193,6 +193,9 @@ struct GameBoardView: View {
     /// leave no room for the players.
     private static let pinnedControlsShare: CGFloat = 0.5
 
+    /// How strongly the signed-in player's color tints the board.
+    static let playerTintOpacity = 0.15
+
     /// The parts of the board that its own actions bring into view.
     private enum ScrollTarget: Hashable {
         case identity, plane
@@ -404,7 +407,7 @@ struct GameBoardView: View {
         ZStack {
             Color.mtgBackground
             if let hex = viewModel.currentPlayer?.playerColor {
-                Color(hex: hex).opacity(0.15)
+                Color(hex: hex).opacity(Self.playerTintOpacity)
             }
         }
     }

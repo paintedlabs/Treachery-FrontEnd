@@ -148,7 +148,7 @@ struct MetamorphAbilitySheet: View {
                                 .frame(width: 8, height: 8)
                             Text(card.name)
                                 .font(.caption)
-                                .foregroundStyle(card.role.color)
+                                .foregroundStyle(card.role.textColor)
                         }
 
                         Text(card.abilityText)

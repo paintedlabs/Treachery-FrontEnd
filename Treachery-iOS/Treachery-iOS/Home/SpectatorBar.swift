@@ -14,6 +14,9 @@ struct SpectatorBar: View {
     @State private var isConfirmingLeave = false
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
+    /// How strongly the bar's red wash shows over the board.
+    static let washOpacity = 0.1
+
     var body: some View {
         VStack(spacing: 8) {
             HStack(spacing: 8) {
@@ -69,7 +72,7 @@ struct SpectatorBar: View {
         }
         .padding()
         .frame(maxWidth: .infinity)
-        .background(Color.mtgError.opacity(0.1))
+        .background(Color.mtgError.opacity(Self.washOpacity))
         .overlay(
             Rectangle()
                 .fill(Color.mtgError)

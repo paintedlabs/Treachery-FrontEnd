@@ -168,7 +168,7 @@ struct WearerOfMasksAbilitySheet: View {
                     Spacer()
                     Text(card.role.displayName)
                         .font(.caption)
-                        .foregroundStyle(card.role.color)
+                        .foregroundStyle(card.role.textColor)
                     if isSelected {
                         Image(systemName: "checkmark.circle.fill")
                             .foregroundStyle(Color.mtgGold)

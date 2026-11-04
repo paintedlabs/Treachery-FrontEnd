@@ -51,9 +51,12 @@ extension Color {
 
     // For text in the colors above, which are too dark for caption- and
     // body-size text on the app's backgrounds. Each is at least 4.5:1 on
-    // mtgSurface, and so on the darker mtgBackground too (WCAG AA). The
-    // colors above stay for dots, icons, borders and fills.
-    static let mtgErrorText = Color(hex: "e06a6a")      // 5.45:1 on mtgSurface
+    // mtgSurface, and so on the darker mtgBackground too (WCAG AA). Error
+    // text also sits on the board's tint of the player's color, under the
+    // spectator bar's red wash: still 4.58:1 there with the lightest
+    // color, Amber. The colors above stay for dots, icons, borders and
+    // fills.
+    static let mtgErrorText = Color(hex: "e47474")      // 5.96:1 on mtgSurface
     static let mtgAssassinText = Color(hex: "e07070")   // 5.69:1
     static let mtgTraitorText = Color(hex: "b57ae0")    // 5.77:1
 }
