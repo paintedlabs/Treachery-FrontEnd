@@ -33,9 +33,13 @@ extension GameBoardViewModel {
         /// Eliminated, and a Metamorph has taken their card: resolveMetamorph
         /// clears the card of the player it takes one from.
         case taken
-        /// No seat, or a card this build doesn't know. It offers its own way
+        /// The players snapshot doesn't include them. It offers its own way
         /// home, since without a seat there's no spectator bar or Forfeit.
-        case notFound
+        case unseated
+        /// Seated, but holding a card this build doesn't know, most likely
+        /// one a newer version of Treachery deals. The seat is fine: Forfeit
+        /// and the bars below still work.
+        case unknownCard
     }
 
     /// What the spectator bar's Leave button does.
@@ -55,11 +59,11 @@ extension GameBoardViewModel {
     var identityArea: IdentityArea {
         // In every mode, like the spectator bar: a user without a seat has
         // no other way off the board.
-        guard let player = currentPlayer else { return .notFound }
+        guard let player = currentPlayer else { return .unseated }
         guard isTreacheryActive else { return .notDealt }
         if let card = currentIdentityCard { return .card(card, player: player) }
         if player.isEliminated, player.identityCardId == nil { return .taken }
-        return .notFound
+        return .unknownCard
     }
 
     /// Only players still in the game change life totals. The server would

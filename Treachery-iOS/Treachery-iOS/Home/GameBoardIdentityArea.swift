@@ -76,18 +76,32 @@ struct GameBoardIdentityArea: View {
                     .multilineTextAlignment(.center)
             }
             .padding()
-        case .notFound:
-            // No seat, or a card this build doesn't know. Without a seat
-            // there's no Forfeit, spectator bar or action bar, so this
-            // offers its own way out.
+        case .unknownCard:
+            // Seated: Forfeit and the bars below still work, so there's no
+            // way out here, only what would show the card.
+            VStack(spacing: 8) {
+                Image(systemName: "arrow.down.app.fill")
+                    .font(.title)
+                    .foregroundStyle(Color.mtgGold)
+                    .accessibilityHidden(true)
+                Text("Your identity card needs a newer version of Treachery. Update the app to see it.")
+                    .font(.subheadline)
+                    .foregroundStyle(Color.mtgTextSecondary)
+                    .multilineTextAlignment(.center)
+            }
+            .padding()
+        case .unseated:
+            // Without a seat there's no Forfeit, spectator bar or action
+            // bar, so this offers its own way out.
             VStack(spacing: 8) {
                 Image(systemName: "exclamationmark.triangle.fill")
                     .font(.title)
                     .foregroundStyle(Color.mtgGold)
                     .accessibilityHidden(true)
-                Text("Unable to find your player data")
+                Text("You're not seated in this game")
                     .font(.subheadline)
                     .foregroundStyle(Color.mtgTextSecondary)
+                    .multilineTextAlignment(.center)
                 Button {
                     onGoHome()
                 } label: {

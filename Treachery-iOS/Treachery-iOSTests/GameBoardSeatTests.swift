@@ -185,7 +185,7 @@ struct GameBoardSeatTests {
     func userWithoutASeatGetsAWayHomeInEveryMode(_ mode: GameMode) {
         // With no seat there's no spectator bar or Forfeit. The way home
         // that offers instead showed only in Treachery games.
-        #expect(makeVM(gameMode: mode, currentUserId: "u9").identityArea == .notFound)
+        #expect(makeVM(gameMode: mode, currentUserId: "u9").identityArea == .unseated)
     }
 
     @Test(arguments: [GameMode.planechase, GameMode.none])
@@ -208,9 +208,14 @@ struct GameBoardSeatTests {
         #expect(vm.identityArea == .taken)
     }
 
-    @Test func cardThisBuildDoesNotKnowIsNotFound() {
-        // No card database entry for "card1": it offers the way home.
-        #expect(makeVM(gameMode: .treachery).identityArea == .notFound)
+    @Test(arguments: [false, true])
+    func cardThisBuildDoesNotKnowNeedsANewerVersion(currentUserEliminated: Bool) {
+        // No card database entry for "card1". The seat is fine, so it isn't
+        // told its player data can't be found, nor offered a way home that
+        // leaves without forfeiting.
+        let vm = makeVM(gameMode: .treachery, currentUserEliminated: currentUserEliminated)
+        #expect(vm.seat != .unseated)
+        #expect(vm.identityArea == .unknownCard)
     }
 
     private func identityCard(id: String) -> IdentityCard {
