@@ -19,7 +19,11 @@
  *
  * It refuses unless the profile's display_name is exactly the code given as
  * --expect-name. That is the policy's check that the requester owns the
- * account, and it guards against a mistyped uid.
+ * account, and it guards against a mistyped uid. The one exception is a uid
+ * with neither a sign-in account nor a profile, only documents still under
+ * users/{uid}, which a deletion that stopped in step 5 can leave: no account
+ * is left to protect, so --apply by --uid deletes those without checking the
+ * name.
  *
  * DRY RUN BY DEFAULT — it reads and reports, and writes nothing at all until
  * you pass --apply. It prints the account (email and phone masked) and what
@@ -247,11 +251,13 @@ function describeSelector(opts) {
 }
 
 /**
- * The account `opts` names, as { uid, user, profile }: its Auth user record
- * and its users/{uid} snapshot, either of which may be null but not both.
- * Null when neither exists. --email and --phone find the uid through Auth.
+ * The account `opts` names, as { uid, user, profile, leftovers }: its Auth
+ * user record, its users/{uid} snapshot, and, when users/{uid} doesn't exist,
+ * the paths of any documents still under it. A deletion that stopped in step
+ * 5 can leave those, private/data among them. Null when none of the three
+ * exists. --email and --phone find the uid through Auth.
  */
-async function findAccount(opts, auth, db) {
+async function findAccount(opts, auth, db, findProfileDocs) {
   let user = null;
   try {
     if (opts.uid !== null) user = await auth.getUser(opts.uid);
@@ -265,19 +271,25 @@ async function findAccount(opts, auth, db) {
   if (uid === null) return null;
   const snap = await db.doc(`users/${uid}`).get();
   const profile = snap.exists ? snap : null;
-  if (!user && !profile) return null;
-  return { uid, user, profile };
+  const leftovers = profile ? [] : (await findProfileDocs(uid)).map((ref) => ref.path);
+  if (!user && !profile && leftovers.length === 0) return null;
+  return { uid, user, profile, leftovers };
 }
 
 function row(label, value) {
   return `  ${label.padEnd(32)}${value}`;
 }
 
+/** Up to MAX_LISTED of `items`, and how many more there are. */
+function listed(items) {
+  const more = items.length > MAX_LISTED ? `, … ${items.length - MAX_LISTED} more` : "";
+  return `${items.slice(0, MAX_LISTED).join(", ")}${more}`;
+}
+
 /** "0", or the count and up to MAX_LISTED of `items`. */
 function counted(items) {
   if (items.length === 0) return "0";
-  const more = items.length > MAX_LISTED ? `, … ${items.length - MAX_LISTED} more` : "";
-  return `${items.length}  ${items.slice(0, MAX_LISTED).join(", ")}${more}`;
+  return `${items.length}  ${listed(items)}`;
 }
 
 /** games/{gameId} for a seat's path, games/{gameId}/players/{playerId}. */
@@ -300,12 +312,17 @@ function displayName(profile) {
   return JSON.stringify(name);
 }
 
-function accountLines({ uid, user, profile }, opts) {
+function accountLines({ uid, user, profile, leftovers }, opts) {
   const providers = user ? user.providerData.map((info) => info.providerId).sort() : [];
   return [
     "account:",
     row("uid:", opts.uid !== null ? uid : `${uid} (found by ${describeSelector(opts)})`),
-    row("display name:", profile ? displayName(profile) : `none: users/${uid} doesn't exist`),
+    ...(profile
+      ? [row("display name:", displayName(profile))]
+      : [
+          row("display name:", `none: users/${uid} doesn't exist`),
+          row("documents left under it:", counted(leftovers)),
+        ]),
     row(
       "sign-in providers:",
       !user ? "none: no sign-in account" : providers.length > 0 ? providers.join(", ") : "none (guest)"
@@ -315,16 +332,24 @@ function accountLines({ uid, user, profile }, opts) {
   ];
 }
 
-/** Refuses unless the profile's display name is exactly `expectName`. */
-function checkName({ uid, user, profile }, expectName) {
+/**
+ * Refuses unless the profile's display name is exactly `expectName`. A uid
+ * with neither a sign-in account nor a profile, only documents left under
+ * users/{uid}, has no name to check and no owner left to protect, so it
+ * passes: a mistyped uid can reach only what a deleted account left behind.
+ */
+function checkName({ uid, user, profile, leftovers }, expectName) {
+  if (!user && !profile) return;
   if (!profile) {
-    const why = user
-      ? " If an earlier --apply for this account stopped part-way, delete the sign-in account " +
-        `${uid} in the Firebase console (Authentication) to finish. If not, the account has no ` +
-        "profile yet: its owner makes one by signing in to Treachery on the web or Android, and " +
-        "can then set the code."
-      : "";
-    throw refusal(`users/${uid} doesn't exist, so there's no display name to check --expect-name against.${why}`);
+    const left = leftovers.length > 0 ? ` Documents are still left under it: ${listed(leftovers)}.` : "";
+    throw refusal(
+      `users/${uid} doesn't exist, so there's no display name to check --expect-name against.${left} ` +
+        `If an earlier --apply for this account stopped part-way, delete the sign-in account ${uid} ` +
+        `in the Firebase console (Authentication), then run this again with --uid ${uid}: with no ` +
+        `sign-in account or profile left, it deletes anything still under users/${uid} without ` +
+        "checking the name. If not, the account has no profile yet: its owner makes one by signing " +
+        "in to Treachery on the web or Android, and can then set the code."
+    );
   }
   if (profile.get("display_name") !== expectName) {
     throw refusal(
@@ -363,7 +388,7 @@ function summaryLines(uid, deleted) {
     row("took it off friends' lists:", String(deleted.friends)),
     row("deleted friend requests:", String(deleted.requests)),
     row("deleted the profile:", `users/${uid} and everything under it`),
-    row("deleted the sign-in account:", deleted.signInDeleted ? "yes" : "no, an earlier run had"),
+    row("deleted the sign-in account:", deleted.signInDeleted ? "yes" : "no, it was already deleted"),
   ];
   if (!deleted.signInDeleted) return lines;
   return [
@@ -400,16 +425,23 @@ async function main(argv, env) {
   // makes its own app from the environment unless this one already exists.
   initializeApp({ projectId: target.projectId });
   const { db, getAuth } = require("../src/firebase");
-  const { deleteAccountFor, planAccountDeletion } = require("../src/callables/account");
+  const { deleteAccountFor, planAccountDeletion, findProfileDocs } = require("../src/callables/account");
 
-  const account = await findAccount(opts, getAuth(), db);
+  const account = await findAccount(opts, getAuth(), db, findProfileDocs);
   if (!account) {
-    const where = opts.uid !== null ? "no sign-in account or profile" : "no sign-in account";
-    throw refusal(`no such account: ${where} has ${describeSelector(opts)}.`);
+    throw refusal(
+      opts.uid !== null
+        ? `no such account: no sign-in account or profile has uid ${opts.uid}, and nothing is left under users/${opts.uid}.`
+        : `no such account: no sign-in account has ${describeSelector(opts)}.`
+    );
   }
   print(accountLines(account, opts));
   console.log("");
   checkName(account, opts.expectName);
+  if (!account.user && !account.profile) {
+    console.log("No sign-in account or profile is left, only what an earlier deletion left behind, so --expect-name isn't checked.");
+    console.log("");
+  }
 
   const plan = await planAccountDeletion(account.uid);
   if (plan.inProgressGameIds.length > 0) {
@@ -445,7 +477,8 @@ async function main(argv, env) {
       "failed: the deletion stopped part-way. Every step is safe to repeat, so run the same " +
         `command again to finish. If that is refused because users/${account.uid} doesn't exist, ` +
         `this run got as far as deleting the profile: delete the sign-in account ${account.uid} ` +
-        "in the Firebase console (Authentication) to finish."
+        `in the Firebase console (Authentication), then run this again with --uid ${account.uid} ` +
+        `to delete anything still under users/${account.uid}.`
     );
   }
   print(summaryLines(account.uid, deleted));

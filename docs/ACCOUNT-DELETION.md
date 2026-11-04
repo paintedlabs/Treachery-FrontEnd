@@ -117,8 +117,12 @@ If it exits 3, its last line says how far it got:
 - `failed: the deletion stopped part-way.` Run the same command again to
   finish: every step is safe to repeat. If that is refused because
   `users/<uid>` doesn't exist, the first run got as far as deleting the
-  profile: delete the sign-in account in the Firebase console
-  (Authentication, Users) to finish.
+  profile. It can still have left documents under it, such as `private/data`
+  with their email address, phone number and push token, and the refusal
+  names them. Delete the sign-in account in the Firebase console
+  (Authentication, Users), then run the `--apply` command again: with no
+  sign-in account or profile left, it deletes anything still under
+  `users/<uid>` without checking the name.
 
 ## 4. Check it stayed deleted
 
@@ -132,15 +136,21 @@ run the dry run again by uid:
 node scripts/delete-account.js --uid <uid> --expect-name <code> --project treachery-71922
 ```
 
-- `refused: no such account` (exit 1): it's done.
+- `refused: no such account` (exit 1): it's done. Nothing is left under
+  `users/<uid>` either.
+- If it shows `sign-in providers:              none: no sign-in account`
+  and lists documents after `documents left under it:`, an earlier run
+  stopped before deleting them. Run the same command with `--apply` to
+  delete them. It doesn't check the name: no account is left to check it
+  against.
 - If it shows the account again, with
   `sign-in providers:              none: no sign-in account` and a new
   display name such as "Player" or "Guest", an app wrote the profile again.
   Delete it by that name (if it's masked, read it from `users/<uid>` in the
   Firebase console):
   `--uid <uid> --expect-name '<that name>' --apply --project treachery-71922`.
-  It ends with `deleted the sign-in account:    no, an earlier run had`. An
-  hour after the first deletion, no app can write it again.
+  It ends with `deleted the sign-in account:    no, it was already deleted`.
+  An hour after the first deletion, no app can write it again.
 
 Check by uid, not by email or phone. Those look the account up in Firebase
 Auth, where it is gone, so they report `no such account` even when the

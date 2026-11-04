@@ -96,15 +96,33 @@ function checkLater(uid) {
   ];
 }
 
-/** The refusal for an account that has a sign-in account but no profile. */
-function noProfile(uid) {
+/** How a run by uid ends when nothing of the account is left. */
+function noSuchUid(uid) {
   return (
-    `refused: users/${uid} doesn't exist, so there's no display name to check --expect-name against. ` +
-    `If an earlier --apply for this account stopped part-way, delete the sign-in account ${uid} in the ` +
-    'Firebase console (Authentication) to finish. If not, the account has no profile yet: its owner ' +
-    'makes one by signing in to Treachery on the web or Android, and can then set the code.\n'
+    `refused: no such account: no sign-in account or profile has uid ${uid}, ` +
+    `and nothing is left under users/${uid}.\n`
   );
 }
+
+/**
+ * The refusal for an account that has a sign-in account but no profile,
+ * naming the documents still under its users/{uid}.
+ */
+function noProfile(uid, leftovers = []) {
+  const left = leftovers.length > 0 ? ` Documents are still left under it: ${leftovers.join(', ')}.` : '';
+  return (
+    `refused: users/${uid} doesn't exist, so there's no display name to check --expect-name against.${left} ` +
+    `If an earlier --apply for this account stopped part-way, delete the sign-in account ${uid} in the ` +
+    `Firebase console (Authentication), then run this again with --uid ${uid}: with no sign-in account or ` +
+    `profile left, it deletes anything still under users/${uid} without checking the name. If not, the ` +
+    'account has no profile yet: its owner makes one by signing in to Treachery on the web or Android, and ' +
+    'can then set the code.\n'
+  );
+}
+
+/** What a run says when only documents under a deleted account's users/{uid} are left. */
+const LEFTOVERS_ONLY =
+  "No sign-in account or profile is left, only what an earlier deletion left behind, so --expect-name isn't checked.";
 
 /** The refusal when a lobby the account is in starts after the checks. */
 function startedAfterCheck(uid) {
@@ -120,8 +138,8 @@ function stoppedPartWay(uid) {
   return (
     'failed: the deletion stopped part-way. Every step is safe to repeat, so run the same command ' +
     `again to finish. If that is refused because users/${uid} doesn't exist, this run got as far as ` +
-    `deleting the profile: delete the sign-in account ${uid} in the Firebase console (Authentication) ` +
-    'to finish.\n'
+    `deleting the profile: delete the sign-in account ${uid} in the Firebase console (Authentication), ` +
+    `then run this again with --uid ${uid} to delete anything still under users/${uid}.\n`
   );
 }
 
@@ -443,14 +461,20 @@ describe('delete-account script — dry run, --apply, and a second run', () => {
 
   it('a second run finds no such account, exits 1 and changes nothing', async () => {
     const { account } = seed;
-    for (const [args, where] of [
-      [['--uid', account.uid, '--apply', '--project', PROJECT_ID], `no sign-in account or profile has uid ${account.uid}`],
-      [['--email', contact.email, '--apply', '--project', PROJECT_ID], `no sign-in account has email ${maskedEmail(contact.email)}`],
-      [['--phone', contact.phone, '--project', PROJECT_ID], `no sign-in account has phone ${maskedPhone(contact.phone)}`],
+    for (const [args, refusal] of [
+      [['--uid', account.uid, '--apply', '--project', PROJECT_ID], noSuchUid(account.uid)],
+      [
+        ['--email', contact.email, '--apply', '--project', PROJECT_ID],
+        `refused: no such account: no sign-in account has email ${maskedEmail(contact.email)}.\n`,
+      ],
+      [
+        ['--phone', contact.phone, '--project', PROJECT_ID],
+        `refused: no such account: no sign-in account has phone ${maskedPhone(contact.phone)}.\n`,
+      ],
     ]) {
       const result = runScript([...args, '--expect-name', CODE]);
       assert.equal(result.status, 1, `${args[0]}: ${result.stderr}`);
-      assert.equal(result.stderr, `refused: no such account: ${where}.\n`);
+      assert.equal(result.stderr, refusal);
     }
     assertUnchanged(afterApply, await readDocs(seededPaths(seed)));
   });
@@ -494,7 +518,7 @@ describe('delete-account script — dry run, --apply, and a second run', () => {
       row("took it off friends' lists:", '0'),
       row('deleted friend requests:', '0'),
       row('deleted the profile:', `users/${account.uid} and everything under it`),
-      row('deleted the sign-in account:', 'no, an earlier run had'),
+      row('deleted the sign-in account:', 'no, it was already deleted'),
       '',
     ]);
     const state = await endState(seed);
@@ -504,7 +528,7 @@ describe('delete-account script — dry run, --apply, and a second run', () => {
 
     const last = runScript(['--uid', account.uid, '--expect-name', 'Player', '--project', PROJECT_ID]);
     assert.equal(last.status, 1, last.stderr);
-    assert.equal(last.stderr, `refused: no such account: no sign-in account or profile has uid ${account.uid}.\n`);
+    assert.equal(last.stderr, noSuchUid(account.uid));
   });
 });
 
@@ -588,7 +612,10 @@ describe('delete-account script — refusals', () => {
       const result = runScript([...selector, '--expect-name', CODE, '--apply', '--project', PROJECT_ID]);
       assert.equal(result.status, 1, `${selector[0]}: ${result.stderr}`);
       assert.equal(result.stderr, noProfile(record.uid));
-      assert.equal(result.stdout.split('\n')[7], row('display name:', `none: users/${record.uid} doesn't exist`));
+      assert.deepEqual(result.stdout.split('\n').slice(7, 9), [
+        row('display name:', `none: users/${record.uid} doesn't exist`),
+        row('documents left under it:', '0'),
+      ]);
     }
 
     assert.ok(await h.getAuthUser(record.uid), 'the sign-in account must survive');
@@ -632,14 +659,14 @@ describe('delete-account script — refusals', () => {
 
   it('refuses an unknown uid, email address or phone number', () => {
     const missing = uniqueContact('missing');
-    for (const [args, where] of [
-      [['--uid', 'no-such-uid-0451'], 'no sign-in account or profile has uid no-such-uid-0451'],
-      [['--email', missing.email], `no sign-in account has email ${maskedEmail(missing.email)}`],
-      [['--phone', missing.phone], `no sign-in account has phone ${maskedPhone(missing.phone)}`],
+    for (const [args, refusal] of [
+      [['--uid', 'no-such-uid-0451'], noSuchUid('no-such-uid-0451')],
+      [['--email', missing.email], `refused: no such account: no sign-in account has email ${maskedEmail(missing.email)}.\n`],
+      [['--phone', missing.phone], `refused: no such account: no sign-in account has phone ${maskedPhone(missing.phone)}.\n`],
     ]) {
       const result = runScript([...args, '--expect-name', CODE, '--apply', '--project', PROJECT_ID]);
       assert.equal(result.status, 1, result.stderr);
-      assert.equal(result.stderr, `refused: no such account: ${where}.\n`);
+      assert.equal(result.stderr, refusal);
     }
   });
 
@@ -726,7 +753,7 @@ describe('delete-account script — a failure is not a refusal', () => {
     await adminAuth.deleteUser(account.uid); // what the console's Delete account does
     const done = runScript(apply);
     assert.equal(done.status, 1, done.stderr);
-    assert.equal(done.stderr, `refused: no such account: no sign-in account or profile has uid ${account.uid}.\n`);
+    assert.equal(done.stderr, noSuchUid(account.uid));
   });
 
   it('exits 3 when the friend request batch fails, and running it again finishes the deletion', async () => {
@@ -770,6 +797,138 @@ describe('delete-account script — a failure is not a refusal', () => {
     assert.deepEqual(state.people.friendB.friend_ids, []);
     assert.equal(state.sentRequest, null);
     assert.equal(state.receivedRequest, null);
+  });
+});
+
+describe('delete-account script — what a deletion that stops in step 5 leaves', () => {
+  // recursiveDelete deletes users/{uid} even when deleting a document under
+  // it fails, so a failed step 5 can leave private/data, with the email
+  // address, phone number and push token, under a profile that is gone.
+  const contact = uniqueContact('leftover');
+  let seed;
+  let leftover; // users/{uid}/private/data
+  let apply;
+
+  before(async () => {
+    seed = await seedAccount(await createSignInAccount(CODE, contact), contact);
+    leftover = `users/${seed.account.uid}/private/data`;
+    apply = ['--uid', seed.account.uid, '--expect-name', CODE, '--apply', '--project', PROJECT_ID];
+  });
+
+  it('exits 3 when step 5 leaves private/data behind, and the next run names it', async () => {
+    const { account } = seed;
+
+    const failed = runScriptWithFault('fail-delete-under-profile', account, apply);
+    assert.equal(failed.status, 3, failed.stderr);
+    assert.ok(failed.stderr.endsWith(`\n${stoppedPartWay(account.uid)}`), failed.stderr);
+    const state = await endState(seed);
+    assert.equal(state.profile, null, 'users/{uid} itself is deleted');
+    assert.deepEqual(
+      state.privateData,
+      { email: contact.email, phone_number: contact.phone, fcm_token: 'fcm-token' },
+      'private/data is left behind'
+    );
+    assert.equal(state.signIn, true, 'step 6 never ran');
+
+    for (const [selector, uidRow] of [
+      [['--uid', account.uid], account.uid],
+      [['--email', contact.email], `${account.uid} (found by email ${maskedEmail(contact.email)})`],
+    ]) {
+      const result = runScript([...selector, '--expect-name', CODE, '--project', PROJECT_ID]);
+      assert.equal(result.status, 1, `${selector[0]}: ${result.stderr}`);
+      assert.equal(result.stderr, noProfile(account.uid, [leftover]));
+      assert.deepEqual(result.stdout.split('\n').slice(5), [
+        'account:',
+        row('uid:', uidRow),
+        row('display name:', `none: users/${account.uid} doesn't exist`),
+        row('documents left under it:', `1  ${leftover}`),
+        row('sign-in providers:', 'password, phone'),
+        row('email:', maskedEmail(contact.email)),
+        row('phone:', maskedPhone(contact.phone)),
+        '',
+        '',
+      ]);
+    }
+  });
+
+  it('keeps the name check while the sign-in account exists: --apply is refused and changes nothing', async () => {
+    const { account } = seed;
+    const before = await readDocs(seededPaths(seed));
+
+    for (const code of [CODE, 'Lantern-4822']) {
+      const result = runScript(['--uid', account.uid, '--expect-name', code, '--apply', '--project', PROJECT_ID]);
+      assert.equal(result.status, 1, `${code}: ${result.stderr}`);
+      assert.equal(result.stderr, noProfile(account.uid, [leftover]));
+      assert.ok(!result.stdout.includes(`deleting ${account.uid}`), 'it must stop before deleting anything');
+    }
+
+    assertUnchanged(before, await readDocs(seededPaths(seed)));
+    assert.ok(await h.getAuthUser(account.uid), 'the sign-in account must survive');
+  });
+
+  it('once the sign-in account is deleted, --apply by uid deletes what is left without a name check', async () => {
+    const { account, finished } = seed;
+    await adminAuth.deleteUser(account.uid); // what the console's Delete account does
+
+    // No account is left whose name could be checked, so any code passes.
+    const dryRun = runScript(['--uid', account.uid, '--expect-name', 'Lantern-4822', '--project', PROJECT_ID]);
+    assert.equal(dryRun.status, 0, dryRun.stderr);
+    assert.equal(dryRun.stderr, '');
+    assert.deepEqual(dryRun.stdout.split('\n').slice(5), [
+      'account:',
+      row('uid:', account.uid),
+      row('display name:', `none: users/${account.uid} doesn't exist`),
+      row('documents left under it:', `1  ${leftover}`),
+      row('sign-in providers:', 'none: no sign-in account'),
+      row('email:', 'none'),
+      row('phone:', 'none'),
+      '',
+      LEFTOVERS_ONLY,
+      '',
+      'deleting it would:',
+      row('leave waiting lobbies:', '0'),
+      row('anonymize its seats in games:', `1  games/${finished.gameId}`),
+      row("take it off friends' lists:", '0'),
+      row('delete friend requests:', '0'),
+      row('delete profile documents:', `1  ${leftover}`),
+      row('delete the sign-in account:', '0'),
+      '',
+      'DRY RUN — nothing was written. Re-run with --apply --project <id> to delete this account.',
+      '',
+    ]);
+
+    const done = runScript(apply);
+    assert.equal(done.status, 0, done.stderr);
+    assert.equal(done.stderr, '');
+    const lines = done.stdout.split('\n');
+    assert.deepEqual(lines.slice(lines.indexOf(`deleting ${account.uid} from ${PROJECT_ID} …`)), [
+      `deleting ${account.uid} from ${PROJECT_ID} …`,
+      `deleted ${account.uid}:`,
+      row('left waiting lobbies:', '0'),
+      row('anonymized its seats in games:', `1  games/${finished.gameId}`),
+      row("took it off friends' lists:", '0'),
+      row('deleted friend requests:', '0'),
+      row('deleted the profile:', `users/${account.uid} and everything under it`),
+      row('deleted the sign-in account:', 'no, it was already deleted'),
+      '',
+    ]);
+
+    // Nothing of the account is left: the state a run that never failed leaves.
+    const state = await endState(seed);
+    assert.equal(state.privateData, null, 'private/data must be deleted');
+    assert.deepEqual(state.profileCollections, [], 'nothing may be left under users/{uid}');
+    assert.equal(state.profile, null);
+    assert.equal(state.signIn, false);
+    assert.deepEqual(state.people.friendA.friend_ids, []);
+    assert.deepEqual(state.people.friendB.friend_ids, []);
+    assert.equal(state.sentRequest, null);
+    assert.equal(state.receivedRequest, null);
+    assert.equal(state.finishedSeats[0].display_name, DELETED_NAME);
+    assert.deepEqual(state.lobby.player_ids, ['lobbyMate']);
+
+    const check = runScript(['--uid', account.uid, '--expect-name', CODE, '--project', PROJECT_ID]);
+    assert.equal(check.status, 1, check.stderr);
+    assert.equal(check.stderr, noSuchUid(account.uid));
   });
 });
 

@@ -148,7 +148,9 @@ async function unlinkSocialData(uid) {
 /**
  * users/{uid} and every document under it that exists: what step 5's
  * recursiveDelete removes. listDocuments also returns documents that don't
- * exist but have subcollections, so documents under those are found too.
+ * exist but have subcollections, so documents under those are found too,
+ * and so are documents under a users/{uid} that is already gone, which a
+ * step 5 that failed part-way can leave.
  */
 async function findProfileDocs(uid) {
   const found = [];
@@ -228,6 +230,9 @@ async function deleteAccountFor(uid) {
   }
 
   // 5. Delete the profile, including private/* (email, phone, FCM token).
+  //    recursiveDelete deletes users/{uid} itself even when deleting a
+  //    document under it fails, so a failure here can leave private/data
+  //    under a profile that is gone. Running this again deletes it.
   await db.recursiveDelete(db.doc(`users/${uid}`));
 
   // 6. Delete the sign-in account last. If this throws, the account still
@@ -282,6 +287,7 @@ async function planAccountDeletion(uid) {
 // Not deployed functions: index.js lists every deployed name explicitly.
 exports.deleteAccountFor = deleteAccountFor;
 exports.planAccountDeletion = planAccountDeletion;
+exports.findProfileDocs = findProfileDocs;
 
 // ════════════════════════════════════════════════════════════════
 // CLOUD FUNCTION: deleteAccount

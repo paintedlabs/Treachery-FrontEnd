@@ -14,6 +14,10 @@
  *       starts before it leaves the next.
  *   fail-friend-request-batch
  *       The batch that deletes its friend requests (step 4) fails.
+ *   fail-delete-under-profile
+ *       Step 5 can't delete the documents under users/{uid}, such as
+ *       private/data, and deletes users/{uid} itself anyway, as Firestore's
+ *       recursiveDelete does when one of its deletes fails for good.
  *   fail-sign-in-delete
  *       Deleting its sign-in account (step 6) fails.
  *
@@ -23,7 +27,7 @@
 
 const Module = require('node:module');
 const path = require('node:path');
-const { getFirestore, Firestore, WriteBatch } = require('firebase-admin/firestore');
+const { getFirestore, Firestore, WriteBatch, BulkWriter } = require('firebase-admin/firestore');
 const { BaseAuth } = require('firebase-admin/auth');
 
 const FAULT = process.env.DELETE_ACCOUNT_FAULT;
@@ -100,6 +104,20 @@ switch (FAULT) {
         return Promise.reject(injected('the batch that deletes friend requests', UNAVAILABLE));
       }
       return commit.apply(this, args);
+    };
+    break;
+  }
+
+  case 'fail-delete-under-profile': {
+    // recursiveDelete deletes each document under users/{uid} through a
+    // BulkWriter, then queues the delete of users/{uid} itself whether or not
+    // those succeeded.
+    const deleteDoc = BulkWriter.prototype.delete;
+    BulkWriter.prototype.delete = function failUnderProfile(ref, ...rest) {
+      if (ref.path.startsWith(`users/${UID}/`)) {
+        return Promise.reject(injected(`deleting ${ref.path}`, UNAVAILABLE));
+      }
+      return deleteDoc.call(this, ref, ...rest);
     };
     break;
   }
