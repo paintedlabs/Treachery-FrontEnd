@@ -54,7 +54,7 @@ struct LobbyBottomButtons: View {
                 .frame(maxWidth: .infinity, minHeight: 44)
                 .contentShape(Rectangle())
             }
-            .foregroundStyle(Color.mtgError)
+            .foregroundStyle(Color.mtgErrorText)
             .disabled(viewModel.pendingAction != nil)
             .accessibilityLabel(viewModel.isLeaving ? "Leaving game" : "Leave game")
 

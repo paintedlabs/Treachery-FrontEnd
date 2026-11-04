@@ -71,7 +71,7 @@ struct IdentityCardHeader: View {
                         .shadow(color: (player.role?.color ?? .gray).opacity(0.5), radius: 4)
                     Text(player.role?.displayName ?? "Unknown")
                         .font(.headline)
-                        .foregroundStyle(player.role?.color ?? Color.mtgTextPrimary)
+                        .foregroundStyle(player.role?.textColor ?? Color.mtgTextPrimary)
                 }
 
                 Spacer()

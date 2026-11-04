@@ -33,6 +33,18 @@ enum Role: String, Codable, CaseIterable, Identifiable {
         }
     }
 
+    /// This role's color for text: Assassin and Traitor are lighter than
+    /// `color`, which is too dark for caption-size labels. `color` stays
+    /// for dots and borders.
+    var textColor: Color {
+        switch self {
+        case .leader:   return .mtgLeader
+        case .guardian:  return .mtgGuardian
+        case .assassin:  return .mtgAssassinText
+        case .traitor:   return .mtgTraitorText
+        }
+    }
+
     var winConditionText: String {
         switch self {
         case .leader:

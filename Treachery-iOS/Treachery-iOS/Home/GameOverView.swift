@@ -203,7 +203,7 @@ struct GameOverView: View {
                     Text("\(winningTeam.displayName) Wins!")
                         .font(.system(.title, design: .serif))
                         .fontWeight(.bold)
-                        .foregroundStyle(winningTeam.color)
+                        .foregroundStyle(winningTeam.textColor)
                 }
                 .accessibilityElement(children: .combine)
                 .accessibilityLabel("\(winningTeam.displayName) team wins")
@@ -288,7 +288,7 @@ struct GameOverView: View {
         VStack(alignment: alignment, spacing: 2) {
             Text(player.role?.displayName ?? "Unknown")
                 .font(.subheadline)
-                .foregroundStyle(player.role?.color ?? Color.mtgTextSecondary)
+                .foregroundStyle(player.role?.textColor ?? Color.mtgTextSecondary)
 
             if let card = viewModel.identityCard(for: player) {
                 Text(card.name)

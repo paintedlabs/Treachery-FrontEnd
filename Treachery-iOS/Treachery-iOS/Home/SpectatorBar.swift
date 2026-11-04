@@ -21,7 +21,7 @@ struct SpectatorBar: View {
                 Text("You've Been Eliminated")
                     .font(.system(.headline, design: .serif))
                     .fontWeight(.bold)
-                    .foregroundStyle(Color.mtgError)
+                    .foregroundStyle(Color.mtgErrorText)
             }
 
             Text("You're now spectating. Watch the game unfold or leave.")
@@ -44,7 +44,7 @@ struct SpectatorBar: View {
                     .frame(minHeight: 44)
                     .contentShape(Rectangle())
             }
-            .foregroundStyle(Color.mtgError)
+            .foregroundStyle(Color.mtgErrorText)
             .confirmationDialog(
                 "Leave without ending the game?",
                 isPresented: $isConfirmingLeave,

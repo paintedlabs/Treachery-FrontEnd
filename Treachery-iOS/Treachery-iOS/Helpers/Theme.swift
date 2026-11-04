@@ -48,6 +48,14 @@ extension Color {
     static let mtgGuardian = Color(hex: "4c8cc9")
     static let mtgAssassin = Color(hex: "c94c4c")
     static let mtgTraitor = Color(hex: "9c4cc9")
+
+    // For text in the colors above, which are too dark for caption- and
+    // body-size text on the app's backgrounds. Each is at least 4.5:1 on
+    // mtgSurface, and so on the darker mtgBackground too (WCAG AA). The
+    // colors above stay for dots, icons, borders and fills.
+    static let mtgErrorText = Color(hex: "e06a6a")      // 5.45:1 on mtgSurface
+    static let mtgAssassinText = Color(hex: "e07070")   // 5.69:1
+    static let mtgTraitorText = Color(hex: "b57ae0")    // 5.77:1
 }
 
 // MARK: - View Modifiers
@@ -322,7 +330,7 @@ struct MtgErrorBanner: View {
                 .foregroundStyle(Color.mtgError)
                 .font(.caption)
             Text(message)
-                .foregroundStyle(Color.mtgError)
+                .foregroundStyle(Color.mtgErrorText)
                 .font(.caption)
         }
         .accessibilityElement(children: .combine)

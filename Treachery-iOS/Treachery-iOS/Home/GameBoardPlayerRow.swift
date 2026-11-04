@@ -171,7 +171,7 @@ struct GameBoardPlayerRow: View {
                 .frame(width: 8, height: 8)
             Text(player.role?.displayName ?? "")
                 .font(.caption)
-                .foregroundStyle(player.role?.color ?? Color.mtgTextSecondary)
+                .foregroundStyle(player.role?.textColor ?? Color.mtgTextSecondary)
             if player.isUnveiled && player.role != .leader {
                 Text("(Unveiled)")
                     .font(.caption2)
@@ -258,7 +258,7 @@ struct GameBoardPlayerRow: View {
             // reads "Eliminated".
             Text("Eliminated")
                 .font(.caption)
-                .foregroundStyle(Color.mtgError)
+                .foregroundStyle(Color.mtgErrorText)
                 .accessibilityHidden(true)
         }
     }
