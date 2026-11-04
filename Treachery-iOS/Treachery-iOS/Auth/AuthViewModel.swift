@@ -29,6 +29,10 @@ enum ProfileSetupState: Equatable, Sendable {
     /// Not set up yet: an attempt is running, or the last one was postponed
     /// (offline, say) and the next is due.
     case pending
+    /// Not set up yet, and on hold while the account is being deleted: an
+    /// attempt then could create the profile again just after the server
+    /// deleted it. Pending again if the deletion fails.
+    case onHold
     /// Set up with a placeholder name. The name prompt asks for the user's
     /// own until they save one or skip.
     case needsName
@@ -265,7 +269,8 @@ final class AuthViewModel: ObservableObject {
 
     /// Brings a postponed profile setup's next retry forward to now, as when
     /// the app becomes active and may be back online. Does nothing while an
-    /// attempt runs, whose answer is fresh, or when nothing needs setting up.
+    /// attempt runs, whose answer is fresh, while the setup is on hold for
+    /// the account's deletion, or when nothing needs setting up.
     func retryPostponedProfileSetup() {
         profileSetupRetryWait?.cancel()
     }
@@ -273,7 +278,8 @@ final class AuthViewModel: ObservableObject {
     /// Brings a postponed profile setup's next retry forward to now, then
     /// returns once that attempt, or the one already running, is over. Try
     /// Again on a screen that needs the profile calls this before reading
-    /// it. Returns at once when nothing needs setting up.
+    /// it. Returns at once when nothing needs setting up, and while the
+    /// setup is on hold for the account's deletion.
     func retryProfileSetup() async {
         guard profileSetup != nil else { return }
         await withCheckedContinuation { continuation in
@@ -324,9 +330,10 @@ final class AuthViewModel: ObservableObject {
         return wait
     }
 
-    /// Stops the profile setup, if one runs, because its account signed out
-    /// or another signed in. An attempt still running ends without acting on
-    /// its outcome (`provisionProfile(for:)`).
+    /// Stops the profile setup, if one runs, because its account signed out,
+    /// another signed in or the account is being deleted. An attempt still
+    /// running creates no profile (`ProfileProvisioner`) and ends without
+    /// acting on its outcome (`provisionProfile(for:)`).
     private func stopProfileSetup() {
         profileSetup?.cancel()
         profileSetup = nil
@@ -388,5 +395,24 @@ extension AuthViewModel: SessionEnding {
         errorMessage = nil
         try firebaseManager.signOut()
         AnalyticsService.trackEvent("sign_out")
+    }
+
+    /// Puts a pending profile setup on hold (`ProfileSetupState.onHold`),
+    /// stopping an attempt that's running before it creates anything.
+    /// Retries, the app becoming active and Try Again then set nothing up
+    /// until the session ends or the deletion fails.
+    func accountDeletionWillStart() {
+        guard profileSetupState == .pending else { return }
+        stopProfileSetup()
+        profileSetupState = .onHold
+    }
+
+    /// Takes the profile setup off hold, if it's on hold and this device is
+    /// still signed in. It tries at once, then on the usual schedule. If a
+    /// deletion that timed out finished after all, that attempt finds the
+    /// account gone and signs out.
+    func accountDeletionDidFail() {
+        guard profileSetupState == .onHold, case .authenticated(let account) = authState else { return }
+        startProfileSetup(for: account)
     }
 }

@@ -86,9 +86,10 @@ struct AuthViewModelProfileSetupTests {
         #expect(auth.reloadAccountCalls == ["u1", "u2", "u2"])
     }
 
-    /// An attempt still running when its account signs out or another signs
-    /// in finishes without acting on its outcome: no name prompt for an
-    /// account that's gone, and no sign-out of the next one.
+    /// An attempt still running when its account signs out, another signs
+    /// in or the account's deletion starts creates no profile, and finishes
+    /// without acting on its outcome: no name prompt for an account that's
+    /// gone, and no sign-out of the next one.
     @Test("A cancelled attempt doesn't act on its outcome", arguments: [AccountStatus.exists, .gone])
     func cancelledAttemptDoesNotActOnItsOutcome(status: AccountStatus) async {
         auth.accountStatus = status
@@ -101,6 +102,7 @@ struct AuthViewModelProfileSetupTests {
         }
         await attempt?.value
 
+        #expect(firestore.createUserCalls.isEmpty)
         #expect(!viewModel.isNewUser)
         #expect(auth.signOutCallCount == 0)
     }
@@ -118,6 +120,111 @@ struct AuthViewModelProfileSetupTests {
 
         #expect(viewModel.profileSetupState == .noAccount)
         #expect(!viewModel.isNewUser)
+    }
+
+    // MARK: - Account deletion
+
+    // The server deletes the profile, then the sign-in account. An attempt
+    // in between could find the profile gone but the account still there,
+    // and create the profile again, with the email and phone number, to
+    // outlive the account. So nothing sets up the profile while the account
+    // is being deleted. ProfileViewModel's deletion tells the session when
+    // the deletion starts and if it fails; these tests stand in for it.
+
+    @Test func aPendingRetryDoesNotRunWhileTheAccountIsBeingDeleted() async {
+        viewModel.authStateDidChange(to: account())
+        await clock.waitForSleepers()
+        // Online again: a retry now would create the profile.
+        auth.accountStatus = .exists
+
+        viewModel.accountDeletionWillStart()
+
+        #expect(viewModel.profileSetupState == .onHold)
+        #expect(clock.pendingDeadlines.isEmpty)
+        // The retry would have been due long ago, and Try Again sets nothing
+        // up either: it returns at once, where it would have waited for an
+        // attempt to end.
+        clock.advance(by: .seconds(300))
+        await viewModel.retryProfileSetup()
+        #expect(auth.reloadAccountCalls == ["u1"])
+        #expect(firestore.createUserCalls.isEmpty)
+
+        // The deletion went through, and the auth state listener reports
+        // the sign-out.
+        viewModel.authStateDidChange(to: nil)
+
+        #expect(viewModel.profileSetupState == .noAccount)
+        #expect(auth.reloadAccountCalls == ["u1"])
+        #expect(!viewModel.isNewUser)
+    }
+
+    @Test func becomingActiveWhileTheAccountIsBeingDeletedRetriesNothing() async {
+        viewModel.authStateDidChange(to: account())
+        await clock.waitForSleepers()
+        auth.accountStatus = .exists
+        viewModel.accountDeletionWillStart()
+
+        viewModel.retryPostponedProfileSetup()
+        // Waits for the attempt that becoming active would have started.
+        await viewModel.retryProfileSetup()
+
+        #expect(auth.reloadAccountCalls == ["u1"])
+        #expect(firestore.createUserCalls.isEmpty)
+        #expect(clock.pendingDeadlines.isEmpty)
+        #expect(viewModel.profileSetupState == .onHold)
+    }
+
+    /// The deletion can start while an attempt is running. That attempt is
+    /// stopped there, so it creates nothing (see the cancelled-attempt test
+    /// above), and the name prompt can't open over the deletion.
+    @Test func theDeletionStopsAnAttemptThatIsRunning() async {
+        viewModel.authStateDidChange(to: account())
+        await clock.waitForSleepers()
+        auth.accountStatus = .exists
+        var attemptStopped: Bool?
+        auth.whileReloadingAccount = { [viewModel] in
+            viewModel.accountDeletionWillStart()
+            attemptStopped = Task.isCancelled
+        }
+
+        // Try Again runs an attempt now, and returns once the deletion
+        // stopped it.
+        await viewModel.retryProfileSetup()
+
+        #expect(attemptStopped == true)
+        #expect(viewModel.profileSetupState == .onHold)
+        #expect(!viewModel.isNewUser)
+    }
+
+    /// The account is still there, and still has no profile, so the retry
+    /// that was pending runs: at once, then on the usual schedule.
+    @Test func aFailedDeletionResumesThePendingRetry() async {
+        viewModel.authStateDidChange(to: account())
+        await clock.waitForSleepers()
+        clock.advance(by: .seconds(2))
+        viewModel.accountDeletionWillStart()
+
+        viewModel.accountDeletionDidFail()
+        await clock.waitForSleepers()
+
+        #expect(viewModel.profileSetupState == .pending)
+        #expect(auth.reloadAccountCalls == ["u1", "u1"])
+        // Retried 2 seconds in, so the next retry is due 5 seconds later.
+        #expect(clock.pendingDeadlines == [.seconds(7)])
+    }
+
+    @Test func aDeletionFailingAfterTheSessionEndedResumesNothing() async {
+        viewModel.authStateDidChange(to: account())
+        await clock.waitForSleepers()
+        viewModel.accountDeletionWillStart()
+        viewModel.authStateDidChange(to: nil)
+
+        viewModel.accountDeletionDidFail()
+
+        #expect(viewModel.profileSetupState == .noAccount)
+        #expect(clock.pendingDeadlines.isEmpty)
+        await viewModel.retryProfileSetup()
+        #expect(auth.reloadAccountCalls == ["u1"])
     }
 
     // MARK: - Becoming active

@@ -213,8 +213,9 @@ final class ProfileViewModel: ObservableObject {
 
     /// - Parameters:
     ///   - session: Ends the signed-in session, for Sign Out and once the
-    ///     account is deleted, and says whether it is a guest's. In the app
-    ///     this is `AuthViewModel`, the single source of auth state.
+    ///     account is deleted, says whether it is a guest's, and holds back
+    ///     setting up the profile while the account is being deleted. In the
+    ///     app this is `AuthViewModel`, the single source of auth state.
     ///   - retryProfileSetup: Gives a postponed profile setup another go and
     ///     returns once it's over, so Try Again can find a profile that
     ///     couldn't be created at sign-in. In the app this is
@@ -430,10 +431,11 @@ final class ProfileViewModel: ObservableObject {
     /// so RootView returns to the signed-out screen. The view calls this only
     /// once the user has confirmed (or chosen Try Again); a call made while a
     /// deletion is under way is ignored, so repeat taps never send a second
-    /// request.
+    /// request. The session holds back setting up the profile meanwhile.
     func deleteAccount() async {
         guard !accountDeletionState.isUnderway else { return }
         accountDeletionState = .deleting
+        session.accountDeletionWillStart()
         // Leave name editing: an unsaved rename is dropped, not left pending
         // underneath a deletion. (No rename can be saving here: Delete
         // Account is unavailable until it finishes.)
@@ -445,23 +447,30 @@ final class ProfileViewModel: ObservableObject {
             try await cloudFunctions.deleteAccount()
         } catch AccountDeletionError.inProgressGame(let message) {
             let serverMessage = message.trimmingCharacters(in: .whitespacesAndNewlines)
-            accountDeletionState = .failed(
+            failAccountDeletion(
                 message: serverMessage.isEmpty ? AccountDeletionMessage.inProgressGameFallback : serverMessage,
                 isRetryable: false
             )
             return
         } catch AccountDeletionError.timedOut {
             Self.logger.error("deleteAccount timed out")
-            accountDeletionState = .failed(message: AccountDeletionMessage.timedOut, isRetryable: true)
+            failAccountDeletion(message: AccountDeletionMessage.timedOut, isRetryable: true)
             return
         } catch {
             Self.logger.error("deleteAccount failed: \(error.localizedDescription, privacy: .private)")
-            accountDeletionState = .failed(message: AccountDeletionMessage.retry, isRetryable: true)
+            failAccountDeletion(message: AccountDeletionMessage.retry, isRetryable: true)
             return
         }
 
         trackEvent("account_deleted")
         endSession()
+    }
+
+    /// Ends a deletion the server didn't confirm. This device stays signed
+    /// in, so the session can go on setting up the profile.
+    private func failAccountDeletion(message: String, isRetryable: Bool) {
+        accountDeletionState = .failed(message: message, isRetryable: isRetryable)
+        session.accountDeletionDidFail()
     }
 
     /// Signs out again after the server deleted the account but the first

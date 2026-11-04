@@ -75,7 +75,8 @@ enum AuthMethod: String {
 ///
 /// Each state of `users/{uid}` (`UserDocument`) gets its own treatment:
 /// - Missing: create it, but only once Firebase Auth confirms the account
-///   still exists. A profile deleted along with its account, on another
+///   still exists, and provisioning wasn't stopped (its task cancelled)
+///   meanwhile. A profile deleted along with its account, on another
 ///   device or on this one before a sign-out that then failed, must not come
 ///   back.
 /// - Incomplete: write only the missing `display_name`, `created_at` and
@@ -100,9 +101,10 @@ struct ProfileProvisioner {
         /// Firebase Auth says the account no longer exists. Nothing was
         /// written; the caller signs out.
         case accountGone
-        /// The profile couldn't be read or written, or the account couldn't
-        /// be confirmed (offline, say). Nothing changed; `AuthViewModel`
-        /// tries again later.
+        /// The profile couldn't be read or written, the account couldn't be
+        /// confirmed (offline, say), or provisioning was stopped before it
+        /// created a profile. Nothing changed; `AuthViewModel` tries again
+        /// later, unless it stopped it.
         case postponed
 
         /// Whether the profile's name is a placeholder the user should
@@ -186,6 +188,13 @@ struct ProfileProvisioner {
             return .accountGone
         case .unknown:
             Self.logger.notice("No profile, and the account couldn't be confirmed; not creating one yet")
+            return .postponed
+        }
+        // Stopped meanwhile, as when the account's deletion has just started:
+        // the server deletes the profile before the account, and a profile
+        // created in between would outlive them.
+        guard !Task.isCancelled else {
+            Self.logger.notice("No profile, but provisioning was stopped; not creating one")
             return .postponed
         }
 

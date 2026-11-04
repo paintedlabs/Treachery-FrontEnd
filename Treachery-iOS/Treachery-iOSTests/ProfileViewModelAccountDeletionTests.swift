@@ -222,6 +222,42 @@ struct ProfileViewModelAccountDeletionTests {
         #expect(session.endSessionCallCount == 0)
     }
 
+    // MARK: - Profile setup
+
+    /// The session holds back setting up the profile from before the server
+    /// is asked: meanwhile an attempt could create the profile again just
+    /// after the server deleted it. Once the account is deleted it stays
+    /// held, until the session ends.
+    @Test func deletionHoldsTheProfileSetupFromBeforeTheServerCall() async {
+        var heldWhileInFlight: Int?
+        cloudFunctions.whileDeletingAccount = { [session] in
+            heldWhileInFlight = session.accountDeletionWillStartCallCount
+        }
+
+        await viewModel.deleteAccount()
+
+        #expect(heldWhileInFlight == 1)
+        #expect(session.accountDeletionDidFailCallCount == 0)
+        #expect(viewModel.accountDeletionState == .deleted)
+    }
+
+    /// Whatever the failure, this device stays signed in, so setting up the
+    /// profile goes on.
+    @Test("A failed deletion lets the profile setup go on", arguments: [
+        AccountDeletionError.inProgressGame(message: "You're in a game that's still in progress."),
+        AccountDeletionError.timedOut,
+        URLError(.notConnectedToInternet),
+    ] as [any Error])
+    func failedDeletionLetsTheProfileSetupGoOn(error: any Error) async {
+        cloudFunctions.errorToThrow = error
+
+        await viewModel.deleteAccount()
+
+        #expect(!viewModel.accountDeletionState.isUnderway)
+        #expect(session.accountDeletionWillStartCallCount == 1)
+        #expect(session.accountDeletionDidFailCallCount == 1)
+    }
+
     // MARK: - Repeat taps
 
     @Test func repeatTapsWhileDeletingAreIgnored() async {

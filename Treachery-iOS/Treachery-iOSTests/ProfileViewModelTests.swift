@@ -231,6 +231,7 @@ struct ProfileViewModelTests {
     @Test("Loads again only once the profile setup is finished", arguments: [
         (ProfileSetupState.noAccount, false),
         (ProfileSetupState.pending, false),
+        (ProfileSetupState.onHold, false),
         (ProfileSetupState.needsName, false),
         (ProfileSetupState.finished, true),
     ])

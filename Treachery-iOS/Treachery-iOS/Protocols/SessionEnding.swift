@@ -15,4 +15,15 @@ protocol SessionEnding {
     /// Signs this device out, throwing if it could not. On success the auth
     /// state listener routes the app to the signed-out screen.
     func endSession() throws
+
+    /// Called before the server is asked to delete the signed-in account.
+    /// Until the session ends, or `accountDeletionDidFail()`, nothing sets up
+    /// the account's profile: the server deletes the profile before the
+    /// sign-in account, and an attempt in between could create the profile
+    /// again, with the email and phone number, to outlive the account.
+    func accountDeletionWillStart()
+
+    /// Called when the server didn't confirm the deletion, so this device
+    /// stays signed in and setting up the profile can go on.
+    func accountDeletionDidFail()
 }
