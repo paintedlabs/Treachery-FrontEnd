@@ -47,8 +47,16 @@ jobs:
       # can't go green. Last, so the checks above still report on the PR.
       - name: Privacy policy placeholders are filled in
         run: |
-          if grep -rnE 'TODO_(OPERATOR_NAME|CONTACT_EMAIL|EFFECTIVE_DATE)' app; then
+          # Only grep's "no match" (1) passes. A match (0) means a placeholder
+          # is left. An error (2), such as a missing folder, means the search
+          # didn't finish, so it fails too.
+          status=0
+          grep -rnE 'TODO_(OPERATOR_NAME|CONTACT_EMAIL|EFFECTIVE_DATE)' app src || status=$?
+          if [ "$status" -eq 0 ]; then
             echo "::error::Replace the privacy policy placeholders listed above."
+            exit 1
+          elif [ "$status" -ne 1 ]; then
+            echo "::error::Couldn't search app and src for privacy policy placeholders (grep exit $status)."
             exit 1
           fi
 
