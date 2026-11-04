@@ -121,6 +121,12 @@ export default function PrivacyPolicyScreen() {
               the request with your IP address and details of your browser or app. We use these logs
               to find and fix problems.
             </Bullet>
+            <Bullet>
+              <Term>Messages you send us.</Term> If you email us for help, to report a player or to
+              delete your account, we get your email address, your message and anything you include
+              in it, such as your device details or another player’s display name. We use them to
+              answer you and to look into reports.
+            </Bullet>
           </BulletList>
           <Paragraph>
             Treachery doesn’t access your phone’s address book, photos, camera, microphone or your
@@ -229,12 +235,17 @@ export default function PrivacyPolicyScreen() {
               requests and a few months for web requests.
             </Bullet>
             <Bullet>
+              Messages you send us: as long as we need them to answer you or to handle a report.
+            </Bullet>
+            <Bullet>
               After information is deleted, Google can take up to 180 days to clear it from its
               backups.
             </Bullet>
           </BulletList>
         </Section>
 
+        {/* support.tsx repeats the web and Android steps below word for word, and the iPhone
+            steps in short. Change both pages together. */}
         <Section title="Deleting your account">
           <Paragraph>
             <Term>On iPhone:</Term> open Profile, tap Delete Account and confirm. This deletes your
@@ -258,6 +269,10 @@ export default function PrivacyPolicyScreen() {
             Signing out doesn’t delete your account. You can’t sign back in to a guest account after
             signing out, so if you don’t want it kept, delete it before you sign out. On the web and
             Android, that means emailing us and staying signed in until we’ve confirmed it’s yours.
+          </Paragraph>
+          <Paragraph>
+            If an account breaks the rules, for example with an offensive display name or by
+            harassing other players, we may rename it, or delete it in the same way as above.
           </Paragraph>
         </Section>
 
