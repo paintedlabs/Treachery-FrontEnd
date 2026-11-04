@@ -145,6 +145,21 @@ struct Game: Codable, Identifiable, Hashable {
     }
 }
 
+// MARK: - Starting Life
+
+extension Game {
+    /// The starting life totals the create screen's stepper and the lobby's
+    /// menu offer: 20 to 60 in steps of 5. createGame and updateGameSettings
+    /// (functions/src/callables/lobby.js) must accept every one of them, so
+    /// the functions that do have to be deployed before a build offering
+    /// them ships.
+    static let startingLifeRange = 20...60
+    static let startingLifeStep = 5
+    static let startingLifeOptions = Array(
+        stride(from: startingLifeRange.lowerBound, through: startingLifeRange.upperBound, by: startingLifeStep)
+    )
+}
+
 // MARK: - Game Errors
 
 enum GameError: LocalizedError {

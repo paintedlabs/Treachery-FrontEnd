@@ -290,7 +290,10 @@ struct LobbyView: View {
                             .font(.subheadline)
                         Spacer()
                         Menu {
-                            ForEach([20, 25, 30, 40, 50], id: \.self) { life in
+                            // The values the create screen offers. The system
+                            // menu scrolls when the nine don't fit at large
+                            // text sizes.
+                            ForEach(Game.startingLifeOptions, id: \.self) { life in
                                 Button("\(life)") {
                                     Task { await viewModel.updateGameSettings(startingLife: life) }
                                 }
@@ -303,8 +306,13 @@ struct LobbyView: View {
                                 Image(systemName: "chevron.up.chevron.down")
                                     .foregroundStyle(Color.mtgGold)
                                     .font(.caption2)
+                                    .accessibilityHidden(true)
                             }
+                            .frame(minWidth: 44, minHeight: 44, alignment: .trailing)
+                            .contentShape(Rectangle())
                         }
+                        .accessibilityLabel("Starting life")
+                        .accessibilityValue("\(game.startingLife)")
                     }
 
                     Rectangle().fill(Color.mtgDivider).frame(height: 1)
