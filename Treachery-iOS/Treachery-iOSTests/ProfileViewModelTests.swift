@@ -335,6 +335,34 @@ struct ProfileViewModelTests {
         #expect(viewModel.user?.displayName == "Player")
     }
 
+    /// A Try Again whose task is cancelled stops waiting for the setup and
+    /// loads nothing, and the next one runs as usual.
+    @Test func cancelledTryAgainLoadsNothing() async {
+        firestore.usersToReturn = [:]
+        let setup = ProfileSetupRetrySpy()
+        let viewModel = ProfileViewModel(
+            session: SessionEndingSpy(),
+            retryProfileSetup: { await setup.retry() },
+            firestoreManager: firestore,
+            cloudFunctions: MockCloudFunctions(),
+            trackEvent: { _ in }
+        )
+        await viewModel.loadData(userId: "u1")
+        var tryAgain: Task<Void, Never>?
+        setup.whileRetrying = { tryAgain?.cancel() }
+
+        tryAgain = Task { await viewModel.retry(userId: "u1") }
+        await tryAgain?.value
+
+        #expect(setup.retryCount == 1)
+        #expect(firestore.getUserCallCount == 1)
+
+        await viewModel.retry(userId: "u1")
+
+        #expect(setup.retryCount == 2)
+        #expect(firestore.getUserCallCount == 2)
+    }
+
     /// The profile setup can finish while Profile is open, as when the name
     /// prompt over it closes. Only then does Profile read the profile again:
     /// before, it may not exist, or still have its placeholder name.

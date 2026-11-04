@@ -95,7 +95,11 @@ final class MockFirestoreManager: FirestoreManaging {
         return user
     }
 
+    /// How many times profile provisioning read the profile, once per attempt.
+    private(set) var getUserDocumentCallCount = 0
+
     func getUserDocument(id: String) async throws -> UserDocument {
+        getUserDocumentCallCount += 1
         if let error = errorToThrow ?? userDocumentError { throw error }
         if let document = userDocumentsToReturn[id] { return document }
         return usersToReturn[id].map { .complete($0) } ?? .missing

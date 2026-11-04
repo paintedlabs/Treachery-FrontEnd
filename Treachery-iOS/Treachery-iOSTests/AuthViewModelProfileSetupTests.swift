@@ -287,6 +287,35 @@ struct AuthViewModelProfileSetupTests {
         #expect(auth.reloadAccountCalls == ["u1"])
     }
 
+    /// Most accounts are set up long before they're deleted. Then there's no
+    /// setup to hold: the deletion starting changes nothing, and its
+    /// failing, however it fails, starts no setup, which would read the
+    /// profile again.
+    @Test("A deletion with the profile set up holds and resumes nothing", arguments: [
+        AccountDeletionFailure.nothingDeleted,
+        .outcomeUnknown,
+    ])
+    func aDeletionWithTheProfileSetUpHoldsAndResumesNothing(failure: AccountDeletionFailure) async {
+        firestore.usersToReturn["u1"] = TreacheryUser(
+            id: "u1", displayName: "Ada", friendIds: [], createdAt: Date(timeIntervalSince1970: 1_000_000)
+        )
+        viewModel.authStateDidChange(to: account())
+        // Waits for the first attempt, which finds the profile complete.
+        await viewModel.retryProfileSetup()
+        #expect(viewModel.profileSetupState == .finished)
+
+        viewModel.accountDeletionWillStart()
+
+        #expect(viewModel.profileSetupState == .finished)
+
+        viewModel.accountDeletionDidFail(failure)
+
+        #expect(viewModel.profileSetupState == .finished)
+        // Returns at once: there's no attempt to wait for.
+        await viewModel.retryProfileSetup()
+        #expect(firestore.getUserDocumentCallCount == 1)
+    }
+
     // MARK: - Becoming active
 
     @Test func becomingActiveRetriesAtOnce() async {
