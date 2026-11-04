@@ -80,9 +80,12 @@ platform :ios do
   end
 
   # Gives Crashlytics this build's dSYMs so its crash reports are symbolicated.
-  # Runs after the upload to App Store Connect, so it must never fail the lane:
-  # any error is logged and the lane carries on. The deploy workflows also keep
-  # the dSYM zip as a run artifact for a manual re-upload.
+  # Runs right after the export, before anything goes to App Store Connect:
+  # deliver uploads the binary before it submits for review, so a failed
+  # upload or submission must not lose the symbols. It must never fail the
+  # lane either: any error is logged and the lane carries on. The deploy
+  # workflows also keep the dSYM zip as a run artifact for a manual upload
+  # (docs/DEPLOYMENT.md).
   #
   # Runs Firebase's upload-symbols itself rather than through
   # upload_symbols_to_crashlytics: that action logs a failed upload and then
@@ -101,7 +104,7 @@ platform :ios do
       end
       UI.success("Uploaded dSYMs to Crashlytics")
     rescue => e
-      UI.important("No dSYMs went to Crashlytics; upload the run's ios-dsyms artifact by hand. Reason: #{e.message}")
+      UI.important("No dSYMs went to Crashlytics; upload the run's ios-dsyms artifact by hand (docs/DEPLOYMENT.md). Reason: #{e.message}")
     end
   end
 
@@ -173,13 +176,14 @@ platform :ios do
       cloned_source_packages_path: SOURCE_PACKAGES
     )
 
+    # Symbols first, so a failed upload below can't lose them.
+    upload_crashlytics_symbols
+
     # Upload to TestFlight
     upload_to_testflight(
       api_key: api_key,
       skip_waiting_for_build_processing: true
     )
-
-    upload_crashlytics_symbols
   end
 
   # ── Release (App Store) ──────────────────────────────
@@ -298,6 +302,9 @@ platform :ios do
       cloned_source_packages_path: SOURCE_PACKAGES
     )
 
+    # Symbols first, so a failed upload or submission below can't lose them.
+    upload_crashlytics_symbols
+
     # Upload and submit for review, phased as decided at the top of the lane.
     upload_to_app_store(
       api_key: api_key,
@@ -313,8 +320,6 @@ platform :ios do
         export_compliance_uses_encryption: false
       }
     )
-
-    upload_crashlytics_symbols
   end
 
   # ── Utilities ────────────────────────────────────────

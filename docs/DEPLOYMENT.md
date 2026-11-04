@@ -94,6 +94,27 @@ Pauses add up to at most 30 days, and a resumed rollout continues where it
 stopped. Fix forward with a new version, or choose "Release to All Users" once
 the cause turns out to be harmless.
 
+## iOS crash symbols
+
+The TestFlight and App Store lanes upload each build's dSYMs to Crashlytics
+right after building, before anything goes to App Store Connect, so a failed
+upload or review submission still leaves Crashlytics with them. A failed
+symbol upload never fails the lane; it logs "No dSYMs went to Crashlytics"
+with the reason. Each deploy run also keeps the dSYM zip as its
+`ios-dsyms-<run id>-<attempt>` artifact for 14 days. To upload it by hand
+within that time, from `Treachery-iOS/`:
+
+```bash
+# The run id is the number at the end of the run's URL. gh unzips the
+# artifact to build/dsyms/Treachery-iOS.app.dSYM.zip.
+gh run download <run id> -n ios-dsyms-<run id>-<attempt> -D build/dsyms
+# Firebase's uploader comes with the pinned firebase-ios-sdk package.
+xcodebuild -resolvePackageDependencies -project Treachery-iOS.xcodeproj \
+  -scheme Treachery-iOS -clonedSourcePackagesDirPath build/SourcePackages
+build/SourcePackages/checkouts/firebase-ios-sdk/Crashlytics/upload-symbols \
+  -gsp Treachery-iOS/GoogleService-Info.plist -p ios build/dsyms/Treachery-iOS.app.dSYM.zip
+```
+
 ## Rules changes
 
 `firestore.rules` in the repo is the source of truth. **Never edit rules in
