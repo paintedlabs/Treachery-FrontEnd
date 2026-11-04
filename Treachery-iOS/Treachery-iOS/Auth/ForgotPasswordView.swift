@@ -16,6 +16,21 @@ struct ForgotPasswordView: View {
     @State private var didSend = false
 
     var body: some View {
+        // Scrolls when the form is taller than the screen, as at the
+        // largest text sizes.
+        FullHeightScrollView {
+            form
+        }
+        .mtgBackground()
+        .navigationBarBackButtonHidden(isLoading)
+        .alert("Email Sent", isPresented: $didSend) {
+            Button("OK") { dismiss() }
+        } message: {
+            Text("Check your inbox for a password reset link.")
+        }
+    }
+
+    private var form: some View {
         VStack(alignment: .center, spacing: 16) {
             Spacer()
 
@@ -67,8 +82,12 @@ struct ForgotPasswordView: View {
             .buttonStyle(MtgPrimaryButtonStyle(isDisabled: isLoading))
             .disabled(isLoading)
 
-            Button("Back to Sign In") {
+            Button {
                 dismiss()
+            } label: {
+                Text("Back to Sign In")
+                    .frame(minHeight: 44)
+                    .contentShape(Rectangle())
             }
             .font(.subheadline)
             .foregroundStyle(Color.mtgGold)
@@ -77,13 +96,6 @@ struct ForgotPasswordView: View {
             Spacer()
         }
         .padding()
-        .mtgBackground()
-        .navigationBarBackButtonHidden(isLoading)
-        .alert("Email Sent", isPresented: $didSend) {
-            Button("OK") { dismiss() }
-        } message: {
-            Text("Check your inbox for a password reset link.")
-        }
     }
 
     private func sendReset() {

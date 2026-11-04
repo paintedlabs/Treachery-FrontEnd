@@ -19,6 +19,16 @@ struct PhoneAuthView: View {
     private var isCodeStep: Bool { verificationID != nil }
 
     var body: some View {
+        // Scrolls when the form is taller than the screen, as at the
+        // largest text sizes.
+        FullHeightScrollView {
+            form
+        }
+        .mtgBackground()
+        .navigationBarBackButtonHidden(isLoading)
+    }
+
+    private var form: some View {
         VStack(alignment: .center, spacing: 16) {
             Spacer()
 
@@ -103,18 +113,26 @@ struct PhoneAuthView: View {
                 .buttonStyle(MtgPrimaryButtonStyle(isDisabled: isLoading))
                 .disabled(isLoading)
 
-                Button("Use a different number") {
+                Button {
                     verificationID = nil
                     verificationCode = ""
                     authViewModel.errorMessage = nil
+                } label: {
+                    Text("Use a different number")
+                        .frame(minHeight: 44)
+                        .contentShape(Rectangle())
                 }
                 .font(.subheadline)
                 .foregroundStyle(Color.mtgGold)
                 .disabled(isLoading)
             }
 
-            Button("Back to Sign In") {
+            Button {
                 dismiss()
+            } label: {
+                Text("Back to Sign In")
+                    .frame(minHeight: 44)
+                    .contentShape(Rectangle())
             }
             .font(.subheadline)
             .foregroundStyle(Color.mtgGold)
@@ -123,8 +141,6 @@ struct PhoneAuthView: View {
             Spacer()
         }
         .padding()
-        .mtgBackground()
-        .navigationBarBackButtonHidden(isLoading)
     }
 
     private func sendCode() {

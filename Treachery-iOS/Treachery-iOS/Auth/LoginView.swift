@@ -9,6 +9,8 @@ import SwiftUI
 
 struct LoginView: View {
     @EnvironmentObject var authViewModel: AuthViewModel
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     @State private var email = ""
     @State private var password = ""
@@ -19,6 +21,20 @@ struct LoginView: View {
     private var busy: Bool { isLoading || isGuestLoading }
 
     var body: some View {
+        // Scrolls at the largest text sizes, where the form is taller than
+        // the screen and Play as Guest would otherwise be cut off.
+        FullHeightScrollView {
+            form
+        }
+        .mtgRadialBackground()
+        .onAppear {
+            withAnimation(.easeOut(duration: 0.6).delay(0.2)) {
+                formVisible = true
+            }
+        }
+    }
+
+    private var form: some View {
         VStack(alignment: .center, spacing: 18) {
             Spacer()
 
@@ -94,21 +110,19 @@ struct LoginView: View {
                 .buttonStyle(MtgPrimaryButtonStyle(isDisabled: busy))
                 .disabled(busy)
 
-                // Links row
-                HStack {
-                    NavigationLink("Create Account") {
-                        SignUpView()
+                // Links row: stacked at the accessibility text sizes, where
+                // side by side would break words in the middle.
+                if dynamicTypeSize.isAccessibilitySize {
+                    VStack(spacing: 0) {
+                        createAccountLink
+                        forgotPasswordLink
                     }
-                    .font(.subheadline)
-                    .foregroundStyle(Color.mtgGold)
-
-                    Spacer()
-
-                    NavigationLink("Forgot Password?") {
-                        ForgotPasswordView()
+                } else {
+                    HStack {
+                        createAccountLink
+                        Spacer()
+                        forgotPasswordLink
                     }
-                    .font(.subheadline)
-                    .foregroundStyle(Color.mtgGold)
                 }
 
                 // Phone sign in
@@ -160,24 +174,46 @@ struct LoginView: View {
                 .disabled(busy)
             }
             .opacity(formVisible ? 1 : 0)
-            .offset(y: formVisible ? 0 : 12)
+            // With Reduce Motion the form only fades in; it doesn't slide up.
+            .offset(y: formVisible || reduceMotion ? 0 : 12)
 
             Spacer()
 
-            Link("Learn the rules at MTGTreachery.net",
-                 destination: URL(string: "https://mtgtreachery.net")!)
-                .font(.system(.caption, design: .serif))
-                .italic()
-                .foregroundStyle(Color.mtgTextSecondary)
-                .frame(maxWidth: .infinity, alignment: .center)
+            Link(destination: URL(string: "https://mtgtreachery.net")!) {
+                Text("Learn the rules at MTGTreachery.net")
+                    .frame(minHeight: 44)
+                    .contentShape(Rectangle())
+            }
+            .font(.system(.caption, design: .serif))
+            .italic()
+            .foregroundStyle(Color.mtgTextSecondary)
+            .frame(maxWidth: .infinity, alignment: .center)
         }
         .padding()
-        .mtgRadialBackground()
-        .onAppear {
-            withAnimation(.easeOut(duration: 0.6).delay(0.2)) {
-                formVisible = true
-            }
+    }
+
+    private var createAccountLink: some View {
+        NavigationLink {
+            SignUpView()
+        } label: {
+            Text("Create Account")
+                .frame(minHeight: 44)
+                .contentShape(Rectangle())
         }
+        .font(.subheadline)
+        .foregroundStyle(Color.mtgGold)
+    }
+
+    private var forgotPasswordLink: some View {
+        NavigationLink {
+            ForgotPasswordView()
+        } label: {
+            Text("Forgot Password?")
+                .frame(minHeight: 44)
+                .contentShape(Rectangle())
+        }
+        .font(.subheadline)
+        .foregroundStyle(Color.mtgGold)
     }
 
     private func signIn() {

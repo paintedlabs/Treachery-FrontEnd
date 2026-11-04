@@ -18,6 +18,16 @@ struct SignUpView: View {
     @State private var localError: String?
 
     var body: some View {
+        // Scrolls when the form is taller than the screen, as at the
+        // largest text sizes.
+        FullHeightScrollView {
+            form
+        }
+        .mtgBackground()
+        .navigationBarBackButtonHidden(isLoading)
+    }
+
+    private var form: some View {
         VStack(alignment: .center, spacing: 16) {
             Spacer()
 
@@ -92,8 +102,13 @@ struct SignUpView: View {
             .buttonStyle(MtgPrimaryButtonStyle(isDisabled: isLoading))
             .disabled(isLoading)
 
-            Button("Already have an account? Sign In") {
+            Button {
                 dismiss()
+            } label: {
+                Text("Already have an account? Sign In")
+                    .multilineTextAlignment(.center)
+                    .frame(minHeight: 44)
+                    .contentShape(Rectangle())
             }
             .font(.subheadline)
             .foregroundStyle(Color.mtgGold)
@@ -102,8 +117,6 @@ struct SignUpView: View {
             Spacer()
         }
         .padding()
-        .mtgBackground()
-        .navigationBarBackButtonHidden(isLoading)
     }
 
     private func signUp() {
