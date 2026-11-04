@@ -9,7 +9,6 @@ import SwiftUI
 
 struct RootView: View {
     @EnvironmentObject var authViewModel: AuthViewModel
-    @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
         Group {
@@ -53,6 +52,8 @@ struct RootView: View {
             }
         }
     }
+
+    @Environment(\.scenePhase) private var scenePhase
 }
 
 // MARK: - Onboarding Flow
