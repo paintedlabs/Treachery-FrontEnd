@@ -344,6 +344,7 @@ struct GameBoardView: View {
                     } label: {
                         HStack(spacing: 8) {
                             Image(systemName: "flag.checkered")
+                                .accessibilityHidden(true)
                             Text("End Game")
                                 .fontWeight(.semibold)
                         }

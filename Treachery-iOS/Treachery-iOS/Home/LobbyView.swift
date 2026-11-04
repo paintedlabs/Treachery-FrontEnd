@@ -284,11 +284,13 @@ struct LobbyView: View {
 
                     Rectangle().fill(Color.mtgDivider).frame(height: 1)
 
-                    // Starting Life
+                    // Starting Life. The menu carries the label and value for
+                    // VoiceOver, so the text beside it isn't read twice.
                     HStack {
                         Text("Starting Life")
                             .foregroundStyle(Color.mtgTextSecondary)
                             .font(.subheadline)
+                            .accessibilityHidden(true)
                         Spacer()
                         Menu {
                             // The values the create screen offers. The system
@@ -318,11 +320,12 @@ struct LobbyView: View {
 
                     Rectangle().fill(Color.mtgDivider).frame(height: 1)
 
-                    // Game Mode
+                    // Game Mode, labeled for VoiceOver by its menu
                     HStack {
                         Text("Game Mode")
                             .foregroundStyle(Color.mtgTextSecondary)
                             .font(.subheadline)
+                            .accessibilityHidden(true)
                         Spacer()
                         Menu {
                             ForEach(GameMode.allCases, id: \.self) { mode in
@@ -355,6 +358,7 @@ struct LobbyView: View {
                             Text("Max Traitor Rarity")
                                 .foregroundStyle(Color.mtgTextSecondary)
                                 .font(.subheadline)
+                                .accessibilityHidden(true)
                             Spacer()
                             Menu {
                                 ForEach(Rarity.allCases) { rarity in

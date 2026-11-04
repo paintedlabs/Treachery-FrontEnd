@@ -80,9 +80,11 @@ struct GameOverView: View {
         .onAppear {
             AnalyticsService.trackScreen("GameOver")
             viewModel.currentUserId = authViewModel.currentUserId
-            // With Reduce Motion the trophy is simply there; the rest still
-            // fades in.
-            if !reduceMotion {
+            // With Reduce Motion the trophy is simply there, and stays full
+            // size if Reduce Motion is turned off; the rest still fades in.
+            if reduceMotion {
+                trophyScale = 1.0
+            } else {
                 withAnimation(.spring(response: 0.6, dampingFraction: 0.6).delay(0.2)) {
                     trophyScale = 1.0
                 }
@@ -128,6 +130,7 @@ struct GameOverView: View {
                 Image(systemName: "clock")
                     .font(.system(size: symbolSize))
                     .foregroundStyle(Color.mtgGold)
+                    .accessibilityHidden(true)
                 Text("Game Still In Progress")
                     .font(.system(size: inProgressTitleSize, weight: .bold, design: .serif))
                     .foregroundStyle(Color.mtgTextPrimary)
@@ -187,6 +190,7 @@ struct GameOverView: View {
                     .shadow(color: winningTeam.color.opacity(0.5), radius: 16, x: 0, y: 0)
                     .shadow(color: winningTeam.color.opacity(0.3), radius: 32, x: 0, y: 0)
                     .scaleEffect(reduceMotion ? 1 : trophyScale)
+                    .accessibilityHidden(true)
 
                 Text("Game Over")
                     .font(.system(size: titleSize, weight: .bold, design: .serif))
@@ -248,14 +252,13 @@ struct GameOverView: View {
                             .foregroundStyle(Color.mtgError)
                             .font(.caption)
                             .padding(.leading, 4)
+                            .accessibilityLabel("Eliminated")
                     }
                 }
                 .padding(.vertical, 10)
                 .padding(.horizontal, 16)
+                // Read as shown: name, commander, role, card, and the mark.
                 .accessibilityElement(children: .combine)
-                .accessibilityLabel(
-                    "\(player.displayName), \(player.role?.displayName ?? "Unknown")\(player.isEliminated ? ", eliminated" : "")"
-                )
 
                 if player.id != viewModel.players.last?.id {
                     Rectangle()
@@ -307,6 +310,7 @@ struct GameOverView: View {
                 .foregroundStyle(Color.mtgGold)
                 .shadow(color: Color.mtgGold.opacity(0.4), radius: 16, x: 0, y: 0)
                 .scaleEffect(reduceMotion ? 1 : trophyScale)
+                .accessibilityHidden(true)
 
             Text("Game Over")
                 .font(.system(size: summaryTitleSize, weight: .bold, design: .serif))
@@ -356,12 +360,13 @@ struct GameOverView: View {
                         Image(systemName: "xmark.circle.fill")
                             .foregroundStyle(Color.mtgError)
                             .font(.caption)
+                            .accessibilityLabel("Eliminated")
                     }
                 }
                 .padding(.vertical, 10)
                 .padding(.horizontal, 16)
+                // Read as shown: name, commander, and the mark.
                 .accessibilityElement(children: .combine)
-                .accessibilityLabel("\(player.displayName)\(player.isEliminated ? ", eliminated" : "")")
 
                 if player.id != viewModel.players.last?.id {
                     Rectangle()
