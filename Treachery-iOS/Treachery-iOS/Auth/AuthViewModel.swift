@@ -67,22 +67,13 @@ final class AuthViewModel: ObservableObject {
     private let clock: any Clock<Duration>
     private var authStateHandle: Any?
 
-    /// Sets up the signed-in account's profile, retrying while that's
-    /// postponed (`startProfileSetup(for:)`). Nil once the profile is set
-    /// up, while the setup is on hold for the account's deletion, and while
-    /// no one is signed in.
-    private var profileSetup: Task<Void, Never>?
-    /// The profile setup's wait before its next retry, while it waits.
-    /// Cancelling it retries at once.
-    private var profileSetupRetryWait: Task<Void, Never>?
+    /// What the profile setup is running, if anything (`SetupWork`).
+    private var setupWork = SetupWork.idle
     /// Callers of `retryProfileSetup()`, waiting for the attempt that's
     /// running or about to start to end, or while the setup is on hold
     /// until relaunch, for the check of the deletion's outcome. Finishing
     /// one ends that wait.
     private var profileSetupWaiters: [AsyncStream<Void>.Continuation] = []
-    /// While the setup is on hold until relaunch, the check of whether the
-    /// deletion went through, if one runs (`checkDeletionOutcome()`).
-    private var deletionOutcomeCheck: Task<Void, Never>?
 
     private static let logger = Logger(subsystem: "com.Solomon.Treachery-iOS", category: "Auth")
 
@@ -131,8 +122,12 @@ final class AuthViewModel: ObservableObject {
     }
 
     deinit {
-        profileSetup?.cancel()
-        profileSetupRetryWait?.cancel()
+        // A deletion check needs no cancelling: it holds the view model
+        // while it runs, and one yet to start returns on finding it gone.
+        if case .settingUp(let setup, let retryWait) = setupWork {
+            setup.cancel()
+            retryWait?.cancel()
+        }
         if let handle = authStateHandle {
             firebaseManager.removeAuthStateListener(handle)
         }
@@ -291,8 +286,8 @@ final class AuthViewModel: ObservableObject {
     func retryPostponedProfileSetup() {
         if profileSetupState == .onHoldUntilRelaunch {
             checkDeletionOutcome()
-        } else {
-            profileSetupRetryWait?.cancel()
+        } else if case .settingUp(_, let retryWait?) = setupWork {
+            retryWait.cancel()
         }
     }
 
@@ -306,13 +301,37 @@ final class AuthViewModel: ObservableObject {
     /// leaves Friends during a pull to refresh, stops waiting then; the
     /// attempt goes on.
     func retryProfileSetup() async {
-        guard profileSetup != nil || profileSetupState == .onHoldUntilRelaunch else { return }
+        guard setupWork.isSettingUp || profileSetupState == .onHoldUntilRelaunch else { return }
         let (attemptOver, waiter) = AsyncStream<Void>.makeStream()
         profileSetupWaiters.append(waiter)
         retryPostponedProfileSetup()
         // Ends once the waiter is finished, or as soon as this task is
         // cancelled.
         for await _ in attemptOver {}
+    }
+
+    /// What the profile setup is running. One value rather than a task
+    /// handle for each kind of work, so a setup attempt and a check of a
+    /// deletion's outcome can't run at once: the end of either ends the
+    /// waits of `retryProfileSetup()`.
+    private enum SetupWork {
+        /// Nothing runs: the profile is set up or can't be, the setup is on
+        /// hold for the account's deletion with no check running, or no one
+        /// is signed in.
+        case idle
+        /// Setting up the signed-in account's profile, retrying while that's
+        /// postponed (`startProfileSetup(for:)`). `retryWait` is the wait
+        /// before the next retry, while there is one; cancelling it retries
+        /// at once.
+        case settingUp(Task<Void, Never>, retryWait: Task<Void, Never>?)
+        /// While the setup is on hold until relaunch, checking whether the
+        /// deletion went through (`checkDeletionOutcome()`).
+        case checkingDeletion(Task<Void, Never>)
+
+        var isSettingUp: Bool {
+            if case .settingUp = self { return true }
+            return false
+        }
     }
 
     /// Starts setting up `account`'s profile: provisions it, and while that's
@@ -323,13 +342,14 @@ final class AuthViewModel: ObservableObject {
     private func startProfileSetup(for account: SignedInAccount) {
         stopProfileSetup()
         profileSetupState = .pending
-        profileSetup = Task { [weak self] in
+        let setup = Task { [weak self] in
             var retry = 0
             while let wait = await self?.attemptProfileSetup(for: account, retry: retry) {
                 await wait.value
                 retry += 1
             }
         }
+        setupWork = .settingUp(setup, retryWait: nil)
     }
 
     /// One attempt of the profile setup. Returns the wait before the next one
@@ -338,13 +358,13 @@ final class AuthViewModel: ObservableObject {
     private func attemptProfileSetup(for account: SignedInAccount, retry: Int) async -> Task<Void, Never>? {
         // Stopped while it waited.
         guard !Task.isCancelled else { return nil }
-        profileSetupRetryWait = nil
+        setRetryWait(nil)
         let outcome = await provisionProfile(for: account)
         // Stopped during the attempt, which released the waiters.
         guard !Task.isCancelled else { return nil }
         releaseProfileSetupWaiters()
         guard outcome == .postponed, currentUserId == account.uid else {
-            profileSetup = nil
+            setupWork = .idle
             return nil
         }
         let delays = Self.profileSetupRetryDelays
@@ -353,8 +373,16 @@ final class AuthViewModel: ObservableObject {
             // Cancelled to retry early or to stop; the next attempt checks which.
             _ = try? await clock.sleep(for: delay)
         }
-        profileSetupRetryWait = wait
+        setRetryWait(wait)
         return wait
+    }
+
+    /// Records the setup's wait before its next retry, or that it has none.
+    /// Called only from the setup's own task, which has just checked that it
+    /// wasn't stopped, so `setupWork` is still `.settingUp`.
+    private func setRetryWait(_ retryWait: Task<Void, Never>?) {
+        guard case .settingUp(let setup, _) = setupWork else { return }
+        setupWork = .settingUp(setup, retryWait: retryWait)
     }
 
     /// Stops the profile setup, if one runs, because its account signed out,
@@ -367,12 +395,16 @@ final class AuthViewModel: ObservableObject {
     /// while offline Firestore sends them once it's back online. A check of
     /// a deletion's outcome still running ends without acting on it.
     private func stopProfileSetup() {
-        profileSetup?.cancel()
-        profileSetup = nil
-        profileSetupRetryWait?.cancel()
-        profileSetupRetryWait = nil
-        deletionOutcomeCheck?.cancel()
-        deletionOutcomeCheck = nil
+        switch setupWork {
+        case .idle:
+            break
+        case .settingUp(let setup, let retryWait):
+            setup.cancel()
+            retryWait?.cancel()
+        case .checkingDeletion(let check):
+            check.cancel()
+        }
+        setupWork = .idle
         releaseProfileSetupWaiters()
     }
 
@@ -383,19 +415,20 @@ final class AuthViewModel: ObservableObject {
     /// still going. One check at a time; its end ends the waits of
     /// `retryProfileSetup()`.
     private func checkDeletionOutcome() {
-        guard deletionOutcomeCheck == nil, let userId = currentUserId else { return }
-        deletionOutcomeCheck = Task { [weak self] in
+        guard case .idle = setupWork, let userId = currentUserId else { return }
+        let check = Task { [weak self] in
             guard let self else { return }
             let status = await firebaseManager.reloadAccount(userId: userId)
             // Stopped meanwhile, which released the waiters.
             guard !Task.isCancelled else { return }
-            deletionOutcomeCheck = nil
+            setupWork = .idle
             if status == .gone {
                 Self.logger.notice("The account's deletion went through after all; signing out")
                 signOutDeletedAccount()
             }
             releaseProfileSetupWaiters()
         }
+        setupWork = .checkingDeletion(check)
     }
 
     private func releaseProfileSetupWaiters() {
