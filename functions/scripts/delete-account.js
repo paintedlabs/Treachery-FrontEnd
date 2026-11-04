@@ -25,6 +25,11 @@
  * is left to protect, so --apply by --uid deletes those without checking the
  * name.
  *
+ * `--expect-name -` reads the name from the first line of stdin instead, and
+ * asks for it when stdin is a terminal. Use it for a name copied from the
+ * Firebase console, which can be the requester's email address: it then
+ * never goes on the command line, where shell history would keep it.
+ *
  * DRY RUN BY DEFAULT — it reads and reports, and writes nothing at all until
  * you pass --apply. It prints the account (email and phone masked) and what
  * deleting it would do.
@@ -77,6 +82,7 @@
  * `gcloud auth application-default set-quota-project <project-id>`.
  */
 
+const readline = require("node:readline");
 const { initializeApp } = require("firebase-admin/app");
 const { HttpsError } = require("firebase-functions/v2/https");
 const { resolveTarget, describeTarget } = require("./lib/target");
@@ -117,7 +123,9 @@ function usage() {
       "  --phone <+number>      Find the account by the phone number it signs in with,",
       "                         in international format, like +15551234567.",
       "  --expect-name <code>   Required. Refuses unless the profile's display name is",
-      "                         exactly this.",
+      "                         exactly this. With -, it reads the name from the first",
+      "                         line of stdin instead, which keeps it out of shell",
+      "                         history.",
       "  --project <id>         Firebase project to target. --apply requires it; a dry",
       "                         run without it uses GOOGLE_CLOUD_PROJECT /",
       "                         GCLOUD_PROJECT, or the Application Default",
@@ -207,6 +215,21 @@ function checkOptions(opts) {
   }
   if (opts.phone !== null && !/^\+\d+$/.test(opts.phone)) {
     throw usageError("--phone takes an international number: + then digits only, like +15551234567.");
+  }
+}
+
+/**
+ * The first line of `input`, without its line ending: the name
+ * `--expect-name -` reads. Asks for it on stderr when `input` is a terminal.
+ */
+async function readName(input) {
+  if (input.isTTY) process.stderr.write("Display name to expect (paste it, then press Return): ");
+  const lines = readline.createInterface({ input, crlfDelay: Infinity });
+  try {
+    for await (const line of lines) return line;
+    return "";
+  } finally {
+    lines.close();
   }
 }
 
@@ -403,8 +426,11 @@ function print(lines) {
   for (const line of lines) console.log(line);
 }
 
-/** Runs the script on `argv` and resolves to its exit status; throws a Stop to end it early. */
-async function main(argv, env) {
+/**
+ * Runs the script on `argv`, reading `stdin` only for --expect-name -, and
+ * resolves to its exit status; throws a Stop to end it early.
+ */
+async function main(argv, env, stdin) {
   const opts = parseArgs(argv);
   if (opts.help) {
     usage();
@@ -413,6 +439,10 @@ async function main(argv, env) {
   checkOptions(opts);
   const mismatch = emulatorMismatch(env);
   if (mismatch) throw usageError(mismatch);
+  if (opts.expectName === "-") {
+    opts.expectName = await readName(stdin);
+    if (!opts.expectName) throw usageError("--expect-name - found no name on the first line of stdin.");
+  }
   const target = await resolveTarget(opts, env);
   if (target.error) throw usageError(target.error);
   print(describeTarget(target, opts.apply));
@@ -488,7 +518,7 @@ async function main(argv, env) {
 }
 
 if (require.main === module) {
-  main(process.argv.slice(2), process.env).then(
+  main(process.argv.slice(2), process.env, process.stdin).then(
     (exitCode) => {
       process.exitCode = exitCode;
     },

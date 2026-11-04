@@ -132,9 +132,12 @@ Until that sign-in runs out, up to an hour after the sign-in account is
 deleted, the app can write a new profile for the account, and the Android
 app writes the email address or phone number back with it. So at least an
 hour after the sign-in account was deleted, whether by `--apply` or by you in
-the Firebase console, run the dry run again by uid:
+the Firebase console, run the dry run again by uid. This is probably a new
+terminal, so turn its history off too, as in step 3: if an app wrote the
+profile again, its name can be the requester's email address.
 
 ```sh
+unset HISTFILE
 node scripts/delete-account.js --uid <uid> --expect-name <code> --project treachery-71922
 ```
 
@@ -148,9 +151,15 @@ node scripts/delete-account.js --uid <uid> --expect-name <code> --project treach
 - If it shows the account again, with
   `sign-in providers:              none: no sign-in account` and a new
   display name such as "Player" or "Guest", an app wrote the profile again.
-  Delete it by that name (if it's masked, read it from `users/<uid>` in the
-  Firebase console):
-  `--uid <uid> --expect-name '<that name>' --apply --project treachery-71922`.
+  Delete it by that name. Copy it from `users/<uid>` in the Firebase console
+  (the script masks a name with "@" in it), run this, and paste it when the
+  script asks for it. With `--expect-name -` the name never goes on the
+  command line, so no shell history can keep it:
+
+  ```sh
+  node scripts/delete-account.js --uid <uid> --expect-name - --apply --project treachery-71922
+  ```
+
   It ends with `deleted the sign-in account:    no, it was already deleted`
   and the reminder to check by uid. The hour since the sign-in account was
   deleted has passed, so no app can write the profile again: the check finds
@@ -174,10 +183,18 @@ profile is back.
 
 To delete an account that broke the rules, or one we're told belongs to a
 child under 13 (the privacy policy's Children section), rather than one its
-owner asked about, pass its current display name as `--expect-name` and
-follow steps 3 and 4. The check then still guards against a mistyped uid. If
-the script shows the name masked, read it from the account's `users/<uid>`
-document in the Firebase console.
+owner asked about, follow steps 3 and 4 with its current display name in
+place of the code. The check then still guards against a mistyped uid. Copy
+the name from the account's `users/<uid>` document in the Firebase console
+and give it with `--expect-name -`, pasting it when the script asks: a name
+can be personal, and this keeps it out of your shell history.
+
+```sh
+unset HISTFILE
+cd functions
+node scripts/delete-account.js --uid <uid> --expect-name - --project treachery-71922
+node scripts/delete-account.js --uid <uid> --expect-name - --apply --project treachery-71922
+```
 
 ## Rehearsing it
 

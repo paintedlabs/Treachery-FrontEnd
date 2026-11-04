@@ -44,15 +44,15 @@ const DELETED_NAME = 'Deleted player';
 /**
  * Runs the script on the command line with the suite's environment plus
  * `env` (an undefined value removes a variable), with Firestore and Auth on
- * the suite's emulators unless `env` says otherwise, and each of `preloads`
- * loaded into it first.
+ * the suite's emulators unless `env` says otherwise, each of `preloads`
+ * loaded into it first, and `input` on its stdin (none by default).
  *
  * Without Application Default Credentials, the Firestore client looks for a
  * GCE metadata server and prints a MetadataLookupWarning to stderr when there
  * is none. The emulators need no credentials, so the lookup is switched off
  * and stderr holds only what the script prints.
  */
-function runScript(args, env = {}, preloads = []) {
+function runScript(args, env = {}, preloads = [], input = undefined) {
   return spawnSync(process.execPath, [...preloads.flatMap((file) => ['--require', file]), SCRIPT, ...args], {
     env: {
       ...process.env,
@@ -61,9 +61,15 @@ function runScript(args, env = {}, preloads = []) {
       FIREBASE_AUTH_EMULATOR_HOST: AUTH_HOST,
       ...env,
     },
+    input,
     encoding: 'utf8',
     timeout: 120_000,
   });
+}
+
+/** runScript, with `input` on the script's stdin, as `--expect-name -` reads it. */
+function runScriptWithInput(input, args) {
+  return runScript(args, {}, [], input);
 }
 
 /** runScript, with `fault` (see delete-account-faults.js) happening to `account`. */
@@ -608,6 +614,58 @@ describe('delete-account script — refusals', () => {
       assert.ok(!named.stdout.includes(secret), `stdout must not contain ${secret}`);
     }
     assert.ok(await h.getAuthUser(account.uid), 'the sign-in account must survive');
+  });
+
+  it('--expect-name - reads the name from the first line of stdin, exactly as written there', async () => {
+    // A name an old build gave an email account, which step 4 may find on a
+    // profile an app wrote again: the runbook has it given on stdin.
+    const contact = uniqueContact('stdin');
+    const name = `${contact.email} `;
+    const account = await createSignInAccount(name, contact);
+    const named = ['--uid', account.uid, '--expect-name', '-', '--project', PROJECT_ID];
+    const shown = `"${name[0]}***${name.slice(name.indexOf('@'))}" (masked: it contains "@")`;
+    const runs = [];
+
+    // The first line, with or without its line ending, and nothing after it.
+    // The trailing space counts: the name matches only because it is kept.
+    for (const input of [`${name}\n`, name, `${name}\r\n${CODE}\n`]) {
+      const result = runScriptWithInput(input, named);
+      runs.push(result);
+      assert.equal(result.status, 0, `${JSON.stringify(input)}: ${result.stderr}`);
+      assert.equal(result.stderr, '');
+      assert.equal(result.stdout.split('\n')[7], row('display name:', shown));
+    }
+
+    const other = runScriptWithInput(`${CODE}\n${name}\n`, named);
+    runs.push(other);
+    assert.equal(other.status, 1, other.stderr);
+    assert.equal(
+      other.stderr,
+      `refused: the display name is ${shown}, not ${JSON.stringify(CODE)}. It must match --expect-name exactly.\n`
+    );
+
+    // With no name to read, it stops before printing or reading anything.
+    for (const input of [undefined, '', '\n']) {
+      const result = runScriptWithInput(input, [...named, '--apply']);
+      runs.push(result);
+      assert.equal(result.status, 2, `${JSON.stringify(input)}: ${result.stderr}`);
+      assert.equal(result.stdout, '');
+      assert.match(result.stderr, /^error: --expect-name - found no name on the first line of stdin\./);
+    }
+    assert.ok(await h.getAuthUser(account.uid), 'the sign-in account must survive');
+
+    const applied = runScriptWithInput(`${name}\n`, [...named, '--apply']);
+    runs.push(applied);
+    assert.equal(applied.status, 0, applied.stderr);
+    assert.equal(await h.getAuthUser(account.uid), null, 'the sign-in account must be deleted');
+    assert.equal((await h.db.doc(`users/${account.uid}`).get()).exists, false, 'the profile must be deleted');
+
+    for (const result of runs) {
+      for (const secret of [contact.email, contact.email.split('@')[0]]) {
+        assert.ok(!result.stdout.includes(secret), `stdout must not contain ${secret}`);
+        assert.ok(!result.stderr.includes(secret), `stderr must not contain ${secret}`);
+      }
+    }
   });
 
   it('refuses an account that has a sign-in account but no profile, and changes nothing', async () => {
