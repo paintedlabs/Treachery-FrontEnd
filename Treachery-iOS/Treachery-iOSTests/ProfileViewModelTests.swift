@@ -257,6 +257,84 @@ struct ProfileViewModelTests {
         #expect(viewModel.user?.displayName == "Player")
     }
 
+    /// Profile can reappear while Try Again waits for the setup, as when the
+    /// user switches tabs and back, and it then loads again. That load would
+    /// read before the setup is over and bring the failure back, with a Try
+    /// Again a tap couldn't run. So the screen goes on showing it's loading,
+    /// and Try Again's own load, once the setup is over, shows the profile.
+    @Test func reappearingWhileTryAgainWaitsKeepsShowingLoading() async {
+        firestore.usersToReturn = [:]
+        let setup = ProfileSetupRetrySpy()
+        let viewModel = ProfileViewModel(
+            session: SessionEndingSpy(),
+            retryProfileSetup: { await setup.retry() },
+            firestoreManager: firestore,
+            cloudFunctions: MockCloudFunctions(),
+            trackEvent: { _ in }
+        )
+        await viewModel.loadData(userId: "u1")
+        let created = TreacheryUser(id: "u1", displayName: "Player", friendIds: [], createdAt: Date(timeIntervalSince1970: 1_000_000))
+        var phasesAfterReappearing: [LoadablePhase]?
+        setup.whileRetrying = { [viewModel, firestore] in
+            // The screen reappears and loads again.
+            await viewModel.loadData(userId: "u1")
+            phasesAfterReappearing = [viewModel.profile.phase, viewModel.stats.phase]
+            // The setup creates the profile.
+            firestore.usersToReturn["u1"] = created
+        }
+
+        await viewModel.retry(userId: "u1")
+
+        #expect(phasesAfterReappearing == [.loading, .loading])
+        // The first load and Try Again's: none for the screen reappearing.
+        #expect(firestore.getUserCallCount == 2)
+        #expect(viewModel.profile.phase == .loaded)
+        #expect(viewModel.user?.displayName == "Player")
+    }
+
+    /// Try Again can be tapped as the screen reappears, while that load is
+    /// still reading. It read before the setup, so finishing while Try Again
+    /// waits, it changes nothing: the screen goes on showing it's loading
+    /// until Try Again's own load.
+    @Test func aLoadReadingWhenTryAgainIsTappedChangesNothing() async {
+        firestore.usersToReturn = [:]
+        let setup = ProfileSetupRetrySpy()
+        let viewModel = ProfileViewModel(
+            session: SessionEndingSpy(),
+            retryProfileSetup: { await setup.retry() },
+            firestoreManager: firestore,
+            cloudFunctions: MockCloudFunctions(),
+            trackEvent: { _ in }
+        )
+        let created = TreacheryUser(id: "u1", displayName: "Player", friendIds: [], createdAt: Date(timeIntervalSince1970: 1_000_000))
+        let (tryAgainWaits, tryAgainIsWaiting) = AsyncStream<Void>.makeStream()
+        let (earlierLoadEnds, endEarlierLoad) = AsyncStream<Void>.makeStream()
+        var phasesMidSetup: [LoadablePhase]?
+        setup.whileRetrying = { [viewModel, firestore] in
+            tryAgainIsWaiting.finish()
+            // The earlier load ends while Try Again waits.
+            for await _ in earlierLoadEnds {}
+            phasesMidSetup = [viewModel.profile.phase, viewModel.stats.phase]
+            // The setup creates the profile.
+            firestore.usersToReturn["u1"] = created
+        }
+        var tryAgain: Task<Void, Never>?
+        firestore.whileReturningUser = { [viewModel] in
+            // While this load's answer, no profile, is on its way, Try Again
+            // is tapped.
+            tryAgain = Task { await viewModel.retry(userId: "u1") }
+            for await _ in tryAgainWaits {}
+        }
+
+        await viewModel.loadData(userId: "u1")
+        endEarlierLoad.finish()
+        await tryAgain?.value
+
+        #expect(phasesMidSetup == [.loading, .loading])
+        #expect(viewModel.profile.phase == .loaded)
+        #expect(viewModel.user?.displayName == "Player")
+    }
+
     /// The profile setup can finish while Profile is open, as when the name
     /// prompt over it closes. Only then does Profile read the profile again:
     /// before, it may not exist, or still have its placeholder name.

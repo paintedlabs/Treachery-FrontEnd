@@ -81,7 +81,10 @@ final class MockFirestoreManager: FirestoreManaging {
         createUserCalls.append((user, email, phoneNumber))
     }
 
+    private(set) var getUserCallCount = 0
+
     func getUser(id: String) async throws -> TreacheryUser? {
+        getUserCallCount += 1
         if let error = errorToThrow { throw error }
         let user = usersToReturn[id]
         if let inFlight = whileReturningUser {

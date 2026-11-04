@@ -199,9 +199,10 @@ final class ProfileViewModel: ObservableObject {
     /// Numbers the loads, so one can tell whether a newer one started while
     /// it ran (`loadData(userId:)`).
     private var newestLoad = 0
-    /// Whether a Try Again is running (`retry(userId:)`), which can take a
-    /// while: it first waits for the profile setup's attempt.
-    private var isRetrying = false
+    /// Where Try Again is (`retry(userId:)`). The loads read it, so the
+    /// screen shows it's loading for as long as Try Again waits for the
+    /// profile setup, even if it reappears meanwhile.
+    private var retryPhase = RetryPhase.idle
     private let session: SessionEnding
     private let retryProfileSetup: () async -> Void
     private let firestoreManager: FirestoreManaging
@@ -250,8 +251,12 @@ final class ProfileViewModel: ObservableObject {
     /// already shown stays while this runs and if it fails. A profile that
     /// is missing or can't be read fails, rather than leave a spinner running.
     /// Only the newest load shows what it read: one that a newer load
-    /// overtook ends without changing anything.
+    /// overtook ends without changing anything. While Try Again waits for
+    /// the profile setup, no load starts or shows what it read: the screen
+    /// shows it's loading until Try Again's own load (`retry(userId:)`).
     func loadData(userId: String) async {
+        // It would read before the setup is over.
+        guard retryPhase == .idle else { return }
         self.userId = userId
         newestLoad += 1
         let load = newestLoad
@@ -282,7 +287,9 @@ final class ProfileViewModel: ObservableObject {
 
         // Try Again's load, say, can still be on its way when the name
         // prompt closes and a newer one starts; it read the placeholder name.
-        guard load == newestLoad else { return }
+        // And a load that was reading when Try Again was tapped read before
+        // the setup.
+        guard load == newestLoad, retryPhase == .idle else { return }
         switch profileResult {
         case .success(let user): profile = .loaded(user)
         case .failure(let failure): profile.fail(with: failure)
@@ -297,17 +304,32 @@ final class ProfileViewModel: ObservableObject {
     /// sign-in (offline, say) is set up first; without it there's nothing
     /// to load. That can take a while, about 10 seconds or until the
     /// connection is back, so the screen shows it's loading from the tap,
-    /// and another tap meanwhile is ignored. A retry whose task is cancelled
-    /// stops waiting and loads nothing.
+    /// even if it reappears meanwhile, and another tap while it waits is
+    /// ignored. A retry whose task is cancelled stops waiting and loads
+    /// nothing.
     func retry(userId: String) async {
-        guard !isRetrying else { return }
-        isRetrying = true
-        defer { isRetrying = false }
+        guard retryPhase == .idle else { return }
+        retryPhase = .waitingForProfileSetup
         profile.startLoading()
         stats.startLoading()
         await retryProfileSetup()
+        retryPhase = .idle
         guard !Task.isCancelled else { return }
         await loadData(userId: userId)
+    }
+
+    /// Where Try Again is. The loads read it: a flag that only Try Again
+    /// checked let a load started while it waited, as when the screen
+    /// reappeared, bring back the failure, with a Try Again a tap then
+    /// couldn't run.
+    private enum RetryPhase {
+        /// Not waiting. Loads run and show what they read as usual, Try
+        /// Again's own too: a newer one, as when the name prompt closes,
+        /// still overtakes it.
+        case idle
+        /// Waiting for the profile setup's attempt, with the screen showing
+        /// it's loading. Try Again loads once the attempt is over.
+        case waitingForProfileSetup
     }
 
     /// Loads again once the profile setup is finished, which can happen

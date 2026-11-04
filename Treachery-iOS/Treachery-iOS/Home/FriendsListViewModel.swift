@@ -121,10 +121,10 @@ final class FriendsListViewModel: ObservableObject {
     private var overviewRevision = 0
     /// The revision the newest load started at.
     private var newestLoadRevision = 0
-    /// Whether a Try Again or pull to refresh is running (`retry(userId:)`),
-    /// which can take a while: it first waits for the profile setup's
-    /// attempt.
-    private var isRetrying = false
+    /// Where Try Again or pull to refresh is (`retry(userId:)`). The loads
+    /// read it, so the list shows it's loading for as long as a retry waits
+    /// for the profile setup, even if the screen reappears meanwhile.
+    private var retryPhase = RetryPhase.idle
     private let retryProfileSetup: () async -> Void
     private let firestoreManager: FirestoreManaging
     private let cloudFunctions: CloudFunctionsProtocol
@@ -158,8 +158,12 @@ final class FriendsListViewModel: ObservableObject {
     // MARK: - Data Loading
 
     /// Loads friends and pending requests together. What's already shown
-    /// stays while this runs and if it fails.
+    /// stays while this runs and if it fails. While a retry waits for the
+    /// profile setup, no load starts or shows what it read: the list shows
+    /// it's loading until the retry's own load (`retry(userId:)`).
     func loadData(userId: String) async {
+        // It would read before the setup is over.
+        guard retryPhase == .idle else { return }
         self.userId = userId
         overviewRevision += 1
         let revision = overviewRevision
@@ -184,12 +188,15 @@ final class FriendsListViewModel: ObservableObject {
     /// Shows what the load that started at `revision` found, unless something
     /// newer is shown or on its way:
     /// - A newer load is running: that one shows its result instead.
+    /// - A retry is waiting for the profile setup: this load, still reading
+    ///   when the user pulled to refresh, say, read before the setup, and
+    ///   the retry's own load comes once that's over.
     /// - A friend action changed the list after this load read it: the
     ///   change is newer, so the list stays as the action left it, and only
     ///   the load's ending shows. Otherwise an accepted request could come
     ///   back, with an Accept that the server would refuse.
     private func finishLoad(startedAt revision: Int, with result: Result<FriendsOverview, UserFacingError>) {
-        guard revision == newestLoadRevision else { return }
+        guard revision == newestLoadRevision, retryPhase == .idle else { return }
         switch result {
         case .success(let loaded):
             overview = .loaded(revision == overviewRevision ? loaded : overview.value ?? loaded)
@@ -208,17 +215,32 @@ final class FriendsListViewModel: ObservableObject {
     /// Try Again or pull to refresh. A profile that couldn't be set up at
     /// sign-in (offline, say) is set up first; it holds the friends list.
     /// That can take a while, so the list shows it's loading from the
-    /// start, and another tap or pull meanwhile is ignored. A retry whose
-    /// task is cancelled, as when the user leaves during a pull to refresh,
-    /// stops waiting and loads nothing.
+    /// start, even if the screen reappears meanwhile, and another tap or
+    /// pull while it waits is ignored. A retry whose task is cancelled, as
+    /// when the user leaves during a pull to refresh, stops waiting and
+    /// loads nothing.
     func retry(userId: String) async {
-        guard !isRetrying else { return }
-        isRetrying = true
-        defer { isRetrying = false }
+        guard retryPhase == .idle else { return }
+        retryPhase = .waitingForProfileSetup
         overview.startLoading()
         await retryProfileSetup()
+        retryPhase = .idle
         guard !Task.isCancelled else { return }
         await loadData(userId: userId)
+    }
+
+    /// Where a retry is. The loads read it: a flag that only the retry
+    /// checked let a load started while it waited, as when the screen
+    /// reappeared, bring back the failure, with a Try Again a tap then
+    /// couldn't run.
+    private enum RetryPhase {
+        /// Not waiting. Loads run and show what they read as usual, the
+        /// retry's own too: a newer one, as when the name prompt closes,
+        /// still overtakes it.
+        case idle
+        /// Waiting for the profile setup's attempt, with the list showing
+        /// it's loading. The retry loads once the attempt is over.
+        case waitingForProfileSetup
     }
 
     /// Loads again once the profile setup is finished, which can happen

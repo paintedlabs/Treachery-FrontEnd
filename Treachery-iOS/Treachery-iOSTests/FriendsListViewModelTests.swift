@@ -508,3 +508,91 @@ struct FriendsListViewModelTests {
         )
     }
 }
+
+// MARK: - A retry waiting for the profile setup
+
+// While a retry waits for the profile setup, which can take a while, no
+// load, whether asked for meanwhile or already reading, brings the
+// failure back.
+@MainActor
+extension FriendsListViewModelTests {
+
+    /// Friends can reappear while a retry waits for the setup, as when the
+    /// user switches tabs and back, and it then loads again. That load would
+    /// read before the setup is over and bring the failure back, with a Try
+    /// Again a tap couldn't run. So the list goes on showing it's loading,
+    /// and the retry's own load, once the setup is over, shows the friends.
+    @Test func reappearingWhileARetryWaitsKeepsShowingLoading() async {
+        let ownProfile = firestore.usersToReturn["u1"]
+        firestore.usersToReturn = [:]
+        firestore.friendsToReturn = [friend("f1")]
+        let setup = ProfileSetupRetrySpy()
+        let viewModel = FriendsListViewModel(
+            retryProfileSetup: { await setup.retry() },
+            firestoreManager: firestore,
+            cloudFunctions: cloudFunctions,
+            trackEvent: { _ in },
+            announce: { _ in }
+        )
+        await viewModel.loadData(userId: "u1")
+        var phaseAfterReappearing: LoadablePhase?
+        setup.whileRetrying = { [viewModel, firestore] in
+            // The screen reappears and loads again.
+            await viewModel.loadData(userId: "u1")
+            phaseAfterReappearing = viewModel.overview.phase
+            // The setup creates the profile.
+            firestore.usersToReturn["u1"] = ownProfile
+        }
+
+        await viewModel.retry(userId: "u1")
+
+        #expect(phaseAfterReappearing == .loading)
+        // The first load and the retry's: none for the screen reappearing.
+        #expect(firestore.getFriendsCallCount == 2)
+        #expect(viewModel.overview.phase == .loaded)
+        #expect(viewModel.overview.value?.friends.map(\.id) == ["f1"])
+    }
+
+    /// A pull to refresh can start while a load is still reading, as just
+    /// after the screen appears. That load read before the setup, so
+    /// finishing while the retry waits, it changes nothing: the list goes on
+    /// showing it's loading until the retry's own load.
+    @Test func aLoadReadingWhenTheUserPullsToRefreshChangesNothing() async {
+        let ownProfile = firestore.usersToReturn["u1"]
+        firestore.usersToReturn = [:]
+        firestore.friendsToReturn = [friend("f1")]
+        let setup = ProfileSetupRetrySpy()
+        let viewModel = FriendsListViewModel(
+            retryProfileSetup: { await setup.retry() },
+            firestoreManager: firestore,
+            cloudFunctions: cloudFunctions,
+            trackEvent: { _ in },
+            announce: { _ in }
+        )
+        let (pullWaits, pullIsWaiting) = AsyncStream<Void>.makeStream()
+        let (earlierLoadEnds, endEarlierLoad) = AsyncStream<Void>.makeStream()
+        var phaseMidSetup: LoadablePhase?
+        setup.whileRetrying = { [viewModel, firestore] in
+            pullIsWaiting.finish()
+            // The earlier load ends while the pull waits.
+            for await _ in earlierLoadEnds {}
+            phaseMidSetup = viewModel.overview.phase
+            // The setup creates the profile.
+            firestore.usersToReturn["u1"] = ownProfile
+        }
+        var pull: Task<Void, Never>?
+        firestore.whileGettingFriends = { [viewModel] in
+            // While this load reads, the user pulls to refresh.
+            pull = Task { await viewModel.retry(userId: "u1") }
+            for await _ in pullWaits {}
+        }
+
+        await viewModel.loadData(userId: "u1")
+        endEarlierLoad.finish()
+        await pull?.value
+
+        #expect(phaseMidSetup == .loading)
+        #expect(viewModel.overview.phase == .loaded)
+        #expect(viewModel.overview.value?.friends.map(\.id) == ["f1"])
+    }
+}
