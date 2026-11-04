@@ -13,8 +13,14 @@ protocol AuthManaging {
     func addAuthStateListener(_ callback: @escaping (User?) -> Void) -> Any
     func removeAuthStateListener(_ handle: Any)
     /// Reloads the signed-in account `userId` from Firebase Auth to learn
-    /// whether it still exists. Never throws; a failure is reported as
-    /// `.gone` or `.unknown`.
+    /// whether it still exists. Never throws:
+    /// - `.exists`: the reload succeeded, or it failed with `keychainError`.
+    ///   FirebaseAuth throws that only after its server has answered for the
+    ///   account, when saving the user on the device fails, so the account
+    ///   exists but the `User` may not be refreshed.
+    /// - `.gone`: the reload failed with an error that ends the session.
+    /// - `.unknown`: any other failure, or `userId` is no longer the
+    ///   signed-in account (then nothing is reloaded).
     func reloadAccount(userId: String) async -> AccountStatus
 }
 
