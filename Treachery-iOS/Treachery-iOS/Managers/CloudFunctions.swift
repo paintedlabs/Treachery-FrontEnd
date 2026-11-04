@@ -30,6 +30,22 @@ extension JoinGameResult {
     }
 }
 
+/// What adjustLife answers with.
+struct AdjustLifeResult {
+    /// The total the server stored, or nil if the response doesn't say.
+    let newLife: Int?
+}
+
+extension AdjustLifeResult {
+    /// Reads the adjustLife callable's payload, `{ newLife, eliminated,
+    /// winner }`. A response without a whole number for `newLife` still
+    /// means the change was applied, so it reads as nil instead of throwing.
+    init(payload: Any?) {
+        let data = payload as? [String: Any]
+        self.init(newLife: data?["newLife"] as? Int)
+    }
+}
+
 /// A lobby callable the server turned down for a reason it explains, as
 /// opposed to one that never got an answer. CloudFunctions throws this in
 /// place of the SDK error for these codes, so view models can act on the
@@ -143,7 +159,7 @@ struct CloudFunctions: CloudFunctionsProtocol {
             "playerId": playerId,
             "amount": amount,
         ])
-        return (result.data as? [String: Any])?["newLife"] as? Int
+        return AdjustLifeResult(payload: result.data).newLife
     }
 
     func eliminatePlayer(gameId: String) async throws {
