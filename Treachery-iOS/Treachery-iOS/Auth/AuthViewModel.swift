@@ -38,7 +38,9 @@ enum ProfileSetupState: Equatable, Sendable {
     /// signs out: a deletion failed without the server saying how far it
     /// got (it timed out, say). The server may have deleted the profile and
     /// still be about to delete the sign-in account, and an attempt then
-    /// would create the profile again to outlive the account.
+    /// would create the profile again to outlive the account. Try Again and
+    /// the app becoming active only check whether the account is gone,
+    /// which writes nothing, and sign out if it is.
     case onHoldUntilRelaunch
     /// Set up with a placeholder name. The name prompt asks for the user's
     /// own until they save one or skip.
@@ -74,8 +76,13 @@ final class AuthViewModel: ObservableObject {
     /// Cancelling it retries at once.
     private var profileSetupRetryWait: Task<Void, Never>?
     /// Callers of `retryProfileSetup()`, waiting for the attempt that's
-    /// running or about to start to end. Finishing one ends that wait.
+    /// running or about to start to end, or while the setup is on hold
+    /// until relaunch, for the check of the deletion's outcome. Finishing
+    /// one ends that wait.
     private var profileSetupWaiters: [AsyncStream<Void>.Continuation] = []
+    /// While the setup is on hold until relaunch, the check of whether the
+    /// deletion went through, if one runs (`checkDeletionOutcome()`).
+    private var deletionOutcomeCheck: Task<Void, Never>?
 
     private static let logger = Logger(subsystem: "com.Solomon.Treachery-iOS", category: "Auth")
 
@@ -276,22 +283,30 @@ final class AuthViewModel: ObservableObject {
     static let profileSetupRetryDelays: [Duration] = [.seconds(5), .seconds(30), .seconds(120), .seconds(300)]
 
     /// Brings a postponed profile setup's next retry forward to now, as when
-    /// the app becomes active and may be back online. Does nothing while an
-    /// attempt runs, whose answer is fresh, while the setup is on hold for
-    /// the account's deletion, or when nothing needs setting up.
+    /// the app becomes active and may be back online. While the setup is on
+    /// hold until relaunch, checks instead whether the deletion went through
+    /// (`checkDeletionOutcome()`). Does nothing while an attempt or that
+    /// check runs, whose answer is fresh, while the account is being
+    /// deleted, or when nothing needs setting up.
     func retryPostponedProfileSetup() {
-        profileSetupRetryWait?.cancel()
+        if profileSetupState == .onHoldUntilRelaunch {
+            checkDeletionOutcome()
+        } else {
+            profileSetupRetryWait?.cancel()
+        }
     }
 
     /// Brings a postponed profile setup's next retry forward to now, then
     /// returns once that attempt, or the one already running, is over. Try
     /// Again on a screen that needs the profile calls this before reading
-    /// it. Returns at once when nothing needs setting up, and while the
-    /// setup is on hold for the account's deletion. A caller whose task is
-    /// cancelled, as when the user leaves Friends during a pull to refresh,
-    /// stops waiting then; the attempt goes on.
+    /// it. While the setup is on hold until relaunch, it checks whether the
+    /// deletion went through instead, and returns once that check is over.
+    /// Returns at once when nothing needs setting up, and while the account
+    /// is being deleted. A caller whose task is cancelled, as when the user
+    /// leaves Friends during a pull to refresh, stops waiting then; the
+    /// attempt goes on.
     func retryProfileSetup() async {
-        guard profileSetup != nil else { return }
+        guard profileSetup != nil || profileSetupState == .onHoldUntilRelaunch else { return }
         let (attemptOver, waiter) = AsyncStream<Void>.makeStream()
         profileSetupWaiters.append(waiter)
         retryPostponedProfileSetup()
@@ -349,13 +364,38 @@ final class AuthViewModel: ObservableObject {
     /// `ProfileProvisioner`'s last check, just before
     /// `FirestoreManager.createUser`. That call's writes, the profile and
     /// then any private data, still go ahead: they can't be cancelled, and
-    /// while offline Firestore sends them once it's back online.
+    /// while offline Firestore sends them once it's back online. A check of
+    /// a deletion's outcome still running ends without acting on it.
     private func stopProfileSetup() {
         profileSetup?.cancel()
         profileSetup = nil
         profileSetupRetryWait?.cancel()
         profileSetupRetryWait = nil
+        deletionOutcomeCheck?.cancel()
+        deletionOutcomeCheck = nil
         releaseProfileSetupWaiters()
+    }
+
+    /// While the setup is on hold until relaunch, asks Firebase Auth whether
+    /// the account still exists, and signs out if it's gone: the deletion
+    /// went through after all. Writes nothing, and never sets up the
+    /// profile: an account that's still there may yet be deleted by a run
+    /// still going. One check at a time; its end ends the waits of
+    /// `retryProfileSetup()`.
+    private func checkDeletionOutcome() {
+        guard deletionOutcomeCheck == nil, let userId = currentUserId else { return }
+        deletionOutcomeCheck = Task { [weak self] in
+            guard let self else { return }
+            let status = await firebaseManager.reloadAccount(userId: userId)
+            // Stopped meanwhile, which released the waiters.
+            guard !Task.isCancelled else { return }
+            deletionOutcomeCheck = nil
+            if status == .gone {
+                Self.logger.notice("The account's deletion went through after all; signing out")
+                signOutDeletedAccount()
+            }
+            releaseProfileSetupWaiters()
+        }
     }
 
     private func releaseProfileSetupWaiters() {
@@ -431,6 +471,8 @@ extension AuthViewModel: SessionEnding {
     /// on hold until the app relaunches or the account signs out
     /// (`ProfileSetupState.onHoldUntilRelaunch`), even when a later deletion
     /// is refused: the run that failed may still be deleting the account.
+    /// If it went through after all, the next Try Again or the app becoming
+    /// active finds the account gone and signs out (`checkDeletionOutcome()`).
     func accountDeletionDidFail(_ failure: AccountDeletionFailure) {
         guard profileSetupState == .onHold, case .authenticated(let account) = authState else { return }
         switch failure {

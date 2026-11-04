@@ -242,7 +242,8 @@ struct AuthViewModelProfileSetupTests {
     /// sign-in account. So the setup stays on hold until the app relaunches
     /// or the account signs out, however long that is, and even if Try Again
     /// on the deletion is refused: that says only that the second run
-    /// deleted nothing.
+    /// deleted nothing. Meanwhile only the account is checked (see the tests
+    /// on the hold below), and the profile is neither read nor created.
     @Test func aTimedOutDeletionKeepsTheSetupOnHold() async {
         viewModel.authStateDidChange(to: account())
         await clock.waitForSleepersUnlessCancelled()
@@ -257,11 +258,13 @@ struct AuthViewModelProfileSetupTests {
         #expect(viewModel.profileSetupState == .onHoldUntilRelaunch)
         #expect(clock.pendingDeadlines.isEmpty)
         // The retry would have been due long ago, and the app becomes
-        // active: nothing runs, and Try Again on Profile returns at once.
+        // active, then Try Again on Profile waits for the check that
+        // started: the account is still there, and nothing is set up.
         clock.advance(by: .seconds(300))
         viewModel.retryPostponedProfileSetup()
         await viewModel.retryProfileSetup()
-        #expect(auth.reloadAccountCalls == ["u1"])
+        #expect(auth.reloadAccountCalls == ["u1", "u1"])
+        #expect(firestore.getUserDocumentCallCount == 1)
 
         cloudFunctions.errorToThrow = AccountDeletionError.inProgressGame(message: "You're in a game that's still in progress.")
         await profileScreen.deleteAccount()
@@ -269,7 +272,8 @@ struct AuthViewModelProfileSetupTests {
 
         #expect(cloudFunctions.deleteAccountCallCount == 2)
         #expect(viewModel.profileSetupState == .onHoldUntilRelaunch)
-        #expect(auth.reloadAccountCalls == ["u1"])
+        #expect(auth.reloadAccountCalls == ["u1", "u1", "u1"])
+        #expect(firestore.getUserDocumentCallCount == 1)
         #expect(firestore.createUserCalls.isEmpty)
         #expect(!viewModel.isNewUser)
     }
@@ -489,6 +493,115 @@ struct AuthViewModelProfileSetupTests {
         #expect(profileScreen.profile.phase == .loaded)
         #expect(profileScreen.user?.displayName == "Ada")
         #expect(friendsScreen.overview.phase == .loaded)
+    }
+}
+
+// MARK: - On hold until the app relaunches
+
+/// After a deletion whose outcome is unknown, Try Again and the app becoming
+/// active still do something, but nothing that writes: they ask Firebase
+/// Auth whether the account still exists, and sign out if the deletion went
+/// through after all. Profile and Friends say why the profile isn't set up.
+extension AuthViewModelProfileSetupTests {
+
+    /// Holds the setup as the app does: a deletion on Profile times out
+    /// while the profile setup is postponed.
+    private func holdTheSetupWithATimedOutDeletion() async {
+        viewModel.authStateDidChange(to: account())
+        await clock.waitForSleepersUnlessCancelled()
+        let cloudFunctions = MockCloudFunctions()
+        cloudFunctions.errorToThrow = AccountDeletionError.timedOut
+        await profileScreen(deletingWith: cloudFunctions).deleteAccount()
+        #expect(viewModel.profileSetupState == .onHoldUntilRelaunch)
+    }
+
+    /// The account is still there, or Auth can't say: either way the
+    /// deletion may still be running, so nothing is set up.
+    @Test("On hold, Try Again checks the account and sets nothing up", arguments: [AccountStatus.exists, .unknown])
+    func onHoldTryAgainChecksTheAccountAndSetsNothingUp(status: AccountStatus) async {
+        await holdTheSetupWithATimedOutDeletion()
+        auth.accountStatus = status
+
+        await viewModel.retryProfileSetup()
+
+        #expect(auth.reloadAccountCalls == ["u1", "u1"])
+        // No attempt: the profile is neither read nor created.
+        #expect(firestore.getUserDocumentCallCount == 1)
+        #expect(firestore.createUserCalls.isEmpty)
+        #expect(auth.signOutCallCount == 0)
+        #expect(viewModel.profileSetupState == .onHoldUntilRelaunch)
+        #expect(clock.pendingDeadlines.isEmpty)
+    }
+
+    /// The deletion that timed out went through after all.
+    @Test func onHoldTryAgainSignsOutAnAccountThatIsGone() async {
+        await holdTheSetupWithATimedOutDeletion()
+        auth.accountStatus = .gone
+
+        await viewModel.retryProfileSetup()
+
+        #expect(auth.signOutCallCount == 1)
+        #expect(firestore.getUserDocumentCallCount == 1)
+        #expect(firestore.createUserCalls.isEmpty)
+        // The auth state listener reports the sign-out.
+        viewModel.authStateDidChange(to: nil)
+        #expect(viewModel.profileSetupState == .noAccount)
+    }
+
+    @Test func onHoldBecomingActiveChecksTheAccountAndSignsOutIfItIsGone() async {
+        await holdTheSetupWithATimedOutDeletion()
+        auth.accountStatus = .gone
+        let (checkStarted, startCheck) = AsyncStream<Void>.makeStream()
+        let (checkMayEnd, endCheck) = AsyncStream<Void>.makeStream()
+        auth.whileReloadingAccount = {
+            startCheck.finish()
+            for await _ in checkMayEnd {}
+        }
+
+        viewModel.retryPostponedProfileSetup()
+        // Becoming active started the check on its own. A Try Again now
+        // waits for it rather than starting another.
+        for await _ in checkStarted {}
+        endCheck.finish()
+        await viewModel.retryProfileSetup()
+
+        #expect(auth.reloadAccountCalls == ["u1", "u1"])
+        #expect(auth.signOutCallCount == 1)
+        #expect(firestore.getUserDocumentCallCount == 1)
+        #expect(firestore.createUserCalls.isEmpty)
+    }
+
+    /// Without a profile, Profile and Friends fail to load. On hold, "check
+    /// your connection" would be untrue. Their failure cards say why instead,
+    /// as ProfileView and FriendsListView put it (`whileProfileSetup(is:)`),
+    /// and Try Again on each checks the account and sets nothing up.
+    @Test func profileAndFriendsSayWhyTheProfileIsNotSetUpWhileOnHold() async {
+        await holdTheSetupWithATimedOutDeletion()
+        auth.accountStatus = .exists
+        let profileScreen = profileScreen(deletingWith: MockCloudFunctions())
+        let friendsScreen = FriendsListViewModel(
+            retryProfileSetup: { [viewModel] in await viewModel.retryProfileSetup() },
+            firestoreManager: firestore,
+            cloudFunctions: MockCloudFunctions(),
+            trackEvent: { _ in },
+            announce: { _ in }
+        )
+
+        await profileScreen.loadData(userId: "u1")
+        await friendsScreen.loadData(userId: "u1")
+
+        let setup = viewModel.profileSetupState
+        #expect(profileScreen.profile.failure?.whileProfileSetup(is: setup) == .profileSetupOnHold)
+        #expect(friendsScreen.overview.failure?.whileProfileSetup(is: setup) == .profileSetupOnHold)
+
+        await profileScreen.retry(userId: "u1")
+        await friendsScreen.retry(userId: "u1")
+
+        #expect(profileScreen.profile.failure?.whileProfileSetup(is: setup) == .profileSetupOnHold)
+        #expect(friendsScreen.overview.failure?.whileProfileSetup(is: setup) == .profileSetupOnHold)
+        #expect(auth.reloadAccountCalls == ["u1", "u1", "u1"])
+        #expect(firestore.getUserDocumentCallCount == 1)
+        #expect(firestore.createUserCalls.isEmpty)
     }
 }
 

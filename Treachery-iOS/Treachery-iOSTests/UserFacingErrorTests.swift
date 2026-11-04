@@ -137,6 +137,27 @@ struct UserFacingErrorTests {
         #expect(UserFacingError.profileNotSetUp.message == "Your profile isn't set up yet. Check your connection, then try again.")
     }
 
+    /// On hold after a deletion whose outcome is unknown, a profile that
+    /// isn't set up stays so until the app relaunches, whatever the
+    /// connection. Profile and Friends say that, and that Try Again checks
+    /// the deletion; other failures, and other states, keep their sentence.
+    @Test("While the setup is on hold, a profile that isn't set up says why", arguments: [
+        (UserFacingError.profileNotSetUp, ProfileSetupState.onHoldUntilRelaunch, UserFacingError.profileSetupOnHold),
+        (.profileNotSetUp, .pending, .profileNotSetUp),
+        (.profileNotSetUp, .onHold, .profileNotSetUp),
+        (.profileNotSetUp, .finished, .profileNotSetUp),
+        (.serverUnreachable, .onHoldUntilRelaunch, .serverUnreachable),
+    ])
+    func whileTheSetupIsOnHold(failure: UserFacingError, setup: ProfileSetupState, expected: UserFacingError) {
+        #expect(failure.whileProfileSetup(is: setup) == expected)
+    }
+
+    @Test func theHoldIsSaidPlainly() {
+        let message = "Your account's deletion couldn't be confirmed. Try again to check, or close and reopen the app to finish setting up your profile."
+
+        #expect(UserFacingError.profileSetupOnHold.message == message)
+    }
+
     @Test func anAlreadyMappedErrorIsKept() {
         let mapped = UserFacingError(message: "This game is full.")
 

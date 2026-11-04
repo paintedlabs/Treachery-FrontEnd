@@ -39,6 +39,16 @@ extension UserFacingError {
         self = Self.recognized(error) ?? .unknown
     }
 
+    /// This failure as a screen that needs the user's profile says it while
+    /// the profile setup is in `state`. On hold after a deletion whose
+    /// outcome is unknown, a profile that isn't set up stays so until the
+    /// app relaunches, whatever the connection, so it says that, and that
+    /// Try Again checks whether the account was deleted.
+    func whileProfileSetup(is state: ProfileSetupState) -> Self {
+        guard self == .profileNotSetUp, state == .onHoldUntilRelaunch else { return self }
+        return .profileSetupOnHold
+    }
+
     private static func recognized(_ error: any Error) -> Self? {
         switch error {
         case let error as Self:
@@ -203,6 +213,10 @@ extension UserFacingError {
     static let profileNotSetUp = Self(message: String(
         localized: "Your profile isn't set up yet. Check your connection, then try again.",
         comment: "Error shown when the user's own profile can't be read, usually because it couldn't be created while offline"
+    ))
+    static let profileSetupOnHold = Self(message: String(
+        localized: "Your account's deletion couldn't be confirmed. Try again to check, or close and reopen the app to finish setting up your profile.",
+        comment: "Error shown on Profile and Friends when a failed account deletion may have gone through, so the profile isn't set up yet"
     ))
 
     // Signing in

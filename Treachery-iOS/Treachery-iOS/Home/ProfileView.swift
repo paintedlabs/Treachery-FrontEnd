@@ -195,7 +195,10 @@ struct ProfileView: View {
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 40)
         case .failed(let failure, let previous):
-            LoadFailureCard(title: "Couldn't Load Your Profile", failure: failure) {
+            LoadFailureCard(
+                title: "Couldn't Load Your Profile",
+                failure: failure.whileProfileSetup(is: authViewModel.profileSetupState)
+            ) {
                 Task { await retry() }
             }
             if let previous {

@@ -267,7 +267,10 @@ struct FriendsListView: View {
         case .idle, .loading(previous: nil):
             friendsCard(friends: nil)
         case .failed(let failure, let previous):
-            LoadFailureCard(title: "Couldn't Load Friends", failure: failure) {
+            LoadFailureCard(
+                title: "Couldn't Load Friends",
+                failure: failure.whileProfileSetup(is: authViewModel.profileSetupState)
+            ) {
                 Task { await retry() }
             }
             // What an earlier load found, but never "No friends yet": under
