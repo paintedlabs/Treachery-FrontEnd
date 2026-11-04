@@ -78,4 +78,38 @@ struct LobbyCommanderNameTests {
         #expect(vm.errorMessage == nil)
     }
 
+    // MARK: - Only edits are saved
+
+    @Test func untouchedDraftDoesNotOverwriteANameChangedElsewhere() async {
+        // The name changes on another device after the field has filled.
+        // The lobby going off screen used to write the stale draft back.
+        let (vm, mockFS) = makeLobby()
+        mockFS.emitPlayers(.success(players(commanderName: "Atraxa")), gameId: "game1")
+
+        await vm.saveCommanderName()
+
+        #expect(mockFS.updateCommanderNameCalls.isEmpty)
+    }
+
+    @Test func savedDraftIsNotSentAgainOverALaterChange() async {
+        let (vm, mockFS) = makeLobby()
+        vm.commanderNameDraft = "Atraxa"
+        await vm.saveCommanderName()
+        mockFS.emitPlayers(.success(players(commanderName: "Zur the Enchanter")), gameId: "game1")
+
+        await vm.saveCommanderName()
+
+        #expect(mockFS.updateCommanderNameCalls.map(\.name) == ["Atraxa"])
+    }
+
+    @Test func editedDraftIsSavedEvenAfterAChangeElsewhere() async {
+        // The player's own edit is the newest word on it.
+        let (vm, mockFS) = makeLobby()
+        mockFS.emitPlayers(.success(players(commanderName: "Atraxa")), gameId: "game1")
+        vm.commanderNameDraft = "Zur the Enchanter"
+
+        await vm.saveCommanderName()
+
+        #expect(mockFS.updateCommanderNameCalls.map(\.name) == ["Zur the Enchanter"])
+    }
 }
