@@ -13,6 +13,68 @@ struct JoinGameResult {
     let gameId: String
 }
 
+extension JoinGameResult {
+    /// joinGame answered without a game id, so there is no lobby to open.
+    /// JoinGameViewModel words it for the player.
+    struct MissingGameIdError: Error {}
+
+    /// Reads the joinGame callable's payload. A missing or empty `gameId`
+    /// throws: opening the lobby with "" would hand Firestore an empty
+    /// document path, which raises an Objective-C exception Swift can't catch.
+    init(payload: Any?) throws {
+        let data = payload as? [String: Any] ?? [:]
+        guard let gameId = data["gameId"] as? String, !gameId.isEmpty else {
+            throw MissingGameIdError()
+        }
+        self.init(action: data["action"] as? String ?? "joined", gameId: gameId)
+    }
+}
+
+/// A lobby callable the server turned down for a reason it explains, as
+/// opposed to one that never got an answer. CloudFunctions throws this in
+/// place of the SDK error for these codes, so view models can act on the
+/// reason without knowing about Firebase; any other failure (offline, a
+/// timeout, an internal error) is thrown unchanged.
+struct CallableRefusal: Error {
+    enum Reason: Equatable {
+        /// The game, or the player's seat in it, doesn't exist.
+        case notFound
+        /// The game isn't in a state that allows the request: it has
+        /// started, it's full, and so on.
+        case failedPrecondition
+    }
+
+    let reason: Reason
+    /// The server's explanation. lobby.js writes these for players, e.g.
+    /// "This game is full."
+    let message: String
+}
+
+extension CallableRefusal {
+    /// The refusal `error` describes, or nil for any other kind of failure.
+    init?(_ error: any Error) {
+        let error = error as NSError
+        guard error.domain == FunctionsErrorDomain else { return nil }
+        let reason: Reason
+        let sdkPlaceholder: String
+        switch FunctionsErrorCode(rawValue: error.code) {
+        case .notFound:
+            (reason, sdkPlaceholder) = (.notFound, "NOT FOUND")
+        case .failedPrecondition:
+            (reason, sdkPlaceholder) = (.failedPrecondition, "FAILED PRECONDITION")
+        default:
+            return nil
+        }
+        // Only an answer from lobby.js explains itself. A bare HTTP status,
+        // such as a 404 for a function that isn't deployed, carries just the
+        // SDK's placeholder text and must not pass for a refusal: leave()
+        // would take a 404 like that as "already gone".
+        let message = error.localizedDescription
+        guard message != sdkPlaceholder else { return nil }
+        self.init(reason: reason, message: message)
+    }
+}
+
 struct PhenomenonResult {
     let type: String // "resolved" or "choose"
     let newPlaneId: String?
@@ -54,27 +116,34 @@ struct CloudFunctions: CloudFunctionsProtocol {
     }
 
     func joinGame(gameCode: String) async throws -> JoinGameResult {
-        let callable = functions.httpsCallable("joinGame")
-        let result = try await callable.call(["gameCode": gameCode])
-        let data = result.data as? [String: Any] ?? [:]
-        return JoinGameResult(
-            action: data["action"] as? String ?? "joined",
-            gameId: data["gameId"] as? String ?? ""
-        )
+        let result = try await callLobbyFunction("joinGame", ["gameCode": gameCode])
+        return try JoinGameResult(payload: result.data)
     }
 
     func startGame(gameId: String) async throws {
-        let callable = functions.httpsCallable("startGame")
-        _ = try await callable.call(["gameId": gameId])
+        _ = try await callLobbyFunction("startGame", ["gameId": gameId])
     }
 
-    func adjustLife(gameId: String, playerId: String, amount: Int) async throws {
+    /// Calls a lobby callable, throwing a CallableRefusal when the server
+    /// turns the request down with a reason the lobby screens act on.
+    private func callLobbyFunction(_ name: String, _ data: [String: Any]) async throws -> HTTPSCallableResult {
+        do {
+            return try await functions.httpsCallable(name).call(data)
+        } catch {
+            throw CallableRefusal(error) ?? error
+        }
+    }
+
+    /// Returns the `newLife` adjustLife answers with. A response without it
+    /// still means the change was applied, so it isn't treated as a failure.
+    func adjustLife(gameId: String, playerId: String, amount: Int) async throws -> Int? {
         let callable = functions.httpsCallable("adjustLife")
-        _ = try await callable.call([
+        let result = try await callable.call([
             "gameId": gameId,
             "playerId": playerId,
             "amount": amount,
         ])
+        return (result.data as? [String: Any])?["newLife"] as? Int
     }
 
     func eliminatePlayer(gameId: String) async throws {
@@ -88,8 +157,7 @@ struct CloudFunctions: CloudFunctionsProtocol {
     }
 
     func leaveGame(gameId: String) async throws {
-        let callable = functions.httpsCallable("leaveGame")
-        _ = try await callable.call(["gameId": gameId])
+        _ = try await callLobbyFunction("leaveGame", ["gameId": gameId])
     }
 
     // MARK: - Traitor Abilities
@@ -172,13 +240,12 @@ struct CloudFunctions: CloudFunctionsProtocol {
     }
 
     func updateGameSettings(gameId: String, maxPlayers: Int?, startingLife: Int?, gameMode: String?, maxTraitorRarity: String?) async throws {
-        let callable = functions.httpsCallable("updateGameSettings")
         var data: [String: Any] = ["gameId": gameId]
         if let maxPlayers { data["maxPlayers"] = maxPlayers }
         if let startingLife { data["startingLife"] = startingLife }
         if let gameMode { data["gameMode"] = gameMode }
         if let maxTraitorRarity { data["maxTraitorRarity"] = maxTraitorRarity }
-        _ = try await callable.call(data)
+        _ = try await callLobbyFunction("updateGameSettings", data)
     }
 
     func acceptFriendRequest(requestId: String) async throws {

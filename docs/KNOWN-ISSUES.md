@@ -70,6 +70,7 @@ test-encoded — no CI job builds Swift or Kotlin (see Repo hygiene).
 | iOS `updateUser` encoded the whole model, re-writing legacy PII back onto the public doc | **fixed** — public-field allowlist, matching web and Android |
 | **Android has no traitor-ability support whatsoever** — no `resolveMetamorph`/`resolvePuppetMaster`/`resolveWearerOfMasks` in `CloudFunctionsRepository`, no resolver UI. Treachery games are unplayable past an unveil on Android | **fixed** — repository methods, `ability_resolved` gating, `AbilityResolverSheet` mirroring the iOS sheets; 211 unit tests green |
 | `maxTraitorRarity` is plumbed through both native clients but never sent (iOS passes `nil`, Android omits it), so the setting is web-only | **fixed** — create + lobby pickers on iOS/Android; both `Game` models decode `max_traitor_rarity` and the lobby seeds from the live snapshot |
+| The planar die cost shows the previous roller's count, not the caller's actual (often free) cost (Lower severity, below) | **fixed (iOS)** — the next roll costs `die_roll_count` to whoever rolled last and nothing to anyone else, as `rollPlanarDie` charges; web still shows `die_roll_count` to everyone, and Android shows `die_roll_count - 1` |
 | Both native lobbies fall back to the `navIsHost` nav param before the first game snapshot, so a demoted host briefly still sees host UI. Cosmetic — the server enforces host actions | **open** |
 
 ## Lower severity

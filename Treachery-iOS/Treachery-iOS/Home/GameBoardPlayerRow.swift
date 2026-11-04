@@ -139,7 +139,8 @@ struct GameBoardPlayerRow: View {
 
                 Spacer()
 
-                // Life controls
+                // Life controls. A spectator sees the totals but can't
+                // change them.
                 if !player.isEliminated {
                     HStack(spacing: 12) {
                         Button {
@@ -155,6 +156,8 @@ struct GameBoardPlayerRow: View {
                                 )
                         }
                         .buttonStyle(.plain)
+                        .disabled(!viewModel.canAdjustLife)
+                        .opacity(viewModel.canAdjustLife ? 1 : 0.35)
                         .accessibilityLabel("Decrease \(player.displayName)'s life")
 
                         Text("\(player.lifeTotal)")
@@ -179,6 +182,8 @@ struct GameBoardPlayerRow: View {
                                 )
                         }
                         .buttonStyle(.plain)
+                        .disabled(!viewModel.canAdjustLife)
+                        .opacity(viewModel.canAdjustLife ? 1 : 0.35)
                         .accessibilityLabel("Increase \(player.displayName)'s life")
                     }
                 } else {

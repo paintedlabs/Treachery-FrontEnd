@@ -55,3 +55,15 @@ struct PlanechaseState: Codable, Hashable {
         self.secondaryPlaneId = secondaryPlaneId
     }
 }
+
+extension PlanechaseState {
+    /// The mana `userId`'s next planar die roll costs, as rollPlanarDie
+    /// charges it (functions/src/callables/planechase.js). While one player
+    /// keeps rolling, each roll costs one more than the one before, so their
+    /// next costs as much as their rolls so far. Anyone else's next roll is
+    /// free, and starts the count again.
+    func nextRollCost(for userId: String?) -> Int {
+        guard let userId, lastDieRollerId == userId else { return 0 }
+        return max(0, dieRollCount)
+    }
+}

@@ -12,10 +12,8 @@ struct GameBoardView: View {
     @StateObject private var viewModel: GameBoardViewModel
     @Binding var navigationPath: NavigationPath
     @State private var showCardDetail = false
-    @State private var cardFlipDegrees: Double = 0
-    @State private var showUnveiledBanner = false
     @State private var showForfeitConfirmation = false
-    @State private var showGameUnavailableAlert = false
+    @State private var isConfirmingSpectatorLeave = false
     @State private var showEndGameConfirmation = false
     @State private var showWinnerSelection = false
     @State private var selectedWinners: Set<String> = []
@@ -46,84 +44,94 @@ struct GameBoardView: View {
             VStack(spacing: 0) {
                 ConnectionBanner()
 
-                if viewModel.isGameUnavailable {
-                    // Game was deleted or became unavailable
-                    Spacer()
-                    VStack(spacing: 12) {
-                        Image(systemName: "wifi.exclamationmark")
-                            .font(.system(size: 48))
-                            .foregroundStyle(Color.mtgGold)
-                        Text("Game Unavailable")
-                            .font(.system(.title2, design: .serif))
-                            .fontWeight(.bold)
-                            .foregroundStyle(Color.mtgTextPrimary)
-                        Text("This game is no longer available. It may have been deleted by the host.")
-                            .font(.subheadline)
-                            .foregroundStyle(Color.mtgTextSecondary)
-                            .multilineTextAlignment(.center)
-                        Button("Return to Home") {
-                            navigationPath.removeLast(navigationPath.count)
-                        }
-                        .buttonStyle(MtgPrimaryButtonStyle())
-                        .padding(.top)
-                        .padding(.horizontal, 40)
-                    }
-                    .padding()
-                    Spacer()
-                } else if viewModel.players.isEmpty {
-                    // Loading state
-                    Spacer()
-                    MtgLoadingView(message: "Loading game...")
-                    Spacer()
+                if viewModel.status != .ready {
+                    statusContent
                 } else {
-                    // Identity card header — only when treachery active
-                    if viewModel.isTreacheryActive {
-                        if let card = viewModel.currentIdentityCard,
-                           let player = viewModel.currentPlayer {
-                            ZStack {
-                                Button {
-                                    showCardDetail = true
-                                } label: {
-                                    IdentityCardHeader(card: card, player: player)
-                                }
-                                .buttonStyle(.plain)
-                                .rotation3DEffect(
-                                    .degrees(cardFlipDegrees),
-                                    axis: (x: 0, y: 1, z: 0),
-                                    perspective: 0.5
-                                )
+                    // The signed-in user's identity card, or why there's none. A
+                    // user without a seat gets this in every mode: it's their way
+                    // home.
+                    switch viewModel.identityArea {
+                    case .notDealt:
+                        EmptyView()
+                    case .card(let card, let player):
+                        ZStack {
+                            Button {
+                                showCardDetail = true
+                            } label: {
+                                IdentityCardHeader(card: card, player: player)
+                            }
+                            .buttonStyle(.plain)
+                            .rotation3DEffect(
+                                .degrees(viewModel.unveilProgress == .flippingAway ? 90 : 0),
+                                axis: (x: 0, y: 1, z: 0),
+                                perspective: 0.5
+                            )
+                            .animation(
+                                viewModel.unveilProgress == .flippingAway ? .easeIn(duration: 0.3) : .easeOut(duration: 0.3),
+                                value: viewModel.unveilProgress
+                            )
 
-                                // Unveiled banner overlay
-                                if showUnveiledBanner {
-                                    VStack {
-                                        Text("IDENTITY REVEALED")
-                                            .font(.headline)
-                                            .fontWeight(.black)
-                                            .foregroundStyle(Color.mtgBackground)
-                                            .padding(.horizontal, 20)
-                                            .padding(.vertical, 10)
-                                            .background(
-                                                RoundedRectangle(cornerRadius: 8)
-                                                    .fill(player.role?.color ?? Color.mtgGuardian)
-                                                    .shadow(color: (player.role?.color ?? Color.mtgGuardian).opacity(0.6), radius: 12)
-                                            )
-                                    }
-                                    .transition(.scale.combined(with: .opacity))
-                                    .zIndex(1)
+                            // Unveiled banner overlay, once the server has
+                            // unveiled the player
+                            if viewModel.unveilProgress == .revealing {
+                                VStack {
+                                    Text("IDENTITY REVEALED")
+                                        .font(.headline)
+                                        .fontWeight(.black)
+                                        .foregroundStyle(Color.mtgBackground)
+                                        .padding(.horizontal, 20)
+                                        .padding(.vertical, 10)
+                                        .background(
+                                            RoundedRectangle(cornerRadius: 8)
+                                                .fill(player.role?.color ?? Color.mtgGuardian)
+                                                .shadow(color: (player.role?.color ?? Color.mtgGuardian).opacity(0.6), radius: 12)
+                                        )
                                 }
+                                .transition(.scale.combined(with: .opacity))
+                                .zIndex(1)
                             }
-                        } else {
-                            // Current player not found (reconnection case)
-                            VStack(spacing: 8) {
-                                Image(systemName: "exclamationmark.triangle.fill")
-                                    .font(.title)
-                                    .foregroundStyle(Color.mtgGold)
-                                Text("Unable to find your player data")
-                                    .font(.subheadline)
-                                    .foregroundStyle(Color.mtgTextSecondary)
-                            }
-                            .padding()
                         }
+                        .animation(
+                            viewModel.unveilProgress == .revealing
+                                ? .spring(response: 0.4, dampingFraction: 0.6)
+                                : .easeOut(duration: 0.5),
+                            value: viewModel.unveilProgress
+                        )
+                    case .taken:
+                        VStack(spacing: 8) {
+                            Image(systemName: "theatermasks.fill")
+                                .font(.title)
+                                .foregroundStyle(Color.mtgGold)
+                                .accessibilityHidden(true)
+                            Text("The Metamorph took your identity card.")
+                                .font(.subheadline)
+                                .foregroundStyle(Color.mtgTextSecondary)
+                                .multilineTextAlignment(.center)
+                        }
+                        .padding()
+                    case .notFound:
+                        // No seat, or a card this build doesn't know. Without
+                        // a seat there's no Forfeit, spectator bar or action
+                        // bar, so this offers its own way out.
+                        VStack(spacing: 8) {
+                            Image(systemName: "exclamationmark.triangle.fill")
+                                .font(.title)
+                                .foregroundStyle(Color.mtgGold)
+                                .accessibilityHidden(true)
+                            Text("Unable to find your player data")
+                                .font(.subheadline)
+                                .foregroundStyle(Color.mtgTextSecondary)
+                            Button {
+                                goHome()
+                            } label: {
+                                Text("Back to Home")
+                                    .font(.subheadline)
+                                    .frame(minHeight: 44)
+                                    .contentShape(Rectangle())
+                            }
+                            .foregroundStyle(Color.mtgGold)
+                        }
+                        .padding()
                     }
 
                     // Plane card banner — only when planechase active (and not own-deck)
@@ -193,10 +201,20 @@ struct GameBoardView: View {
                             .padding(.horizontal)
                             .padding(.vertical, 4)
                     }
+                    if let failure = viewModel.lifeChangeFailure {
+                        MtgErrorBanner(message: failure.message)
+                            .padding(.horizontal)
+                            .padding(.vertical, 4)
+                    }
+                    if let failure = viewModel.unveilFailure {
+                        MtgErrorBanner(message: failure)
+                            .padding(.horizontal)
+                            .padding(.vertical, 4)
+                    }
 
-                    // Spectator overlay for eliminated players (treachery only)
-                    if viewModel.isTreacheryActive,
-                       let player = viewModel.currentPlayer, player.isEliminated {
+                    // Spectator bar for eliminated players, in every mode:
+                    // its Leave is their only way off the board.
+                    if let leave = viewModel.spectatorLeave {
                         VStack(spacing: 8) {
                             HStack(spacing: 8) {
                                 Image(systemName: "person.slash.fill")
@@ -213,12 +231,32 @@ struct GameBoardView: View {
                                 .italic()
                                 .multilineTextAlignment(.center)
 
-                            Button("Leave Game") {
-                                // Spectators go home — game-over must not reveal identities mid-game.
-                                navigationPath.removeLast(navigationPath.count)
+                            Button {
+                                switch leave {
+                                case .goHome:
+                                    // Spectators go home — game-over must not reveal identities mid-game.
+                                    goHome()
+                                case .confirmFirst:
+                                    isConfirmingSpectatorLeave = true
+                                }
+                            } label: {
+                                // Every eliminated player's way home: a full-size target.
+                                Text("Leave Game")
+                                    .frame(minHeight: 44)
+                                    .contentShape(Rectangle())
                             }
                             .foregroundStyle(Color.mtgError)
-                            .padding(.top, 4)
+                            .confirmationDialog(
+                                "Leave without ending the game?",
+                                isPresented: $isConfirmingSpectatorLeave,
+                                titleVisibility: .visible
+                            ) {
+                                Button("End Game") { presentWinnerSelection() }
+                                Button("Leave Game", role: .destructive) { goHome() }
+                                Button("Stay", role: .cancel) {}
+                            } message: {
+                                Text("Only you can end this game. If you leave, it stays open for the others until you come back from Home to end it.")
+                            }
                         }
                         .padding()
                         .frame(maxWidth: .infinity)
@@ -237,16 +275,15 @@ struct GameBoardView: View {
                     }
 
                     // Action bar (unveil/win) — only when treachery active
-                    if viewModel.isTreacheryActive,
-                       !(viewModel.currentPlayer?.isEliminated ?? true) {
-                        ActionBar(viewModel: viewModel, onUnveil: playUnveilAnimation)
+                    if viewModel.isTreacheryActive, viewModel.seat == .playing {
+                        ActionBar(viewModel: viewModel)
                     }
 
-                    // End Game button — only when NOT treachery (host only)
-                    if !viewModel.isTreacheryActive && viewModel.isHost {
+                    // End Game button — the host's, in every mode but Treachery's,
+                    // eliminated or not
+                    if viewModel.canEndGame {
                         Button {
-                            selectedWinners = []
-                            showWinnerSelection = true
+                            presentWinnerSelection()
                         } label: {
                             HStack(spacing: 8) {
                                 Image(systemName: "flag.checkered")
@@ -266,8 +303,9 @@ struct GameBoardView: View {
         .navigationBarBackButtonHidden(true)
         .onAppear { AnalyticsService.trackScreen("GameBoard") }
         .toolbar {
-            // Forfeit button — available in all game modes so players can always leave
-            if !viewModel.isGameUnavailable && !(viewModel.currentPlayer?.isEliminated ?? true) {
+            // Forfeit button — available in all game modes so players can always
+            // leave: a forfeit brings up the spectator bar, whose Leave goes home
+            if viewModel.status == .ready && viewModel.seat == .playing {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {
                         showForfeitConfirmation = true
@@ -298,14 +336,41 @@ struct GameBoardView: View {
         .onAppear {
             viewModel.currentUserId = authViewModel.currentUserId
         }
+        .onDisappear {
+            // Taps still waiting out their debounce would go with the board.
+            viewModel.sendPendingLifeChanges()
+        }
+        .onChange(of: viewModel.lifeChangeFailure) { _, failure in
+            // A failed change can put a total back with no other sign, and
+            // the banner is away from the rows: read it out.
+            guard let failure else { return }
+            AccessibilityNotification.Announcement(failure.message).post()
+        }
+        .onChange(of: viewModel.seat) { oldSeat, newSeat in
+            // Elimination changes the board with no other sign: the life
+            // buttons stop working, and the spectator bar, now the way
+            // home, appears at the bottom.
+            guard oldSeat == .playing, newSeat == .spectating else { return }
+            AccessibilityNotification.Announcement(
+                "You've been eliminated. You can keep watching, or use Leave Game at the bottom of the screen."
+            ).post()
+        }
+        .onChange(of: viewModel.unveilProgress) { _, progress in
+            switch progress {
+            case .revealing:
+                // The banner is the only sign the unveil went through.
+                AccessibilityNotification.Announcement("Identity revealed").post()
+            case .failed(let message):
+                // And the error, away below the players, the only sign it
+                // didn't: the button just goes back to Unveil.
+                AccessibilityNotification.Announcement(message).post()
+            case .idle, .sending, .flippingAway, .awaitingSnapshot:
+                break
+            }
+        }
         .onChange(of: viewModel.isGameFinished) { _, finished in
             if finished {
                 navigationPath.append(AppDestination.gameOver(gameId: viewModel.gameId))
-            }
-        }
-        .onChange(of: viewModel.isGameUnavailable) { _, unavailable in
-            if unavailable {
-                showGameUnavailableAlert = true
             }
         }
         .sheet(isPresented: $showCardDetail) {
@@ -356,34 +421,46 @@ struct GameBoardView: View {
         }
     }
 
-    // MARK: - Unveil Animation
+    // MARK: - Status
 
-    private func playUnveilAnimation() {
-        // Phase 1: Flip card away (0 -> 90 degrees)
-        withAnimation(.easeIn(duration: 0.3)) {
-            cardFlipDegrees = 90
+    /// Everything but the board itself. Each state offers a way home, since
+    /// this screen hides the back button and the tab bar.
+    @ViewBuilder
+    private var statusContent: some View {
+        switch viewModel.status {
+        case .ready:
+            EmptyView() // the board itself is shown instead
+        case .loading:
+            GameLoadingView(message: "Loading game...", onGoHome: { goHome() })
+        case .unavailable:
+            GameStatusView(
+                systemImage: "wifi.exclamationmark",
+                title: "Game Unavailable",
+                message: "This game has closed and is no longer available.",
+                onGoHome: { goHome() }
+            )
+        case .notInGame:
+            GameStatusView.notInGame(onGoHome: { goHome() })
+        case .failed:
+            GameStatusView(
+                systemImage: "exclamationmark.triangle.fill",
+                title: "Couldn't Load the Game",
+                message: "Check your connection and try again.",
+                action: .tryAgain { viewModel.retry() },
+                onGoHome: { goHome() }
+            )
+        case .needsNewerVersion:
+            GameStatusView.needsNewerVersion(onGoHome: { goHome() })
         }
+    }
 
-        // Phase 2: Perform the unveil at the midpoint, then flip back (90 -> 0)
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-            Task { await viewModel.unveilCurrentPlayer() }
+    private func goHome() {
+        navigationPath.removeLast(navigationPath.count)
+    }
 
-            withAnimation(.easeOut(duration: 0.3)) {
-                cardFlipDegrees = 0
-            }
-
-            // Phase 3: Show the "IDENTITY REVEALED" banner
-            withAnimation(.spring(response: 0.4, dampingFraction: 0.6)) {
-                showUnveiledBanner = true
-            }
-
-            // Phase 4: Dismiss the banner after a delay
-            DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
-                withAnimation(.easeOut(duration: 0.5)) {
-                    showUnveiledBanner = false
-                }
-            }
-        }
+    private func presentWinnerSelection() {
+        selectedWinners = []
+        showWinnerSelection = true
     }
 }
 

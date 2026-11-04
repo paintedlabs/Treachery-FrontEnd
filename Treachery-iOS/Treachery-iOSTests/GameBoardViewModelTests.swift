@@ -169,41 +169,52 @@ struct GameBoardViewModelTests {
     }
 
     // MARK: - Die Roll Cost
+    //
+    // rollPlanarDie (planechase.js) charges whoever rolled last as many mana
+    // as they've rolled so far, and anyone else nothing.
 
-    @Test func dieRollCostFirstRollFree() {
+    private func makePlanechaseVM(
+        lastDieRollerId: String?,
+        dieRollCount: Int,
+        currentUserId: String? = "u1"
+    ) -> GameBoardViewModel {
         var game = makeSampleGame(gameMode: .treacheryPlanechase)
         game.planechase = PlanechaseState(
             useOwnDeck: false, currentPlaneId: "p1", usedPlaneIds: [],
-            lastDieRollerId: nil, dieRollCount: 0
+            lastDieRollerId: lastDieRollerId, dieRollCount: dieRollCount
         )
-        let vm = makeVM(game: game)
+        return makeVM(game: game, currentUserId: currentUserId)
+    }
+
+    @Test func firstRollIsFree() {
+        let vm = makePlanechaseVM(lastDieRollerId: nil, dieRollCount: 0)
         #expect(vm.dieRollCost == 0)
     }
 
-    @Test func dieRollCostSecondRollFree() {
-        var game = makeSampleGame(gameMode: .treacheryPlanechase)
-        game.planechase = PlanechaseState(
-            useOwnDeck: false, currentPlaneId: "p1", usedPlaneIds: [],
-            lastDieRollerId: nil, dieRollCount: 1
-        )
-        let vm = makeVM(game: game)
+    @Test(arguments: [1, 2, 3])
+    func rollingAgainCostsTheRollsSoFar(rollsSoFar: Int) {
+        // After one roll the next costs 1 mana; this used to show 0.
+        let vm = makePlanechaseVM(lastDieRollerId: "u1", dieRollCount: rollsSoFar)
+        #expect(vm.dieRollCost == rollsSoFar)
+    }
+
+    @Test func someoneElsesRollLeavesYoursFree() {
+        // This used to show their cost, 2, to everyone.
+        let vm = makePlanechaseVM(lastDieRollerId: "u2", dieRollCount: 3)
         #expect(vm.dieRollCost == 0)
     }
 
-    @Test func dieRollCostThirdRollCostsOne() {
-        var game = makeSampleGame(gameMode: .treacheryPlanechase)
-        game.planechase = PlanechaseState(
-            useOwnDeck: false, currentPlaneId: "p1", usedPlaneIds: [],
-            lastDieRollerId: nil, dieRollCount: 2
-        )
-        let vm = makeVM(game: game)
-        #expect(vm.dieRollCost == 1)
+    @Test func noSignedInUserIsNotTheLastRoller() {
+        // nil == nil must not make a missing user the roller.
+        let vm = makePlanechaseVM(lastDieRollerId: nil, dieRollCount: 2, currentUserId: nil)
+        #expect(vm.dieRollCost == 0)
     }
 
     // MARK: - Traitor Ability Retry
 
     private func abilityPlayer(
         cardId: String = "traitor_07",
+        originalCardId: String? = nil,
         isUnveiled: Bool = true,
         isEliminated: Bool = false,
         abilityResolved: Bool = false
@@ -212,6 +223,7 @@ struct GameBoardViewModelTests {
             id: "p1", orderId: 1, userId: "u1", displayName: "Alice",
             role: .traitor, identityCardId: cardId, lifeTotal: 40,
             isEliminated: isEliminated, isUnveiled: isUnveiled, joinedAt: Date(),
+            originalIdentityCardId: originalCardId,
             abilityResolved: abilityResolved
         )
     }
@@ -246,6 +258,23 @@ struct GameBoardViewModelTests {
         #expect(vm.resolvableAbility == nil)
     }
 
+    @Test(arguments: ["traitor_07", "traitor_09", "traitor_13"])
+    func abilityCardSwappedInGivesNoAbility(cardId: String) {
+        // A Puppet Master handed it over; every resolver refuses a holder
+        // who was dealt another card ("Your card is not The Metamorph.").
+        let vm = makeVM(players: [abilityPlayer(cardId: cardId, originalCardId: "guardian_03")])
+        #expect(vm.resolvableAbility == nil)
+        vm.presentAbilityResolver()
+        #expect(vm.pendingAbilityResolution == nil)
+    }
+
+    @Test func abilityCardDealtAndHeldAgainKeepsItsAbility() {
+        // The server records the card first dealt; holding that one again
+        // passes its check.
+        let vm = makeVM(players: [abilityPlayer(cardId: "traitor_07", originalCardId: "traitor_07")])
+        #expect(vm.resolvableAbility == .metamorph)
+    }
+
     @Test func presentAbilityResolverOpensSheet() {
         let vm = makeVM(players: [abilityPlayer()])
         vm.presentAbilityResolver()
@@ -256,5 +285,22 @@ struct GameBoardViewModelTests {
         let vm = makeVM(players: [abilityPlayer(abilityResolved: true)])
         vm.presentAbilityResolver()
         #expect(vm.pendingAbilityResolution == nil)
+    }
+
+    @Test func metamorphIsNotOfferedACardAlreadyTaken() {
+        // A Metamorph leaves its victim without a card, and resolveMetamorph
+        // refuses such a target: "Target has no identity to steal."
+        let players = [
+            abilityPlayer(),
+            Player(id: "p2", orderId: 2, userId: "u2", displayName: "Bob",
+                   role: .assassin, identityCardId: "assassin_01", lifeTotal: 0,
+                   isEliminated: true, isUnveiled: true, joinedAt: Date()),
+            Player(id: "p3", orderId: 3, userId: "u3", displayName: "Carol",
+                   role: .guardian, identityCardId: nil, lifeTotal: 0,
+                   isEliminated: true, isUnveiled: true, joinedAt: Date()),
+        ]
+        let vm = makeVM(players: players)
+        vm.presentAbilityResolver()
+        #expect(vm.pendingAbilityResolution?.candidatePlayers.map(\.id) == ["p2"])
     }
 }
