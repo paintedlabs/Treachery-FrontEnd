@@ -87,14 +87,20 @@ function header(mode) {
   ];
 }
 
-/** How an --apply that deleted the sign-in account ends: when to check on it. */
-function checkLater(uid) {
+/**
+ * How an --apply ends: when to check on it. The hour runs from when the
+ * sign-in account was deleted, by this run unless `until` says otherwise.
+ */
+function checkLater(uid, until = 'an hour from now') {
   return [
     '',
-    'A web or Android app still signed in to it can recreate its profile until an hour from now.',
+    `A web or Android app still signed in to it can recreate its profile until ${until}.`,
     `Then run this with --uid ${uid} and without --apply: it should find no such account.`,
   ];
 }
+
+/** checkLater's `until` for an --apply that found the sign-in account already deleted. */
+const AFTER_EARLIER_SIGN_IN_DELETE = 'an hour after its sign-in account was deleted';
 
 /** How a run by uid ends when nothing of the account is left. */
 function noSuchUid(uid) {
@@ -114,9 +120,10 @@ function noProfile(uid, leftovers = []) {
     `refused: users/${uid} doesn't exist, so there's no display name to check --expect-name against.${left} ` +
     `If an earlier --apply for this account stopped part-way, delete the sign-in account ${uid} in the ` +
     `Firebase console (Authentication), then run this again with --uid ${uid}: with no sign-in account or ` +
-    `profile left, it deletes anything still under users/${uid} without checking the name. If not, the ` +
-    'account has no profile yet: its owner makes one by signing in to Treachery on the web or Android, and ' +
-    'can then set the code.\n'
+    `profile left, it deletes anything still under users/${uid} without checking the name. An hour after ` +
+    `you delete the sign-in account, run this with --uid ${uid} and without --apply: it should find no such ` +
+    'account. If no --apply has run for it, the account has no profile yet: its owner makes one by signing ' +
+    'in to Treachery on the web or Android, and can then set the code.\n'
   );
 }
 
@@ -139,7 +146,9 @@ function stoppedPartWay(uid) {
     'failed: the deletion stopped part-way. Every step is safe to repeat, so run the same command ' +
     `again to finish. If that is refused because users/${uid} doesn't exist, this run got as far as ` +
     `deleting the profile: delete the sign-in account ${uid} in the Firebase console (Authentication), ` +
-    `then run this again with --uid ${uid} to delete anything still under users/${uid}.\n`
+    `then run this again with --uid ${uid} to delete anything still under users/${uid}. An hour after you ` +
+    `delete the sign-in account, not an hour after this run, run this with --uid ${uid} and without ` +
+    '--apply: it should find no such account.\n'
   );
 }
 
@@ -519,6 +528,7 @@ describe('delete-account script — dry run, --apply, and a second run', () => {
       row('deleted friend requests:', '0'),
       row('deleted the profile:', `users/${account.uid} and everything under it`),
       row('deleted the sign-in account:', 'no, it was already deleted'),
+      ...checkLater(account.uid, AFTER_EARLIER_SIGN_IN_DELETE),
       '',
     ]);
     const state = await endState(seed);
@@ -910,6 +920,7 @@ describe('delete-account script — what a deletion that stops in step 5 leaves'
       row('deleted friend requests:', '0'),
       row('deleted the profile:', `users/${account.uid} and everything under it`),
       row('deleted the sign-in account:', 'no, it was already deleted'),
+      ...checkLater(account.uid, AFTER_EARLIER_SIGN_IN_DELETE),
       '',
     ]);
 

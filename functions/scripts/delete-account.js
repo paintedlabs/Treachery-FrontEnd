@@ -57,9 +57,10 @@
  *
  * Running it again after a successful --apply finds no such account (exit 1)
  * and changes nothing. A web or Android app still signed in to the account
- * can recreate its profile for up to an hour after the deletion, though, and
- * --email and --phone can't see that profile, so check an hour later with
- * --uid (docs/ACCOUNT-DELETION.md).
+ * can recreate its profile for up to an hour after its sign-in account is
+ * deleted, though, whether by --apply or in the Firebase console, and --email
+ * and --phone can't see that profile, so check an hour after that with --uid
+ * (docs/ACCOUNT-DELETION.md).
  *
  * Before it reads anything it prints the project, where that id came from,
  * and whether Firestore and Auth are emulators or live. --apply writes only
@@ -347,8 +348,10 @@ function checkName({ uid, user, profile, leftovers }, expectName) {
         `If an earlier --apply for this account stopped part-way, delete the sign-in account ${uid} ` +
         `in the Firebase console (Authentication), then run this again with --uid ${uid}: with no ` +
         `sign-in account or profile left, it deletes anything still under users/${uid} without ` +
-        "checking the name. If not, the account has no profile yet: its owner makes one by signing " +
-        "in to Treachery on the web or Android, and can then set the code."
+        `checking the name. An hour after you delete the sign-in account, run this with --uid ${uid} ` +
+        "and without --apply: it should find no such account. If no --apply has run for it, the " +
+        "account has no profile yet: its owner makes one by signing in to Treachery on the web or " +
+        "Android, and can then set the code."
     );
   }
   if (profile.get("display_name") !== expectName) {
@@ -373,15 +376,16 @@ function planLines({ uid, user }, plan) {
 }
 
 /**
- * What the deletion did. When this run deleted the sign-in account, it adds
- * when to check that the account stayed deleted: a web or Android app still
- * signed in to it holds an ID token that stays valid for up to an hour, and
- * the apps write a profile for a signed-in account that has none. --email
- * and --phone can't find such a profile, because they look the account up
- * in Auth, so the check is by uid.
+ * What the deletion did, and when to check that the account stayed deleted:
+ * a web or Android app still signed in to it holds an ID token that stays
+ * valid for up to an hour after the sign-in account is deleted, by this run,
+ * an earlier one or the Firebase console, and the apps write a profile for a
+ * signed-in account that has none. --email and --phone can't find such a
+ * profile, because they look the account up in Auth, so the check is by uid.
  */
 function summaryLines(uid, deleted) {
-  const lines = [
+  const until = deleted.signInDeleted ? "an hour from now" : "an hour after its sign-in account was deleted";
+  return [
     `deleted ${uid}:`,
     row("left waiting lobbies:", counted(deleted.lobbyIds.map((gameId) => `games/${gameId}`))),
     row("anonymized its seats in games:", counted(deleted.seatPaths.map(gameOf))),
@@ -389,12 +393,8 @@ function summaryLines(uid, deleted) {
     row("deleted friend requests:", String(deleted.requests)),
     row("deleted the profile:", `users/${uid} and everything under it`),
     row("deleted the sign-in account:", deleted.signInDeleted ? "yes" : "no, it was already deleted"),
-  ];
-  if (!deleted.signInDeleted) return lines;
-  return [
-    ...lines,
     "",
-    "A web or Android app still signed in to it can recreate its profile until an hour from now.",
+    `A web or Android app still signed in to it can recreate its profile until ${until}.`,
     `Then run this with --uid ${uid} and without --apply: it should find no such account.`,
   ];
 }
@@ -478,7 +478,9 @@ async function main(argv, env) {
         `command again to finish. If that is refused because users/${account.uid} doesn't exist, ` +
         `this run got as far as deleting the profile: delete the sign-in account ${account.uid} ` +
         `in the Firebase console (Authentication), then run this again with --uid ${account.uid} ` +
-        `to delete anything still under users/${account.uid}.`
+        `to delete anything still under users/${account.uid}. An hour after you delete the sign-in ` +
+        `account, not an hour after this run, run this with --uid ${account.uid} and without ` +
+        "--apply: it should find no such account."
     );
   }
   print(summaryLines(account.uid, deleted));
