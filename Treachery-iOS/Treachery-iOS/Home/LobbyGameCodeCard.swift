@@ -36,6 +36,9 @@ struct LobbyGameCodeCard: View {
                 .clipShape(Capsule())
                 .accessibilityLabel("Game mode: \(game.gameMode.displayName)")
 
+            // Each keeps its look; its tap area reaches around it to 44pt.
+            // Plain, so the whole area takes the tap, not only the label's
+            // own frame.
             HStack(spacing: 16) {
                 Button {
                     UIPasteboard.general.string = game.code
@@ -47,9 +50,9 @@ struct LobbyGameCodeCard: View {
                             .font(.caption)
                     }
                     .foregroundStyle(Color.mtgGold)
-                    .frame(minWidth: 44, minHeight: 44)
-                    .contentShape(Rectangle())
+                    .minimumTapTarget()
                 }
+                .buttonStyle(.plain)
                 .accessibilityLabel("Copy game code")
 
                 Button {
@@ -62,11 +65,12 @@ struct LobbyGameCodeCard: View {
                             .font(.caption)
                     }
                     .foregroundStyle(Color.mtgGold)
-                    .frame(minWidth: 44, minHeight: 44)
-                    .contentShape(Rectangle())
+                    .minimumTapTarget()
                 }
+                .buttonStyle(.plain)
                 .accessibilityLabel("Share game code with friends")
             }
+            .padding(.top, 4)
         }
         .padding(.vertical, 24)
         .padding(.horizontal, 20)

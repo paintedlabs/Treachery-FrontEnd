@@ -217,6 +217,19 @@ extension View {
     func mtgGoldShimmer() -> some View {
         modifier(MtgGoldShimmer())
     }
+
+    /// Takes taps across at least 44×44pt, centered on the view, without
+    /// changing its size or place in the layout, so a small control keeps
+    /// its look. The extra area reaches into the space around the view:
+    /// keep other controls out of it, and draw the control above any
+    /// neighbor it covers.
+    func minimumTapTarget() -> some View {
+        background {
+            Color.clear
+                .frame(minWidth: 44, minHeight: 44)
+                .contentShape(Rectangle())
+        }
+    }
 }
 
 // MARK: - Reusable Styled Components

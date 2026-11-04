@@ -86,8 +86,7 @@ struct WearerOfMasksAbilitySheet: View {
                     Image(systemName: "minus.circle.fill")
                         .font(.system(size: 32))
                         .foregroundStyle(Color.mtgAssassin)
-                        .frame(minWidth: 44, minHeight: 44)
-                        .contentShape(Rectangle())
+                        .minimumTapTarget()
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel("Decrease X")
@@ -103,8 +102,7 @@ struct WearerOfMasksAbilitySheet: View {
                     Image(systemName: "plus.circle.fill")
                         .font(.system(size: 32))
                         .foregroundStyle(Color.mtgSuccess)
-                        .frame(minWidth: 44, minHeight: 44)
-                        .contentShape(Rectangle())
+                        .minimumTapTarget()
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel("Increase X")

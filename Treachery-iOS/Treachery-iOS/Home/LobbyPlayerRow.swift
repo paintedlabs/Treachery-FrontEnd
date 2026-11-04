@@ -29,8 +29,11 @@ struct LobbyPlayerRow: View {
                         .padding(.trailing, 8)
                 }
 
+                // Its tap area reaches over the start of the name, so it's
+                // drawn above the name.
                 if isMe {
                     colorPickerToggle
+                        .zIndex(1)
                 }
 
                 // VoiceOver reads these as one, "Luke, Host"; the color
@@ -97,11 +100,12 @@ struct LobbyPlayerRow: View {
                         .frame(width: 16, height: 16)
                 }
             }
-            // The dot keeps its size; the area around it takes the tap.
-            .frame(minWidth: 44, minHeight: 44)
-            .contentShape(Rectangle())
+            // The dot keeps its size and place; the area around it takes
+            // the tap too.
+            .minimumTapTarget()
         }
         .buttonStyle(.plain)
+        .padding(.trailing, 6)
         .accessibilityLabel("Choose player color")
     }
 

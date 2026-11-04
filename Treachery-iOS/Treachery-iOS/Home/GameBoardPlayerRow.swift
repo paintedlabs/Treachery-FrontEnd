@@ -38,9 +38,11 @@ struct GameBoardPlayerRow: View {
                         .padding(.trailing, 8)
                 }
 
-                // Color picker toggle for current user
+                // Color picker toggle for current user. Its tap area reaches
+                // over the start of the name, so it's drawn above the name.
                 if isCurrentUser {
                     colorPickerToggle
+                        .zIndex(1)
                 }
 
                 // At the accessibility text sizes the name needs the row's
@@ -93,11 +95,12 @@ struct GameBoardPlayerRow: View {
                         .frame(width: 16, height: 16)
                 }
             }
-            // The dot keeps its size; the area around it takes the tap.
-            .frame(minWidth: 44, minHeight: 44)
-            .contentShape(Rectangle())
+            // The dot keeps its size and place; the area around it takes
+            // the tap too.
+            .minimumTapTarget()
         }
         .buttonStyle(.plain)
+        .padding(.trailing, 6)
         .accessibilityLabel("Choose player color")
     }
 
@@ -150,11 +153,10 @@ struct GameBoardPlayerRow: View {
                 Button {
                     onViewCard?(player)
                 } label: {
-                    // The role sits where it does in the other rows, and its
-                    // target runs on below it to a full 44pt.
+                    // The role sits where it does in the other rows; its
+                    // tap area reaches above and below it to a full 44pt.
                     roleLabel(showsInfoIcon: true)
-                        .frame(minWidth: 44, minHeight: 44, alignment: .topLeading)
-                        .contentShape(Rectangle())
+                        .minimumTapTarget()
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel("View \(player.displayName)'s identity card")
@@ -196,9 +198,8 @@ struct GameBoardPlayerRow: View {
         // Life controls. A spectator sees the totals but can't
         // change them.
         if !player.isEliminated {
-            // The buttons' 44pt hit areas reach 2pt past their 40pt circles,
-            // so the spacing is that much less than the 8pt it looks.
-            HStack(spacing: 6) {
+            // Each button's tap area reaches into the spacing around it.
+            HStack(spacing: 12) {
                 Button {
                     viewModel.adjustLife(for: player.id, by: -1)
                 } label: {
@@ -210,8 +211,7 @@ struct GameBoardPlayerRow: View {
                                 .fill(Color.mtgAssassin.opacity(0.1))
                                 .frame(width: 40, height: 40)
                         )
-                        .frame(minWidth: 44, minHeight: 44)
-                        .contentShape(Rectangle())
+                        .minimumTapTarget()
                 }
                 .buttonStyle(.plain)
                 .disabled(!viewModel.canAdjustLife)
@@ -238,8 +238,7 @@ struct GameBoardPlayerRow: View {
                                 .fill(Color.mtgSuccess.opacity(0.1))
                                 .frame(width: 40, height: 40)
                         )
-                        .frame(minWidth: 44, minHeight: 44)
-                        .contentShape(Rectangle())
+                        .minimumTapTarget()
                 }
                 .buttonStyle(.plain)
                 .disabled(!viewModel.canAdjustLife)
