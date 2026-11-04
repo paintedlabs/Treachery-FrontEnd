@@ -8,6 +8,7 @@
 import Foundation
 import FirebaseAuth
 import FirebaseFunctions
+import os
 
 struct JoinGameResult {
     let action: String // "joined" or "already_joined"
@@ -56,6 +57,8 @@ enum AccountDeletionError: Error, Equatable {
 
 struct CloudFunctions: CloudFunctionsProtocol {
     private let functions = Functions.functions()
+
+    private static let logger = Logger(subsystem: "com.Solomon.Treachery-iOS", category: "AccountDeletion")
 
     func createGame(
         gameMode: String,
@@ -236,7 +239,17 @@ struct CloudFunctions: CloudFunctionsProtocol {
             // No arguments: send `{}`, as the contract specifies, rather than null.
             result = try await callable.call([String: Any]())
         } catch {
-            throw AccountDeletionError(callableError: error) ?? error
+            guard let deletionError = AccountDeletionError(callableError: error) else { throw error }
+            if deletionError == .notSent {
+                // Several causes become notSent, from a failed DNS lookup to
+                // a keychain error getting the sign-in token, and only this
+                // log keeps which. The domain and code hold no personal data,
+                // so they stay readable in a sysdiagnose; the rest is private.
+                let nsError = error as NSError
+                let cause = "\(nsError.domain) \(nsError.code)"
+                Self.logger.error("deleteAccount couldn't be sent (\(cause, privacy: .public)): \(String(describing: error), privacy: .private)")
+            }
+            throw deletionError
         }
         try Self.validateDeleteAccountResponse(result.data)
     }
