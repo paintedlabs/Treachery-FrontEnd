@@ -24,6 +24,9 @@ final class MockCloudFunctions: CloudFunctionsProtocol {
     /// What adjustLife answers with as the server's new total. Read when the
     /// call returns, so a test can set it while the call is held.
     var adjustLifeNewLife: Int?
+    /// Thrown by the next adjustLife calls, one each, ahead of
+    /// `errorToThrow`: a test can fail one call and let the next through.
+    var adjustLifeErrors: [Error] = []
 
     // Call tracking
     var createGameCalls: [(gameMode: String, maxPlayers: Int, startingLife: Int, maxTraitorRarity: String?)] = []
@@ -71,6 +74,7 @@ final class MockCloudFunctions: CloudFunctionsProtocol {
     @MainActor
     func adjustLife(gameId: String, playerId: String, amount: Int) async throws -> Int? {
         if let adjustLifeGate { await adjustLifeGate.hold() }
+        if !adjustLifeErrors.isEmpty { throw adjustLifeErrors.removeFirst() }
         if let error = errorToThrow { throw error }
         adjustLifeCalls.append((gameId, playerId, amount))
         return adjustLifeNewLife

@@ -413,6 +413,74 @@ struct OptimisticLifeTrackingTests {
     }
 }
 
+// MARK: - Taps held until the change before them settles
+
+/// In each of these the -1's debounce ends before the -3 has settled, so
+/// the -1 waits; nothing but the -3 settling may send it.
+@MainActor
+struct HeldLifeTapTests {
+
+    @Test(.timeLimit(.minutes(1)))
+    func aHeldTapGoesOutWhenTheEchoSettlesAConfirmedChange() async throws {
+        let board = LifeBoard()
+        let gate = board.holdCalls()
+        let send = try await board.holdTapBehindAChangeInFlight()
+
+        // The response comes first: the -3 stays on screen until its echo,
+        // and the -1 keeps waiting.
+        board.functions.adjustLifeNewLife = 37
+        gate.release()
+        await send.value
+        #expect(board.vm.lifeChangeSends.isEmpty)
+        #expect(board.functions.adjustLifeCalls.map(\.amount) == [-3])
+        #expect(board.shown() == 36)
+
+        board.functions.adjustLifeNewLife = 36
+        board.snapshot([37, 40, 40])
+        #expect(board.vm.lifeChangeSends["p0"] != nil)
+        await board.finishSends()
+        #expect(board.functions.adjustLifeCalls.map(\.amount) == [-3, -1])
+        #expect(board.shown() == 36)
+    }
+
+    @Test(.timeLimit(.minutes(1)))
+    func aHeldTapGoesOutWhenTheResponseSettlesAChangeTheEchoShowed() async throws {
+        let board = LifeBoard()
+        let gate = board.holdCalls()
+        let send = try await board.holdTapBehindAChangeInFlight()
+
+        // The echo comes first, but the -3's call is still out.
+        board.snapshot([37, 40, 40])
+        #expect(board.vm.lifeChangeSends.count == 1)
+        #expect(gate.arrivals == 1)
+        #expect(board.shown() == 36)
+
+        gate.release()
+        await send.value
+        await board.finishSends()
+        #expect(board.functions.adjustLifeCalls.map(\.amount) == [-3, -1])
+        #expect(gate.arrivals == 2)
+        #expect(board.shown() == 36)
+    }
+
+    @Test(.timeLimit(.minutes(1)))
+    func aHeldTapGoesOutWhenTheChangeAheadOfItFails() async throws {
+        let board = LifeBoard()
+        let gate = board.holdCalls()
+        board.functions.adjustLifeErrors = [NSError(domain: "test", code: 1)]
+        let send = try await board.holdTapBehindAChangeInFlight()
+
+        gate.release()
+        await send.value
+        await board.finishSends()
+
+        // The -3 failed and is never resent; the -1 went out on its own.
+        #expect(board.functions.adjustLifeCalls.map(\.amount) == [-1])
+        #expect(gate.arrivals == 2)
+        #expect(board.shown() == 39)
+    }
+}
+
 // MARK: - Board
 
 /// A board on the production initializer, so its players listener is
@@ -495,6 +563,24 @@ private struct LifeBoard {
         for debounce in debounces {
             await debounce.value
         }
+    }
+
+    /// Sends p0 -3 and, while the gate holds that call, taps p0 -1 and ends
+    /// its debounce. Returns the -3's send, with the -1 waiting behind it.
+    func holdTapBehindAChangeInFlight() async throws -> Task<Void, Never> {
+        vm.adjustLife(for: "p0", by: -3)
+        await endDebounces()
+        let inFlight = try send()
+        let gate = try #require(functions.adjustLifeGate)
+        await gate.waitForCall(from: inFlight)
+
+        vm.adjustLife(for: "p0", by: -1)
+        await endDebounces()
+        #expect(vm.lifeChangeDebounces.isEmpty)
+        #expect(vm.lifeChangeSends.count == 1)
+        #expect(gate.arrivals == 1)
+        #expect(shown() == 36)
+        return inFlight
     }
 
     /// Waits for the calls under way, and any they lead to, to finish.
