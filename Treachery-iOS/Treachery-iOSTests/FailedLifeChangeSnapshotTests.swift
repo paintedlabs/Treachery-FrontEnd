@@ -68,6 +68,18 @@ struct FailedLifeChangeSnapshotTests {
 
         #expect(board.vm.lifeChangeMessage == "Couldn't update Player 0's life. Game is not in progress.")
     }
+
+    @Test(.timeLimit(.minutes(1)))
+    func aSnapshotAfterTheGameIsOverLeavesTheMessageAsItIs() async throws {
+        // Game Over covers the board by then, and the revised message would
+        // only be read out over the results.
+        let board = await boardWithAFailedChange()
+        try board.finishGame()
+
+        board.snapshot([35, 40, 40])
+
+        #expect(board.vm.lifeChangeMessage == tryAgain)
+    }
 }
 
 /// `LifeChangeFailure.revised(by:)` on its own.

@@ -137,4 +137,18 @@ extension GameBoardViewModel {
             }
         }
     }
+
+    /// `lifeChangeFailures` once a players snapshot shows `players`. A
+    /// player shown eliminated loses theirs: the server refuses changes to
+    /// them, and no tap could clear the message. Anyone else's is revised
+    /// by where their total went; see `LifeChangeFailure.revised(by:)`.
+    /// Once the game is over they stay as they are: Game Over covers the
+    /// board, and a revision would only be read out over the results.
+    func revisedLifeChangeFailures(by players: [Player]) -> [LifeChangeFailure] {
+        guard !isGameFinished else { return lifeChangeFailures }
+        return lifeChangeFailures.compactMap { failure in
+            guard let player = players.first(where: { $0.id == failure.playerId }) else { return failure }
+            return player.isEliminated ? nil : failure.revised(by: player)
+        }
+    }
 }

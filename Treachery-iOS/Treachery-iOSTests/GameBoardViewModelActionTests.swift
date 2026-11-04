@@ -238,16 +238,17 @@ struct GameBoardViewModelActionTests {
     @Test(.timeLimit(.minutes(1)))
     func gameEndingDuringTheRevealOpensNoAbilitySheet() async throws {
         // Game Over is up by then, and resolveMetamorph would refuse: "Game
-        // is not in progress."
+        // is not in progress." The game ends during the banner; one that
+        // ends during the flip ends the reveal there (GameBoardUnveilTests).
         let clock = TestClock()
         let (vm, _, _) = makeVM(players: metamorphPlayers(), clock: clock)
 
         await vm.unveilCurrentPlayer()?.value
         let reveal = try #require(vm.unveilReveal)
         await clock.waitForSleepers()
-        vm.game?.state = .finished
         clock.advance(by: .milliseconds(300))
         await clock.waitForSleepers()
+        vm.game?.state = .finished
         clock.advance(by: .seconds(2))
         await reveal.value
 

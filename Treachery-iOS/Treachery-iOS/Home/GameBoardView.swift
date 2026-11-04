@@ -94,17 +94,18 @@ struct GameBoardView: View {
             // Taps still waiting out their debounce would go with the board.
             viewModel.sendPendingLifeChanges()
         }
+        // What each change reads out, if anything, is the view model's call;
+        // see GameBoardViewModel+Accessibility.swift. Nothing is, once the
+        // game is over and Game Over covers the board.
         .onChange(of: viewModel.errorMessage) { _, message in
             // An action that fails (a roll, a forfeit, an ability) says so in
-            // the controls pinned below the players, away from where the
-            // player is looking or VoiceOver is reading: read it out.
-            guard let message else { return }
-            AccessibilityNotification.Announcement(message).post()
+            // the controls pinned below the players.
+            guard let announcement = viewModel.announcement(forError: message) else { return }
+            AccessibilityNotification.Announcement(announcement).post()
         }
         .onChange(of: viewModel.lifeChangeFailures) { old, new in
-            // A failed change can put a total back with no other sign, and
-            // the banner is away from the rows: read out each new one.
-            for announcement in GameBoardViewModel.LifeChangeFailure.announcements(from: old, to: new) {
+            // Each new failure by itself.
+            for announcement in viewModel.announcements(forFailuresFrom: old, to: new) {
                 var message = AttributedString(announcement.message)
                 // Low priority waits for VoiceOver to finish what it's saying.
                 message.accessibilitySpeechAnnouncementPriority = announcement.interrupts ? .default : .low
@@ -112,26 +113,12 @@ struct GameBoardView: View {
             }
         }
         .onChange(of: viewModel.seat) { oldSeat, newSeat in
-            // Elimination changes the board with no other sign: the life
-            // buttons stop working, and the spectator bar, now the way
-            // home, appears at the bottom.
-            guard oldSeat == .playing, newSeat == .spectating else { return }
-            AccessibilityNotification.Announcement(
-                "You've been eliminated. You can keep watching, or use Leave Game at the bottom of the screen."
-            ).post()
+            guard let announcement = viewModel.announcement(forSeatChangeFrom: oldSeat, to: newSeat) else { return }
+            AccessibilityNotification.Announcement(announcement).post()
         }
         .onChange(of: viewModel.unveilProgress) { _, progress in
-            switch progress {
-            case .revealing:
-                // The banner is the only sign the unveil went through.
-                AccessibilityNotification.Announcement("Identity revealed").post()
-            case .failed(let message):
-                // And the error, away below the players, the only sign it
-                // didn't: the button just goes back to Unveil.
-                AccessibilityNotification.Announcement(message).post()
-            case .idle, .sending, .flippingAway, .awaitingSnapshot:
-                break
-            }
+            guard let announcement = viewModel.announcement(for: progress) else { return }
+            AccessibilityNotification.Announcement(announcement).post()
         }
         .onChange(of: viewModel.isGameFinished) { _, finished in
             if finished {

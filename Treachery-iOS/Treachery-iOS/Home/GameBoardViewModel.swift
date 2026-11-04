@@ -443,14 +443,17 @@ extension GameBoardViewModel {
     /// edge-on, then back face-up under the "IDENTITY REVEALED" banner.
     /// Then the ability sheet opens, when their card has an ability to use.
     /// The board owns the reveal: when the board goes away, it ends there.
+    /// It ends after the flip once the game is over: Game Over covers it.
     private func playReveal() {
         AnalyticsService.trackEvent("unveil_identity")
         unveilProgress = .flippingAway
         unveilReveal = Task { [weak self, clock] in
             do {
                 try await clock.sleep(for: UnveilProgress.flipDuration)
-                self?.unveilProgress = .revealing
-                try await clock.sleep(for: UnveilProgress.bannerDuration)
+                if self?.game?.state == .inProgress {
+                    self?.unveilProgress = .revealing
+                    try await clock.sleep(for: UnveilProgress.bannerDuration)
+                }
             } catch {
                 return // The board went away.
             }
@@ -546,20 +549,16 @@ extension GameBoardViewModel {
     /// A players snapshot: settles the batches it shows, redraws the board,
     /// sends any taps that were waiting on a batch it settled, and settles
     /// an unveil whose call couldn't. A player it shows eliminated loses
-    /// their unsent taps and any failure explained for them: the server
-    /// refuses changes to them, and no tap could clear the message. A
-    /// failure for anyone else is revised by where their total went; see
-    /// `LifeChangeFailure.revised(by:)`.
+    /// their unsent taps: the server refuses changes to them. What the
+    /// board says about failed changes follows the snapshot too; see
+    /// `revisedLifeChangeFailures(by:)`.
     private func receivePlayers(_ players: [Player]) {
         serverPlayers = players
         lifeLedger.reconcile(with: players)
         for player in players where player.isEliminated {
             lifeChangeDebounces.removeValue(forKey: player.id)?.cancel()
         }
-        lifeChangeFailures = lifeChangeFailures.compactMap { failure in
-            guard let player = players.first(where: { $0.id == failure.playerId }) else { return failure }
-            return player.isEliminated ? nil : failure.revised(by: player)
-        }
+        lifeChangeFailures = revisedLifeChangeFailures(by: players)
         withAnimation(.easeInOut(duration: 0.3)) {
             refreshPlayers()
         }

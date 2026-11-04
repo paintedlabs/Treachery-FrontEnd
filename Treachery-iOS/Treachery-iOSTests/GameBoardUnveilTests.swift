@@ -1,3 +1,4 @@
+import Combine
 import Testing
 import Foundation
 @testable import Treachery_iOS
@@ -176,5 +177,37 @@ struct GameBoardUnveilTests {
         mockFS.emitPlayers(.success(players(unveiled: true)), gameId: "game1")
         #expect(vm.unveilProgress == .idle)
         #expect(cf.unveilPlayerCalls == ["game1"])
+    }
+
+    // MARK: - A game that ends
+
+    @Test(.timeLimit(.minutes(1)))
+    func aRevealWhoseGameEndsDuringTheFlipNeverShowsTheBanner() async throws {
+        // Another player's lethal change ends the game while the header
+        // turns. Game Over covers the board, so the banner, and "Identity
+        // revealed" with it, would only play behind the results.
+        let clock = TestClock()
+        let cf = MockCloudFunctions()
+        let (vm, mockFS) = makeBoard(cloudFunctions: cf, clock: clock)
+        var progress: [GameBoardViewModel.UnveilProgress] = []
+        let subscription = vm.$unveilProgress.sink { progress.append($0) }
+        defer { subscription.cancel() }
+
+        await vm.unveilCurrentPlayer()?.value
+        #expect(vm.unveilProgress == .flippingAway)
+        let reveal = try #require(vm.unveilReveal)
+        var finished = try #require(mockFS.gamesToReturn["game1"])
+        finished.state = .finished
+        mockFS.emitGame(.loaded(finished), gameId: "game1")
+
+        await clock.waitForSleepers()
+        clock.advance(by: GameBoardViewModel.UnveilProgress.flipDuration)
+        await reveal.value
+
+        #expect(!progress.contains(.revealing))
+        #expect(vm.unveilProgress == .awaitingSnapshot)
+        // It ends there, without waiting out the banner, and opens no sheet.
+        #expect(clock.pendingDeadlines.isEmpty)
+        #expect(vm.pendingAbilityResolution == nil)
     }
 }
