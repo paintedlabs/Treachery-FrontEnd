@@ -1,3 +1,4 @@
+import Combine
 import Testing
 import Foundation
 @testable import Treachery_iOS
@@ -37,12 +38,15 @@ struct GameBoardViewModelActionTests {
         ]
     }
 
+    /// Waits on the clock end at once, unless a test passes a `TestClock` to
+    /// step through them.
     private func makeVM(
         game: Game? = nil,
         players: [Player]? = nil,
         currentUserId: String? = "u1",
         cloudFunctions: MockCloudFunctions = MockCloudFunctions(),
-        firestoreManager: MockFirestoreManager = MockFirestoreManager()
+        firestoreManager: MockFirestoreManager = MockFirestoreManager(),
+        clock: any Clock<Duration> = ImmediateClock()
     ) -> (GameBoardViewModel, MockCloudFunctions, MockFirestoreManager) {
         let g = game ?? makeSampleGame()
         let p = players ?? makePlayers()
@@ -54,7 +58,8 @@ struct GameBoardViewModelActionTests {
             firestoreManager: firestoreManager,
             cloudFunctions: cloudFunctions,
             cardDatabase: CardDatabase(cards: []),
-            planeDatabase: PlaneDatabase(cards: [])
+            planeDatabase: PlaneDatabase(cards: []),
+            clock: clock
         )
         return (vm, cloudFunctions, firestoreManager)
     }
@@ -90,15 +95,18 @@ struct GameBoardViewModelActionTests {
         cf.errorToThrow = NSError(domain: "test", code: 1, userInfo: [NSLocalizedDescriptionKey: "network error"])
         let (vm, _, _) = makeVM(cloudFunctions: cf)
         await vm.unveilCurrentPlayer()
-        #expect(vm.errorMessage == "network error")
+        // A plain sentence, never the SDK's description.
+        #expect(vm.errorMessage == "Couldn't unveil your identity. Check your connection and try again.")
+        #expect(vm.unveilProgress == .idle)
     }
 
-    @Test func unveilSetsPendingDuringCall() async {
-        let (vm, _, _) = makeVM()
-        #expect(vm.isPending == false)
+    @Test func unveilIsNotHeldUpByAnotherAction() async {
+        // It used to share isPending, and return without a word while, say,
+        // a phenomenon was resolving.
+        let (vm, cf, _) = makeVM()
+        vm.isPending = true
         await vm.unveilCurrentPlayer()
-        // After completion, pending should be false again
-        #expect(vm.isPending == false)
+        #expect(cf.unveilPlayerCalls == ["game1"])
     }
 
     @Test func unveilDoesNothingWhenLeader() async {
@@ -114,6 +122,97 @@ struct GameBoardViewModelActionTests {
         // There's no check for leader in the viewmodel. So it WOULD call the cloud function.
         // This test documents that behavior — the view prevents it, but the VM doesn't.
         #expect(cf.unveilPlayerCalls.count == 1)
+    }
+
+    // MARK: - Unveil reveal
+
+    @Test(.timeLimit(.minutes(1)))
+    func revealPlaysOnlyOnceTheServerHasUnveiled() async {
+        let clock = TestClock()
+        let cf = MockCloudFunctions()
+        let gate = CallGate()
+        cf.unveilPlayerGate = gate
+        let (vm, _, _) = makeVM(cloudFunctions: cf, clock: clock)
+        let progress = UnveilProgressRecorder(vm)
+
+        let unveil = Task { await vm.unveilCurrentPlayer() }
+        await gate.waitForCall(from: unveil)
+        // Nothing turns while the call is under way.
+        #expect(vm.unveilProgress == .sending)
+        #expect(clock.pendingDeadlines.isEmpty)
+
+        gate.release()
+        await clock.waitForSleepers()
+        #expect(vm.unveilProgress == .flippingAway)
+        #expect(clock.pendingDeadlines == [.milliseconds(300)])
+
+        clock.advance(by: .milliseconds(300))
+        await clock.waitForSleepers()
+        #expect(vm.unveilProgress == .revealing)
+        #expect(clock.pendingDeadlines == [.milliseconds(2_300)])
+
+        clock.advance(by: .seconds(2))
+        await unveil.value
+        #expect(progress.values == [.idle, .sending, .flippingAway, .revealing, .idle])
+    }
+
+    @Test(.timeLimit(.minutes(1)))
+    func failedUnveilPlaysNoReveal() async {
+        let clock = TestClock()
+        let cf = MockCloudFunctions()
+        cf.errorToThrow = URLError(.notConnectedToInternet)
+        let (vm, _, _) = makeVM(cloudFunctions: cf, clock: clock)
+        let progress = UnveilProgressRecorder(vm)
+
+        await vm.unveilCurrentPlayer()
+
+        // No flip and no banner: only the error says what happened.
+        #expect(progress.values == [.idle, .sending, .idle])
+        #expect(clock.pendingDeadlines.isEmpty)
+        #expect(vm.errorMessage == "Couldn't unveil your identity. Check your connection and try again.")
+    }
+
+    @Test(.timeLimit(.minutes(1)))
+    func repeatUnveilWhileOneIsUnderWayIsIgnored() async {
+        let cf = MockCloudFunctions()
+        let gate = CallGate()
+        cf.unveilPlayerGate = gate
+        let (vm, _, _) = makeVM(cloudFunctions: cf)
+
+        let first = Task { await vm.unveilCurrentPlayer() }
+        await gate.waitForCall(from: first)
+        // The gate holds only the first call, so a repeat that slipped
+        // through would be counted rather than wait forever.
+        await vm.unveilCurrentPlayer()
+        gate.release()
+        await first.value
+
+        #expect(gate.arrivals == 1)
+        #expect(cf.unveilPlayerCalls == ["game1"])
+    }
+
+    @Test(.timeLimit(.minutes(1)))
+    func abilitySheetOpensOnceTheRevealIsOver() async {
+        let clock = TestClock()
+        var players = makePlayers()
+        players[1] = Player(
+            id: "p1", orderId: 1, userId: "u1", displayName: "Alice",
+            role: .traitor, identityCardId: "traitor_07", lifeTotal: 40,
+            isEliminated: false, isUnveiled: false, joinedAt: Date()
+        )
+        let (vm, _, _) = makeVM(players: players, clock: clock)
+
+        let unveil = Task { await vm.unveilCurrentPlayer() }
+        await clock.waitForSleepers()
+        clock.advance(by: .milliseconds(300))
+        await clock.waitForSleepers()
+        // The sheet would cover the reveal.
+        #expect(vm.unveilProgress == .revealing)
+        #expect(vm.pendingAbilityResolution == nil)
+
+        clock.advance(by: .seconds(2))
+        await unveil.value
+        #expect(vm.pendingAbilityResolution?.abilityType == .metamorph)
     }
 
     // MARK: - eliminateAndLeave
@@ -259,5 +358,19 @@ struct GameBoardViewModelActionTests {
         await vm.selectTunnelPlane(plane)
         // tunnelOptions should not be cleared if isPending
         #expect(vm.isPending == true)
+    }
+}
+
+/// Every value `unveilProgress` takes, in order, starting with the one it has
+/// when recording starts.
+@MainActor
+private final class UnveilProgressRecorder {
+    private(set) var values: [GameBoardViewModel.UnveilProgress] = []
+    private var subscription: AnyCancellable?
+
+    init(_ viewModel: GameBoardViewModel) {
+        subscription = viewModel.$unveilProgress.sink { [weak self] progress in
+            self?.values.append(progress)
+        }
     }
 }

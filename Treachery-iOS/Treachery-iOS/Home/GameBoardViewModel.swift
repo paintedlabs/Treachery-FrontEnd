@@ -24,6 +24,9 @@ final class GameBoardViewModel: ObservableObject {
     /// tap clears, so tapping someone else doesn't hide it.
     @Published private(set) var lifeChangeFailure: LifeChangeFailure?
     @Published var isPending = false
+    /// Unveiling has its own progress, so another action under way can't
+    /// make an unveil silently do nothing.
+    @Published private(set) var unveilProgress: UnveilProgress = .idle
     @Published var pendingAbilityResolution: AbilityResolution?
 
     // Planechase transient state
@@ -226,21 +229,34 @@ final class GameBoardViewModel: ObservableObject {
 
     // MARK: - Unveil (via Cloud Function)
 
+    /// Unveils the player, then plays the reveal, timed on the injected
+    /// clock: the header turns edge-on and back, under the "IDENTITY
+    /// REVEALED" banner. Nothing plays unless the server has unveiled them.
+    /// Returns once the reveal is over, which opens the ability sheet when
+    /// their card has one.
     func unveilCurrentPlayer() async {
-        guard let player = currentPlayer else { return }
-        guard !player.isUnveiled else { return }
-        guard !isPending else { return }
+        guard let player = currentPlayer, !player.isUnveiled, unveilProgress == .idle else { return }
         errorMessage = nil
-        isPending = true
-
+        unveilProgress = .sending
         do {
             try await cloudFunctions.unveilPlayer(gameId: gameId)
-            AnalyticsService.trackEvent("unveil_identity")
-            checkForAbilityTrigger(player: player)
         } catch {
-            errorMessage = error.localizedDescription
+            logger.error("unveilPlayer failed: \(String(describing: error), privacy: .public)")
+            unveilProgress = .idle
+            errorMessage = "Couldn't unveil your identity. Check your connection and try again."
+            return
         }
-        isPending = false
+        AnalyticsService.trackEvent("unveil_identity")
+        unveilProgress = .flippingAway
+        do {
+            try await clock.sleep(for: UnveilProgress.flipDuration)
+            unveilProgress = .revealing
+            try await clock.sleep(for: UnveilProgress.bannerDuration)
+        } catch {
+            // Cancelled part way: the reveal just ends.
+        }
+        unveilProgress = .idle
+        presentAbilityAfterUnveil()
     }
 
     func presentAbilityResolver() {
@@ -248,9 +264,13 @@ final class GameBoardViewModel: ObservableObject {
         pendingAbilityResolution = makeAbilityResolution(for: player)
     }
 
-    private func checkForAbilityTrigger(player: Player) {
-        guard !player.abilityResolved else { return }
-        guard ExecutableAbility(cardId: player.identityCardId ?? "") != nil else { return }
+    /// Opens the ability sheet after the reveal when the card just unveiled
+    /// has an ability left to use. The unveil may not have reached a players
+    /// snapshot yet, so unlike `resolvableAbility` this doesn't wait for it.
+    private func presentAbilityAfterUnveil() {
+        guard pendingAbilityResolution == nil,
+              let player = currentPlayer, !player.isEliminated, !player.abilityResolved,
+              ExecutableAbility(cardId: player.identityCardId ?? "") != nil else { return }
         pendingAbilityResolution = makeAbilityResolution(for: player)
     }
 

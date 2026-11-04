@@ -20,6 +20,7 @@ final class MockCloudFunctions: CloudFunctionsProtocol {
     var startGameGate: CallGate?
     var leaveGameGate: CallGate?
     var adjustLifeGate: CallGate?
+    var unveilPlayerGate: CallGate?
 
     /// What adjustLife answers with as the server's new total. Read when the
     /// call returns, so a test can set it while the call is held.
@@ -87,6 +88,7 @@ final class MockCloudFunctions: CloudFunctionsProtocol {
     }
 
     func unveilPlayer(gameId: String) async throws {
+        if let unveilPlayerGate { await unveilPlayerGate.hold() }
         if let error = errorToThrow { throw error }
         unveilPlayerCalls.append(gameId)
     }

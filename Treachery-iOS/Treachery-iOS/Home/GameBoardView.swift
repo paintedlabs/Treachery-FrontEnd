@@ -12,8 +12,6 @@ struct GameBoardView: View {
     @StateObject private var viewModel: GameBoardViewModel
     @Binding var navigationPath: NavigationPath
     @State private var showCardDetail = false
-    @State private var cardFlipDegrees: Double = 0
-    @State private var showUnveiledBanner = false
     @State private var showForfeitConfirmation = false
     @State private var isConfirmingSpectatorLeave = false
     @State private var showEndGameConfirmation = false
@@ -61,13 +59,18 @@ struct GameBoardView: View {
                                 }
                                 .buttonStyle(.plain)
                                 .rotation3DEffect(
-                                    .degrees(cardFlipDegrees),
+                                    .degrees(viewModel.unveilProgress == .flippingAway ? 90 : 0),
                                     axis: (x: 0, y: 1, z: 0),
                                     perspective: 0.5
                                 )
+                                .animation(
+                                    viewModel.unveilProgress == .flippingAway ? .easeIn(duration: 0.3) : .easeOut(duration: 0.3),
+                                    value: viewModel.unveilProgress
+                                )
 
-                                // Unveiled banner overlay
-                                if showUnveiledBanner {
+                                // Unveiled banner overlay, once the server has
+                                // unveiled the player
+                                if viewModel.unveilProgress == .revealing {
                                     VStack {
                                         Text("IDENTITY REVEALED")
                                             .font(.headline)
@@ -85,6 +88,12 @@ struct GameBoardView: View {
                                     .zIndex(1)
                                 }
                             }
+                            .animation(
+                                viewModel.unveilProgress == .revealing
+                                    ? .spring(response: 0.4, dampingFraction: 0.6)
+                                    : .easeOut(duration: 0.5),
+                                value: viewModel.unveilProgress
+                            )
                         } else {
                             // Current player not found (reconnection case).
                             // Forfeit and the action bar need that player, so
@@ -244,7 +253,7 @@ struct GameBoardView: View {
 
                     // Action bar (unveil/win) — only when treachery active
                     if viewModel.isTreacheryActive, viewModel.seat == .playing {
-                        ActionBar(viewModel: viewModel, onUnveil: playUnveilAnimation)
+                        ActionBar(viewModel: viewModel)
                     }
 
                     // End Game button — the host's, in every mode but Treachery's,
@@ -313,6 +322,11 @@ struct GameBoardView: View {
             // the banner is away from the rows: read it out.
             guard let failure else { return }
             AccessibilityNotification.Announcement(failure.message).post()
+        }
+        .onChange(of: viewModel.unveilProgress) { _, progress in
+            // The banner is the only sign the unveil went through.
+            guard progress == .revealing else { return }
+            AccessibilityNotification.Announcement("Identity revealed").post()
         }
         .onChange(of: viewModel.isGameFinished) { _, finished in
             if finished {
@@ -405,36 +419,6 @@ struct GameBoardView: View {
     private func presentWinnerSelection() {
         selectedWinners = []
         showWinnerSelection = true
-    }
-
-    // MARK: - Unveil Animation
-
-    private func playUnveilAnimation() {
-        // Phase 1: Flip card away (0 -> 90 degrees)
-        withAnimation(.easeIn(duration: 0.3)) {
-            cardFlipDegrees = 90
-        }
-
-        // Phase 2: Perform the unveil at the midpoint, then flip back (90 -> 0)
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-            Task { await viewModel.unveilCurrentPlayer() }
-
-            withAnimation(.easeOut(duration: 0.3)) {
-                cardFlipDegrees = 0
-            }
-
-            // Phase 3: Show the "IDENTITY REVEALED" banner
-            withAnimation(.spring(response: 0.4, dampingFraction: 0.6)) {
-                showUnveiledBanner = true
-            }
-
-            // Phase 4: Dismiss the banner after a delay
-            DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
-                withAnimation(.easeOut(duration: 0.5)) {
-                    showUnveiledBanner = false
-                }
-            }
-        }
     }
 }
 
