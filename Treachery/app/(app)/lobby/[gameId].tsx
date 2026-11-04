@@ -323,12 +323,7 @@ export default function LobbyScreen() {
   const currentPlayerColor = players.find((p) => p.user_id === currentUserId)?.player_color;
 
   return (
-    <ScrollView
-      ref={scrollRef}
-      style={[styles.container, isDesktop && styles.desktopContainer]}
-      contentContainerStyle={styles.content}
-      keyboardShouldPersistTaps="handled"
-    >
+    <View style={[styles.container, isDesktop && styles.desktopContainer]}>
       {/* Player color background tint */}
       {currentPlayerColor && (
         <View
@@ -337,241 +332,255 @@ export default function LobbyScreen() {
         />
       )}
 
+      {/* Pinned above the ScrollView, so scrolling to an error never hides it. */}
       <ConnectionBanner />
 
-      {/* Game code display - ornate card frame */}
-      {game && (
-        <View style={styles.codeSection}>
-          <View style={styles.codeFrame}>
-            <View style={styles.codeTrim} />
-            <Text style={styles.codeLabel}>Game Code</Text>
-            <Text style={styles.codeText}>{game.code}</Text>
-            <TouchableOpacity
-              style={styles.shareButton}
-              onPress={handleShare}
-              accessibilityLabel="Share game code"
-              accessibilityRole="button"
-            >
-              <Ionicons name="share-outline" size={14} color={colors.primary} />
-              <Text style={styles.shareText}>Share Code</Text>
-            </TouchableOpacity>
-            {game.game_mode && (
-              <View style={styles.modeBadge}>
-                <Text style={styles.modeBadgeText}>
-                  {MODE_DISPLAY[game.game_mode] ?? game.game_mode}
-                </Text>
-              </View>
-            )}
-          </View>
-        </View>
-      )}
-
-      {/* Ornate divider */}
-      <View style={styles.ornateDividerRow}>
-        <View style={styles.ornateLine} />
-        <Text style={styles.ornateDiamond}>&#9670;</Text>
-        <View style={styles.ornateLine} />
-      </View>
-
-      {/* Game settings (host only) */}
-      {isHost && game && (
-        <View style={styles.settingsCard}>
-          <Text style={styles.settingsTitle}>GAME SETTINGS</Text>
-
-          <View style={styles.settingsRow}>
-            <Text style={styles.settingsLabel}>Max Players</Text>
-            <View style={styles.settingsStepper}>
+      <ScrollView
+        ref={scrollRef}
+        style={styles.scroll}
+        contentContainerStyle={styles.content}
+        keyboardShouldPersistTaps="handled"
+      >
+        {/* Game code display - ornate card frame */}
+        {game && (
+          <View style={styles.codeSection}>
+            <View style={styles.codeFrame}>
+              <View style={styles.codeTrim} />
+              <Text style={styles.codeLabel}>Game Code</Text>
+              <Text style={styles.codeText}>{game.code}</Text>
               <TouchableOpacity
-                // Legacy games could be stored with max_players > 8 (the server now
-                // caps at 8), so clamp the decrement into the valid range — from any
-                // value above 8, '-' goes straight to 8 instead of a rejected 11.
-                onPress={() =>
-                  updateGameSettings({
-                    maxPlayers: Math.min(8, Math.max(2, game.max_players - 1)),
-                  })
-                }
-                disabled={game.max_players <= 2}
-                accessibilityLabel="Decrease max players"
+                style={styles.shareButton}
+                onPress={handleShare}
+                accessibilityLabel="Share game code"
+                accessibilityRole="button"
               >
-                <Ionicons
-                  name="remove-circle-outline"
-                  size={24}
-                  color={game.max_players > 2 ? colors.primary : colors.textTertiary}
-                />
+                <Ionicons name="share-outline" size={14} color={colors.primary} />
+                <Text style={styles.shareText}>Share Code</Text>
               </TouchableOpacity>
-              <Text style={styles.settingsValue}>{game.max_players}</Text>
-              <TouchableOpacity
-                onPress={() =>
-                  updateGameSettings({ maxPlayers: Math.min(8, game.max_players + 1) })
-                }
-                disabled={game.max_players >= 8}
-                accessibilityLabel="Increase max players"
-              >
-                <Ionicons
-                  name="add-circle-outline"
-                  size={24}
-                  color={game.max_players < 8 ? colors.primary : colors.textTertiary}
-                />
-              </TouchableOpacity>
-            </View>
-          </View>
-
-          <View style={styles.settingsDivider} />
-
-          <View style={styles.settingsRow}>
-            <Text style={styles.settingsLabel}>Starting Life</Text>
-            <View style={styles.settingsChips}>
-              {STARTING_LIFE_OPTIONS.map((life) => {
-                const active = game.starting_life === life;
-                return (
-                  <TouchableOpacity
-                    key={life}
-                    style={styles.lifeChipTarget}
-                    onPress={() => updateGameSettings({ startingLife: life })}
-                    // RN-web ignores accessibilityState; the label carries the selection.
-                    accessibilityLabel={`Set starting life to ${life}${active ? ', selected' : ''}`}
-                    accessibilityRole="button"
-                  >
-                    <View style={[styles.chip, styles.lifeChip, active && styles.chipActive]}>
-                      <Text style={[styles.chipText, active && styles.chipTextActive]}>{life}</Text>
-                    </View>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-          </View>
-
-          <View style={styles.settingsDivider} />
-
-          <View style={styles.settingsRow}>
-            <Text style={styles.settingsLabel}>Game Mode</Text>
-            <View style={styles.settingsChips}>
-              {Object.entries(MODE_DISPLAY).map(([key, label]) => (
-                <TouchableOpacity
-                  key={key}
-                  style={[styles.chip, game.game_mode === key && styles.chipActive]}
-                  onPress={() => updateGameSettings({ gameMode: key })}
-                  accessibilityLabel={`Set game mode to ${label}`}
-                >
-                  <Text style={[styles.chipText, game.game_mode === key && styles.chipTextActive]}>
-                    {label}
+              {game.game_mode && (
+                <View style={styles.modeBadge}>
+                  <Text style={styles.modeBadgeText}>
+                    {MODE_DISPLAY[game.game_mode] ?? game.game_mode}
                   </Text>
-                </TouchableOpacity>
-              ))}
+                </View>
+              )}
             </View>
           </View>
-
-          {/* Max traitor rarity — only meaningful in treachery modes */}
-          {((game.game_mode ?? 'treachery') === 'treachery' ||
-            game.game_mode === 'treachery_planechase') && (
-            <>
-              <View style={styles.settingsDivider} />
-              <View style={styles.settingsRow}>
-                <Text style={styles.settingsLabel}>Max Traitor Rarity</Text>
-                <View style={styles.settingsChips}>
-                  {TRAITOR_RARITY_OPTIONS.map((rarity) => {
-                    const active =
-                      (game.max_traitor_rarity ?? DEFAULT_MAX_TRAITOR_RARITY) === rarity;
-                    return (
-                      <TouchableOpacity
-                        key={rarity}
-                        style={[styles.chip, active && styles.chipActive]}
-                        onPress={() => updateGameSettings({ maxTraitorRarity: rarity })}
-                        accessibilityLabel={`Set max traitor rarity to ${RARITY_DISPLAY_NAMES[rarity]}`}
-                        accessibilityRole="button"
-                      >
-                        <Text style={[styles.chipText, active && styles.chipTextActive]}>
-                          {RARITY_DISPLAY_NAMES[rarity]}
-                        </Text>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
-              </View>
-            </>
-          )}
-        </View>
-      )}
-
-      {/* Player list */}
-      <Text style={styles.sectionTitle}>Players ({players.length})</Text>
-
-      {players.length === 0 ? (
-        <Text style={styles.waitingText}>Waiting for players to join...</Text>
-      ) : (
-        <View style={styles.list}>
-          {players.map((item) => {
-            const isCurrent = item.user_id === currentUserId;
-            return (
-              <LobbyPlayerRow
-                key={item.id}
-                item={item}
-                isCurrentUser={isCurrent}
-                isHostPlayer={item.user_id === game?.host_id}
-                onColorChange={isCurrent ? updatePlayerColor : undefined}
-                onCommanderNameSubmit={isCurrent ? updateCommanderName : undefined}
-              />
-            );
-          })}
-        </View>
-      )}
-
-      {!isHost && (
-        <View style={styles.waitingRow}>
-          <ActivityIndicator size="small" color={colors.primary} />
-          <Text style={styles.waitingForHost}>Waiting for host to start the game...</Text>
-        </View>
-      )}
-
-      {errorMessage && <ErrorBanner message={errorMessage} />}
-
-      {/* Bottom buttons */}
-      <View style={styles.bottomButtons}>
-        {isHost && (
-          <>
-            <TouchableOpacity
-              style={[
-                styles.primaryButton,
-                (!canStartGame || isStartingGame) && styles.buttonDisabled,
-              ]}
-              onPress={startGame}
-              disabled={!canStartGame || isStartingGame}
-              accessibilityLabel={isStartingGame ? 'Starting game' : 'Start game'}
-              accessibilityRole="button"
-            >
-              {isStartingGame ? (
-                <View style={styles.buttonRow}>
-                  <ActivityIndicator size="small" color="#0d0b1a" />
-                  <Text style={styles.buttonText}>Starting...</Text>
-                </View>
-              ) : (
-                <Text style={styles.buttonText}>Start Game</Text>
-              )}
-            </TouchableOpacity>
-
-            {!canStartGame && players.length < minPlayers && (
-              <Text style={styles.minPlayersText}>Need at least {minPlayers} players to start</Text>
-            )}
-          </>
         )}
 
-        <TouchableOpacity
-          style={styles.leaveButton}
-          onPress={handleLeave}
-          disabled={isLeaving}
-          accessibilityLabel="Leave game"
-          accessibilityRole="button"
-        >
-          {isLeaving ? (
-            <View style={styles.buttonRow}>
-              <ActivityIndicator size="small" color={colors.destructive} />
-              <Text style={styles.leaveText}>Leaving...</Text>
+        {/* Ornate divider */}
+        <View style={styles.ornateDividerRow}>
+          <View style={styles.ornateLine} />
+          <Text style={styles.ornateDiamond}>&#9670;</Text>
+          <View style={styles.ornateLine} />
+        </View>
+
+        {/* Game settings (host only) */}
+        {isHost && game && (
+          <View style={styles.settingsCard}>
+            <Text style={styles.settingsTitle}>GAME SETTINGS</Text>
+
+            <View style={styles.settingsRow}>
+              <Text style={styles.settingsLabel}>Max Players</Text>
+              <View style={styles.settingsStepper}>
+                <TouchableOpacity
+                  // Legacy games could be stored with max_players > 8 (the server now
+                  // caps at 8), so clamp the decrement into the valid range — from any
+                  // value above 8, '-' goes straight to 8 instead of a rejected 11.
+                  onPress={() =>
+                    updateGameSettings({
+                      maxPlayers: Math.min(8, Math.max(2, game.max_players - 1)),
+                    })
+                  }
+                  disabled={game.max_players <= 2}
+                  accessibilityLabel="Decrease max players"
+                >
+                  <Ionicons
+                    name="remove-circle-outline"
+                    size={24}
+                    color={game.max_players > 2 ? colors.primary : colors.textTertiary}
+                  />
+                </TouchableOpacity>
+                <Text style={styles.settingsValue}>{game.max_players}</Text>
+                <TouchableOpacity
+                  onPress={() =>
+                    updateGameSettings({ maxPlayers: Math.min(8, game.max_players + 1) })
+                  }
+                  disabled={game.max_players >= 8}
+                  accessibilityLabel="Increase max players"
+                >
+                  <Ionicons
+                    name="add-circle-outline"
+                    size={24}
+                    color={game.max_players < 8 ? colors.primary : colors.textTertiary}
+                  />
+                </TouchableOpacity>
+              </View>
             </View>
-          ) : (
-            <Text style={styles.leaveText}>Leave Game</Text>
+
+            <View style={styles.settingsDivider} />
+
+            <View style={styles.settingsRow}>
+              <Text style={styles.settingsLabel}>Starting Life</Text>
+              <View style={styles.settingsChips}>
+                {STARTING_LIFE_OPTIONS.map((life) => {
+                  const active = game.starting_life === life;
+                  return (
+                    <TouchableOpacity
+                      key={life}
+                      style={styles.lifeChipTarget}
+                      onPress={() => updateGameSettings({ startingLife: life })}
+                      // RN-web ignores accessibilityState; the label carries the selection.
+                      accessibilityLabel={`Set starting life to ${life}${active ? ', selected' : ''}`}
+                      accessibilityRole="button"
+                    >
+                      <View style={[styles.chip, styles.lifeChip, active && styles.chipActive]}>
+                        <Text style={[styles.chipText, active && styles.chipTextActive]}>
+                          {life}
+                        </Text>
+                      </View>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </View>
+
+            <View style={styles.settingsDivider} />
+
+            <View style={styles.settingsRow}>
+              <Text style={styles.settingsLabel}>Game Mode</Text>
+              <View style={styles.settingsChips}>
+                {Object.entries(MODE_DISPLAY).map(([key, label]) => (
+                  <TouchableOpacity
+                    key={key}
+                    style={[styles.chip, game.game_mode === key && styles.chipActive]}
+                    onPress={() => updateGameSettings({ gameMode: key })}
+                    accessibilityLabel={`Set game mode to ${label}`}
+                  >
+                    <Text
+                      style={[styles.chipText, game.game_mode === key && styles.chipTextActive]}
+                    >
+                      {label}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+
+            {/* Max traitor rarity — only meaningful in treachery modes */}
+            {((game.game_mode ?? 'treachery') === 'treachery' ||
+              game.game_mode === 'treachery_planechase') && (
+              <>
+                <View style={styles.settingsDivider} />
+                <View style={styles.settingsRow}>
+                  <Text style={styles.settingsLabel}>Max Traitor Rarity</Text>
+                  <View style={styles.settingsChips}>
+                    {TRAITOR_RARITY_OPTIONS.map((rarity) => {
+                      const active =
+                        (game.max_traitor_rarity ?? DEFAULT_MAX_TRAITOR_RARITY) === rarity;
+                      return (
+                        <TouchableOpacity
+                          key={rarity}
+                          style={[styles.chip, active && styles.chipActive]}
+                          onPress={() => updateGameSettings({ maxTraitorRarity: rarity })}
+                          accessibilityLabel={`Set max traitor rarity to ${RARITY_DISPLAY_NAMES[rarity]}`}
+                          accessibilityRole="button"
+                        >
+                          <Text style={[styles.chipText, active && styles.chipTextActive]}>
+                            {RARITY_DISPLAY_NAMES[rarity]}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                </View>
+              </>
+            )}
+          </View>
+        )}
+
+        {/* Player list */}
+        <Text style={styles.sectionTitle}>Players ({players.length})</Text>
+
+        {players.length === 0 ? (
+          <Text style={styles.waitingText}>Waiting for players to join...</Text>
+        ) : (
+          <View style={styles.list}>
+            {players.map((item) => {
+              const isCurrent = item.user_id === currentUserId;
+              return (
+                <LobbyPlayerRow
+                  key={item.id}
+                  item={item}
+                  isCurrentUser={isCurrent}
+                  isHostPlayer={item.user_id === game?.host_id}
+                  onColorChange={isCurrent ? updatePlayerColor : undefined}
+                  onCommanderNameSubmit={isCurrent ? updateCommanderName : undefined}
+                />
+              );
+            })}
+          </View>
+        )}
+
+        {!isHost && (
+          <View style={styles.waitingRow}>
+            <ActivityIndicator size="small" color={colors.primary} />
+            <Text style={styles.waitingForHost}>Waiting for host to start the game...</Text>
+          </View>
+        )}
+
+        {errorMessage && <ErrorBanner message={errorMessage} />}
+
+        {/* Bottom buttons */}
+        <View style={styles.bottomButtons}>
+          {isHost && (
+            <>
+              <TouchableOpacity
+                style={[
+                  styles.primaryButton,
+                  (!canStartGame || isStartingGame) && styles.buttonDisabled,
+                ]}
+                onPress={startGame}
+                disabled={!canStartGame || isStartingGame}
+                accessibilityLabel={isStartingGame ? 'Starting game' : 'Start game'}
+                accessibilityRole="button"
+              >
+                {isStartingGame ? (
+                  <View style={styles.buttonRow}>
+                    <ActivityIndicator size="small" color="#0d0b1a" />
+                    <Text style={styles.buttonText}>Starting...</Text>
+                  </View>
+                ) : (
+                  <Text style={styles.buttonText}>Start Game</Text>
+                )}
+              </TouchableOpacity>
+
+              {!canStartGame && players.length < minPlayers && (
+                <Text style={styles.minPlayersText}>
+                  Need at least {minPlayers} players to start
+                </Text>
+              )}
+            </>
           )}
-        </TouchableOpacity>
-      </View>
+
+          <TouchableOpacity
+            style={styles.leaveButton}
+            onPress={handleLeave}
+            disabled={isLeaving}
+            accessibilityLabel="Leave game"
+            accessibilityRole="button"
+          >
+            {isLeaving ? (
+              <View style={styles.buttonRow}>
+                <ActivityIndicator size="small" color={colors.destructive} />
+                <Text style={styles.leaveText}>Leaving...</Text>
+              </View>
+            ) : (
+              <Text style={styles.leaveText}>Leave Game</Text>
+            )}
+          </TouchableOpacity>
+        </View>
+      </ScrollView>
 
       <ConfirmDialog
         visible={showLeaveConfirm}
@@ -593,7 +602,7 @@ export default function LobbyScreen() {
         autoDismissMs={1800}
         onDismiss={() => setShowCopiedNotice(false)}
       />
-    </ScrollView>
+    </View>
   );
 }
 
@@ -602,9 +611,12 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.background,
   },
-  // The whole lobby scrolls, so a tall host settings card pushes the player
-  // list down instead of squeezing it. flexGrow keeps the buttons at the
-  // bottom of a screen with room to spare.
+  // Everything below the connection banner scrolls, so a tall host settings
+  // card pushes the player list down instead of squeezing it. flexGrow keeps
+  // the buttons at the bottom of a screen with room to spare.
+  scroll: {
+    flex: 1,
+  },
   content: {
     flexGrow: 1,
   },
