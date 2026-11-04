@@ -60,12 +60,12 @@ struct FirestoreListenerMappingTests {
         #expect(gameEvent(exists: false, hasPendingWrites: true) == nil)
     }
 
-    @Test func gameListenerAsksForMetadataChanges() {
+    @Test func metadataChangesSettingStaysOn() {
         // The server's confirmation of a miss often changes nothing but the
         // snapshot's metadata (isFromCache flips), and Firestore delivers
         // that only to a listener that asks for metadata changes. This pins
-        // the setting. Whether listenToGame passes it on can only be seen
-        // against the SDK.
+        // the setting only. Whether listenToGame passes it on can only be
+        // seen against the SDK.
         #expect(FirestoreManager.gameListenerIncludesMetadataChanges)
     }
 

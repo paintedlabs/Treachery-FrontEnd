@@ -8,7 +8,8 @@ import Foundation
 /// What a document listener reports for each snapshot.
 ///
 /// The outcomes stay apart because screens must treat them differently: a
-/// deleted game ends the screen, a listener error gets Retry, and data this
+/// deleted game ends the screen, a listener error gets Retry, a refused read
+/// gets only Back to Home (retrying would be refused again), and data this
 /// build can't read asks for an update. Collapsing them into `nil` used to
 /// make a decode failure look like a deleted game, and a game that was
 /// already gone look like one still loading.
@@ -16,7 +17,9 @@ enum DocumentEvent<Value> {
     /// The document exists and decoded.
     case loaded(Value)
     /// The server confirmed the document doesn't exist: it was deleted or
-    /// never created. A miss in the local cache alone is not reported.
+    /// never created. A miss in the local cache alone is not reported, nor
+    /// is one that shows this device's writes the server hasn't acknowledged
+    /// yet: both wait for the server's word.
     case missing
     /// Nothing usable arrived; the failure says why.
     case failed(ListenerFailure)
