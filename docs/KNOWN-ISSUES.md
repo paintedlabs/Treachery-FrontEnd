@@ -106,6 +106,13 @@ Not all individually test-encoded; from the audit report.
   arbitrary `code`/`max_players`/`game_mode`. The `createGame` callable is
   preferred, not enforced, so the duplicate-join-code race survives for any
   non-callable writer
+- `firestore.rules` doesn't type-check a game's `created_at` or
+  `last_activity_at`: `isValidClientGameCreate` allows extra keys, and
+  `isHostLobbySettingsUpdate` and `isOnlyAddingSelfToPlayerIds` accept any
+  `last_activity_at`. The stale-game sweep treats a `last_activity_at` that
+  isn't a Timestamp as absent, so a bad value can no longer stall it, but a
+  client can still keep a lobby out of the sweep, e.g. with a far-future
+  `last_activity_at`. Needs `is timestamp` checks, bounded by `request.time`
 - `allocateUniqueJoinCode` is check-then-use rather than transactional, and
   codes are never released — uniqueness is best-effort over 12 attempts
 - `registerFcmToken` will resurrect a deleted user doc (`set(..., {merge:true})`

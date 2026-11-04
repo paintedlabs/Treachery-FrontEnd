@@ -34,7 +34,7 @@ const HUB_HOST = process.env.FIREBASE_EMULATOR_HUB || '127.0.0.1:4460';
 // The sweep deletes games: never point this file at a real project.
 assert.match(process.env.GCLOUD_PROJECT, /^demo-/, 'the sweep test only runs against a demo-* project');
 
-const { db } = require('../../../src/firebase');
+const { db, Timestamp } = require('../../../src/firebase');
 const { sweepStaleGames } = require('../../../src/triggers');
 
 const HOUR = 60 * 60 * 1000;
@@ -193,5 +193,68 @@ describe('sweepStaleGames', () => {
 
     assert.deepEqual(await sweepStaleGames({ now, limit: 2 }), { deleted: 1, failedStates: [] });
     assert.equal((await newest.get()).exists, false, 'the next run deletes it');
+  });
+
+  it('treats a last_activity_at that is not a Timestamp as absent, falling back to created_at', async () => {
+    // firestore.rules doesn't type-check last_activity_at, so a client can
+    // store anything there. Only the created_at query finds such a game, and
+    // the recent-activity check used to throw on it, so one bad lobby made
+    // every run skip all waiting games. Two months before NOW keeps this
+    // window clear of the games the earlier tests left behind.
+    const now = new Date(NOW.getTime() - 60 * DAY);
+    const ago = (ms) => new Date(now.getTime() - ms);
+    // Each value looks like activity an hour ago, so a check that tried to
+    // read these as times would wrongly keep the games.
+    const anHourAgo = ago(HOUR);
+    const malformed = {
+      string: await seedGame({
+        state: 'waiting',
+        createdAt: ago(3 * DAY),
+        lastActivityAt: anHourAgo.toISOString(),
+      }),
+      number: await seedGame({
+        state: 'waiting',
+        createdAt: ago(3 * DAY),
+        lastActivityAt: anHourAgo.getTime(),
+      }),
+      map: await seedGame({
+        state: 'waiting',
+        createdAt: ago(3 * DAY),
+        lastActivityAt: { seconds: Math.floor(anHourAgo.getTime() / 1000), nanoseconds: 0 },
+      }),
+    };
+    const stale = await seedGame({
+      state: 'waiting',
+      createdAt: ago(3 * DAY),
+      lastActivityAt: ago(2 * DAY),
+    });
+    // The same kind of value on a game created inside the window: created_at
+    // decides, so it stays, like a new legacy game.
+    const recentMalformed = await seedGame({
+      state: 'waiting',
+      createdAt: ago(23 * HOUR),
+      lastActivityAt: 'not a time',
+    });
+
+    const storedType = { string: 'string', number: 'number', map: 'object' };
+    for (const [name, ref] of Object.entries(malformed)) {
+      const value = (await ref.get()).get('last_activity_at');
+      assert.equal(typeof value, storedType[name], `the ${name} value is stored as a ${name}`);
+      assert.ok(!(value instanceof Timestamp), `the ${name} value is not stored as a Timestamp`);
+    }
+    const recentBefore = await readGame(recentMalformed);
+
+    assert.deepEqual(await sweepStaleGames({ now }), { deleted: 4, failedStates: [] });
+
+    for (const [name, ref] of Object.entries({ ...malformed, stale })) {
+      const swept = await readGame(ref);
+      assert.equal(swept.exists, false, `the ${name} game must be deleted`);
+      assert.deepEqual(swept.players, [], `the ${name} game's players must be deleted`);
+    }
+    assert.deepEqual(
+      await readGame(recentMalformed),
+      recentBefore,
+      'a recent game with a bad last_activity_at must be untouched'
+    );
   });
 });

@@ -3,7 +3,7 @@
 
 const { onSchedule } = require("firebase-functions/v2/scheduler");
 const { onDocumentCreated, onDocumentUpdated } = require("firebase-functions/v2/firestore");
-const { db, FieldValue } = require("./firebase");
+const { db, FieldValue, Timestamp } = require("./firebase");
 const { sanitizeCommanderKey } = require("./validation");
 const { isTreacheryMode } = require("./rules");
 const { notifyPlayers } = require("./notifications");
@@ -78,9 +78,14 @@ async function sweepStaleGames({ now = new Date(), limit = 100 } = {}) {
 
       for (const doc of [...withActivity, ...withoutActivity]) {
         if (gameIds.has(doc.id)) continue;
-        // Double-check: if it has last_activity_at and it's recent, skip
-        const data = doc.data();
-        if (data.last_activity_at && data.last_activity_at.toDate() >= cutoff) continue;
+        // Double-check: if it has last_activity_at and it's recent, skip.
+        // Only a Timestamp counts. Clients can write any value there
+        // (firestore.rules doesn't type-check it), and anything else is
+        // treated as absent, as on a legacy game, so the game falls back to
+        // its created_at. Calling toDate() on such a value used to throw,
+        // and one bad game made every run skip its whole state.
+        const lastActivity = doc.get("last_activity_at");
+        if (lastActivity instanceof Timestamp && lastActivity.toDate() >= cutoff) continue;
         gameIds.add(doc.id);
         gameDocs.push(doc);
       }
