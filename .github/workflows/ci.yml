@@ -41,6 +41,16 @@ jobs:
           EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.FIREBASE_MESSAGING_SENDER_ID }}
           EXPO_PUBLIC_FIREBASE_APP_ID: ${{ secrets.FIREBASE_APP_ID }}
           EXPO_PUBLIC_ENVIRONMENT: ci
+      # The privacy policy (app/(public)/privacy.tsx) ships with placeholders
+      # for the operator's name, contact email and effective date. Its URL is
+      # the one App Store Connect lists, so a PR that still has any of them
+      # can't go green. Last, so the checks above still report on the PR.
+      - name: Privacy policy placeholders are filled in
+        run: |
+          if grep -rnE 'TODO_(OPERATOR_NAME|CONTACT_EMAIL|EFFECTIVE_DATE)' app; then
+            echo "::error::Replace the privacy policy placeholders listed above."
+            exit 1
+          fi
 
   # ── Cloud Functions ──────────────────────────────────
   functions:

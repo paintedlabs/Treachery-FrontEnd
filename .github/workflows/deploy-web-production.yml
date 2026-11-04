@@ -17,6 +17,17 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Never publish the privacy policy with its placeholders: its URL is the
+      # one App Store Connect lists. CI checks this too; this catches a merge
+      # that skipped CI.
+      - name: Privacy policy placeholders are filled in
+        working-directory: Treachery
+        run: |
+          if grep -rnE 'TODO_(OPERATOR_NAME|CONTACT_EMAIL|EFFECTIVE_DATE)' app; then
+            echo "::error::Replace the privacy policy placeholders listed above before deploying."
+            exit 1
+          fi
+
       - uses: actions/setup-node@v4
         with:
           node-version: 22
