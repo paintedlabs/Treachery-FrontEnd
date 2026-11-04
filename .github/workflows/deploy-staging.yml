@@ -33,6 +33,26 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Never publish the privacy policy or support page with placeholders
+      # (defined in src/constants/operator.ts): the staging site is public
+      # too. CI checks this as well; this catches a merge that skipped CI.
+      # Same check as deploy-web-production.yml.
+      - name: Privacy policy and support page placeholders are filled in
+        working-directory: Treachery
+        run: |
+          # Only grep's "no match" (1) passes. A match (0) means a placeholder
+          # is left. An error (2), such as a missing folder, means the search
+          # didn't finish, so it fails too.
+          status=0
+          grep -rnE 'TODO_(OPERATOR_NAME|CONTACT_EMAIL|EFFECTIVE_DATE)' app src || status=$?
+          if [ "$status" -eq 0 ]; then
+            echo "::error::Replace the privacy policy and support page placeholders listed above before deploying."
+            exit 1
+          elif [ "$status" -ne 1 ]; then
+            echo "::error::Couldn't search app and src for privacy policy and support page placeholders (grep exit $status)."
+            exit 1
+          fi
+
       - uses: actions/setup-node@v4
         with:
           node-version: 22
