@@ -23,7 +23,8 @@ import Foundation
 /// only one batch per player is ever in flight, its calls never overlap, and
 /// an echo can't be taken for a later batch's. A batch whose echo never comes
 /// is settled by `recordEchoTimeout(of:)`, so it can't hold the next one back
-/// for good, though only once snapshots are arriving again.
+/// for good: once snapshots are arriving again, or after `echoWaitLimit`
+/// waits without one.
 ///
 /// A pure value: GameBoardViewModel feeds it taps, snapshots and call
 /// outcomes, and owns the timing and the calls.
@@ -60,9 +61,22 @@ struct LifeLedger {
         /// listener may just be behind, and the total it last showed comes
         /// from before the change. The batch stays on screen; wait again.
         case waitAgain
+        /// Still no players snapshot since the response, after
+        /// `echoWaitLimit` waits. The batch settled anyway, so the player's
+        /// next taps can go out. The board shows the latest snapshot's
+        /// total, which may or may not include the change.
+        case settledUnconfirmed
         /// The batch isn't waiting for its echo any more.
         case notWaiting
     }
+
+    /// How many times a confirmed batch's wait for its echo can run out
+    /// with no players snapshot since the response before the batch
+    /// settles anyway. The listener may be behind, but the snapshot that
+    /// ends the wait may never come: when another device's change cancels
+    /// this one out, and the listener delivers the two together before the
+    /// response, nothing more comes until someone changes a total.
+    static let echoWaitLimit = 3
 
     private var entries: [String: Entry] = [:]
     private var batchCount = 0
@@ -153,13 +167,23 @@ struct LifeLedger {
     /// since the response, the listener may just be behind (reconnecting,
     /// say): settling then would put back a total from before a change the
     /// server confirmed, with nothing to say so, and making the change again
-    /// would apply it twice.
+    /// would apply it twice. So the batch waits for a snapshot, though only
+    /// `echoWaitLimit` times: the snapshot with both may have come before
+    /// the response. Then it settles anyway, and the board can't vouch for
+    /// the total it shows.
     @discardableResult
     mutating func recordEchoTimeout(of batch: Batch) -> EchoTimeout {
-        guard case .confirmed(let snapshotSinceResponse) = inFlight(of: batch)?.progress else { return .notWaiting }
-        guard snapshotSinceResponse else { return .waitAgain }
-        settle(batch)
-        return .settled
+        guard case .confirmed(let snapshotSinceResponse, let timeouts) = inFlight(of: batch)?.progress else { return .notWaiting }
+        if snapshotSinceResponse {
+            settle(batch)
+            return .settled
+        }
+        guard timeouts + 1 < Self.echoWaitLimit else {
+            settle(batch)
+            return .settledUnconfirmed
+        }
+        entries[batch.playerId]?.inFlight?.progress = .confirmed(snapshotSinceResponse: false, timeouts: timeouts + 1)
+        return .waitAgain
     }
 
     /// The call for `batch` failed. Its amount is dropped, so the board falls
@@ -262,8 +286,9 @@ struct LifeLedger {
         case reflected
         /// The call succeeded, but no snapshot has moved off the baseline yet.
         /// Shown until one does, or until the echo times out, which needs a
-        /// players snapshot to have come since the response.
-        case confirmed(snapshotSinceResponse: Bool)
+        /// players snapshot to have come since the response, or
+        /// `echoWaitLimit` timeouts.
+        case confirmed(snapshotSinceResponse: Bool, timeouts: Int = 0)
     }
 
     private func inFlight(of batch: Batch) -> InFlight? {

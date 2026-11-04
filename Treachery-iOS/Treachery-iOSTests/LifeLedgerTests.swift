@@ -304,6 +304,25 @@ struct LifeLedgerTests {
         #expect(ledger.recordEchoTimeout(of: batch) == .notWaiting)
     }
 
+    @Test func anEchoTimeoutSettlesAfterTheLimitEvenWithoutASnapshot() throws {
+        // The snapshot with both this -3 and another device's +3 came before
+        // the response, and nothing more comes.
+        var ledger = LifeLedger()
+        ledger.record(-3, for: "p0")
+        let batch = try beginBatch(in: &ledger)
+        ledger.reconcile(with: server(40))
+        ledger.recordSuccess(of: batch, newLife: 37)
+
+        for _ in 1..<LifeLedger.echoWaitLimit {
+            #expect(ledger.recordEchoTimeout(of: batch) == .waitAgain)
+        }
+        #expect(ledger.recordEchoTimeout(of: batch) == .settledUnconfirmed)
+
+        #expect(!ledger.isWaitingForEcho(for: "p0"))
+        #expect(shown(ledger, on: server(40)) == 40)
+        #expect(ledger.recordEchoTimeout(of: batch) == .notWaiting)
+    }
+
     @Test func anEchoTimeoutOnlySettlesTheBatchItWasFor() throws {
         var ledger = LifeLedger()
         ledger.record(-3, for: "p0")

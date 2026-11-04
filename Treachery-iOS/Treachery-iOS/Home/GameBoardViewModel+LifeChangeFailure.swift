@@ -180,3 +180,26 @@ extension GameBoardViewModel {
         }
     }
 }
+
+extension GameBoardViewModel.LifeChangeFailure.Kind {
+
+    /// What the board knows about a change whose call failed with `error`:
+    /// the server's reason, when it turned the change down, or else what
+    /// the board showed as the call failed; see `LifeLedger.FailureOutcome`.
+    ///
+    /// - Parameter baseline: The player's server life when the change was
+    ///   sent.
+    init(_ outcome: LifeLedger.FailureOutcome, amount: Int, from baseline: Int, error: any Error) {
+        if let reason = CallableRefusal.explanation(of: error) {
+            self = .refused(reason: reason)
+            return
+        }
+        switch outcome {
+        case .reverted:
+            self = .notApplied(baseline: baseline, amount: amount)
+        case .unconfirmed:
+            // The total shown most likely includes the change already.
+            self = .unconfirmed
+        }
+    }
+}

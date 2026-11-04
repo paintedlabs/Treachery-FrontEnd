@@ -652,12 +652,17 @@ extension GameBoardViewModel {
     /// The batch comes off the board, which shows the latest snapshot's
     /// total, and taps held behind it go out. While no snapshot has come
     /// since the response, the listener may be behind, so the wait starts
-    /// again instead.
+    /// again instead, up to `LifeLedger.echoWaitLimit` times. After that the
+    /// board says it can't confirm the player's total.
     private func echoWaitEnded(for batch: LifeLedger.Batch) {
         lifeChangeEchoWaits[batch.playerId] = nil
         switch lifeLedger.recordEchoTimeout(of: batch) {
         case .settled:
             refreshPlayers()
+            sendPendingLifeChange(for: batch.playerId)
+        case .settledUnconfirmed:
+            refreshPlayers()
+            explainLifeChange(.unconfirmed, for: batch.playerId)
             sendPendingLifeChange(for: batch.playerId)
         case .waitAgain:
             // Nothing needs the batch settled once the game is over.
@@ -686,23 +691,16 @@ extension GameBoardViewModel {
         _ outcome: LifeLedger.FailureOutcome, amount: Int, from baseline: Int, for playerId: String, error: Error
     ) {
         logger.error("adjustLife failed: \(String(describing: error), privacy: .public)")
+        explainLifeChange(LifeChangeFailure.Kind(outcome, amount: amount, from: baseline, error: error), for: playerId)
+    }
+
+    /// Adds `kind` to what the board says about the player's life changes.
+    private func explainLifeChange(_ kind: LifeChangeFailure.Kind, for playerId: String) {
         // Once the game is over or the player is out, the board shows that,
         // and no tap could clear the message. A player no longer on the
         // board has no row to explain.
         guard !isGameFinished, let player = serverPlayers.first(where: { $0.id == playerId }),
               !player.isEliminated else { return }
-        let kind: LifeChangeFailure.Kind
-        if let reason = CallableRefusal.explanation(of: error) {
-            kind = .refused(reason: reason)
-        } else {
-            switch outcome {
-            case .reverted:
-                kind = .notApplied(baseline: baseline, amount: amount)
-            case .unconfirmed:
-                // The total shown most likely includes the change already.
-                kind = .unconfirmed
-            }
-        }
         let failure = LifeChangeFailure(playerId: playerId, playerName: player.displayName, kind: kind)
         // One per player, kept in the order they first failed.
         if let index = lifeChangeFailures.firstIndex(where: { $0.playerId == playerId }) {

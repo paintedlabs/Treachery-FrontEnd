@@ -599,6 +599,49 @@ struct HeldLifeTapTests {
     }
 
     @Test(.timeLimit(.minutes(1)))
+    func aChangeCancelledOutBeforeItsResponseStopsHoldingTapsAfterAFewWaits() async throws {
+        // This -3 and another device's +3 land together, and the listener
+        // delivers the total with both, 40, before this device's response.
+        // Nothing more comes while the table is quiet, so no snapshot since
+        // the response can end the wait.
+        let board = LifeBoard()
+        let gate = board.holdCalls()
+        board.vm.adjustLife(for: "p0", by: -3)
+        await board.endDebounces()
+        let send = try board.send()
+        await gate.waitForCall(from: send)
+        board.snapshot([40, 40, 40])
+        board.functions.adjustLifeNewLife = 37
+        gate.release()
+        await send.value
+        board.vm.adjustLife(for: "p0", by: -1)
+        await board.endDebounces()
+        #expect(board.shown() == 36)
+
+        // Each wait but the last starts again, with the -1 still held.
+        for _ in 1..<LifeLedger.echoWaitLimit {
+            let wait = try #require(board.vm.lifeChangeEchoWaits["p0"])
+            await board.clock.waitForSleepers()
+            board.clock.advance(by: GameBoardViewModel.lifeChangeEchoTimeout)
+            await wait.value
+            #expect(board.vm.lifeChangeSends.isEmpty)
+            #expect(board.shown() == 36)
+        }
+        let lastWait = try #require(board.vm.lifeChangeEchoWaits["p0"])
+        await board.clock.waitForSleepers()
+        board.functions.adjustLifeNewLife = 39
+        board.clock.advance(by: GameBoardViewModel.lifeChangeEchoTimeout)
+        await lastWait.value
+        await board.finishSends()
+
+        // The -3 comes off, the -1 goes out from the server's 40, and the
+        // board says it can't vouch for the total.
+        #expect(board.functions.adjustLifeCalls.map(\.amount) == [-3, -1])
+        #expect(board.shown() == 39)
+        #expect(board.vm.lifeChangeMessage == "Couldn't confirm Player 0's life change. Check the total before changing it again.")
+    }
+
+    @Test(.timeLimit(.minutes(1)))
     func theWaitStopsOnceTheGameIsOver() async throws {
         // Game Over covers the board, which nothing will show again, so the
         // wait doesn't start over every few seconds behind it.
