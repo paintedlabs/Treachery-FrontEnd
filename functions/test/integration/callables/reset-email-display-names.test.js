@@ -9,9 +9,10 @@
  * gets a named database of its own: the rest of the suite leaves users,
  * seats and friend requests in the default one. The seed holds email names
  * on profiles, on seats in waiting, in-progress and finished games and on
- * friend requests; names with an "@" that aren't email addresses; names
- * without one; and enough documents to cross the script's 200-document read
- * pages and BulkWriter's 20-write batches.
+ * friend requests; names with an "@" that aren't email addresses, among the
+ * email names and after them; names without one; and enough documents to
+ * cross the script's 200-document read pages and BulkWriter's 20-write
+ * batches.
  */
 
 const { describe, it, before, after } = require('node:test');
@@ -150,6 +151,24 @@ function assertNoNames(lines, names) {
   }
 }
 
+const KEPT_HEADING = /^names with "@" that aren't email addresses, kept as they are \((\d+)\):$/;
+
+/**
+ * The script's list of kept docs in `lines`: where its heading is, the
+ * total the heading gives, and the lines under it, up to the blank line
+ * that ends the list.
+ */
+function keptList(lines) {
+  const at = lines.findIndex((line) => KEPT_HEADING.test(line));
+  assert.notEqual(at, -1, 'the kept docs must get a list of their own');
+  const end = lines.indexOf('', at);
+  return {
+    at,
+    total: Number(KEPT_HEADING.exec(lines[at])[1]),
+    lines: lines.slice(at + 1, end === -1 ? lines.length : end),
+  };
+}
+
 /**
  * The rehearsal's documents. `reset` marks each one the script must
  * rewrite, with the one field and the name it must get; every other
@@ -198,9 +217,12 @@ function rehearsalSeed() {
   user('handle-two-ats', { display_name: 'ashgrove@oak@elm.io' });
   user('plain', { display_name: 'Thessaly Okafor-Wren', elo: 1533 });
   user('no-name', { elo: 1500 });
+  // A few docs in each bulk run (here and below) have a name with an "@"
+  // that isn't an email address, so kept names sit among the email names.
   for (let i = 0; i < 230; i++) {
     const n = String(i).padStart(3, '0');
     if (i % 2 === 0) user(`bulk-${n}`, { display_name: `bulkfolk.${n}.zq@example.net`, elo: 1500 }, `Bulkfolk.${n}.zq`);
+    else if (i % 50 === 25) user(`bulk-${n}`, { display_name: `Bulkfolk ${n} @ Home Zq`, elo: 1500 });
     else user(`bulk-${n}`, { display_name: `Bulkfolk Plain ${n} Zq`, elo: 1500 });
   }
 
@@ -226,6 +248,7 @@ function rehearsalSeed() {
     for (let s = 0; s < 8; s++) {
       const n = `${gameId}-${s}`;
       if (s % 2 === 0) seat(gameId, s, `seatfolk.${n}.zq@example.net`, `Seatfolk.${n}.zq`);
+      else if (s === 3 && g % 10 === 5) seat(gameId, s, `Seatfolk ${n} @ Table Zq`);
       else seat(gameId, s, `Seatfolk Plain ${n} Zq`);
     }
   }
@@ -238,6 +261,7 @@ function rehearsalSeed() {
   for (let i = 0; i < 220; i++) {
     const n = String(i).padStart(3, '0');
     if (i % 2 === 0) request(`bulk-${n}`, `askfolk.${n}.zq@example.net`, `Askfolk.${n}.zq`);
+    else if (i % 50 === 25) request(`bulk-${n}`, `Askfolk ${n} @ Club Zq`);
     else request(`bulk-${n}`, `Askfolk Plain ${n} Zq`);
   }
   return docs;
@@ -248,14 +272,38 @@ describe('reset-email-display-names — rehearsal', () => {
   const paths = docs.map((d) => d.path);
   const names = namesIn(docs);
   // What the dry run reports and --apply writes, by collection.
-  const users = { scanned: 239, reset: 118, kept: 4 };
+  const users = { scanned: 239, reset: 118, kept: 9 };
   const seats = {
     scanned: 251,
     reset: 124,
-    kept: 3,
+    kept: 6,
     byState: { waiting: 1, in_progress: 1, finished: 121, 'no game doc': 1 },
   };
-  const requests = { scanned: 224, reset: 112, kept: 1 };
+  const requests = { scanned: 224, reset: 112, kept: 5 };
+  // The docs whose names have an "@" but aren't email addresses, in the
+  // order the script reads them: profiles, then seats, then friend requests.
+  const kept = [
+    'users/bulk-025',
+    'users/bulk-075',
+    'users/bulk-125',
+    'users/bulk-175',
+    'users/bulk-225',
+    'users/handle-leading',
+    'users/handle-no-dot',
+    'users/handle-spaced',
+    'users/handle-two-ats',
+    'games/bulk-05/players/p3',
+    'games/bulk-15/players/p3',
+    'games/bulk-25/players/p3',
+    'games/history/players/p1',
+    'games/lobby/players/p1',
+    'games/table/players/p1',
+    'friend_requests/bulk-025',
+    'friend_requests/bulk-075',
+    'friend_requests/bulk-125',
+    'friend_requests/bulk-175',
+    'friend_requests/handle',
+  ];
   let run;
   let afterApply;
 
@@ -277,10 +325,24 @@ describe('reset-email-display-names — rehearsal', () => {
     const now = await readAll(run.db, paths);
     for (const p of paths) assertUntouched(p, before.get(p), now.get(p));
 
-    assert.match(output.join('\n'), /^ {2}other names with "@" \(kept\): +4$/m);
-    assert.match(output.join('\n'), /^ {2}other names with "@" \(kept\): +3$/m);
-    assert.match(output.join('\n'), /^ {2}other sender names with "@" \(kept\): +1$/m);
+    assert.match(output.join('\n'), /^ {2}other names with "@" \(kept\): +9$/m);
+    assert.match(output.join('\n'), /^ {2}other names with "@" \(kept\): +6$/m);
+    assert.match(output.join('\n'), /^ {2}other sender names with "@" \(kept\): +5$/m);
     assert.match(output.join('\n'), /DRY RUN — nothing was written/);
+
+    // The plan still shows its first 20 resets. Every kept doc is listed
+    // after it, by path, though the resets used up the plan's lines.
+    assert.deepEqual(
+      output.slice(0, 20),
+      Array.from({ length: 20 }, (_, i) => `  users/bulk-${String(2 * i).padStart(3, '0')}: reset display_name`)
+    );
+    assert.equal(output[20], '  … further per-doc detail suppressed');
+    const list = keptList(output);
+    assert.ok(list.at > 20, 'the kept docs are listed after the plan');
+    assert.equal(list.total, kept.length);
+    assert.deepEqual(list.lines, kept.map((p) => `  ${p}`));
+    // `output` holds what the script prints to stdout (log) and to stderr
+    // (logError) alike.
     assertNoNames(output, names);
   });
 
@@ -357,6 +419,10 @@ describe('reset-email-display-names — a doc changed after the script read it',
       { path: 'games/finished', data: { state: 'finished', game_mode: 'treachery' } },
       { path: 'games/finished/players/p0', data: { user_id: 'gone', display_name: 'percival.thorne@example.com' } },
       { path: 'friend_requests/withdrawn', data: { from_user_id: 'x', from_display_name: 'gwendolyn.ash@example.com' } },
+      // Names with an "@" that aren't email addresses: kept, and listed.
+      { path: 'users/handle', data: { display_name: 'Odile @ Home' } },
+      { path: 'games/finished/players/p1', data: { user_id: 'kept', display_name: 'Wren @ Table' } },
+      { path: 'friend_requests/handle', data: { from_user_id: 'y', from_display_name: 'Bram @ Club' } },
     ];
     await seed(run.db, docs);
     const get = async (p) => (await run.db.doc(p).get()).data() ?? null;
@@ -397,6 +463,7 @@ describe('reset-email-display-names — a doc changed after the script read it',
     assert.deepEqual(await get('users/steady'), { display_name: 'Stellan.marsh' });
     assert.equal((await get('games/finished/players/p0')).display_name, 'Deleted player');
     assert.equal(await get('friend_requests/withdrawn'), null, 'a deleted request is not recreated');
+    assert.deepEqual(keptList(output).lines, ['  users/handle', '  games/finished/players/p1', '  friend_requests/handle']);
 
     run.afterRead = null;
     const second = await backfill.resetEmailDisplayNames(run.scriptDb, { apply: true, log, logError: log });
@@ -404,6 +471,31 @@ describe('reset-email-display-names — a doc changed after the script read it',
     assert.deepEqual(second.totals, { planned: 1, updated: 1, skipped: 0, failed: 0 });
     assert.deepEqual(await get('users/elo-moved'), { display_name: 'Ingrid.halloway', elo: 1523 });
     assertNoNames(output, namesIn([...docs, { data: { display_name: 'Renata Q' } }]));
+  });
+});
+
+describe('reset-email-display-names — more kept docs than its list holds', () => {
+  it('lists the first 200 by path, then says how many more there are', async () => {
+    const run = await rehearsalDatabase('reset-email-kept-cap');
+    const docs = Array.from({ length: 205 }, (_, i) => {
+      const n = String(i).padStart(3, '0');
+      return { path: `users/handle-${n}`, data: { display_name: `Keepfolk ${n} @ Home Zq` } };
+    });
+    await seed(run.db, docs);
+    const output = [];
+    const log = (line) => output.push(line);
+
+    const { stats, totals } = await backfill.resetEmailDisplayNames(run.scriptDb, { apply: false, log, logError: log });
+
+    assert.deepEqual(stats.users, { scanned: 205, reset: 0, kept: 205 });
+    assert.equal(totals.planned, 0);
+    const list = keptList(output);
+    assert.equal(list.total, 205);
+    assert.deepEqual(list.lines, [
+      ...docs.slice(0, 200).map((d) => `  ${d.path}`),
+      '  … 5 more not listed (the list stops at 200)',
+    ]);
+    assertNoNames(output, namesIn(docs));
   });
 });
 
