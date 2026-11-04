@@ -46,44 +46,52 @@ struct SignUpView: View {
                 FailureMessage(message: error)
             }
 
-            TextField("Email", text: $email)
-                .textContentType(.emailAddress)
-                .keyboardType(.emailAddress)
-                .autocapitalization(.none)
-                .disableAutocorrection(true)
-                .padding()
-                .background(Color.mtgSurface)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 8)
-                        .stroke(Color.mtgDivider, lineWidth: 1)
-                )
-                .cornerRadius(8)
-                .foregroundStyle(Color.mtgTextPrimary)
-                .disabled(isLoading)
+            // Each field's name goes above it at the accessibility text
+            // sizes, where "Confirm Password" no longer fits as a placeholder.
+            LabeledField("Email") { placeholder in
+                TextField("Email", text: $email, prompt: placeholder)
+                    .textContentType(.emailAddress)
+                    .keyboardType(.emailAddress)
+                    .autocapitalization(.none)
+                    .disableAutocorrection(true)
+                    .padding()
+                    .background(Color.mtgSurface)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 8)
+                            .stroke(Color.mtgDivider, lineWidth: 1)
+                    )
+                    .cornerRadius(8)
+                    .foregroundStyle(Color.mtgTextPrimary)
+                    .disabled(isLoading)
+            }
 
-            SecureField("Password", text: $password)
-                .textContentType(.newPassword)
-                .padding()
-                .background(Color.mtgSurface)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 8)
-                        .stroke(Color.mtgDivider, lineWidth: 1)
-                )
-                .cornerRadius(8)
-                .foregroundStyle(Color.mtgTextPrimary)
-                .disabled(isLoading)
+            LabeledField("Password") { placeholder in
+                SecureField("Password", text: $password, prompt: placeholder)
+                    .textContentType(.newPassword)
+                    .padding()
+                    .background(Color.mtgSurface)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 8)
+                            .stroke(Color.mtgDivider, lineWidth: 1)
+                    )
+                    .cornerRadius(8)
+                    .foregroundStyle(Color.mtgTextPrimary)
+                    .disabled(isLoading)
+            }
 
-            SecureField("Confirm Password", text: $confirmPassword)
-                .textContentType(.newPassword)
-                .padding()
-                .background(Color.mtgSurface)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 8)
-                        .stroke(Color.mtgDivider, lineWidth: 1)
-                )
-                .cornerRadius(8)
-                .foregroundStyle(Color.mtgTextPrimary)
-                .disabled(isLoading)
+            LabeledField("Confirm Password") { placeholder in
+                SecureField("Confirm Password", text: $confirmPassword, prompt: placeholder)
+                    .textContentType(.newPassword)
+                    .padding()
+                    .background(Color.mtgSurface)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 8)
+                            .stroke(Color.mtgDivider, lineWidth: 1)
+                    )
+                    .cornerRadius(8)
+                    .foregroundStyle(Color.mtgTextPrimary)
+                    .disabled(isLoading)
+            }
 
             Button {
                 signUp()

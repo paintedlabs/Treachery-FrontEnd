@@ -51,19 +51,34 @@ struct PhoneAuthView: View {
             }
 
             if !isCodeStep {
-                // Phone number entry
-                TextField("Phone number (e.g. +15551234567)", text: $phoneNumber)
-                    .textContentType(.telephoneNumber)
-                    .keyboardType(.phonePad)
-                    .padding()
-                    .background(Color.mtgSurface)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 8)
-                            .stroke(Color.mtgDivider, lineWidth: 1)
-                    )
-                    .cornerRadius(8)
-                    .foregroundStyle(Color.mtgTextPrimary)
-                    .disabled(isLoading)
+                // Phone number entry. The format goes under the field, where
+                // it wraps: as part of the placeholder it was cut off at the
+                // larger text sizes, and gone once typing started. The name
+                // goes above the field at the accessibility sizes.
+                VStack(alignment: .leading, spacing: 6) {
+                    LabeledField("Phone number") { placeholder in
+                        TextField("Phone number", text: $phoneNumber, prompt: placeholder)
+                            .textContentType(.telephoneNumber)
+                            .keyboardType(.phonePad)
+                            .padding()
+                            .background(Color.mtgSurface)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 8)
+                                    .stroke(Color.mtgDivider, lineWidth: 1)
+                            )
+                            .cornerRadius(8)
+                            .foregroundStyle(Color.mtgTextPrimary)
+                            .disabled(isLoading)
+                    }
+
+                    Text("Include your country code, like +15551234567.")
+                        .font(.footnote)
+                        .foregroundStyle(Color.mtgTextSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        // Grouped, so VoiceOver reads the number in parts.
+                        .accessibilityLabel("Include your country code, like +1 555 123 4567.")
+                }
 
                 Button {
                     sendCode()
