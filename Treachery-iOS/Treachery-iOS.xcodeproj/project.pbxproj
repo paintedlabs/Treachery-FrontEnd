@@ -7,7 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		A3AA08222C90AB5B0093EF53 /* FirebaseAnalytics in Frameworks */ = {isa = PBXBuildFile; productRef = A3AA08212C90AB5B0093EF53 /* FirebaseAnalytics */; };
+		A3AA08222C90AB5B0093EF53 /* FirebaseAnalyticsCore in Frameworks */ = {isa = PBXBuildFile; productRef = A3AA08212C90AB5B0093EF53 /* FirebaseAnalyticsCore */; };
 		A3AA08242C90AB5B0093EF53 /* FirebaseAuth in Frameworks */ = {isa = PBXBuildFile; productRef = A3AA08232C90AB5B0093EF53 /* FirebaseAuth */; };
 		A3AA08262C90AB5B0093EF53 /* FirebaseCrashlytics in Frameworks */ = {isa = PBXBuildFile; productRef = A3AA08252C90AB5B0093EF53 /* FirebaseCrashlytics */; };
 		A3AEF7A62F649FDD006719B7 /* FirebaseFirestore in Frameworks */ = {isa = PBXBuildFile; productRef = A3AEF7A52F649FDD006719B7 /* FirebaseFirestore */; };
@@ -78,7 +78,7 @@
 				A3AEF7A62F649FDD006719B7 /* FirebaseFirestore in Frameworks */,
 				A3AEF7A82F64C000006719B7 /* FirebaseMessaging in Frameworks */,
 				A3AEF7AA2F64C000006719B7 /* FirebaseFunctions in Frameworks */,
-				A3AA08222C90AB5B0093EF53 /* FirebaseAnalytics in Frameworks */,
+				A3AA08222C90AB5B0093EF53 /* FirebaseAnalyticsCore in Frameworks */,
 				A3AA08242C90AB5B0093EF53 /* FirebaseAuth in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -148,7 +148,7 @@
 			);
 			name = "Treachery-iOS";
 			packageProductDependencies = (
-				A3AA08212C90AB5B0093EF53 /* FirebaseAnalytics */,
+				A3AA08212C90AB5B0093EF53 /* FirebaseAnalyticsCore */,
 				A3AA08232C90AB5B0093EF53 /* FirebaseAuth */,
 				A3AA08252C90AB5B0093EF53 /* FirebaseCrashlytics */,
 				A3AEF7A52F649FDD006719B7 /* FirebaseFirestore */,
@@ -671,16 +671,16 @@
 			repositoryURL = "https://github.com/firebase/firebase-ios-sdk";
 			requirement = {
 				kind = upToNextMajorVersion;
-				minimumVersion = 11.2.0;
+				minimumVersion = 11.15.0;
 			};
 		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
-		A3AA08212C90AB5B0093EF53 /* FirebaseAnalytics */ = {
+		A3AA08212C90AB5B0093EF53 /* FirebaseAnalyticsCore */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = A3AA08192C90A9300093EF53 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
-			productName = FirebaseAnalytics;
+			productName = FirebaseAnalyticsCore;
 		};
 		A3AA08232C90AB5B0093EF53 /* FirebaseAuth */ = {
 			isa = XCSwiftPackageProductDependency;
