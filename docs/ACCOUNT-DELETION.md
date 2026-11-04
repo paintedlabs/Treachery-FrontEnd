@@ -203,7 +203,13 @@ node scripts/delete-account.js --uid <uid> --expect-name - --apply --project tre
 `-- --test-name-pattern "delete-account script"` to run only its tests.
 
 To try it by hand, start the Firestore and Auth emulators on the integration
-suite's ports, from `functions/`:
+suite's ports, from `functions/`. They need Java 21 or newer: if
+`java -version` shows an older one, set `JAVA_HOME` to a 21+ JDK first, for
+example
+`export JAVA_HOME=/opt/homebrew/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home`,
+which run.sh also looks for. (On macOS, `java` follows `JAVA_HOME`; where
+`java` is a JDK's own binary instead, also put `$JAVA_HOME/bin` first on
+`PATH`.)
 
 ```sh
 firebase emulators:start --project demo-test --only auth,firestore \
@@ -211,10 +217,14 @@ firebase emulators:start --project demo-test --only auth,firestore \
 ```
 
 That config turns the Emulator UI off, so make an account from a second
-terminal, also in `functions/`. The `node -e` command prints its uid:
+terminal, also in `functions/`. The `node -e` command prints its uid.
+`METADATA_SERVER_DETECTION=none` stops the Google client libraries looking
+for a Compute Engine metadata server, as they do when you have no Google
+credentials. Without it, each command also prints a `MetadataLookupWarning`
+on stderr, which is harmless here.
 
 ```sh
-export FIRESTORE_EMULATOR_HOST=127.0.0.1:8288 FIREBASE_AUTH_EMULATOR_HOST=127.0.0.1:9299
+export FIRESTORE_EMULATOR_HOST=127.0.0.1:8288 FIREBASE_AUTH_EMULATOR_HOST=127.0.0.1:9299 METADATA_SERVER_DETECTION=none
 node -e '
 const { initializeApp } = require("firebase-admin/app");
 const { getAuth } = require("firebase-admin/auth");
