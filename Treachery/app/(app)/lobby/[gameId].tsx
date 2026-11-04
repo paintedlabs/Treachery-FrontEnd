@@ -6,7 +6,6 @@ import {
   TouchableOpacity,
   ScrollView,
   StyleSheet,
-  FlatList,
   ActivityIndicator,
   Share,
   Platform,
@@ -309,7 +308,11 @@ export default function LobbyScreen() {
   const currentPlayerColor = players.find((p) => p.user_id === currentUserId)?.player_color;
 
   return (
-    <View style={[styles.container, isDesktop && styles.desktopContainer]}>
+    <ScrollView
+      style={[styles.container, isDesktop && styles.desktopContainer]}
+      contentContainerStyle={styles.content}
+      keyboardShouldPersistTaps="handled"
+    >
       {/* Player color background tint */}
       {currentPlayerColor && (
         <View
@@ -463,13 +466,12 @@ export default function LobbyScreen() {
       {players.length === 0 ? (
         <Text style={styles.waitingText}>Waiting for players to join...</Text>
       ) : (
-        <FlatList
-          data={players}
-          keyExtractor={(p) => p.id}
-          renderItem={({ item }) => {
+        <View style={styles.list}>
+          {players.map((item) => {
             const isCurrent = item.user_id === currentUserId;
             return (
               <LobbyPlayerRow
+                key={item.id}
                 item={item}
                 isCurrentUser={isCurrent}
                 isHostPlayer={item.user_id === game?.host_id}
@@ -477,10 +479,8 @@ export default function LobbyScreen() {
                 onCommanderNameSubmit={isCurrent ? updateCommanderName : undefined}
               />
             );
-          }}
-          style={styles.list}
-          keyboardShouldPersistTaps="handled"
-        />
+          })}
+        </View>
       )}
 
       {!isHost && (
@@ -560,7 +560,7 @@ export default function LobbyScreen() {
         autoDismissMs={1800}
         onDismiss={() => setShowCopiedNotice(false)}
       />
-    </View>
+    </ScrollView>
   );
 }
 
@@ -568,6 +568,12 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
+  },
+  // The whole lobby scrolls, so a tall host settings card pushes the player
+  // list down instead of squeezing it. flexGrow keeps the buttons at the
+  // bottom of a screen with room to spare.
+  content: {
+    flexGrow: 1,
   },
   desktopContainer: {
     maxWidth: contentMaxWidths.medium,
@@ -672,8 +678,11 @@ const styles = StyleSheet.create({
   },
   settingsRow: {
     flexDirection: 'row',
+    // Chips that don't fit beside their label drop onto their own line.
+    flexWrap: 'wrap',
     alignItems: 'center',
     justifyContent: 'space-between',
+    gap: 6,
   },
   settingsLabel: {
     color: colors.textSecondary,
@@ -694,6 +703,9 @@ const styles = StyleSheet.create({
   settingsChips: {
     flexDirection: 'row',
     flexWrap: 'wrap',
+    // RN-web views don't shrink by default, so without this the chips run off
+    // a phone-width card (sideways scroll) instead of wrapping.
+    flexShrink: 1,
     gap: 6,
   },
   chip: {
@@ -738,7 +750,7 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
   },
   list: {
-    flex: 1,
+    flexGrow: 1,
   },
   playerRow: {
     flexDirection: 'row',
