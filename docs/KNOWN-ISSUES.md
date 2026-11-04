@@ -77,8 +77,9 @@ test-encoded — no CI job builds Swift or Kotlin (see Repo hygiene).
 
 Not all individually test-encoded; from the audit report.
 
-- ~~Profile win-rate deflated~~ — **fixed**: divides by games with a recorded outcome
-- `auth_method` analytics property: iOS reports `guest`, `phone` or `email`, but Android and web still report phone accounts as `email`
+- Profile win-rate deflated — **fixed on iOS and web**: Win % divides by games with a recorded outcome. Android still divides by all finished games
+- Planechase and Life Tracker results differ by client: iOS's Profile and Game History score these games from `winner_user_ids`, as `onGameFinished` does for ELO, but web and Android score a game only when it has a `winning_team`. So they count none of these games as a win or loss, and their History shows no Victory or Defeat for them
+- `auth_method` analytics property: iOS reports `guest`, `phone` or `email`, but web still reports phone accounts as `email`. Android has no phone sign-in, so its `guest` or `email` is right
 - ~~Legacy 12-player lobbies bricked~~ — **fixed**: the stepper decrement clamps into the valid range on all three clients
 - Planar die cost displays the previous roller's count, not the caller's actual (often free) cost
 - Stale/deleted game link → infinite spinner with the web back button trapped
