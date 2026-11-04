@@ -338,7 +338,8 @@ struct GameBoardViewModelActionTests {
         cf.errorToThrow = NSError(domain: "test", code: 1, userInfo: [NSLocalizedDescriptionKey: "fail"])
         let (vm, _, _) = makeVM(cloudFunctions: cf)
         await vm.eliminateAndLeave()
-        #expect(vm.errorMessage == "fail")
+        // A plain sentence, never the SDK's description.
+        #expect(vm.errorMessage == "Couldn't forfeit the game. Check your connection and try again.")
     }
 
     // MARK: - rollDie
@@ -455,7 +456,7 @@ struct GameBoardViewModelActionTests {
         cf.errorToThrow = NSError(domain: "test", code: 1, userInfo: [NSLocalizedDescriptionKey: "end error"])
         let (vm, _, _) = makeVM(cloudFunctions: cf)
         await vm.endGame()
-        #expect(vm.errorMessage == "end error")
+        #expect(vm.errorMessage == "Couldn't end the game. Check your connection and try again.")
     }
 
     // MARK: - updatePlayerColor
@@ -490,7 +491,7 @@ struct GameBoardViewModelActionTests {
         cf.errorToThrow = NSError(domain: "test", code: 1, userInfo: [NSLocalizedDescriptionKey: "resolve fail"])
         let (vm, _, _) = makeVM(cloudFunctions: cf)
         await vm.resolvePhenomenon()
-        #expect(vm.errorMessage == "resolve fail")
+        #expect(vm.errorMessage == "Couldn't resolve the phenomenon. Check your connection and try again.")
     }
 
     // MARK: - selectTunnelPlane

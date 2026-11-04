@@ -4,6 +4,9 @@
 //
 
 import Foundation
+import os
+
+private let logger = Logger(subsystem: "com.Solomon.Treachery-iOS", category: "CreateGame")
 
 @MainActor
 final class CreateGameViewModel: ObservableObject {
@@ -65,7 +68,8 @@ final class CreateGameViewModel: ObservableObject {
             isCreating = false
             return .lobby(gameId: gameId, isHost: true)
         } catch {
-            errorMessage = error.localizedDescription
+            logger.error("createGame failed: \(String(describing: error), privacy: .public)")
+            errorMessage = "Couldn't create the game. Check your connection and try again."
             isCreating = false
             return nil
         }

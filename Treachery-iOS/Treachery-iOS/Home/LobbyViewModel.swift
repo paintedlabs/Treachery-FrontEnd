@@ -399,10 +399,7 @@ final class LobbyViewModel: ObservableObject {
     /// lobby size."; otherwise `fallback`, since the request most likely
     /// never reached the server.
     private static func message(for error: any Error, otherwise fallback: String) -> String {
-        if let refusal = error as? CallableRefusal, refusal.reason == .failedPrecondition {
-            return refusal.message
-        }
-        return fallback
+        CallableRefusal.explanation(of: error) ?? fallback
     }
 
     // MARK: - Player Customization

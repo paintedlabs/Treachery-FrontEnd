@@ -4,6 +4,9 @@
 //
 
 import Foundation
+import os
+
+private let logger = Logger(subsystem: "com.Solomon.Treachery-iOS", category: "GameBoard")
 
 // MARK: - Traitor Abilities
 //
@@ -54,7 +57,9 @@ extension GameBoardViewModel {
             try await cloudFunctions.resolveMetamorph(gameId: gameId, targetPlayerId: targetPlayerId)
             AnalyticsService.trackEvent("ability_metamorph", params: ["target": targetPlayerId])
         } catch {
-            errorMessage = error.localizedDescription
+            logger.error("resolveMetamorph failed: \(String(describing: error), privacy: .public)")
+            errorMessage = CallableRefusal.explanation(of: error)
+                ?? "Couldn't steal that identity. Check your connection and try again."
         }
         pendingAbilityResolution = nil
     }
@@ -76,7 +81,9 @@ extension GameBoardViewModel {
             try await cloudFunctions.resolvePuppetMaster(gameId: gameId, redistributions: changes)
             AnalyticsService.trackEvent("ability_puppet_master", params: ["swaps": changes.count])
         } catch {
-            errorMessage = error.localizedDescription
+            logger.error("resolvePuppetMaster failed: \(String(describing: error), privacy: .public)")
+            errorMessage = CallableRefusal.explanation(of: error)
+                ?? "Couldn't redistribute the cards. Check your connection and try again."
         }
         pendingAbilityResolution = nil
     }
@@ -94,7 +101,10 @@ extension GameBoardViewModel {
                 AnalyticsService.trackEvent("ability_wearer_of_masks", params: ["chosen_card": chosenCardId ?? ""])
             }
         } catch {
-            errorMessage = error.localizedDescription
+            logger.error("resolveWearerOfMasks failed: \(String(describing: error), privacy: .public)")
+            errorMessage = CallableRefusal.explanation(of: error) ?? (chosenCardId == nil
+                ? "Couldn't decline the ability. Check your connection and try again."
+                : "Couldn't become that identity. Check your connection and try again.")
         }
         pendingAbilityResolution = nil
     }

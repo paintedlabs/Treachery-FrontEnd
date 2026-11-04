@@ -170,13 +170,11 @@ struct CloudFunctions: CloudFunctionsProtocol {
     }
 
     func eliminatePlayer(gameId: String) async throws {
-        let callable = functions.httpsCallable("eliminatePlayer")
-        _ = try await callable.call(["gameId": gameId])
+        _ = try await callFunction("eliminatePlayer", ["gameId": gameId])
     }
 
     func unveilPlayer(gameId: String) async throws {
-        let callable = functions.httpsCallable("unveilPlayer")
-        _ = try await callable.call(["gameId": gameId])
+        _ = try await callFunction("unveilPlayer", ["gameId": gameId])
     }
 
     func leaveGame(gameId: String) async throws {
@@ -186,28 +184,25 @@ struct CloudFunctions: CloudFunctionsProtocol {
     // MARK: - Traitor Abilities
 
     func resolveMetamorph(gameId: String, targetPlayerId: String) async throws {
-        let callable = functions.httpsCallable("resolveMetamorph")
-        _ = try await callable.call([
+        _ = try await callFunction("resolveMetamorph", [
             "gameId": gameId,
             "targetPlayerId": targetPlayerId,
         ])
     }
 
     func resolvePuppetMaster(gameId: String, redistributions: [String: String]) async throws {
-        let callable = functions.httpsCallable("resolvePuppetMaster")
-        _ = try await callable.call([
+        _ = try await callFunction("resolvePuppetMaster", [
             "gameId": gameId,
             "redistributions": redistributions,
         ])
     }
 
     func resolveWearerOfMasks(gameId: String, chosenCardId: String?) async throws {
-        let callable = functions.httpsCallable("resolveWearerOfMasks")
         var data: [String: Any] = ["gameId": gameId]
         if let cardId = chosenCardId {
             data["chosenCardId"] = cardId
         }
-        _ = try await callable.call(data)
+        _ = try await callFunction("resolveWearerOfMasks", data)
     }
 
     func registerFcmToken(_ token: String) async throws {
@@ -220,8 +215,7 @@ struct CloudFunctions: CloudFunctionsProtocol {
     /// Roll the planar die for the given game. Returns the result string
     /// ("blank", "chaos", or "planeswalk") from the Cloud Function.
     func rollPlanarDie(gameId: String) async throws -> String {
-        let callable = functions.httpsCallable("rollPlanarDie")
-        let result = try await callable.call(["gameId": gameId])
+        let result = try await callFunction("rollPlanarDie", ["gameId": gameId])
         guard let data = result.data as? [String: Any],
               let dieResult = data["result"] as? String else {
             throw NSError(domain: "CloudFunctions", code: -1,
@@ -234,8 +228,7 @@ struct CloudFunctions: CloudFunctionsProtocol {
     /// Returns a `PhenomenonResult` so the caller can handle Interplanar Tunnel
     /// (choose from options) and Spatial Merging (secondary plane).
     func resolvePhenomenon(gameId: String) async throws -> PhenomenonResult {
-        let callable = functions.httpsCallable("resolvePhenomenon")
-        let result = try await callable.call(["gameId": gameId])
+        let result = try await callFunction("resolvePhenomenon", ["gameId": gameId])
         let data = result.data as? [String: Any] ?? [:]
         return PhenomenonResult(
             type: data["type"] as? String ?? "resolved",
@@ -248,18 +241,16 @@ struct CloudFunctions: CloudFunctionsProtocol {
 
     /// Select a specific plane (e.g., from Interplanar Tunnel options).
     func selectPlane(gameId: String, planeId: String) async throws {
-        let callable = functions.httpsCallable("selectPlane")
-        _ = try await callable.call(["gameId": gameId, "planeId": planeId])
+        _ = try await callFunction("selectPlane", ["gameId": gameId, "planeId": planeId])
     }
 
     /// End a non-treachery game (host only). Optionally pass winner user IDs for ELO tracking.
     func endGame(gameId: String, winnerUserIds: [String]? = nil) async throws {
-        let callable = functions.httpsCallable("endGame")
         var data: [String: Any] = ["gameId": gameId]
         if let winners = winnerUserIds, !winners.isEmpty {
             data["winnerUserIds"] = winners
         }
-        _ = try await callable.call(data)
+        _ = try await callFunction("endGame", data)
     }
 
     func updateGameSettings(gameId: String, maxPlayers: Int?, startingLife: Int?, gameMode: String?, maxTraitorRarity: String?) async throws {

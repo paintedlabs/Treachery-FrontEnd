@@ -239,7 +239,9 @@ final class GameBoardViewModel: ObservableObject {
             try await cloudFunctions.eliminatePlayer(gameId: gameId)
             AnalyticsService.trackEvent("forfeit_game")
         } catch {
-            errorMessage = error.localizedDescription
+            logger.error("eliminatePlayer failed: \(String(describing: error), privacy: .public)")
+            errorMessage = CallableRefusal.explanation(of: error)
+                ?? "Couldn't forfeit the game. Check your connection and try again."
         }
         isPending = false
     }
@@ -258,7 +260,8 @@ final class GameBoardViewModel: ObservableObject {
             AnalyticsService.trackEvent("roll_planar_die", params: ["result": result])
         } catch {
             logger.error("rollPlanarDie failed: \(String(describing: error), privacy: .public)")
-            errorMessage = "Couldn't roll the planar die. Check your connection and try again."
+            errorMessage = CallableRefusal.explanation(of: error)
+                ?? "Couldn't roll the planar die. Check your connection and try again."
         }
         isRollingDie = false
     }
@@ -302,7 +305,9 @@ final class GameBoardViewModel: ObservableObject {
             }
             // For other types, Firestore listener will update the state
         } catch {
-            errorMessage = error.localizedDescription
+            logger.error("resolvePhenomenon failed: \(String(describing: error), privacy: .public)")
+            errorMessage = CallableRefusal.explanation(of: error)
+                ?? "Couldn't resolve the phenomenon. Check your connection and try again."
         }
         isPending = false
     }
@@ -316,7 +321,9 @@ final class GameBoardViewModel: ObservableObject {
         do {
             try await cloudFunctions.selectPlane(gameId: gameId, planeId: plane.id)
         } catch {
-            errorMessage = error.localizedDescription
+            logger.error("selectPlane failed: \(String(describing: error), privacy: .public)")
+            errorMessage = CallableRefusal.explanation(of: error)
+                ?? "Couldn't planeswalk to \(plane.name). Check your connection and try again."
         }
         isPending = false
     }
@@ -330,7 +337,9 @@ final class GameBoardViewModel: ObservableObject {
             try await cloudFunctions.endGame(gameId: gameId, winnerUserIds: winnerUserIds)
             AnalyticsService.trackEvent("end_game")
         } catch {
-            errorMessage = error.localizedDescription
+            logger.error("endGame failed: \(String(describing: error), privacy: .public)")
+            errorMessage = CallableRefusal.explanation(of: error)
+                ?? "Couldn't end the game. Check your connection and try again."
         }
         isPending = false
     }
@@ -342,7 +351,8 @@ final class GameBoardViewModel: ObservableObject {
         do {
             try await firestoreManager.updatePlayerColor(gameId: gameId, playerId: player.id, color: hex)
         } catch {
-            errorMessage = error.localizedDescription
+            logger.error("updatePlayerColor failed: \(String(describing: error), privacy: .public)")
+            errorMessage = "Couldn't change your color. Check your connection and try again."
         }
     }
 
@@ -408,7 +418,8 @@ extension GameBoardViewModel {
     /// snapshot that shows the unveil, already or later, settles that.
     private func unveilCallFailed(_ error: any Error) {
         logger.error("unveilPlayer failed: \(String(describing: error), privacy: .public)")
-        unveilProgress = .failed(message: "Couldn't unveil your identity. Check your connection and try again.")
+        unveilProgress = .failed(message: CallableRefusal.explanation(of: error)
+            ?? "Couldn't unveil your identity. Check your connection and try again.")
         settleUnveil()
     }
 
