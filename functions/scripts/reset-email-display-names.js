@@ -16,8 +16,10 @@
  * domain), which is what those builds set, to the name the clients' name
  * prompt suggests for that address: the part before the "@" with its first
  * letter capitalized. Any other name containing "@", like "Bob @ Home" or
- * "@sol", is one a player chose. It is left as it is and counted apart, so
- * the dry run shows how many there are. It covers:
+ * "@sol", is one a player chose. It is left as it is, counted apart, and
+ * listed by document path after the reset plan (the first 200), so whoever
+ * runs the dry run can look those documents over: an address this rule
+ * misses stays public. It covers:
  *
  *   users/{uid}.display_name                          public profiles
  *   games/{gameId}/players/{playerId}.display_name    seats, in every game state
@@ -25,7 +27,8 @@
  *                                                     neither side can delete
  *
  * It prints document paths and counts but never a name: the old and the new
- * name both come from an email address.
+ * name both come from an email address, and a kept name may hold an address
+ * this rule missed.
  *
  * DRY RUN BY DEFAULT — it reads and reports, and writes nothing at all until
  * you pass --apply.
@@ -79,6 +82,7 @@ const EMAIL_ADDRESS = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 const PAGE_SIZE = 200; // docs read per page
 const MAX_PLAN_LINES = 20; // per-doc detail lines before we go quiet
+const MAX_KEPT_LINES = 200; // kept docs listed by path after the plan
 
 // The gRPC statuses of an update refused because its document was deleted,
 // or changed, after this run read it.
@@ -292,13 +296,20 @@ async function resetEmailDisplayNames(db, { apply, log = console.log, logError =
     planLines++;
   }
 
+  // The kept docs get a list of their own, printed after the plan, so the
+  // resets never crowd them out: they are the ones to look over by hand.
+  const keptPaths = [];
+  function keep(doc) {
+    if (keptPaths.length < MAX_KEPT_LINES) keptPaths.push(doc.ref.path);
+  }
+
   // 1. Public profiles.
   stats.users.scanned = await forEachPage(db.collection("users"), "display_name", async (docs) => {
     for (const doc of docs) {
       const current = doc.get("display_name");
       if (isOtherNameWithAt(current)) {
         stats.users.kept++;
-        plan(`users/${doc.id}: keep display_name (has "@", not an email address)`);
+        keep(doc);
         continue;
       }
       const name = resetName(current);
@@ -316,7 +327,7 @@ async function resetEmailDisplayNames(db, { apply, log = console.log, logError =
     for (const doc of seats) {
       if (!isOtherNameWithAt(doc.get("display_name"))) continue;
       stats.seats.kept++;
-      plan(`${doc.ref.path}: keep display_name (has "@", not an email address)`);
+      keep(doc);
     }
     const resets = seats
       .map((doc) => ({ doc, name: resetName(doc.get("display_name")) }))
@@ -349,7 +360,7 @@ async function resetEmailDisplayNames(db, { apply, log = console.log, logError =
         const current = doc.get("from_display_name");
         if (isOtherNameWithAt(current)) {
           stats.requests.kept++;
-          plan(`friend_requests/${doc.id}: keep from_display_name (has "@", not an email address)`);
+          keep(doc);
           continue;
         }
         const name = resetName(current);
@@ -362,6 +373,16 @@ async function resetEmailDisplayNames(db, { apply, log = console.log, logError =
   );
 
   await writer.close();
+
+  const keptTotal = stats.users.kept + stats.seats.kept + stats.requests.kept;
+  if (keptTotal > 0) {
+    log("");
+    log(`names with "@" that aren't email addresses, kept as they are (${keptTotal}):`);
+    for (const docPath of keptPaths) log(`  ${docPath}`);
+    if (keptTotal > keptPaths.length) {
+      log(`  … ${keptTotal - keptPaths.length} more not listed (the list stops at ${MAX_KEPT_LINES})`);
+    }
+  }
 
   const byState = Object.entries(stats.seats.byState)
     .map(([state, count]) => `${state} ${count}`)
