@@ -4,20 +4,28 @@
 //
 
 import Foundation
+import os
+
+/// The user's finished games, newest first, with each game's players.
+struct GameHistory: Equatable {
+    let games: [Game]
+    /// Each game's players by game id. A game whose players didn't load is
+    /// absent, and its row shows no players.
+    let playersByGame: [String: [Player]]
+}
 
 @MainActor
 final class GameHistoryViewModel: ObservableObject {
 
     // MARK: - Published State
 
-    @Published var games: [Game] = []
-    @Published var gamePlayers: [String: [Player]] = [:]
-    @Published var isLoading = true
-    @Published var errorMessage: String?
+    @Published private(set) var history: Loadable<GameHistory, UserFacingError> = .idle
 
     // MARK: - Properties
 
     private let firestoreManager: FirestoreManaging
+
+    private static let logger = Logger(subsystem: "com.Solomon.Treachery-iOS", category: "Profile")
 
     // MARK: - Init
 
@@ -27,31 +35,18 @@ final class GameHistoryViewModel: ObservableObject {
 
     // MARK: - Data Loading
 
+    /// Loads the user's finished games and their players. What's already
+    /// shown stays while this runs and if it fails.
     func loadHistory(userId: String) async {
-        isLoading = true
-        errorMessage = nil
+        history.startLoading()
 
         do {
-            games = try await firestoreManager.getFinishedGames(forUserId: userId)
-
-            await withTaskGroup(of: (String, [Player])?.self) { group in
-                for game in games {
-                    group.addTask { [firestoreManager] in
-                        guard let players = try? await firestoreManager.getPlayers(gameId: game.id) else {
-                            return nil
-                        }
-                        return (game.id, players)
-                    }
-                }
-                for await result in group {
-                    if let (gameId, players) = result {
-                        gamePlayers[gameId] = players
-                    }
-                }
-            }
+            let games = try await firestoreManager.getFinishedGames(forUserId: userId)
+            let playersByGame = await firestoreManager.playersByGame(for: games)
+            history = .loaded(GameHistory(games: games, playersByGame: playersByGame))
         } catch {
-            errorMessage = error.localizedDescription
+            Self.logger.error("Loading game history failed: \(String(describing: error), privacy: .private)")
+            history.fail(with: UserFacingError(error))
         }
-        isLoading = false
     }
 }

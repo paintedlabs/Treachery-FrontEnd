@@ -9,7 +9,16 @@ import SwiftUI
 
 struct GameHistoryView: View {
     @EnvironmentObject var authViewModel: AuthViewModel
-    @StateObject private var viewModel = GameHistoryViewModel()
+    @StateObject private var viewModel: GameHistoryViewModel
+
+    /// `viewModel` is built once, the first time this view is installed.
+    init(viewModel: @autoclosure @escaping () -> GameHistoryViewModel) {
+        _viewModel = StateObject(wrappedValue: viewModel())
+    }
+
+    init() {
+        self.init(viewModel: GameHistoryViewModel())
+    }
 
     var body: some View {
         ZStack {
@@ -17,40 +26,7 @@ struct GameHistoryView: View {
 
             ScrollView {
                 VStack(spacing: 16) {
-                    if viewModel.isLoading {
-                        Spacer(minLength: 100)
-                        MtgLoadingView(message: "Loading game history...")
-                        Spacer()
-                    } else if viewModel.games.isEmpty {
-                        Spacer(minLength: 80)
-                        VStack(spacing: 12) {
-                            Image(systemName: "clock.badge.questionmark")
-                                .font(.largeTitle)
-                                .foregroundStyle(Color.mtgTextSecondary)
-                            Text("No games yet")
-                                .font(.system(.headline, design: .serif))
-                                .foregroundStyle(Color.mtgTextPrimary)
-                            Text("Finished games will appear here.")
-                                .font(.subheadline)
-                                .foregroundStyle(Color.mtgTextSecondary)
-                        }
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 32)
-                    } else {
-                        ForEach(viewModel.games) { game in
-                            GameHistoryRow(
-                                game: game,
-                                players: viewModel.gamePlayers[game.id] ?? [],
-                                currentUserId: authViewModel.currentUserId
-                            )
-                            .padding(.horizontal)
-                        }
-                    }
-
-                    if let error = viewModel.errorMessage {
-                        MtgErrorBanner(message: error)
-                            .padding(.horizontal)
-                    }
+                    content
                 }
                 .padding(.top)
             }
@@ -58,14 +34,67 @@ struct GameHistoryView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbarColorScheme(.dark, for: .navigationBar)
         .onAppear { AnalyticsService.trackScreen("GameHistory") }
-        .task {
-            guard let userId = authViewModel.currentUserId else { return }
-            await viewModel.loadHistory(userId: userId)
+        .task { await reload() }
+        .refreshable { await reload() }
+    }
+
+    /// Games only once they've loaded, "No games yet" only when a load
+    /// succeeded with none, and a failure with Try Again above any games
+    /// kept from an earlier load.
+    @ViewBuilder private var content: some View {
+        switch viewModel.history {
+        case .idle, .loading(previous: nil):
+            MtgLoadingView(message: "Loading game history...")
+                .padding(.top, 100)
+        case .failed(let failure, let previous):
+            LoadFailureCard(title: "Couldn't Load Game History", failure: failure) {
+                Task { await reload() }
+            }
+            .padding(.horizontal)
+            if let previous {
+                rows(for: previous)
+            }
+        case .loading(previous: let history?), .loaded(let history):
+            if history.games.isEmpty {
+                emptyState
+            } else {
+                rows(for: history)
+            }
         }
-        .refreshable {
-            guard let userId = authViewModel.currentUserId else { return }
-            await viewModel.loadHistory(userId: userId)
+    }
+
+    private var emptyState: some View {
+        VStack(spacing: 12) {
+            Image(systemName: "clock.badge.questionmark")
+                .font(.largeTitle)
+                .foregroundStyle(Color.mtgTextSecondary)
+                .accessibilityHidden(true)
+            Text("No games yet")
+                .font(.system(.headline, design: .serif))
+                .foregroundStyle(Color.mtgTextPrimary)
+            Text("Finished games will appear here.")
+                .font(.subheadline)
+                .foregroundStyle(Color.mtgTextSecondary)
         }
+        .frame(maxWidth: .infinity)
+        .padding(.top, 80)
+        .padding(.vertical, 32)
+    }
+
+    private func rows(for history: GameHistory) -> some View {
+        ForEach(history.games) { game in
+            GameHistoryRow(
+                game: game,
+                players: history.playersByGame[game.id] ?? [],
+                currentUserId: authViewModel.currentUserId
+            )
+            .padding(.horizontal)
+        }
+    }
+
+    private func reload() async {
+        guard let userId = authViewModel.currentUserId else { return }
+        await viewModel.loadHistory(userId: userId)
     }
 }
 

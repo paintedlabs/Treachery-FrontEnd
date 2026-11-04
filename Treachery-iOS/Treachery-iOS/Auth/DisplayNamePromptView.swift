@@ -19,6 +19,19 @@ struct DisplayNamePromptView: View {
     private var isSaving: Bool { saveTask != nil }
 
     var body: some View {
+        // Scrolls when the prompt is taller than the screen, as at the
+        // largest text sizes with a failure shown, so Continue and Skip stay
+        // reachable.
+        FullHeightScrollView {
+            prompt
+        }
+        .mtgRadialBackground()
+        .onAppear {
+            prefillName()
+        }
+    }
+
+    private var prompt: some View {
         VStack(spacing: 16) {
             // Offline, a save waits for the connection; this says why.
             ConnectionBanner()
@@ -26,13 +39,16 @@ struct DisplayNamePromptView: View {
             Spacer()
 
             Text("Choose Your Name")
-                .font(.system(size: 28, weight: .bold, design: .serif))
+                .font(.system(.title, design: .serif, weight: .bold))
                 .foregroundColor(.mtgGoldBright)
+                .multilineTextAlignment(.center)
+                .accessibilityAddTraits(.isHeader)
 
             Text("This is how other players will see you")
                 .font(.system(.subheadline, design: .serif))
                 .italic()
                 .foregroundColor(.mtgTextSecondary)
+                .multilineTextAlignment(.center)
 
             OrnateDivider()
                 .padding(.vertical, 8)
@@ -92,10 +108,6 @@ struct DisplayNamePromptView: View {
             Spacer()
         }
         .padding(.horizontal)
-        .mtgRadialBackground()
-        .onAppear {
-            prefillName()
-        }
     }
 
     private func prefillName() {
@@ -130,8 +142,8 @@ struct DisplayNamePromptView: View {
                 // Stay on the prompt so the user can try again or skip.
                 saveTask = nil
                 let message = String(
-                    localized: "We couldn't save your name. Check your connection and try again.",
-                    comment: "Shown on the name prompt when saving the chosen display name failed"
+                    localized: "Your name wasn't saved. \(UserFacingError(error).message)",
+                    comment: "Shown on the name prompt when saving the chosen display name failed. The argument says why."
                 )
                 validationError = message
                 AccessibilityNotification.Announcement(message).post()

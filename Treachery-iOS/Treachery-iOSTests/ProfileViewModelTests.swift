@@ -69,17 +69,21 @@ struct ProfileViewModelTests {
         #expect(viewModel.renameState == .idle)
     }
 
-    @Test func failedRenameKeepsTheOldNameAndSaysSo() async {
+    @Test func failedRenameKeepsTheOldNameAndSaysWhyInPlainWords() async {
         await viewModel.loadData(userId: "u1")
         viewModel.startEditing()
         viewModel.editedName = "New Name"
-        firestore.userWriteError = NSError(domain: "FIRFirestoreErrorDomain", code: 7)
+        firestore.userWriteError = NSError(
+            domain: "FIRFirestoreErrorDomain",
+            code: 7,
+            userInfo: [NSLocalizedDescriptionKey: "Missing or insufficient permissions."]
+        )
 
         await viewModel.saveName()
 
         #expect(viewModel.user?.displayName == "Old Name")
-        #expect(viewModel.renameState == .failed(message: ProfileViewModel.ProfileMessage.renameFailed))
-        #expect(viewModel.renameFailureMessage == ProfileViewModel.ProfileMessage.renameFailed)
+        #expect(viewModel.renameState == .failed(.notPermitted))
+        #expect(viewModel.renameFailureMessage == "Your new name wasn't saved. You don't have permission to do that.")
         #expect(!viewModel.isEditingName)
         #expect(!viewModel.isSavingName)
     }
@@ -121,7 +125,24 @@ struct ProfileViewModelTests {
 
     // MARK: - Loading
 
-    @Test func failedLoadShowsPlainText() async {
+    @Test func nothingIsShownUntilTheFirstLoadFinishes() async {
+        #expect(viewModel.overview.phase == .idle)
+        var phaseMidLoad: LoadablePhase?
+        var hadValueMidLoad: Bool?
+        firestore.whileGettingFinishedGames = { [viewModel] in
+            phaseMidLoad = viewModel.overview.phase
+            hadValueMidLoad = viewModel.overview.value != nil
+        }
+
+        await viewModel.loadData(userId: "u1")
+
+        #expect(phaseMidLoad == .loading)
+        #expect(hadValueMidLoad == false)
+        #expect(viewModel.overview.phase == .loaded)
+        #expect(viewModel.user?.displayName == "Old Name")
+    }
+
+    @Test func failedLoadSaysWhyInPlainWordsThenRetryLoads() async {
         firestore.errorToThrow = NSError(
             domain: "FIRFirestoreErrorDomain",
             code: 14,
@@ -130,7 +151,56 @@ struct ProfileViewModelTests {
 
         await viewModel.loadData(userId: "u1")
 
-        #expect(viewModel.errorMessage == ProfileViewModel.ProfileMessage.loadFailed)
+        #expect(viewModel.overview.phase == .failed)
+        #expect(viewModel.overview.failure == .serverUnreachable)
+        // Nothing to show, rather than an endless "Loading stats...".
+        #expect(viewModel.overview.value == nil)
+        #expect(viewModel.user == nil)
+
+        firestore.errorToThrow = nil
+        await viewModel.loadData(userId: "u1")
+
+        #expect(viewModel.overview.phase == .loaded)
+        #expect(viewModel.overview.failure == nil)
+        #expect(viewModel.user?.displayName == "Old Name")
+    }
+
+    @Test func failedRefreshKeepsTheProfileOnScreen() async {
+        await viewModel.loadData(userId: "u1")
+        firestore.finishedGamesError = NSError(domain: "FIRFirestoreErrorDomain", code: 4)
+        var nameMidRefresh: String?
+        firestore.whileGettingFinishedGames = { [viewModel] in
+            nameMidRefresh = viewModel.user?.displayName
+        }
+
+        await viewModel.loadData(userId: "u1")
+
+        #expect(nameMidRefresh == "Old Name")
+        #expect(viewModel.overview.phase == .failed)
+        #expect(viewModel.overview.failure == .timedOut)
+        #expect(viewModel.user?.displayName == "Old Name")
+        #expect(viewModel.user?.elo == 1640)
+    }
+
+    /// A profile that is missing or unreadable used to leave a spinner
+    /// running for good.
+    @Test func missingProfileIsAFailureThatCanBeRetried() async {
+        firestore.usersToReturn = [:]
+
+        await viewModel.loadData(userId: "u1")
+
+        #expect(viewModel.overview.phase == .failed)
+        #expect(viewModel.overview.failure == .unknown)
+        #expect(viewModel.user == nil)
+    }
+
+    @Test func statsFailingFailsTheLoadInsteadOfShowingAPartialProfile() async {
+        firestore.finishedGamesError = NSError(domain: "FIRFirestoreErrorDomain", code: 14)
+
+        await viewModel.loadData(userId: "u1")
+
+        #expect(viewModel.overview.failure == .serverUnreachable)
+        #expect(viewModel.overview.value == nil)
     }
 
     @Test func statsCountOnlyDecidedGamesInTheWinRate() async throws {
@@ -149,7 +219,7 @@ struct ProfileViewModelTests {
 
         await viewModel.loadData(userId: "u1")
 
-        let stats = try #require(viewModel.gameStats)
+        let stats = try #require(viewModel.overview.value?.stats)
         #expect(stats.totalGames == 4)
         #expect(stats.wins == 1)
         #expect(stats.losses == 1)
@@ -167,12 +237,13 @@ struct ProfileViewModelTests {
 
         await viewModel.loadData(userId: "u1")
 
-        let stats = try #require(viewModel.gameStats)
+        let stats = try #require(viewModel.overview.value?.stats)
         #expect(stats.totalGames == 2)
         #expect(stats.wins == 1)
         #expect(stats.losses == 0)
         #expect(stats.unknownResults == 1)
-        #expect(viewModel.errorMessage == nil)
+        // A game whose players didn't load doesn't fail the whole profile.
+        #expect(viewModel.overview.failure == nil)
     }
 
     // MARK: - Fixtures

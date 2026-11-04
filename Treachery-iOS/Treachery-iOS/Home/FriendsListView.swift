@@ -5,12 +5,22 @@
 //  Created by Luke Solomon on 3/14/26.
 //
 
+import Accessibility
 import SwiftUI
 
 struct FriendsListView: View {
     @EnvironmentObject var authViewModel: AuthViewModel
-    @StateObject private var viewModel = FriendsListViewModel()
+    @StateObject private var viewModel: FriendsListViewModel
     @State private var friendToRemove: TreacheryUser?
+
+    /// `viewModel` is built once, the first time this view is installed.
+    init(viewModel: @autoclosure @escaping () -> FriendsListViewModel) {
+        _viewModel = StateObject(wrappedValue: viewModel())
+    }
+
+    init() {
+        self.init(viewModel: FriendsListViewModel())
+    }
 
     var body: some View {
         ZStack {
@@ -18,194 +28,8 @@ struct FriendsListView: View {
 
             ScrollView {
                 VStack(spacing: 20) {
-                    // Search section
-                    VStack(spacing: 12) {
-                        MtgSectionHeader(title: "Add Friends")
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding(.horizontal, 16)
-                            .padding(.top, 16)
-
-                        OrnateDivider()
-                            .padding(.horizontal, 16)
-
-                        HStack(spacing: 8) {
-                            TextField("Search by display name", text: $viewModel.searchText)
-                                .padding(.horizontal, 12)
-                                .padding(.vertical, 10)
-                                .foregroundStyle(Color.mtgTextPrimary)
-                                .background(Color.mtgCardElevated)
-                                .clipShape(RoundedRectangle(cornerRadius: 8))
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 8)
-                                        .stroke(Color.mtgDivider, lineWidth: 1)
-                                )
-                                .textInputAutocapitalization(.never)
-                                .autocorrectionDisabled()
-                                .onSubmit {
-                                    Task { await viewModel.searchUsers() }
-                                }
-
-                            if viewModel.isSearching {
-                                ProgressView()
-                                    .tint(Color.mtgGold)
-                            } else if !viewModel.searchText.isEmpty {
-                                Button("Search") {
-                                    Task { await viewModel.searchUsers() }
-                                }
-                                .foregroundStyle(Color.mtgGold)
-                                .font(.subheadline)
-                            }
-                        }
-                        .padding(.horizontal, 16)
-
-                        ForEach(viewModel.searchResults) { user in
-                            if user.id != authViewModel.currentUserId {
-                                HStack {
-                                    Text(user.displayName)
-                                        .foregroundStyle(Color.mtgTextPrimary)
-                                    Spacer()
-                                    if viewModel.isFriend(user) {
-                                        Text("Friends")
-                                            .font(.caption)
-                                            .foregroundStyle(Color.mtgSuccess)
-                                    } else if viewModel.sentRequestUserIds.contains(user.id) {
-                                        Text("Request Sent")
-                                            .font(.caption)
-                                            .foregroundStyle(Color.mtgGold)
-                                    } else {
-                                        Button("Add") {
-                                            Task { await viewModel.sendRequest(to: user) }
-                                        }
-                                        .font(.caption)
-                                        .foregroundStyle(Color.mtgBackground)
-                                        .padding(.horizontal, 12)
-                                        .padding(.vertical, 4)
-                                        .background(Color.mtgGold)
-                                        .clipShape(Capsule())
-                                        .accessibilityLabel("Send friend request to \(user.displayName)")
-                                    }
-                                }
-                                .padding(.horizontal, 16)
-                                .padding(.vertical, 6)
-                                .accessibilityElement(children: .combine)
-                            }
-                        }
-                    }
-                    .padding(.bottom, 8)
-                    .mtgCardFrame()
-
-                    // Pending requests
-                    if !viewModel.pendingRequests.isEmpty {
-                        VStack(spacing: 0) {
-                            MtgSectionHeader(title: "Friend Requests (\(viewModel.pendingRequests.count))")
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .padding(.horizontal, 16)
-                                .padding(.top, 16)
-                                .padding(.bottom, 8)
-
-                            OrnateDivider()
-                                .padding(.horizontal, 16)
-                                .padding(.bottom, 8)
-
-                            ForEach(viewModel.pendingRequests) { request in
-                                HStack {
-                                    VStack(alignment: .leading) {
-                                        Text(request.fromDisplayName)
-                                            .fontWeight(.medium)
-                                            .foregroundStyle(Color.mtgTextPrimary)
-                                        Text("Wants to be friends")
-                                            .font(.caption)
-                                            .foregroundStyle(Color.mtgTextSecondary)
-                                    }
-                                    Spacer()
-                                    Button("Accept") {
-                                        Task { await viewModel.acceptRequest(request) }
-                                    }
-                                    .font(.caption)
-                                    .foregroundStyle(Color.mtgBackground)
-                                    .padding(.horizontal, 12)
-                                    .padding(.vertical, 4)
-                                    .background(Color.mtgSuccess)
-                                    .clipShape(Capsule())
-                                    .accessibilityLabel("Accept friend request from \(request.fromDisplayName)")
-
-                                    Button("Decline") {
-                                        Task { await viewModel.declineRequest(request) }
-                                    }
-                                    .font(.caption)
-                                    .foregroundStyle(Color.mtgTextSecondary)
-                                    .padding(.horizontal, 12)
-                                    .padding(.vertical, 4)
-                                    .overlay(
-                                        Capsule()
-                                            .stroke(Color.mtgDivider, lineWidth: 1)
-                                    )
-                                    .accessibilityLabel("Decline friend request from \(request.fromDisplayName)")
-                                }
-                                .padding(.horizontal, 16)
-                                .padding(.vertical, 8)
-                            }
-                        }
-                        .mtgCardFrame()
-                    }
-
-                    // Friends list
-                    VStack(spacing: 0) {
-                        MtgSectionHeader(title: "Friends (\(viewModel.friends.count))")
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding(.horizontal, 16)
-                            .padding(.top, 16)
-                            .padding(.bottom, 8)
-
-                        OrnateDivider()
-                            .padding(.horizontal, 16)
-                            .padding(.bottom, 8)
-
-                        if viewModel.isLoading {
-                            MtgLoadingView()
-                                .padding()
-                        } else if viewModel.friends.isEmpty {
-                            Text("No friends yet. Search for players above.")
-                                .foregroundStyle(Color.mtgTextSecondary)
-                                .font(.subheadline)
-                                .padding(16)
-                        } else {
-                            ForEach(viewModel.friends) { friend in
-                                HStack {
-                                    Text(friend.displayName)
-                                        .foregroundStyle(Color.mtgTextPrimary)
-                                    Spacer()
-                                    Button("Remove") {
-                                        friendToRemove = friend
-                                    }
-                                    .font(.caption)
-                                    .foregroundStyle(Color.mtgError)
-                                    .padding(.horizontal, 12)
-                                    .padding(.vertical, 4)
-                                    .overlay(
-                                        Capsule()
-                                            .stroke(Color.mtgDivider, lineWidth: 1)
-                                    )
-                                    .accessibilityLabel("Remove \(friend.displayName) from friends")
-                                }
-                                .padding(.horizontal, 16)
-                                .padding(.vertical, 10)
-
-                                if friend.id != viewModel.friends.last?.id {
-                                    Rectangle()
-                                        .fill(Color.mtgDivider)
-                                        .frame(height: 1)
-                                        .padding(.horizontal, 16)
-                                }
-                            }
-                        }
-                    }
-                    .mtgCardFrame()
-
-                    if let error = viewModel.errorMessage {
-                        MtgErrorBanner(message: error)
-                            .padding(.horizontal)
-                    }
+                    searchCard
+                    overviewContent
                 }
                 .padding()
             }
@@ -228,14 +52,353 @@ struct FriendsListView: View {
         } message: { friend in
             Text("Remove \(friend.displayName) from your friends? You will be removed from their friends list too.")
         }
-        .onAppear { AnalyticsService.trackScreen("Friends") }
-        .task {
-            guard let userId = authViewModel.currentUserId else { return }
-            await viewModel.loadData(userId: userId)
+        // An alert rather than a banner: the button that failed can be
+        // anywhere in the list, and a banner there could be off screen.
+        .alert(
+            viewModel.actionFailure?.action.failureTitle ?? "",
+            isPresented: isShowingActionFailure,
+            presenting: viewModel.actionFailure
+        ) { _ in
+            Button("OK", role: .cancel) { viewModel.dismissActionFailure() }
+        } message: { failure in
+            Text(failure.error.message)
         }
-        .refreshable {
-            guard let userId = authViewModel.currentUserId else { return }
-            await viewModel.loadData(userId: userId)
+        .onChange(of: searchAnnouncement) { _, announcement in
+            if let announcement {
+                AccessibilityNotification.Announcement(announcement).post()
+            }
+        }
+        .onAppear { AnalyticsService.trackScreen("Friends") }
+        .task { await reload() }
+        .refreshable { await reload() }
+    }
+
+    private var isShowingActionFailure: Binding<Bool> {
+        Binding(
+            get: { viewModel.actionFailure != nil },
+            set: { isPresented in
+                if !isPresented { viewModel.dismissActionFailure() }
+            }
+        )
+    }
+
+    private func reload() async {
+        guard let userId = authViewModel.currentUserId else { return }
+        await viewModel.loadData(userId: userId)
+    }
+
+    // MARK: - Search
+
+    private var searchCard: some View {
+        VStack(spacing: 12) {
+            MtgSectionHeader(title: "Add Friends")
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 16)
+                .padding(.top, 16)
+
+            OrnateDivider()
+                .padding(.horizontal, 16)
+
+            HStack(spacing: 8) {
+                TextField("Search by display name", text: $viewModel.searchText)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 12)
+                    .foregroundStyle(Color.mtgTextPrimary)
+                    .background(Color.mtgCardElevated)
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 8)
+                            .stroke(Color.mtgDivider, lineWidth: 1)
+                    )
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+                    .onSubmit {
+                        Task { await viewModel.searchUsers() }
+                    }
+
+                if case .loading = viewModel.search {
+                    ProgressView()
+                        .tint(Color.mtgGold)
+                        .frame(minWidth: 44, minHeight: 44)
+                } else if !viewModel.searchText.isEmpty {
+                    Button {
+                        Task { await viewModel.searchUsers() }
+                    } label: {
+                        Text("Search")
+                            .font(.subheadline)
+                            .foregroundStyle(Color.mtgGold)
+                            .frame(minWidth: 44, minHeight: 44)
+                            .contentShape(Rectangle())
+                    }
+                }
+            }
+            .padding(.horizontal, 16)
+
+            searchResults
+        }
+        .padding(.bottom, 8)
+        .mtgCardFrame()
+    }
+
+    @ViewBuilder private var searchResults: some View {
+        switch viewModel.search {
+        case .idle, .loading:
+            EmptyView()
+        case .loaded(let search) where search.players.isEmpty:
+            VStack(alignment: .leading, spacing: 4) {
+                Text("No players named \u{201C}\(search.query)\u{201D}")
+                    .font(.subheadline)
+                    .foregroundStyle(Color.mtgTextPrimary)
+                Text("Search matches the start of a name, and capital letters count.")
+                    .font(.footnote)
+                    .foregroundStyle(Color.mtgTextSecondary)
+            }
+            .fixedSize(horizontal: false, vertical: true)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 16)
+            .accessibilityElement(children: .combine)
+        case .loaded(let search):
+            ForEach(search.players) { user in
+                searchResultRow(for: user)
+            }
+        case .failed(let failure, _):
+            Label {
+                Text("Couldn't search for players. \(failure.message)")
+            } icon: {
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .foregroundStyle(Color.mtgError)
+            }
+            .font(.footnote)
+            .foregroundStyle(Color.mtgTextPrimary)
+            .fixedSize(horizontal: false, vertical: true)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 16)
+            .accessibilityElement(children: .combine)
+        }
+    }
+
+    /// What VoiceOver hears when a search ends without results to explore.
+    private var searchAnnouncement: String? {
+        switch viewModel.search {
+        case .loaded(let search) where search.players.isEmpty:
+            "No players named \u{201C}\(search.query)\u{201D}"
+        case .failed(let failure, _):
+            "Couldn't search for players. \(failure.message)"
+        case .idle, .loading, .loaded:
+            nil
+        }
+    }
+
+    private func searchResultRow(for user: TreacheryUser) -> some View {
+        AdaptiveRow {
+            Text(user.displayName)
+                .foregroundStyle(Color.mtgTextPrimary)
+        } trailing: {
+            if viewModel.isFriend(user) {
+                Text("Friends")
+                    .font(.caption)
+                    .foregroundStyle(Color.mtgSuccess)
+            } else if viewModel.sentRequestUserIds.contains(user.id) {
+                Text("Request Sent")
+                    .font(.caption)
+                    .foregroundStyle(Color.mtgGold)
+            } else {
+                Button {
+                    Task { await viewModel.sendRequest(to: user) }
+                } label: {
+                    CapsuleButtonLabel(title: "Add", style: .filled(Color.mtgGold))
+                }
+                .accessibilityLabel("Send friend request to \(user.displayName)")
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 6)
+        .accessibilityElement(children: .combine)
+    }
+
+    // MARK: - Friends and Requests
+
+    /// Friends and requests only once they've loaded, "No friends yet" only
+    /// when a load succeeded with none, and a failure with Try Again above
+    /// anything kept from an earlier load.
+    @ViewBuilder private var overviewContent: some View {
+        switch viewModel.overview {
+        case .idle, .loading(previous: nil):
+            friendsCard(friends: nil)
+        case .failed(let failure, let previous):
+            LoadFailureCard(title: "Couldn't Load Friends", failure: failure) {
+                Task { await reload() }
+            }
+            if let previous, !previous.friends.isEmpty || !previous.pendingRequests.isEmpty {
+                overviewCards(for: previous)
+            }
+        case .loading(previous: let overview?), .loaded(let overview):
+            overviewCards(for: overview)
+        }
+    }
+
+    @ViewBuilder private func overviewCards(for overview: FriendsOverview) -> some View {
+        if !overview.pendingRequests.isEmpty {
+            pendingRequestsCard(overview.pendingRequests)
+        }
+        friendsCard(friends: overview.friends)
+    }
+
+    private func pendingRequestsCard(_ requests: [FriendRequest]) -> some View {
+        VStack(spacing: 0) {
+            MtgSectionHeader(title: "Friend Requests (\(requests.count))")
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 16)
+                .padding(.top, 16)
+                .padding(.bottom, 8)
+
+            OrnateDivider()
+                .padding(.horizontal, 16)
+                .padding(.bottom, 8)
+
+            ForEach(requests) { request in
+                AdaptiveRow {
+                    VStack(alignment: .leading) {
+                        Text(request.fromDisplayName)
+                            .fontWeight(.medium)
+                            .foregroundStyle(Color.mtgTextPrimary)
+                        Text("Wants to be friends")
+                            .font(.caption)
+                            .foregroundStyle(Color.mtgTextSecondary)
+                    }
+                } trailing: {
+                    // The two buttons stack too when even they don't fit side by side.
+                    ViewThatFits(in: .horizontal) {
+                        HStack(spacing: 8) { requestButtons(for: request) }
+                        VStack(alignment: .leading, spacing: 0) { requestButtons(for: request) }
+                    }
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 8)
+            }
+        }
+        .mtgCardFrame()
+    }
+
+    @ViewBuilder private func requestButtons(for request: FriendRequest) -> some View {
+        Button {
+            Task { await viewModel.acceptRequest(request) }
+        } label: {
+            CapsuleButtonLabel(title: "Accept", style: .filled(Color.mtgSuccess))
+        }
+        .accessibilityLabel("Accept friend request from \(request.fromDisplayName)")
+
+        Button {
+            Task { await viewModel.declineRequest(request) }
+        } label: {
+            CapsuleButtonLabel(title: "Decline", style: .outlined(Color.mtgTextSecondary))
+        }
+        .accessibilityLabel("Decline friend request from \(request.fromDisplayName)")
+    }
+
+    /// The friends card. `friends` is nil while the first load runs.
+    private func friendsCard(friends: [TreacheryUser]?) -> some View {
+        VStack(spacing: 0) {
+            MtgSectionHeader(title: friends.map { "Friends (\($0.count))" } ?? "Friends")
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 16)
+                .padding(.top, 16)
+                .padding(.bottom, 8)
+
+            OrnateDivider()
+                .padding(.horizontal, 16)
+                .padding(.bottom, 8)
+
+            if let friends {
+                if friends.isEmpty {
+                    Text("No friends yet. Search for players above.")
+                        .foregroundStyle(Color.mtgTextSecondary)
+                        .font(.subheadline)
+                        .padding(16)
+                } else {
+                    friendRows(friends)
+                }
+            } else {
+                MtgLoadingView()
+                    .padding()
+            }
+        }
+        .mtgCardFrame()
+    }
+
+    private func friendRows(_ friends: [TreacheryUser]) -> some View {
+        ForEach(friends) { friend in
+            AdaptiveRow {
+                Text(friend.displayName)
+                    .foregroundStyle(Color.mtgTextPrimary)
+            } trailing: {
+                Button {
+                    friendToRemove = friend
+                } label: {
+                    CapsuleButtonLabel(title: "Remove", style: .outlined(Color.mtgError))
+                }
+                .accessibilityLabel("Remove \(friend.displayName) from friends")
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 4)
+
+            if friend.id != friends.last?.id {
+                Rectangle()
+                    .fill(Color.mtgDivider)
+                    .frame(height: 1)
+                    .padding(.horizontal, 16)
+            }
+        }
+    }
+}
+
+// MARK: - Capsule Button Label
+
+/// The small capsule look of the friend actions, inside a hit area at least
+/// 44 points tall: the capsule stays compact, the target doesn't.
+private struct CapsuleButtonLabel: View {
+    enum Style {
+        case filled(Color)
+        case outlined(Color)
+    }
+
+    let title: String
+    let style: Style
+
+    var body: some View {
+        Group {
+            switch style {
+            case .filled(let color):
+                Text(title)
+                    .foregroundStyle(Color.mtgBackground)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 4)
+                    .background(color, in: Capsule())
+            case .outlined(let color):
+                Text(title)
+                    .foregroundStyle(color)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 4)
+                    .overlay(Capsule().stroke(Color.mtgDivider, lineWidth: 1))
+            }
+        }
+        .font(.caption)
+        // One word: never broken across lines. Rows stack instead (AdaptiveRow).
+        .fixedSize()
+        .frame(minWidth: 44, minHeight: 44)
+        .contentShape(Rectangle())
+    }
+}
+
+// MARK: - Action Failure Titles
+
+private extension FriendActionFailure.Action {
+    var failureTitle: String {
+        switch self {
+        case .sendRequest: String(localized: "Couldn't Send Friend Request", comment: "Alert title when sending a friend request failed")
+        case .acceptRequest: String(localized: "Couldn't Accept Friend Request", comment: "Alert title when accepting a friend request failed")
+        case .declineRequest: String(localized: "Couldn't Decline Friend Request", comment: "Alert title when declining a friend request failed")
+        case .removeFriend: String(localized: "Couldn't Remove Friend", comment: "Alert title when removing a friend failed")
         }
     }
 }

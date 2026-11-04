@@ -4,78 +4,114 @@
 //
 
 import Foundation
+import os
+
+/// The signed-in user's friends and the friend requests waiting for them
+/// to answer.
+struct FriendsOverview {
+    var friends: [TreacheryUser]
+    var pendingRequests: [FriendRequest]
+}
+
+/// A finished search for players by name.
+struct PlayerSearch {
+    /// What was searched for, trimmed.
+    let query: String
+    /// The players whose names start with `query`, never the signed-in user.
+    let players: [TreacheryUser]
+}
+
+/// A friend action that didn't go through, for the alert that says so.
+struct FriendActionFailure: Equatable {
+    enum Action: Equatable {
+        case sendRequest
+        case acceptRequest
+        case declineRequest
+        case removeFriend
+    }
+
+    let action: Action
+    let error: UserFacingError
+}
 
 @MainActor
 final class FriendsListViewModel: ObservableObject {
 
     // MARK: - Published State
 
-    @Published var friends: [TreacheryUser] = []
-    @Published var pendingRequests: [FriendRequest] = []
-    @Published var searchResults: [TreacheryUser] = []
+    @Published private(set) var overview: Loadable<FriendsOverview, UserFacingError> = .idle
+    @Published private(set) var search: Loadable<PlayerSearch, UserFacingError> = .idle
     @Published var searchText = ""
-    @Published var isSearching = false
-    @Published var isLoading = true
-    @Published var errorMessage: String?
-    @Published var sentRequestUserIds: Set<String> = []
+    @Published private(set) var sentRequestUserIds: Set<String> = []
+    /// The last friend action that failed, until its alert is dismissed.
+    @Published private(set) var actionFailure: FriendActionFailure?
 
     // MARK: - Properties
 
     private var userId: String?
     private let firestoreManager: FirestoreManaging
     private let cloudFunctions: CloudFunctionsProtocol
+    private let trackEvent: (String) -> Void
+
+    private static let logger = Logger(subsystem: "com.Solomon.Treachery-iOS", category: "Friends")
 
     // MARK: - Init
 
+    /// - Parameter trackEvent: Records an analytics event by name.
     init(
         firestoreManager: FirestoreManaging = FirestoreManager(),
-        cloudFunctions: CloudFunctionsProtocol = CloudFunctions()
+        cloudFunctions: CloudFunctionsProtocol = CloudFunctions(),
+        trackEvent: @escaping (String) -> Void = { AnalyticsService.trackEvent($0) }
     ) {
         self.firestoreManager = firestoreManager
         self.cloudFunctions = cloudFunctions
+        self.trackEvent = trackEvent
     }
 
     // MARK: - Data Loading
 
+    /// Loads friends and pending requests together. What's already shown
+    /// stays while this runs and if it fails.
     func loadData(userId: String) async {
         self.userId = userId
-        isLoading = true
-        errorMessage = nil
+        overview.startLoading()
 
         do {
             async let friendsTask = firestoreManager.getFriends(forUserId: userId)
             async let requestsTask = firestoreManager.getPendingFriendRequests(forUserId: userId)
 
-            friends = try await friendsTask
-            pendingRequests = try await requestsTask
+            let friends = try await friendsTask
+            let pendingRequests = try await requestsTask
+            overview = .loaded(FriendsOverview(friends: friends, pendingRequests: pendingRequests))
         } catch {
-            errorMessage = error.localizedDescription
+            Self.logger.error("Loading friends failed: \(String(describing: error), privacy: .private)")
+            overview.fail(with: UserFacingError(error))
         }
-        isLoading = false
     }
 
     // MARK: - Search
 
+    /// Searches for players whose names start with `searchText`. A failed
+    /// search shows only why: results kept from another search would read
+    /// as results for this one.
     func searchUsers() async {
-        guard !searchText.trimmingCharacters(in: .whitespaces).isEmpty else { return }
-        isSearching = true
-        errorMessage = nil
+        let query = searchText.trimmingCharacters(in: .whitespaces)
+        guard !query.isEmpty else { return }
+        search.startLoading()
 
         do {
-            searchResults = try await firestoreManager.searchUsers(
-                byDisplayName: searchText.trimmingCharacters(in: .whitespaces)
-            )
+            let players = try await firestoreManager.searchUsers(byDisplayName: query)
+            search = .loaded(PlayerSearch(query: query, players: players.filter { $0.id != userId }))
         } catch {
-            errorMessage = error.localizedDescription
+            Self.logger.error("Searching for players failed: \(String(describing: error), privacy: .private)")
+            search = .failed(UserFacingError(error), previous: nil)
         }
-        isSearching = false
     }
 
     // MARK: - Friend Actions
 
     func sendRequest(to user: TreacheryUser) async {
         guard let userId else { return }
-        errorMessage = nil
 
         do {
             let currentUser = try await firestoreManager.getUser(id: userId)
@@ -88,30 +124,28 @@ final class FriendsListViewModel: ObservableObject {
                 createdAt: Date()
             )
             try await firestoreManager.sendFriendRequest(request)
-            AnalyticsService.trackEvent("send_friend_request")
+            trackEvent("send_friend_request")
             sentRequestUserIds.insert(user.id)
         } catch {
-            errorMessage = error.localizedDescription
+            fail(.sendRequest, with: error)
         }
     }
 
+    /// Accepts the request, then reloads so the new friend appears.
     func acceptRequest(_ request: FriendRequest) async {
         guard let userId else { return }
-        errorMessage = nil
 
         do {
             try await cloudFunctions.acceptFriendRequest(requestId: request.id)
-            AnalyticsService.trackEvent("accept_friend_request")
-
-            await loadData(userId: userId)
+            trackEvent("accept_friend_request")
         } catch {
-            errorMessage = error.localizedDescription
+            fail(.acceptRequest, with: error)
+            return
         }
+        await loadData(userId: userId)
     }
 
     func declineRequest(_ request: FriendRequest) async {
-        errorMessage = nil
-
         do {
             let updatedRequest = FriendRequest(
                 id: request.id,
@@ -122,27 +156,35 @@ final class FriendsListViewModel: ObservableObject {
                 createdAt: request.createdAt
             )
             try await firestoreManager.updateFriendRequest(updatedRequest)
-            pendingRequests.removeAll { $0.id == request.id }
+            overview.updateValue { $0.pendingRequests.removeAll { $0.id == request.id } }
         } catch {
-            errorMessage = error.localizedDescription
+            fail(.declineRequest, with: error)
         }
     }
 
     func removeFriend(_ friend: TreacheryUser) async {
-        errorMessage = nil
-
         do {
             try await cloudFunctions.removeFriend(friendId: friend.id)
-            AnalyticsService.trackEvent("remove_friend")
-            friends.removeAll { $0.id == friend.id }
+            trackEvent("remove_friend")
+            overview.updateValue { $0.friends.removeAll { $0.id == friend.id } }
         } catch {
-            errorMessage = error.localizedDescription
+            fail(.removeFriend, with: error)
         }
+    }
+
+    /// Closes the alert for the last failed action.
+    func dismissActionFailure() {
+        actionFailure = nil
+    }
+
+    private func fail(_ action: FriendActionFailure.Action, with error: any Error) {
+        Self.logger.error("Friend action \(String(describing: action), privacy: .public) failed: \(String(describing: error), privacy: .private)")
+        actionFailure = FriendActionFailure(action: action, error: UserFacingError(error))
     }
 
     // MARK: - Helpers
 
     func isFriend(_ user: TreacheryUser) -> Bool {
-        friends.contains { $0.id == user.id }
+        overview.value?.friends.contains { $0.id == user.id } ?? false
     }
 }

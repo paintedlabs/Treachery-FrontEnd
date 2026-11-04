@@ -41,6 +41,15 @@ final class AuthViewModel: ObservableObject {
         return nil
     }
 
+    /// Whether the signed-in account is a guest's (Firebase anonymous auth).
+    /// A guest account can't be signed back into once signed out.
+    var isGuest: Bool {
+        if case .authenticated(let user) = authState {
+            return user.isAnonymous
+        }
+        return false
+    }
+
     /// - Parameter now: The clock profile provisioning reads when Firebase
     ///   Auth doesn't say when an account was created.
     init(
@@ -91,7 +100,7 @@ final class AuthViewModel: ObservableObject {
             _ = try await firebaseManager.signInAnonymously()
             AnalyticsService.trackEvent("sign_in", params: ["method": "guest"])
         } catch {
-            errorMessage = error.localizedDescription
+            report(error, while: "guest sign-in")
         }
     }
 
@@ -103,7 +112,7 @@ final class AuthViewModel: ObservableObject {
             _ = try await firebaseManager.signIn(email: email, password: password)
             AnalyticsService.trackEvent("sign_in", params: ["method": "email"])
         } catch {
-            errorMessage = error.localizedDescription
+            report(error, while: "email sign-in")
         }
     }
 
@@ -113,7 +122,7 @@ final class AuthViewModel: ObservableObject {
             _ = try await firebaseManager.signUp(email: email, password: password)
             AnalyticsService.trackEvent("sign_up", params: ["method": "email"])
         } catch {
-            errorMessage = error.localizedDescription
+            report(error, while: "sign-up")
         }
     }
 
@@ -122,7 +131,7 @@ final class AuthViewModel: ObservableObject {
         do {
             try await firebaseManager.resetPassword(email: email)
         } catch {
-            errorMessage = error.localizedDescription
+            report(error, while: "password reset")
         }
     }
 
@@ -133,7 +142,7 @@ final class AuthViewModel: ObservableObject {
         do {
             return try await firebaseManager.verifyPhoneNumber(phoneNumber)
         } catch {
-            errorMessage = error.localizedDescription
+            report(error, while: "sending a phone code")
             return nil
         }
     }
@@ -144,19 +153,17 @@ final class AuthViewModel: ObservableObject {
             _ = try await firebaseManager.signInWithPhoneCode(verificationID: verificationID, code: code)
             AnalyticsService.trackEvent("sign_in", params: ["method": "phone"])
         } catch {
-            errorMessage = error.localizedDescription
+            report(error, while: "phone sign-in")
         }
     }
 
-    // MARK: - Sign Out
+    // MARK: - Errors
 
-    /// The Sign Out button's action. A failure is reported through `errorMessage`.
-    func signOut() {
-        do {
-            try endSession()
-        } catch {
-            errorMessage = error.localizedDescription
-        }
+    /// Shows the sign-in screens a plain sentence for `error` (never
+    /// Firebase's own text) and logs the error itself.
+    private func report(_ error: any Error, while action: String) {
+        Self.logger.error("\(action, privacy: .public) failed: \(String(describing: error), privacy: .private)")
+        errorMessage = UserFacingError(error).message
     }
 
     // MARK: - Onboarding
@@ -211,10 +218,9 @@ final class AuthViewModel: ObservableObject {
 // MARK: - SessionEnding
 
 extension AuthViewModel: SessionEnding {
-    /// Signs out like the Sign Out button, but throws on failure instead of
-    /// setting `errorMessage`, for callers that must handle it themselves
-    /// (after account deletion, the Profile screen keeps the user on a
-    /// blocking screen until sign-out succeeds).
+    /// Signs out, throwing on failure for the caller to report: the Profile
+    /// screen shows a failed Sign Out under the button, and after account
+    /// deletion keeps the user on a blocking screen until sign-out succeeds.
     func endSession() throws {
         errorMessage = nil
         try firebaseManager.signOut()

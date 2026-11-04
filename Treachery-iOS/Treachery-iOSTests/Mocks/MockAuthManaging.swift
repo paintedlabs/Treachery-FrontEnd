@@ -15,20 +15,27 @@ final class MockAuthManaging: AuthManaging {
     var accountStatus: AccountStatus = .exists
     /// Thrown by `signOut()`.
     var signOutError: Error?
+    /// Thrown by the sign-in methods, `verifyPhoneNumber` and
+    /// `resetPassword` in place of their usual outcome.
+    var signInError: Error?
 
     private(set) var reloadAccountCalls: [String] = []
     private(set) var signOutCallCount = 0
 
     var currentUser: User? { nil }
 
-    func signInAnonymously() async throws -> User { throw Unsupported.needsAFirebaseUser }
-    func signIn(email: String, password: String) async throws -> User { throw Unsupported.needsAFirebaseUser }
-    func signUp(email: String, password: String) async throws -> User { throw Unsupported.needsAFirebaseUser }
-    func resetPassword(email: String) async throws {}
-    func verifyPhoneNumber(_ phoneNumber: String) async throws -> String { throw Unsupported.needsAFirebaseUser }
+    func signInAnonymously() async throws -> User { throw signInError ?? Unsupported.needsAFirebaseUser }
+    func signIn(email: String, password: String) async throws -> User { throw signInError ?? Unsupported.needsAFirebaseUser }
+    func signUp(email: String, password: String) async throws -> User { throw signInError ?? Unsupported.needsAFirebaseUser }
+
+    func resetPassword(email: String) async throws {
+        if let signInError { throw signInError }
+    }
+
+    func verifyPhoneNumber(_ phoneNumber: String) async throws -> String { throw signInError ?? Unsupported.needsAFirebaseUser }
 
     func signInWithPhoneCode(verificationID: String, code: String) async throws -> User {
-        throw Unsupported.needsAFirebaseUser
+        throw signInError ?? Unsupported.needsAFirebaseUser
     }
 
     func signOut() throws {

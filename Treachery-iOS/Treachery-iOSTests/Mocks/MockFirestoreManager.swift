@@ -36,6 +36,20 @@ final class MockFirestoreManager: FirestoreManaging {
     /// Runs once inside `updateDisplayName` while the write is in flight, so
     /// a test can act mid-save.
     var whileUpdatingDisplayName: (@MainActor () async -> Void)?
+    /// Thrown only by `getFinishedGames(forUserId:)`.
+    var finishedGamesError: Error?
+    /// Runs once inside `getFinishedGames(forUserId:)` while the read is in
+    /// flight, so a test can look at a screen mid-load.
+    var whileGettingFinishedGames: (@MainActor () async -> Void)?
+    /// Thrown only by `getFriends(forUserId:)`.
+    var friendsError: Error?
+    /// Runs once inside `getFriends(forUserId:)` while the read is in flight.
+    var whileGettingFriends: (@MainActor () async -> Void)?
+    /// Thrown only by `searchUsers(byDisplayName:)`.
+    var searchError: Error?
+    /// Thrown only by the friend request writes: `sendFriendRequest` and
+    /// `updateFriendRequest`.
+    var friendRequestWriteError: Error?
 
     // MARK: - Call tracking
 
@@ -85,18 +99,46 @@ final class MockFirestoreManager: FirestoreManaging {
         updateDisplayNameCalls.append((name, userId))
     }
 
+    private(set) var searchUsersCalls: [String] = []
+
     func searchUsers(byDisplayName name: String) async throws -> [TreacheryUser] {
+        searchUsersCalls.append(name)
+        if let searchError { throw searchError }
         return searchResultsToReturn
     }
 
     // MARK: - Friend Requests
 
-    func sendFriendRequest(_ request: FriendRequest) async throws {}
+    private(set) var sendFriendRequestCalls: [FriendRequest] = []
+    private(set) var updateFriendRequestCalls: [FriendRequest] = []
+
+    func sendFriendRequest(_ request: FriendRequest) async throws {
+        if let friendRequestWriteError { throw friendRequestWriteError }
+        sendFriendRequestCalls.append(request)
+    }
+
     func getPendingFriendRequests(forUserId userId: String) async throws -> [FriendRequest] { pendingRequestsToReturn }
-    func updateFriendRequest(_ request: FriendRequest) async throws {}
+
+    func updateFriendRequest(_ request: FriendRequest) async throws {
+        if let friendRequestWriteError { throw friendRequestWriteError }
+        updateFriendRequestCalls.append(request)
+    }
+
     func addFriend(userId: String, friendId: String) async throws {}
     func removeFriend(userId: String, friendId: String) async throws {}
-    func getFriends(forUserId userId: String) async throws -> [TreacheryUser] { friendsToReturn }
+
+    private(set) var getFriendsCallCount = 0
+
+    func getFriends(forUserId userId: String) async throws -> [TreacheryUser] {
+        getFriendsCallCount += 1
+        if let inFlight = whileGettingFriends {
+            // One-shot, so a test can't recurse into it by accident.
+            whileGettingFriends = nil
+            await inFlight()
+        }
+        if let friendsError { throw friendsError }
+        return friendsToReturn
+    }
 
     // MARK: - Games
 
@@ -111,7 +153,15 @@ final class MockFirestoreManager: FirestoreManaging {
     func deleteGame(id: String) async throws {}
     func addPlayerIdToGame(gameId: String, userId: String) async throws {}
     func getActiveGame(forUserId userId: String) async throws -> Game? { activeGameToReturn }
-    func getFinishedGames(forUserId userId: String) async throws -> [Game] { finishedGamesToReturn }
+    func getFinishedGames(forUserId userId: String) async throws -> [Game] {
+        if let inFlight = whileGettingFinishedGames {
+            // One-shot, so a test can't recurse into it by accident.
+            whileGettingFinishedGames = nil
+            await inFlight()
+        }
+        if let finishedGamesError { throw finishedGamesError }
+        return finishedGamesToReturn
+    }
 
     func listenToGame(id: String, onChange: @escaping (Game?) -> Void) -> ListenerCancellable {
         onChange(gamesToReturn[id])

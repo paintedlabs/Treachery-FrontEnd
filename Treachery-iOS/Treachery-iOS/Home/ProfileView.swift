@@ -33,242 +33,36 @@ struct ProfileView: View {
 
             ScrollView {
                 VStack(spacing: 24) {
-                    // Profile info card
-                    VStack(spacing: 0) {
-                        MtgSectionHeader(title: "Profile")
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding(.horizontal, 16)
-                            .padding(.top, 16)
-                            .padding(.bottom, 8)
+                    overviewContent
 
-                        OrnateDivider()
-                            .padding(.horizontal, 16)
-                            .padding(.bottom, 8)
-
-                        if let user = viewModel.user {
-                            ProfileRow(label: "Display Name", value: viewModel.isEditingName ? nil : user.displayName) {
-                                if viewModel.isEditingName {
-                                    TextField("Name", text: $viewModel.editedName)
-                                        .multilineTextAlignment(.trailing)
-                                        .textInputAutocapitalization(.words)
-                                        .foregroundStyle(Color.mtgGoldBright)
-                                }
-                            }
-
-                            // Primary-colored text: mtgError text on this card is
-                            // below the 4.5:1 contrast minimum (see DeleteAccountSection).
-                            if let renameFailure = viewModel.renameFailureMessage {
-                                Label {
-                                    Text(renameFailure)
-                                } icon: {
-                                    Image(systemName: "exclamationmark.triangle.fill")
-                                        .foregroundStyle(Color.mtgError)
-                                }
-                                .font(.footnote)
-                                .foregroundStyle(Color.mtgTextPrimary)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .padding(.horizontal, 16)
-                                .padding(.bottom, 4)
-                                .accessibilityElement(children: .combine)
-                            }
-
-                            ProfileRow(label: "Member Since") {
-                                Text(user.createdAt, style: .date)
-                                    .foregroundStyle(Color.mtgTextSecondary)
-                            }
-                        } else {
-                            MtgLoadingView()
-                                .padding()
+                    // Sign Out, About and Delete Account stay reachable even
+                    // when the profile can't load.
+                    SignOutSection(
+                        isEnabled: !isAccountDeletionUnderway,
+                        isGuest: authViewModel.isGuest,
+                        failureMessage: viewModel.signOutFailureMessage
+                    ) {
+                        viewModel.requestSignOut()
+                    }
+                    .confirmationDialog(
+                        "Sign Out of Guest Account?",
+                        isPresented: isConfirmingGuestSignOut,
+                        titleVisibility: .visible
+                    ) {
+                        Button("Sign Out", role: .destructive) {
+                            viewModel.confirmGuestSignOut()
                         }
-                    }
-                    .mtgCardFrame()
-
-                    // Game stats card
-                    VStack(spacing: 0) {
-                        MtgSectionHeader(title: "Game Stats")
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding(.horizontal, 16)
-                            .padding(.top, 16)
-                            .padding(.bottom, 8)
-
-                        OrnateDivider()
-                            .padding(.horizontal, 16)
-                            .padding(.bottom, 12)
-
-                        if let stats = viewModel.gameStats {
-                            HStack(spacing: 8) {
-                                MtgStatBox(value: "\(stats.totalGames)", label: "Games", color: Color.mtgTextPrimary)
-                                MtgStatBox(value: "\(stats.wins)", label: "Wins", color: Color.mtgSuccess)
-                                MtgStatBox(value: "\(stats.losses)", label: "Losses", color: Color.mtgError)
-                                MtgStatBox(value: stats.winRateText, label: "Win %", color: Color.mtgGuardian)
-                            }
-                            .padding(.horizontal, 16)
-                            .padding(.bottom, 8)
-
-                            HStack(spacing: 8) {
-                                MtgStatBox(value: "\(viewModel.user?.elo ?? 1500)", label: "ELO", color: Color.mtgGoldBright)
-                            }
-                            .padding(.horizontal, 16)
-                            .padding(.bottom, 12)
-
-                            // Partial stats say so rather than pass for complete ones.
-                            if stats.unknownResults > 0 {
-                                Text("Results for some games couldn't be loaded, so they're left out of wins, losses and Win %.")
-                                    .font(.footnote)
-                                    .foregroundStyle(Color.mtgTextSecondary)
-                                    .fixedSize(horizontal: false, vertical: true)
-                                    .frame(maxWidth: .infinity, alignment: .leading)
-                                    .padding(.horizontal, 16)
-                                    .padding(.bottom, 12)
-                            }
-
-                            // Role breakdown
-                            if !stats.roleBreakdown.isEmpty {
-                                VStack(alignment: .leading, spacing: 6) {
-                                    Text("Roles Played")
-                                        .font(.caption)
-                                        .foregroundStyle(Color.mtgTextSecondary)
-                                    ForEach(stats.roleBreakdown.sorted(by: { $0.value > $1.value }), id: \.key) { role, count in
-                                        HStack(spacing: 6) {
-                                            Circle()
-                                                .fill(role.color)
-                                                .frame(width: 8, height: 8)
-                                            Text(role.displayName)
-                                                .font(.subheadline)
-                                                .foregroundStyle(Color.mtgTextPrimary)
-                                            Spacer()
-                                            Text("\(count)")
-                                                .font(.subheadline)
-                                                .foregroundStyle(Color.mtgTextSecondary)
-                                        }
-                                    }
-                                }
-                                .padding(.horizontal, 16)
-                                .padding(.bottom, 12)
-                            }
-
-                            NavigationLink {
-                                GameHistoryView()
-                            } label: {
-                                HStack {
-                                    Text("View Game History")
-                                        .foregroundStyle(Color.mtgGold)
-                                    Spacer()
-                                    Image(systemName: "chevron.right")
-                                        .font(.caption)
-                                        .foregroundStyle(Color.mtgTextSecondary)
-                                }
-                                .padding(.horizontal, 16)
-                                .padding(.vertical, 12)
-                            }
-                        } else {
-                            MtgLoadingView(message: "Loading stats...")
-                                .padding()
+                        Button("Cancel", role: .cancel) {
+                            viewModel.cancelSignOut()
                         }
-                    }
-                    .mtgCardFrame()
-
-                    // Deck Performance card
-                    if let deckStats = viewModel.user?.deckStats, !deckStats.isEmpty {
-                        VStack(spacing: 0) {
-                            MtgSectionHeader(title: "Deck Performance")
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .padding(.horizontal, 16)
-                                .padding(.top, 16)
-                                .padding(.bottom, 8)
-
-                            OrnateDivider()
-                                .padding(.horizontal, 16)
-                                .padding(.bottom, 12)
-
-                            ForEach(deckStats.sorted(by: { $0.value.games > $1.value.games }), id: \.key) { deckName, stat in
-                                VStack(alignment: .leading, spacing: 6) {
-                                    Text(deckName)
-                                        .font(.system(.subheadline, design: .serif))
-                                        .italic()
-                                        .foregroundStyle(Color.mtgGoldBright)
-
-                                    HStack(spacing: 16) {
-                                        HStack(spacing: 4) {
-                                            Text("ELO")
-                                                .font(.caption)
-                                                .foregroundStyle(Color.mtgTextSecondary)
-                                            Text("\(stat.elo)")
-                                                .font(.subheadline.weight(.semibold))
-                                                .foregroundStyle(Color.mtgGoldBright)
-                                        }
-
-                                        HStack(spacing: 4) {
-                                            Text("Record")
-                                                .font(.caption)
-                                                .foregroundStyle(Color.mtgTextSecondary)
-                                            Text("\(stat.wins)W - \(stat.losses)L")
-                                                .font(.subheadline.weight(.semibold))
-                                                .foregroundStyle(Color.mtgTextPrimary)
-                                        }
-
-                                        HStack(spacing: 4) {
-                                            Text("Games")
-                                                .font(.caption)
-                                                .foregroundStyle(Color.mtgTextSecondary)
-                                            Text("\(stat.games)")
-                                                .font(.subheadline.weight(.semibold))
-                                                .foregroundStyle(Color.mtgTextPrimary)
-                                        }
-
-                                        Spacer()
-                                    }
-                                }
-                                .padding(.horizontal, 16)
-                                .padding(.vertical, 8)
-                            }
-                        }
-                        .mtgCardFrame()
+                    } message: {
+                        Text("""
+                            You're playing as a guest, and a guest account can't be signed back into. \
+                            If you sign out, your stats, game history and friends are lost for good.
+                            """)
                     }
 
-                    // Friends card
-                    if viewModel.user != nil {
-                        NavigationLink {
-                            FriendsListView()
-                        } label: {
-                            HStack {
-                                Text("Friends")
-                                    .foregroundStyle(Color.mtgTextPrimary)
-                                Spacer()
-                                Text("\(viewModel.user?.friendIds.count ?? 0)")
-                                    .foregroundStyle(Color.mtgTextSecondary)
-                                Image(systemName: "chevron.right")
-                                    .font(.caption)
-                                    .foregroundStyle(Color.mtgTextSecondary)
-                            }
-                            .padding(16)
-                        }
-                        .mtgCardFrame()
-                    }
-
-                    // Error
-                    if let error = viewModel.errorMessage {
-                        VStack(alignment: .leading, spacing: 8) {
-                            MtgErrorBanner(message: "Error loading profile")
-                            Text(error)
-                                .foregroundStyle(Color.mtgError)
-                                .font(.caption)
-                                .textSelection(.enabled)
-                        }
-                        .padding(16)
-                        .mtgCardFrame(borderColor: Color.mtgError)
-                    }
-
-                    // Sign out
-                    Button("Sign Out") {
-                        authViewModel.signOut()
-                    }
-                    .foregroundStyle(Color.mtgError)
-                    .padding(16)
-                    .frame(maxWidth: .infinity)
-                    .mtgCardFrame(borderColor: Color.mtgError.opacity(0.5))
-                    .accessibilityLabel("Sign out of your account")
-                    .disabled(isAccountDeletionUnderway)
+                    AboutSection(version: AppInfo.version(from: Bundle.main.infoDictionary))
 
                     // Delete account: last, and set apart from the routine actions
                     DeleteAccountSection(
@@ -354,16 +148,129 @@ struct ProfileView: View {
             // Verbatim: for an in-progress game this is the server's own sentence.
             Text(verbatim: failure.message)
         }
-        // The failure appears away from the Save button that caused it.
+        // VoiceOver doesn't read a failure that appears after its button was
+        // tapped (the rename one appears away from Save), so announce it.
         .onChange(of: viewModel.renameFailureMessage) { _, message in
             if let message {
                 AccessibilityNotification.Announcement(message).post()
             }
         }
-        .task {
-            guard let userId = authViewModel.currentUserId else { return }
-            await viewModel.loadData(userId: userId)
+        .onChange(of: viewModel.signOutFailureMessage) { _, message in
+            if let message {
+                AccessibilityNotification.Announcement(message).post()
+            }
         }
+        .task { await reload() }
+    }
+
+    private func reload() async {
+        guard let userId = authViewModel.currentUserId else { return }
+        await viewModel.loadData(userId: userId)
+    }
+
+    // MARK: - Profile and Stats
+
+    /// The profile and stats only once they've loaded, and a failure with
+    /// Try Again above anything kept from an earlier load.
+    @ViewBuilder private var overviewContent: some View {
+        switch viewModel.overview {
+        case .idle, .loading(previous: nil):
+            MtgLoadingView(message: "Loading profile...")
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 40)
+        case .failed(let failure, let previous):
+            LoadFailureCard(title: "Couldn't Load Your Profile", failure: failure) {
+                Task { await reload() }
+            }
+            if let previous {
+                overviewCards(for: previous)
+            }
+        case .loading(previous: let overview?), .loaded(let overview):
+            overviewCards(for: overview)
+        }
+    }
+
+    @ViewBuilder private func overviewCards(for overview: ProfileOverview) -> some View {
+        profileCard(for: overview.user)
+        GameStatsCard(stats: overview.stats, elo: overview.user.elo)
+        if let deckStats = overview.user.deckStats, !deckStats.isEmpty {
+            DeckPerformanceCard(deckStats: deckStats)
+        }
+        NavigationLink {
+            FriendsListView()
+        } label: {
+            HStack {
+                Text("Friends")
+                    .foregroundStyle(Color.mtgTextPrimary)
+                Spacer()
+                Text("\(overview.user.friendIds.count)")
+                    .foregroundStyle(Color.mtgTextSecondary)
+                Image(systemName: "chevron.right")
+                    .font(.caption)
+                    .foregroundStyle(Color.mtgTextSecondary)
+            }
+            .padding(16)
+        }
+        .mtgCardFrame()
+    }
+
+    private func profileCard(for user: TreacheryUser) -> some View {
+        VStack(spacing: 0) {
+            MtgSectionHeader(title: "Profile")
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 16)
+                .padding(.top, 16)
+                .padding(.bottom, 8)
+
+            OrnateDivider()
+                .padding(.horizontal, 16)
+                .padding(.bottom, 8)
+
+            ProfileRow(label: "Display Name", value: viewModel.isEditingName ? nil : user.displayName) {
+                if viewModel.isEditingName {
+                    TextField("Name", text: $viewModel.editedName)
+                        .multilineTextAlignment(.trailing)
+                        .textInputAutocapitalization(.words)
+                        .foregroundStyle(Color.mtgGoldBright)
+                }
+            }
+
+            // Primary-colored text: mtgError text on this card is
+            // below the 4.5:1 contrast minimum (see DeleteAccountSection).
+            if let renameFailure = viewModel.renameFailureMessage {
+                Label {
+                    Text(renameFailure)
+                } icon: {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .foregroundStyle(Color.mtgError)
+                }
+                .font(.footnote)
+                .foregroundStyle(Color.mtgTextPrimary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 16)
+                .padding(.bottom, 4)
+                .accessibilityElement(children: .combine)
+            }
+
+            ProfileRow(label: "Member Since") {
+                Text(user.createdAt, style: .date)
+                    .foregroundStyle(Color.mtgTextSecondary)
+            }
+        }
+        .mtgCardFrame()
+    }
+
+    // MARK: - Sign Out
+
+    /// Drives the guest's confirmation from the view model's state.
+    /// Dismissal only cancels.
+    private var isConfirmingGuestSignOut: Binding<Bool> {
+        Binding(
+            get: { viewModel.signOutState == .confirmingGuestSignOut },
+            set: { isPresented in
+                if !isPresented { viewModel.cancelSignOut() }
+            }
+        )
     }
 
     // MARK: - Account Deletion
@@ -395,6 +302,199 @@ struct ProfileView: View {
                 if !isPresented { viewModel.cancelAccountDeletion() }
             }
         )
+    }
+}
+
+// MARK: - Game Stats Card
+
+private struct GameStatsCard: View {
+    let stats: GameStats
+    let elo: Int
+
+    var body: some View {
+        VStack(spacing: 0) {
+            MtgSectionHeader(title: "Game Stats")
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 16)
+                .padding(.top, 16)
+                .padding(.bottom, 8)
+
+            OrnateDivider()
+                .padding(.horizontal, 16)
+                .padding(.bottom, 12)
+
+            HStack(spacing: 8) {
+                MtgStatBox(value: "\(stats.totalGames)", label: "Games", color: Color.mtgTextPrimary)
+                MtgStatBox(value: "\(stats.wins)", label: "Wins", color: Color.mtgSuccess)
+                MtgStatBox(value: "\(stats.losses)", label: "Losses", color: Color.mtgError)
+                MtgStatBox(value: stats.winRateText, label: "Win %", color: Color.mtgGuardian)
+            }
+            .padding(.horizontal, 16)
+            .padding(.bottom, 8)
+
+            HStack(spacing: 8) {
+                MtgStatBox(value: "\(elo)", label: "ELO", color: Color.mtgGoldBright)
+            }
+            .padding(.horizontal, 16)
+            .padding(.bottom, 12)
+
+            // Partial stats say so rather than pass for complete ones.
+            if stats.unknownResults > 0 {
+                Text("Results for some games couldn't be loaded, so they're left out of wins, losses and Win %.")
+                    .font(.footnote)
+                    .foregroundStyle(Color.mtgTextSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 16)
+                    .padding(.bottom, 12)
+            }
+
+            // Role breakdown
+            if !stats.roleBreakdown.isEmpty {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Roles Played")
+                        .font(.caption)
+                        .foregroundStyle(Color.mtgTextSecondary)
+                    ForEach(stats.roleBreakdown.sorted(by: { $0.value > $1.value }), id: \.key) { role, count in
+                        HStack(spacing: 6) {
+                            Circle()
+                                .fill(role.color)
+                                .frame(width: 8, height: 8)
+                            Text(role.displayName)
+                                .font(.subheadline)
+                                .foregroundStyle(Color.mtgTextPrimary)
+                            Spacer()
+                            Text("\(count)")
+                                .font(.subheadline)
+                                .foregroundStyle(Color.mtgTextSecondary)
+                        }
+                    }
+                }
+                .padding(.horizontal, 16)
+                .padding(.bottom, 12)
+            }
+
+            NavigationLink {
+                GameHistoryView()
+            } label: {
+                HStack {
+                    Text("View Game History")
+                        .foregroundStyle(Color.mtgGold)
+                    Spacer()
+                    Image(systemName: "chevron.right")
+                        .font(.caption)
+                        .foregroundStyle(Color.mtgTextSecondary)
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 12)
+            }
+        }
+        .mtgCardFrame()
+    }
+}
+
+// MARK: - Deck Performance Card
+
+private struct DeckPerformanceCard: View {
+    let deckStats: [String: DeckStat]
+
+    var body: some View {
+        VStack(spacing: 0) {
+            MtgSectionHeader(title: "Deck Performance")
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 16)
+                .padding(.top, 16)
+                .padding(.bottom, 8)
+
+            OrnateDivider()
+                .padding(.horizontal, 16)
+                .padding(.bottom, 12)
+
+            ForEach(deckStats.sorted(by: { $0.value.games > $1.value.games }), id: \.key) { deckName, stat in
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(deckName)
+                        .font(.system(.subheadline, design: .serif))
+                        .italic()
+                        .foregroundStyle(Color.mtgGoldBright)
+
+                    HStack(spacing: 16) {
+                        HStack(spacing: 4) {
+                            Text("ELO")
+                                .font(.caption)
+                                .foregroundStyle(Color.mtgTextSecondary)
+                            Text("\(stat.elo)")
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(Color.mtgGoldBright)
+                        }
+
+                        HStack(spacing: 4) {
+                            Text("Record")
+                                .font(.caption)
+                                .foregroundStyle(Color.mtgTextSecondary)
+                            Text("\(stat.wins)W - \(stat.losses)L")
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(Color.mtgTextPrimary)
+                        }
+
+                        HStack(spacing: 4) {
+                            Text("Games")
+                                .font(.caption)
+                                .foregroundStyle(Color.mtgTextSecondary)
+                            Text("\(stat.games)")
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(Color.mtgTextPrimary)
+                        }
+
+                        Spacer()
+                    }
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 8)
+            }
+        }
+        .mtgCardFrame()
+    }
+}
+
+// MARK: - Sign Out Section
+
+/// Sign Out and, if it failed, why. Primary-colored text on a red-bordered
+/// card, with the whole card as its target: `mtgError` text on `mtgSurface`
+/// is below the 4.5:1 contrast minimum (see DeleteAccountSection).
+private struct SignOutSection: View {
+    let isEnabled: Bool
+    let isGuest: Bool
+    let failureMessage: String?
+    let action: () -> Void
+
+    var body: some View {
+        VStack(spacing: 8) {
+            Button(action: action) {
+                Text("Sign Out")
+                    .foregroundStyle(Color.mtgTextPrimary)
+                    .multilineTextAlignment(.center)
+                    .frame(maxWidth: .infinity, minHeight: 44)
+                    .padding(.vertical, 6)
+                    .contentShape(Rectangle())
+            }
+            .mtgCardFrame(borderColor: Color.mtgError.opacity(0.5))
+            .disabled(!isEnabled)
+            .accessibilityLabel("Sign out of your account")
+            .accessibilityHint(isGuest ? "Asks you to confirm first, because a guest account can't be signed back into." : "")
+
+            if let failureMessage {
+                Label {
+                    Text(failureMessage)
+                } icon: {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .foregroundStyle(Color.mtgError)
+                }
+                .font(.footnote)
+                .foregroundStyle(Color.mtgTextPrimary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .accessibilityElement(children: .combine)
+            }
+        }
     }
 }
 

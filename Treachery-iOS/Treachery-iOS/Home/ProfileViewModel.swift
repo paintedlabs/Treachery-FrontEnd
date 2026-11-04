@@ -67,6 +67,15 @@ extension GameStats {
     }
 }
 
+/// What the Profile screen shows once it has loaded: the user's public
+/// profile and their stats over finished games. One value, loaded together,
+/// so the screen never shows a profile beside stats that are still loading
+/// or failed.
+struct ProfileOverview {
+    var user: TreacheryUser
+    let stats: GameStats
+}
+
 /// Where the delete-account flow is. One enum rather than Bool flags, so
 /// states like "confirming while deleting" cannot be represented.
 enum AccountDeletionState: Equatable {
@@ -109,9 +118,21 @@ enum RenameState: Equatable {
     /// The draft is being saved. The field stays open until the server
     /// answers.
     case saving
-    /// The last rename didn't save and the old name stays. `message` says
+    /// The last rename didn't save and the old name stays. The error says
     /// why, under the name, until the next edit.
-    case failed(message: String)
+    case failed(UserFacingError)
+}
+
+/// Where signing out is. Email and phone accounts sign out at once; a guest
+/// confirms first, because a guest account can't be signed back into.
+enum SignOutState: Equatable {
+    /// Nothing in progress.
+    case idle
+    /// A guest asked to sign out, and the warning that the account will be
+    /// lost for good is on screen.
+    case confirmingGuestSignOut
+    /// Signing out failed and this device is still signed in.
+    case failed(UserFacingError)
 }
 
 @MainActor
@@ -119,13 +140,17 @@ final class ProfileViewModel: ObservableObject {
 
     // MARK: - Published State
 
-    @Published var user: TreacheryUser?
-    @Published var gameStats: GameStats?
+    @Published private(set) var overview: Loadable<ProfileOverview, UserFacingError> = .idle
     /// The name being typed while renaming.
     @Published var editedName = ""
     @Published private(set) var renameState: RenameState = .idle
-    @Published var errorMessage: String?
+    @Published private(set) var signOutState: SignOutState = .idle
     @Published private(set) var accountDeletionState: AccountDeletionState = .idle
+
+    /// The profile shown, if one has loaded.
+    var user: TreacheryUser? {
+        overview.value?.user
+    }
 
     /// Whether the name field is open, including while its draft is saved.
     var isEditingName: Bool {
@@ -138,8 +163,20 @@ final class ProfileViewModel: ObservableObject {
 
     /// Why the last rename didn't save, if it didn't.
     var renameFailureMessage: String? {
-        guard case .failed(let message) = renameState else { return nil }
-        return message
+        guard case .failed(let error) = renameState else { return nil }
+        return String(
+            localized: "Your new name wasn't saved. \(error.message)",
+            comment: "Shown under the display name when renaming failed; the old name is kept. The argument says why."
+        )
+    }
+
+    /// Why signing out failed, if it did.
+    var signOutFailureMessage: String? {
+        guard case .failed(let error) = signOutState else { return nil }
+        return String(
+            localized: "Couldn't sign out. \(error.message)",
+            comment: "Shown under Sign Out when signing out failed. The argument says why."
+        )
     }
 
     // MARK: - Properties
@@ -156,8 +193,9 @@ final class ProfileViewModel: ObservableObject {
     // MARK: - Init
 
     /// - Parameters:
-    ///   - session: Ends the signed-in session once the account is deleted.
-    ///     In the app this is `AuthViewModel`, the single source of auth state.
+    ///   - session: Ends the signed-in session, for Sign Out and once the
+    ///     account is deleted, and says whether it is a guest's. In the app
+    ///     this is `AuthViewModel`, the single source of auth state.
     ///   - trackEvent: Records an analytics event by name.
     init(
         session: SessionEnding,
@@ -171,35 +209,33 @@ final class ProfileViewModel: ObservableObject {
         self.trackEvent = trackEvent
     }
 
-    /// User-facing text for loading and renaming failures, kept in one place.
-    enum ProfileMessage {
-        static let loadFailed = String(
-            localized: "Check your connection and try again.",
-            comment: "Shown under 'Error loading profile' when the profile or its stats failed to load"
-        )
-        static let renameFailed = String(
-            localized: "We couldn't save your new name. Check your connection and try again.",
-            comment: "Shown under the display name when renaming failed; the old name is kept"
-        )
-    }
-
     // MARK: - Data Loading
 
+    /// A profile that is missing or can't be read: `getUser` returns nil for
+    /// it. Signing in creates or repairs it, so trying again can help.
+    private struct ProfileUnavailable: Error {}
+
+    /// Loads the profile and the stats over the user's finished games
+    /// together. What's already shown stays while this runs and if it fails.
     func loadData(userId: String) async {
         self.userId = userId
-        errorMessage = nil
+        overview.startLoading()
 
         do {
             async let userTask = firestoreManager.getUser(id: userId)
             async let gamesTask = firestoreManager.getFinishedGames(forUserId: userId)
 
-            user = try await userTask
+            guard let user = try await userTask else { throw ProfileUnavailable() }
             let games = try await gamesTask
+            let playersByGame = await firestoreManager.playersByGame(for: games)
 
-            await calculateStats(games: games)
+            overview = .loaded(ProfileOverview(
+                user: user,
+                stats: GameStats(games: games, playersByGame: playersByGame, userId: userId)
+            ))
         } catch {
             Self.profileLogger.error("Loading the profile failed: \(String(describing: error), privacy: .private)")
-            errorMessage = ProfileMessage.loadFailed
+            overview.fail(with: UserFacingError(error))
         }
     }
 
@@ -225,11 +261,53 @@ final class ProfileViewModel: ObservableObject {
 
         do {
             try await firestoreManager.updateDisplayName(newName, forUserId: userId)
-            user?.displayName = newName
+            overview.updateValue { $0.user.displayName = newName }
             renameState = .idle
         } catch {
             Self.profileLogger.error("Renaming failed: \(String(describing: error), privacy: .private)")
-            renameState = .failed(message: ProfileMessage.renameFailed)
+            renameState = .failed(UserFacingError(error))
+        }
+    }
+
+    // MARK: - Sign Out
+
+    /// The Sign Out button's action. An email or phone account signs out at
+    /// once; a guest is asked to confirm first. Ignored while the account is
+    /// being deleted, which signs out on its own.
+    func requestSignOut() {
+        guard !accountDeletionState.isUnderway else { return }
+        if session.isGuest {
+            signOutState = .confirmingGuestSignOut
+        } else {
+            endSessionForSignOut()
+        }
+    }
+
+    /// Signs a guest out once they've confirmed losing the account: the
+    /// confirmation's Sign Out button calls this. It doesn't require the
+    /// confirmation to still be showing, because SwiftUI may close it, which
+    /// cancels, before running the button's action. Ignored while the account
+    /// is being deleted.
+    func confirmGuestSignOut() {
+        guard !accountDeletionState.isUnderway else { return }
+        endSessionForSignOut()
+    }
+
+    /// Closes the guest's confirmation without signing out.
+    func cancelSignOut() {
+        guard signOutState == .confirmingGuestSignOut else { return }
+        signOutState = .idle
+    }
+
+    /// On success the auth state listener replaces this screen with the
+    /// signed-out one.
+    private func endSessionForSignOut() {
+        do {
+            try session.endSession()
+            signOutState = .idle
+        } catch {
+            Self.profileLogger.error("Signing out failed: \(String(describing: error), privacy: .private)")
+            signOutState = .failed(UserFacingError(error))
         }
     }
 
@@ -329,22 +407,5 @@ final class ProfileViewModel: ObservableObject {
             Self.logger.error("Sign-out after account deletion failed: \(error.localizedDescription, privacy: .private)")
             accountDeletionState = .signOutFailed
         }
-    }
-
-    // MARK: - Stats Calculation
-
-    private func calculateStats(games: [Game]) async {
-        guard let userId else { return }
-        var playersByGame: [String: [Player]] = [:]
-
-        for game in games {
-            do {
-                playersByGame[game.id] = try await firestoreManager.getPlayers(gameId: game.id)
-            } catch {
-                Self.profileLogger.error("Loading players for stats failed: \(String(describing: error), privacy: .private)")
-            }
-        }
-
-        gameStats = GameStats(games: games, playersByGame: playersByGame, userId: userId)
     }
 }
