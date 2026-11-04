@@ -177,6 +177,11 @@ struct GameBoardView: View {
                             .padding(.horizontal)
                             .padding(.vertical, 4)
                     }
+                    if let failure = viewModel.lifeChangeFailure {
+                        MtgErrorBanner(message: failure.message)
+                            .padding(.horizontal)
+                            .padding(.vertical, 4)
+                    }
 
                     // Spectator overlay for eliminated players (treachery only)
                     if viewModel.isTreacheryActive,

@@ -19,6 +19,10 @@ final class GameBoardViewModel: ObservableObject {
     @Published var game: Game?
     @Published var players: [Player] = []
     @Published var errorMessage: String?
+    /// The latest life change whose call failed, shown until that player's
+    /// life is changed again here. Kept apart from `errorMessage`, which any
+    /// tap clears, so tapping someone else doesn't hide it.
+    @Published private(set) var lifeChangeFailure: LifeChangeFailure?
     @Published var isPending = false
     @Published var pendingAbilityResolution: AbilityResolution?
 
@@ -500,12 +504,22 @@ extension GameBoardViewModel {
     /// slow shows the old total again until they catch up.
     static let lifeChangeEchoTimeout: Duration = .seconds(5)
 
+    /// A life change whose call failed.
+    struct LifeChangeFailure: Equatable {
+        let playerId: String
+        /// What the board says, naming the player.
+        let message: String
+    }
+
     /// Shows the tap at once, then sends it with any taps on the same player
     /// that follow within `lifeChangeDebounce`, as one adjustLife call.
     func adjustLife(for playerId: String, by amount: Int) {
         guard let player = serverPlayers.first(where: { $0.id == playerId }) else { return }
         guard !player.isEliminated else { return }
         errorMessage = nil
+        if lifeChangeFailure?.playerId == playerId {
+            lifeChangeFailure = nil
+        }
 
         lifeLedger.record(amount, for: playerId)
         refreshPlayers()
@@ -657,7 +671,10 @@ extension GameBoardViewModel {
     private func reportLifeChangeFailure(for playerId: String, error: Error) {
         logger.error("adjustLife failed: \(String(describing: error), privacy: .public)")
         let name = serverPlayers.first { $0.id == playerId }?.displayName ?? "the player"
-        errorMessage = "Couldn't update \(name)'s life. Check your connection and try again."
+        lifeChangeFailure = LifeChangeFailure(
+            playerId: playerId,
+            message: "Couldn't update \(name)'s life. Check your connection and try again."
+        )
     }
 }
 

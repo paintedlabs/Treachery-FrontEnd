@@ -318,12 +318,33 @@ struct OptimisticLifeTrackingTests {
         await send.value
 
         #expect(board.shown("p1") == 40)
-        #expect(board.vm.errorMessage == "Couldn't update Player 1's life. Check your connection and try again.")
+        #expect(board.vm.lifeChangeFailure == GameBoardViewModel.LifeChangeFailure(
+            playerId: "p1",
+            message: "Couldn't update Player 1's life. Check your connection and try again."
+        ))
         // Not retried: nothing is left running that could send it again.
         #expect(board.vm.lifeChangeDebounces.isEmpty)
         #expect(board.vm.lifeChangeSends.isEmpty)
         #expect(board.clock.pendingDeadlines.isEmpty)
         #expect(gate.arrivals == 1)
+    }
+
+    @Test(.timeLimit(.minutes(1)))
+    func aFailureStaysExplainedUntilThatPlayerIsChangedAgain() async {
+        let board = LifeBoard()
+        board.functions.adjustLifeErrors = [NSError(domain: "test", code: 1)]
+        board.vm.adjustLife(for: "p1", by: -3)
+        await board.endDebounces()
+        await board.finishSends()
+        let message = "Couldn't update Player 1's life. Check your connection and try again."
+        #expect(board.vm.lifeChangeFailure?.message == message)
+
+        // Changing someone else doesn't say why Player 1 went back to 40.
+        board.vm.adjustLife(for: "p2", by: -1)
+        #expect(board.vm.lifeChangeFailure?.message == message)
+
+        board.vm.adjustLife(for: "p1", by: -3)
+        #expect(board.vm.lifeChangeFailure == nil)
     }
 
     @Test(.timeLimit(.minutes(1)))
