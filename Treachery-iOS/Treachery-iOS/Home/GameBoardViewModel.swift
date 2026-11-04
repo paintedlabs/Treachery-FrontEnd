@@ -6,7 +6,10 @@
 //
 
 import Foundation
+import os
 import SwiftUI
+
+private let logger = Logger(subsystem: "com.Solomon.Treachery-iOS", category: "GameBoard")
 
 @MainActor
 final class GameBoardViewModel: ObservableObject {
@@ -16,7 +19,6 @@ final class GameBoardViewModel: ObservableObject {
     @Published var game: Game?
     @Published var players: [Player] = []
     @Published var errorMessage: String?
-    @Published var isGameUnavailable = false
     @Published var isPending = false
     @Published var pendingAbilityResolution: AbilityResolution?
 
@@ -41,7 +43,8 @@ final class GameBoardViewModel: ObservableObject {
     private let planeDatabase: PlaneLookupProviding
     private var gameListener: ListenerCancellable?
     private var playersListener: ListenerCancellable?
-    private var hasReceivedFirstGameSnapshot = false
+    /// A listener outcome that leaves nothing to show; see `status`.
+    @Published private var interruption: ListenerInterruption?
 
     // MARK: - Computed Properties
 
@@ -167,7 +170,6 @@ final class GameBoardViewModel: ObservableObject {
         self.serverPlayers = previewPlayers
         self.players = previewPlayers
         self.game = previewGame
-        self.hasReceivedFirstGameSnapshot = true
     }
     #endif
 
@@ -182,24 +184,19 @@ final class GameBoardViewModel: ObservableObject {
     // MARK: - Listeners
 
     private func startListening() {
-        gameListener = firestoreManager.listenToGame(id: gameId) { [weak self] game in
-            Task { @MainActor in
-                guard let self else { return }
-                if game == nil && self.hasReceivedFirstGameSnapshot {
-                    // Game was deleted mid-game
-                    self.isGameUnavailable = true
-                }
-                self.game = game
-                self.hasReceivedFirstGameSnapshot = true
-            }
+        gameListener = firestoreManager.listenToGame(id: gameId) { [weak self] event in
+            self?.receiveGame(event)
         }
-        playersListener = firestoreManager.listenToPlayers(gameId: gameId) { [weak self] players in
-            Task { @MainActor in
-                guard let self else { return }
+        playersListener = firestoreManager.listenToPlayers(gameId: gameId) { [weak self] result in
+            guard let self else { return }
+            switch result {
+            case .success(let players):
                 self.serverPlayers = players
                 withAnimation(.easeInOut(duration: 0.3)) {
                     self.applyOptimisticDeltas()
                 }
+            case .failure(let failure):
+                self.recordListenerFailure(failure, listener: "players")
             }
         }
     }
@@ -513,5 +510,90 @@ final class GameBoardViewModel: ObservableObject {
             return true
         }
         return false
+    }
+}
+
+// MARK: - Listener Status
+
+extension GameBoardViewModel {
+
+    /// What the board and Game Over can show, given what the listeners have
+    /// reported. The data itself lives in `game` and `players`.
+    enum Status: Equatable {
+        /// Waiting for the game and its players.
+        case loading
+        /// The game and its players are here to show.
+        case ready
+        /// The game's state or mode is one this build doesn't know, or its
+        /// data can't be read. Playing it here could show the wrong controls
+        /// or hide the right ones.
+        case needsNewerVersion
+        /// The server confirmed the game no longer exists.
+        case unavailable
+        /// A listener failed; `retry()` re-attaches.
+        case failed
+    }
+
+    /// Outcomes that come with nothing to show. All of them stick: Firestore
+    /// stops delivering after a listener error, unreadable data would only
+    /// arrive again, and nothing re-creates a deleted game. Ordered by
+    /// precedence, lowest first; see `interrupt(_:)`.
+    private enum ListenerInterruption: Comparable {
+        case failed
+        case unreadable
+        case gameMissing
+    }
+
+    var status: Status {
+        switch interruption {
+        case .gameMissing: return .unavailable
+        case .unreadable: return .needsNewerVersion
+        case .failed: return .failed
+        case nil: break
+        }
+        guard let game else { return .loading }
+        if game.state.isUnknown || game.gameMode.isUnknown { return .needsNewerVersion }
+        return players.isEmpty ? .loading : .ready
+    }
+
+    /// Re-attaches both listeners after a failure.
+    func retry() {
+        guard interruption == .failed else { return }
+        interruption = nil
+        // Show loading, not the stale game, until the new listener reports.
+        game = nil
+        gameListener?.remove()
+        playersListener?.remove()
+        startListening()
+    }
+
+    private func receiveGame(_ event: DocumentEvent<Game>) {
+        switch event {
+        case .loaded(let game):
+            self.game = game
+        case .missing:
+            interrupt(.gameMissing)
+        case .failed(let failure):
+            recordListenerFailure(failure, listener: "game")
+        }
+    }
+
+    private func recordListenerFailure(_ failure: ListenerFailure, listener: String) {
+        switch failure {
+        case .listenerStopped(let error):
+            logger.error("Game board \(listener, privacy: .public) listener failed: \(String(describing: error), privacy: .public)")
+            interrupt(.failed)
+        case .unreadable(let error):
+            logger.error("Game board \(listener, privacy: .public) data unreadable: \(String(describing: error), privacy: .public)")
+            interrupt(.unreadable)
+        }
+    }
+
+    /// Keeps the more telling interruption. A missing game wins, because once
+    /// it's deleted the players read is denied too, in whichever order the
+    /// two arrive; unreadable data beats a listener failure, because retrying
+    /// can't fix it.
+    private func interrupt(_ new: ListenerInterruption) {
+        interruption = max(interruption ?? new, new)
     }
 }

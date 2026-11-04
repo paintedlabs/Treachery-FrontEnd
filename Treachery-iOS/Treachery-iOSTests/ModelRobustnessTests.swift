@@ -163,10 +163,39 @@ struct GameRobustnessTests {
         }
     }
 
-    @Test func unknownStateThrows() {
+    // A state or mode added by a newer server or web client must not make the
+    // whole game undecodable: listeners used to report that as a deleted game.
+
+    @Test func unknownStateDecodesAsUnknown() throws {
         let json = Data("""
         {
             "id": "g1", "code": "ABCD", "host_id": "h1", "state": "cancelled",
+            "max_players": 8, "starting_life": 40, "created_at": 1000000
+        }
+        """.utf8)
+        let game = try decoder.decode(Game.self, from: json)
+        #expect(game.state == .unknown("cancelled"))
+        #expect(game.state.isUnknown)
+    }
+
+    @Test func unknownGameModeDecodesAsUnknown() throws {
+        let json = Data("""
+        {
+            "id": "g1", "code": "ABCD", "host_id": "h1", "state": "waiting",
+            "max_players": 8, "starting_life": 40, "created_at": 1000000,
+            "game_mode": "draft_mode"
+        }
+        """.utf8)
+        let game = try decoder.decode(Game.self, from: json)
+        #expect(game.gameMode == .unknown("draft_mode"))
+        #expect(game.state == .waiting)
+    }
+
+    @Test func nonStringStateStillThrows() {
+        // Tolerance covers new values, not a field of the wrong type.
+        let json = Data("""
+        {
+            "id": "g1", "code": "ABCD", "host_id": "h1", "state": 3,
             "max_players": 8, "starting_life": 40, "created_at": 1000000
         }
         """.utf8)
@@ -175,20 +204,23 @@ struct GameRobustnessTests {
         }
     }
 
-    @Test func unknownGameModeDefaultsToTreachery() throws {
-        let json = Data("""
-        {
-            "id": "g1", "code": "ABCD", "host_id": "h1", "state": "waiting",
-            "max_players": 8, "starting_life": 40, "created_at": 1000000,
-            "game_mode": "draft_mode"
-        }
-        """.utf8)
-        // decodeIfPresent with an unknown enum value throws (not returns nil),
-        // so an unknown game_mode will actually throw, not default to treachery.
-        // This documents the actual behavior.
-        #expect(throws: DecodingError.self) {
-            _ = try decoder.decode(Game.self, from: json)
-        }
+    @Test func unknownStateAndModeSurviveRoundTrip() throws {
+        let original = Game(
+            id: "g1", code: "XYZW", hostId: "h1", state: .unknown("abandoned"),
+            gameMode: .unknown("archenemy"), maxPlayers: 8, startingLife: 40,
+            winningTeam: nil, playerIds: ["h1"],
+            createdAt: Date(timeIntervalSince1970: 1000000)
+        )
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .secondsSince1970
+        let data = try encoder.encode(original)
+        let fields = try #require(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        #expect(fields["state"] as? String == "abandoned")
+        #expect(fields["game_mode"] as? String == "archenemy")
+
+        let decoded = try decoder.decode(Game.self, from: data)
+        #expect(decoded.state == .unknown("abandoned"))
+        #expect(decoded.gameMode == .unknown("archenemy"))
     }
 
     @Test func extraUnknownFieldsIgnored() throws {

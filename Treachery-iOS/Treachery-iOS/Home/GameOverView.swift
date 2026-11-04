@@ -50,10 +50,8 @@ struct GameOverView: View {
             }
 
             VStack(spacing: 24) {
-                if viewModel.players.isEmpty {
-                    Spacer()
-                    MtgLoadingView(message: "Loading results...")
-                    Spacer()
+                if viewModel.status != .ready {
+                    statusContent
                 } else if !viewModel.isGameFinished {
                     Spacer()
                     VStack(spacing: 16) {
@@ -291,6 +289,41 @@ struct GameOverView: View {
                 contentOpacity = 1.0
             }
         }
+    }
+
+    // MARK: - Status
+
+    /// Everything but the results. Each state offers a way home, since this
+    /// screen hides the back button and the tab bar.
+    @ViewBuilder
+    private var statusContent: some View {
+        switch viewModel.status {
+        case .ready:
+            EmptyView() // the results are shown instead
+        case .loading:
+            GameLoadingView(message: "Loading results...", onGoHome: { goHome() })
+        case .unavailable:
+            GameStatusView(
+                systemImage: "wifi.exclamationmark",
+                title: "Game Unavailable",
+                message: "This game has closed and is no longer available.",
+                onGoHome: { goHome() }
+            )
+        case .failed:
+            GameStatusView(
+                systemImage: "exclamationmark.triangle.fill",
+                title: "Couldn't Load the Results",
+                message: "Check your connection and try again.",
+                action: .tryAgain { viewModel.retry() },
+                onGoHome: { goHome() }
+            )
+        case .needsNewerVersion:
+            GameStatusView.needsNewerVersion(onGoHome: { goHome() })
+        }
+    }
+
+    private func goHome() {
+        navigationPath.removeLast(navigationPath.count)
     }
 }
 

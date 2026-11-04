@@ -7,8 +7,10 @@ import SwiftUI
 
 struct LobbyBottomButtons: View {
     @ObservedObject var viewModel: LobbyViewModel
-    @Binding var isLeaving: Bool
     var onLeave: () -> Void
+    /// Goes home without leaving the game. Offered only after a failed
+    /// leave, when Leave may be the one thing that doesn't work.
+    var onGoHome: () -> Void
 
     var body: some View {
         VStack(spacing: 12) {
@@ -27,34 +29,54 @@ struct LobbyBottomButtons: View {
                         Text("Start Game")
                     }
                 }
-                .buttonStyle(MtgPrimaryButtonStyle(isDisabled: !viewModel.canStartGame || viewModel.isStartingGame))
-                .disabled(!viewModel.canStartGame || viewModel.isStartingGame)
-
-                if !viewModel.canStartGame && viewModel.players.count < viewModel.minimumPlayerCount {
-                    Text("Need at least \(viewModel.minimumPlayerCount) player\(viewModel.minimumPlayerCount == 1 ? "" : "s") to start")
-                        .font(.caption)
-                        .foregroundStyle(Color.mtgTextSecondary)
-                }
+                .buttonStyle(MtgPrimaryButtonStyle(isDisabled: !canTapStart))
+                .disabled(!canTapStart)
+                // The visible reason sits by the player count, in the
+                // scrolling content, to keep this pinned bar short.
+                .accessibilityHint(viewModel.startRequirement ?? "")
             }
 
             Button {
                 onLeave()
             } label: {
-                if isLeaving {
-                    HStack(spacing: 8) {
-                        ProgressView()
-                            .controlSize(.small)
-                            .tint(Color.mtgError)
-                        Text("Leaving...")
+                Group {
+                    if viewModel.isLeaving {
+                        HStack(spacing: 8) {
+                            ProgressView()
+                                .controlSize(.small)
+                                .tint(Color.mtgError)
+                            Text("Leaving...")
+                        }
+                    } else {
+                        Text("Leave Game")
                     }
-                } else {
-                    Text("Leave Game")
                 }
+                .frame(maxWidth: .infinity, minHeight: 44)
+                .contentShape(Rectangle())
             }
             .foregroundStyle(Color.mtgError)
-            .disabled(isLeaving)
-            .accessibilityLabel("Leave game")
+            .disabled(viewModel.pendingAction != nil)
+            .accessibilityLabel(viewModel.isLeaving ? "Leaving game" : "Leave game")
+
+            if viewModel.offersHomeWithoutLeaving {
+                Button {
+                    onGoHome()
+                } label: {
+                    Text("Back to Home")
+                        .frame(maxWidth: .infinity, minHeight: 44)
+                        .contentShape(Rectangle())
+                }
+                .foregroundStyle(Color.mtgGold)
+                .accessibilityHint("Keeps your seat in this game. You can rejoin it from Home.")
+            }
         }
         .padding()
+    }
+
+    /// Start needs enough players and no start or leave already in flight.
+    /// The view model refuses a repeat start as well; this keeps the button
+    /// from looking tappable while one is pending.
+    private var canTapStart: Bool {
+        viewModel.canStartGame && viewModel.pendingAction == nil
     }
 }

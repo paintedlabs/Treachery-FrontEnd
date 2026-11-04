@@ -5,18 +5,16 @@
 //  Created by Luke Solomon on 3/13/26.
 //
 
+import Accessibility
 import SwiftUI
 
 struct LobbyView: View {
     @EnvironmentObject var authViewModel: AuthViewModel
     @StateObject private var viewModel: LobbyViewModel
     @Binding var navigationPath: NavigationPath
-    @State private var showHostLeftAlert = false
     @State private var showShareSheet = false
-    @State private var isLeaving = false
     @State private var showColorPicker = false
-    @State private var commanderNameInput = ""
-    @State private var commanderNameDebounce: Task<Void, Never>?
+    @State private var isConfirmingHostLeave = false
 
     init(gameId: String, isHost: Bool, navigationPath: Binding<NavigationPath>) {
         _viewModel = StateObject(wrappedValue: LobbyViewModel(gameId: gameId, isHost: isHost))
@@ -40,12 +38,37 @@ struct LobbyView: View {
             VStack(spacing: 0) {
                 ConnectionBanner()
 
-                if viewModel.game == nil && viewModel.errorMessage == nil {
-                    loadingContent
-                } else if viewModel.isGameDisbanded {
-                    disbandedContent
-                } else {
-                    lobbyContent
+                switch viewModel.status {
+                case .loading:
+                    GameLoadingView(message: "Loading lobby...", onGoHome: { goHome() })
+                case .loaded(let game):
+                    lobbyContent(game)
+                case .finished:
+                    GameStatusView(
+                        systemImage: "flag.checkered",
+                        title: "Game Over",
+                        message: "This game has already finished.",
+                        action: GameStatusView.Action(title: "See Results", perform: { seeResults() }),
+                        onGoHome: { goHome() }
+                    )
+                case .needsNewerVersion:
+                    GameStatusView.needsNewerVersion(onGoHome: { goHome() })
+                case .disbanded:
+                    GameStatusView(
+                        systemImage: "xmark.octagon.fill",
+                        tint: .mtgError,
+                        title: "Game Disbanded",
+                        message: "This lobby has closed. You can create or join another game from Home.",
+                        onGoHome: { goHome() }
+                    )
+                case .failed:
+                    GameStatusView(
+                        systemImage: "exclamationmark.triangle.fill",
+                        title: "Couldn't Load the Lobby",
+                        message: "Check your connection and try again.",
+                        action: .tryAgain { viewModel.retry() },
+                        onGoHome: { goHome() }
+                    )
                 }
             }
         }
@@ -55,31 +78,37 @@ struct LobbyView: View {
         .onAppear {
             AnalyticsService.trackScreen("Lobby")
             viewModel.currentUserId = authViewModel.currentUserId
-            if let player = viewModel.currentPlayer {
-                commanderNameInput = player.commanderName ?? ""
-            }
         }
-        .onChange(of: viewModel.players) { _, _ in
-            if commanderNameInput.isEmpty, let player = viewModel.currentPlayer, let name = player.commanderName {
-                commanderNameInput = name
+        .task(id: viewModel.commanderNameDraft) {
+            // Debounce: each keystroke changes the id, which cancels this
+            // wait, and leaving the lobby cancels it too.
+            do {
+                try await Task.sleep(for: .milliseconds(500))
+            } catch {
+                return
             }
+            await viewModel.saveCommanderName()
+        }
+        .onDisappear {
+            // Going off screen cancels the debounce above, as when the board
+            // replaces the lobby the moment the host starts. Save whatever
+            // was typed since the last pause, so it isn't lost.
+            Task { await viewModel.saveCommanderName() }
         }
         .onChange(of: viewModel.isGameStarted) { _, started in
             if started {
                 navigationPath.append(AppDestination.gameBoard(gameId: viewModel.gameId))
             }
         }
-        .onChange(of: viewModel.isGameDisbanded) { _, disbanded in
-            if disbanded && !viewModel.isHost {
-                showHostLeftAlert = true
-            }
-        }
-        .alert("Game Disbanded", isPresented: $showHostLeftAlert) {
-            Button("OK") {
-                navigationPath.removeLast(navigationPath.count)
-            }
+        .confirmationDialog(
+            "Leave the game?",
+            isPresented: $isConfirmingHostLeave,
+            titleVisibility: .visible
+        ) {
+            Button("Leave Game", role: .destructive) { leave() }
+            Button("Stay", role: .cancel) {}
         } message: {
-            Text("The host has left and the game was closed.")
+            Text(hostLeaveMessage)
         }
         .sheet(isPresented: $showShareSheet) {
             if let code = viewModel.game?.code {
@@ -88,84 +117,110 @@ struct LobbyView: View {
         }
     }
 
-    // MARK: - Loading
+    // MARK: - Navigation
 
-    private var loadingContent: some View {
-        VStack {
-            Spacer()
-            MtgLoadingView(message: "Loading lobby...")
-            Spacer()
+    private func goHome() {
+        navigationPath.removeLast(navigationPath.count)
+    }
+
+    private func seeResults() {
+        navigationPath.append(AppDestination.gameOver(gameId: viewModel.gameId))
+    }
+
+    /// The host confirms first, because leaving hands the lobby to someone
+    /// else or closes it. Anyone else leaves straight away.
+    private func requestLeave() {
+        if viewModel.hostLeaveOutcome == nil {
+            leave()
+        } else {
+            isConfirmingHostLeave = true
         }
     }
 
-    // MARK: - Disbanded
-
-    private var disbandedContent: some View {
-        VStack {
-            Spacer()
-            VStack(spacing: 12) {
-                Image(systemName: "xmark.octagon.fill")
-                    .font(.largeTitle)
-                    .foregroundStyle(Color.mtgError)
-                Text("Game Disbanded")
-                    .font(.system(.title2, design: .serif))
-                    .fontWeight(.bold)
-                    .foregroundStyle(Color.mtgTextPrimary)
-                Text("The host has left and the game was closed.")
-                    .font(.subheadline)
-                    .foregroundStyle(Color.mtgTextSecondary)
-                    .multilineTextAlignment(.center)
-                Button("Return Home") {
-                    navigationPath.removeLast(navigationPath.count)
-                }
-                .buttonStyle(MtgPrimaryButtonStyle())
-                .padding(.top)
-                .padding(.horizontal, 40)
+    /// Goes home only once the player is out of the game. A failed leave
+    /// keeps the lobby on screen, still updating, with the error and a Back
+    /// to Home that keeps the seat.
+    private func leave() {
+        Task {
+            if await viewModel.leave() {
+                goHome()
             }
-            .padding()
-            Spacer()
+        }
+    }
+
+    private var hostLeaveMessage: String {
+        switch viewModel.hostLeaveOutcome {
+        case .passesHost(let name):
+            return "You're the host. If you leave, \(name) becomes the host."
+        case .closesLobby:
+            return "You're the only player, so leaving will close the lobby."
+        case nil:
+            return ""
         }
     }
 
     // MARK: - Lobby Content
 
-    private var lobbyContent: some View {
-        VStack(spacing: 0) {
-            if let game = viewModel.game {
-                LobbyGameCodeCard(game: game, showShareSheet: $showShareSheet)
-            }
+    private static let errorBannerID = "lobby-error"
 
-            OrnateDivider()
-                .padding(.horizontal)
-                .padding(.vertical, 12)
+    /// The code card, settings and players scroll together; the buttons stay
+    /// pinned below them so Start Game is reachable on an iPhone SE and at the
+    /// largest text sizes. Only the buttons are pinned: at those sizes an
+    /// error message there would leave no room for the lobby itself.
+    private func lobbyContent(_ game: Game) -> some View {
+        ScrollViewReader { proxy in
+            ScrollView {
+                VStack(spacing: 0) {
+                    LobbyGameCodeCard(game: game, showShareSheet: $showShareSheet)
 
-            if viewModel.isHost {
-                gameSettingsSection
-                    .padding(.bottom, 8)
-            }
+                    if game.gameMode.isUnknown {
+                        Text("This game mode needs a newer version of Treachery to play.")
+                            .font(.caption)
+                            .foregroundStyle(Color.mtgTextSecondary)
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal)
+                            .padding(.top, 8)
+                    }
 
-            playerListSection
+                    OrnateDivider()
+                        .padding(.horizontal)
+                        .padding(.vertical, 12)
 
-            if let error = viewModel.errorMessage {
-                Text(error)
-                    .foregroundStyle(Color.mtgError)
-                    .font(.caption)
-                    .padding(.horizontal)
-            }
+                    if viewModel.isHost {
+                        gameSettingsSection
+                            .padding(.bottom, 8)
+                    }
 
-            LobbyBottomButtons(
-                viewModel: viewModel,
-                isLeaving: $isLeaving,
-                onLeave: {
-                    isLeaving = true
-                    Task {
-                        if let userId = authViewModel.currentUserId {
-                            await viewModel.leaveGame(userId: userId)
-                        }
-                        navigationPath.removeLast(navigationPath.count)
+                    playerListSection
+
+                    // Last, so scrolling to it puts it right above the buttons.
+                    if let error = viewModel.errorMessage {
+                        MtgErrorBanner(message: error)
+                            .padding(.horizontal)
+                            .padding(.vertical, 12)
+                            .id(Self.errorBannerID)
                     }
                 }
-            )
+                .padding(.bottom, 16)
+            }
+            .scrollBounceBehavior(.basedOnSize)
+            .onChange(of: viewModel.errorMessage) { _, message in
+                guard let message else { return }
+                // It appears away from wherever the player is looking, or
+                // VoiceOver is reading: bring it into view and read it out.
+                withAnimation { proxy.scrollTo(Self.errorBannerID, anchor: .bottom) }
+                AccessibilityNotification.Announcement(message).post()
+            }
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                LobbyBottomButtons(viewModel: viewModel, onLeave: { requestLeave() }, onGoHome: { goHome() })
+                    .frame(maxWidth: .infinity)
+                    .background(Color.mtgBackground)
+                    .overlay(alignment: .top) {
+                        Rectangle()
+                            .fill(Color.mtgDivider)
+                            .frame(height: 1)
+                    }
+            }
         }
     }
 
@@ -184,17 +239,26 @@ struct LobbyView: View {
                             .foregroundStyle(Color.mtgTextSecondary)
                             .font(.subheadline)
                         Spacer()
-                        HStack(spacing: 12) {
+                        // No spacing: the buttons' 44pt hit areas already
+                        // space their glyphs out from the number.
+                        HStack(spacing: 0) {
                             Button {
                                 // Clamp to 8 so legacy games stored with a
-                                // higher max don't send server-rejected values.
-                                let newVal = max(2, min(8, game.maxPlayers - 1))
+                                // higher max don't send server-rejected values,
+                                // and never below the players already seated,
+                                // which the server refuses too.
+                                let newVal = max(viewModel.smallestMaxPlayers, min(8, game.maxPlayers - 1))
                                 Task { await viewModel.updateGameSettings(maxPlayers: newVal) }
                             } label: {
                                 Image(systemName: "minus.circle")
-                                    .foregroundStyle(game.maxPlayers > 2 ? Color.mtgGold : Color.mtgTextSecondary.opacity(0.3))
+                                    .foregroundStyle(
+                                        game.maxPlayers > viewModel.smallestMaxPlayers ? Color.mtgGold : Color.mtgTextSecondary.opacity(0.3)
+                                    )
+                                    .frame(minWidth: 44, minHeight: 44)
+                                    .contentShape(Rectangle())
                             }
-                            .disabled(game.maxPlayers <= 2)
+                            .disabled(game.maxPlayers <= viewModel.smallestMaxPlayers)
+                            .accessibilityLabel("Decrease max players")
 
                             Text("\(game.maxPlayers)")
                                 .foregroundStyle(Color.mtgTextPrimary)
@@ -207,8 +271,11 @@ struct LobbyView: View {
                             } label: {
                                 Image(systemName: "plus.circle")
                                     .foregroundStyle(game.maxPlayers < 8 ? Color.mtgGold : Color.mtgTextSecondary.opacity(0.3))
+                                    .frame(minWidth: 44, minHeight: 44)
+                                    .contentShape(Rectangle())
                             }
                             .disabled(game.maxPlayers >= 8)
+                            .accessibilityLabel("Increase max players")
                         }
                     }
 
@@ -302,72 +369,70 @@ struct LobbyView: View {
     // MARK: - Player List
 
     private var playerListSection: some View {
-        ScrollView {
-            VStack(spacing: 0) {
-                MtgSectionHeader(title: "Players (\(viewModel.players.count))")
+        VStack(spacing: 0) {
+            MtgSectionHeader(title: "Players (\(viewModel.players.count))")
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 16)
+                .padding(.bottom, 8)
+
+            if let requirement = viewModel.startRequirement {
+                Text(requirement)
+                    .font(.caption)
+                    .foregroundStyle(Color.mtgTextSecondary)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.horizontal, 16)
                     .padding(.bottom, 8)
+            }
 
-                if viewModel.players.isEmpty {
-                    Text("Waiting for players to join...")
-                        .foregroundStyle(Color.mtgTextSecondary)
-                        .font(.subheadline)
-                        .padding(.vertical, 20)
-                } else {
-                    VStack(spacing: 0) {
-                        ForEach(Array(viewModel.players.enumerated()), id: \.element.id) { index, player in
-                            LobbyPlayerRow(
-                                player: player,
-                                isMe: player.userId == viewModel.currentUserId,
-                                isHost: player.userId == viewModel.game?.hostId,
-                                showColorPicker: player.userId == viewModel.currentUserId ? $showColorPicker : .constant(false),
-                                commanderNameInput: player.userId == viewModel.currentUserId ? $commanderNameInput : .constant(""),
-                                onColorChange: { hex in
-                                    Task { await viewModel.updatePlayerColor(hex) }
-                                },
-                                onCommanderNameChange: { name in
-                                    commanderNameDebounce?.cancel()
-                                    commanderNameDebounce = Task {
-                                        try? await Task.sleep(nanoseconds: 500_000_000)
-                                        guard !Task.isCancelled else { return }
-                                        await viewModel.updateCommanderName(name.isEmpty ? nil : name)
-                                    }
-                                },
-                                onCommanderNameSubmit: { name in
-                                    commanderNameDebounce?.cancel()
-                                    Task { await viewModel.updateCommanderName(name.isEmpty ? nil : name) }
-                                }
-                            )
-                            .transition(.asymmetric(
-                                insertion: .move(edge: .trailing).combined(with: .opacity),
-                                removal: .opacity
-                            ))
-
-                            if player.id != viewModel.players.last?.id {
-                                Rectangle()
-                                    .fill(Color.mtgDivider)
-                                    .frame(height: 1)
-                                    .padding(.horizontal, 16)
+            if viewModel.players.isEmpty {
+                Text("Waiting for players to join...")
+                    .foregroundStyle(Color.mtgTextSecondary)
+                    .font(.subheadline)
+                    .padding(.vertical, 20)
+            } else {
+                VStack(spacing: 0) {
+                    ForEach(Array(viewModel.players.enumerated()), id: \.element.id) { index, player in
+                        LobbyPlayerRow(
+                            player: player,
+                            isMe: player.userId == viewModel.currentUserId,
+                            isHost: player.userId == viewModel.game?.hostId,
+                            showColorPicker: player.userId == viewModel.currentUserId ? $showColorPicker : .constant(false),
+                            commanderNameInput: player.userId == viewModel.currentUserId ? $viewModel.commanderNameDraft : .constant(""),
+                            onColorChange: { hex in
+                                Task { await viewModel.updatePlayerColor(hex) }
+                            },
+                            onCommanderNameSubmit: {
+                                Task { await viewModel.saveCommanderName() }
                             }
+                        )
+                        .transition(.asymmetric(
+                            insertion: .move(edge: .trailing).combined(with: .opacity),
+                            removal: .opacity
+                        ))
+
+                        if player.id != viewModel.players.last?.id {
+                            Rectangle()
+                                .fill(Color.mtgDivider)
+                                .frame(height: 1)
+                                .padding(.horizontal, 16)
                         }
                     }
-                    .animation(.easeInOut(duration: 0.3), value: viewModel.players.map(\.id))
-                    .mtgCardFrame()
-                    .padding(.horizontal)
                 }
+                .animation(.easeInOut(duration: 0.3), value: viewModel.players.map(\.id))
+                .mtgCardFrame()
+                .padding(.horizontal)
+            }
 
-                if !viewModel.isHost {
-                    HStack(spacing: 8) {
-                        ProgressView()
-                            .controlSize(.small)
-                            .tint(Color.mtgGold)
-                        Text("Waiting for host to start the game...")
-                            .font(.subheadline)
-                            .foregroundStyle(Color.mtgTextSecondary)
-                    }
-                    .padding(.top, 16)
+            if !viewModel.isHost {
+                HStack(spacing: 8) {
+                    ProgressView()
+                        .controlSize(.small)
+                        .tint(Color.mtgGold)
+                    Text("Waiting for host to start the game...")
+                        .font(.subheadline)
+                        .foregroundStyle(Color.mtgTextSecondary)
                 }
+                .padding(.top, 16)
             }
         }
     }
