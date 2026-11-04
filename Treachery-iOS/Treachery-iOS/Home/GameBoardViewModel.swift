@@ -487,7 +487,9 @@ extension GameBoardViewModel {
     /// The echo usually comes within moments of the response, often before
     /// it. This is far longer, because ending the wait while snapshots are
     /// slow shows the old total again until they catch up. It starts again
-    /// for as long as no snapshot has come since the response.
+    /// while no snapshot has come since the response, running at most
+    /// `LifeLedger.echoWaitLimit` times in all; then the batch settles, and
+    /// the board says it can't confirm the total.
     static let lifeChangeEchoTimeout: Duration = .seconds(5)
 
     /// The banner for `lifeChangeFailures`, naming everyone affected.
