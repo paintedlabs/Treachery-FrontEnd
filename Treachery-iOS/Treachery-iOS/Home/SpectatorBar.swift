@@ -12,24 +12,33 @@ struct SpectatorBar: View {
     let onGoHome: () -> Void
     let onEndGame: () -> Void
     @State private var isConfirmingLeave = false
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     var body: some View {
         VStack(spacing: 8) {
             HStack(spacing: 8) {
-                Image(systemName: "person.slash.fill")
-                    .foregroundStyle(Color.mtgError)
-                    .accessibilityHidden(true)
+                // At the accessibility text sizes the bar keeps to the title,
+                // with the whole width, and Leave Game, so the two fit in the
+                // pinned controls. VoiceOver says as much on elimination.
+                if !dynamicTypeSize.isAccessibilitySize {
+                    Image(systemName: "person.slash.fill")
+                        .foregroundStyle(Color.mtgError)
+                        .accessibilityHidden(true)
+                }
                 Text("You've Been Eliminated")
                     .font(.system(.headline, design: .serif))
                     .fontWeight(.bold)
                     .foregroundStyle(Color.mtgErrorText)
+                    .multilineTextAlignment(.center)
             }
 
-            Text("You're now spectating. Watch the game unfold or leave.")
-                .font(.caption)
-                .foregroundStyle(Color.mtgTextSecondary)
-                .italic()
-                .multilineTextAlignment(.center)
+            if !dynamicTypeSize.isAccessibilitySize {
+                Text("You're now spectating. Watch the game unfold or leave.")
+                    .font(.caption)
+                    .foregroundStyle(Color.mtgTextSecondary)
+                    .italic()
+                    .multilineTextAlignment(.center)
+            }
 
             Button {
                 switch leave {

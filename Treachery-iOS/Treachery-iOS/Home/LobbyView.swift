@@ -266,7 +266,7 @@ struct LobbyView: View {
                             Text("\(game.maxPlayers)")
                                 .foregroundStyle(Color.mtgTextPrimary)
                                 .fontWeight(.semibold)
-                                .frame(width: 24, alignment: .center)
+                                .frame(minWidth: 24, alignment: .center)
 
                             Button {
                                 let newVal = min(8, game.maxPlayers + 1)

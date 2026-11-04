@@ -19,6 +19,9 @@ struct GameBoardView: View {
     @State private var selectedWinners: Set<String> = []
     @State private var inspectedPlayer: Player?
     @State private var showColorPicker = false
+    /// Counts changes to the pinned controls' height, to flash their scroll
+    /// indicators when there's more of them than fits.
+    @State private var pinnedControlsChanges = 0
 
     init(gameId: String, currentUserId: String? = nil, navigationPath: Binding<NavigationPath>) {
         _viewModel = StateObject(wrappedValue: GameBoardViewModel(gameId: gameId, currentUserId: currentUserId))
@@ -280,17 +283,14 @@ struct GameBoardView: View {
     }
 
     /// The errors, and the controls that act on the game: as tall as they
-    /// need, up to `maxHeight`, past which they scroll by themselves.
+    /// need, up to `maxHeight`, past which they scroll by themselves. Then
+    /// they show their end first, where the controls are, and keep it in
+    /// view as they grow, flashing their scroll indicators to show there's
+    /// more above.
     private func pinnedControls(maxHeight: CGFloat) -> some View {
         ScrollView {
             VStack(spacing: 0) {
                 errorBanners
-
-                // Spectator bar for eliminated players, in every mode:
-                // its Leave is their only way off the board.
-                if let leave = viewModel.spectatorLeave {
-                    SpectatorBar(leave: leave, onGoHome: { goHome() }, onEndGame: { presentWinnerSelection() })
-                }
 
                 // Planar die bar — only when planechase active
                 if viewModel.isPlanechaseActive {
@@ -318,9 +318,23 @@ struct GameBoardView: View {
                     .padding(.horizontal)
                     .padding(.vertical, 8)
                 }
+
+                // Spectator bar for eliminated players, in every mode: its
+                // Leave is their only way off the board, so it comes last,
+                // the first thing shown when the controls don't all fit.
+                if let leave = viewModel.spectatorLeave {
+                    SpectatorBar(leave: leave, onGoHome: { goHome() }, onEndGame: { presentWinnerSelection() })
+                }
             }
         }
         .scrollBounceBehavior(.basedOnSize)
+        .defaultScrollAnchor(.bottom)
+        .defaultScrollAnchor(.bottom, for: .sizeChanges)
+        .onScrollGeometryChange(for: CGFloat.self, of: \.contentSize.height) { _, _ in
+            pinnedControlsChanges += 1
+        }
+        .scrollIndicatorsFlash(trigger: pinnedControlsChanges)
+        .scrollIndicatorsFlash(onAppear: true)
         // Asks the scroll view for its content's height, capped.
         .frame(maxHeight: maxHeight)
         .fixedSize(horizontal: false, vertical: true)
