@@ -203,29 +203,51 @@ final class FirestoreManager: FirestoreManaging {
         guard let user = try await getUser(id: userId) else { throw FirestoreReadError.profileUnavailable }
         guard !user.friendIds.isEmpty else { return [] }
 
-        // Run all batch queries in parallel
+        // One read per 30 ids, the most an `in` filter takes, all in parallel.
         let chunks = stride(from: 0, to: user.friendIds.count, by: 30).map { start in
             Array(user.friendIds[start..<min(start + 30, user.friendIds.count)])
         }
 
-        let friends = try await withThrowingTaskGroup(of: [TreacheryUser].self) { group in
+        let reads = try await withThrowingTaskGroup(of: FriendsRead.self) { group in
             for ids in chunks {
                 group.addTask {
                     let snapshot = try await self.usersCollection
                         .whereField(FieldPath.documentID(), in: ids)
                         .getDocuments()
-                    return try Self.documents(of: snapshot).compactMap { doc -> TreacheryUser? in
+                    let friends = snapshot.documents.compactMap { doc -> TreacheryUser? in
                         guard var user = try? doc.data(as: TreacheryUser.self) else { return nil }
                         user.id = doc.documentID
                         return user
                     }
+                    return FriendsRead(friends: friends, isFromCache: snapshot.metadata.isFromCache)
                 }
             }
-            var result: [TreacheryUser] = []
-            for try await batch in group {
-                result += batch
+            var reads: [FriendsRead] = []
+            for try await read in group {
+                reads.append(read)
             }
-            return result
+            return reads
+        }
+        return try Self.friends(from: reads)
+    }
+
+    /// One of `getFriends`' reads, for up to 30 of the user's friends.
+    struct FriendsRead: Sendable {
+        let friends: [TreacheryUser]
+        /// Whether the answer came from the local cache, as it does offline.
+        let isFromCache: Bool
+    }
+
+    /// The friends `getFriends`' reads found, by name. The list-read rule
+    /// (`documents(of:)`) applies to the reads together, not one by one: with
+    /// more than 30 friends, a read that found none of its friends cached
+    /// doesn't hide the friends the other reads found. Only when no read
+    /// found any, and at least one answered from the cache, does this throw
+    /// `FirestoreReadError.nothingCachedOffline`.
+    static func friends(from reads: [FriendsRead]) throws -> [TreacheryUser] {
+        let friends = reads.flatMap(\.friends)
+        if friends.isEmpty && reads.contains(where: \.isFromCache) {
+            throw FirestoreReadError.nothingCachedOffline
         }
         return friends.sorted { $0.displayName < $1.displayName }
     }

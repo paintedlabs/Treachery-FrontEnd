@@ -49,6 +49,7 @@ protocol FirestoreManaging {
     /// `FirestoreReadError.profileUnavailable` when the user's own profile
     /// is missing or can't be read, and `.nothingCachedOffline` when
     /// offline with none of the friends' profiles in the local cache.
+    /// Offline with only some of them cached, returns those.
     func getFriends(forUserId userId: String) async throws -> [TreacheryUser]
 
     // Games
