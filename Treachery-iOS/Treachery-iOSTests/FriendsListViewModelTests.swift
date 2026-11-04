@@ -9,7 +9,7 @@ struct FriendsListViewModelTests {
 
     private func makeFriend(id: String = "f1", displayName: String = "Friend") -> TreacheryUser {
         TreacheryUser(
-            id: id, displayName: displayName, email: nil, phoneNumber: nil,
+            id: id, displayName: displayName,
             friendIds: [], createdAt: Date()
         )
     }

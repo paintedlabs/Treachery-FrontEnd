@@ -83,7 +83,7 @@ struct HomeView: View {
             .tag(AppTab.friends)
 
             NavigationStack {
-                ProfileView()
+                ProfileView(viewModel: ProfileViewModel(session: authViewModel))
             }
             .tabItem {
                 Label("Profile", systemImage: "person.circle.fill")

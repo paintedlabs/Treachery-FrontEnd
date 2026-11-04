@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import os
 
 struct DeckStat: Codable {
     var elo: Int
@@ -14,13 +15,23 @@ struct DeckStat: Codable {
     var games: Int
 }
 
+/// A public profile, `users/{uid}`, which every signed-in user can read.
+///
+/// It has no email, phone number or FCM token on purpose. Those live only in
+/// the owner-only `users/{uid}/private/data`. Profiles written before that
+/// split still carry them until `functions/scripts/backfill-user-pii.js` runs;
+/// decoding skips them. The signed-in user's own email and phone number come
+/// from Firebase Auth.
 struct TreacheryUser: Codable, Identifiable {
+    /// The rating every profile starts with, and the one a profile without
+    /// `elo` is read as.
+    static let startingElo = 1500
+
+    private static let logger = Logger(subsystem: "com.Solomon.Treachery-iOS", category: "Profile")
+
     var id: String
     var displayName: String
-    let email: String?
-    var phoneNumber: String?
     var friendIds: [String]
-    var fcmToken: String?
     let createdAt: Date
     var elo: Int
     var deckStats: [String: DeckStat]?
@@ -28,10 +39,7 @@ struct TreacheryUser: Codable, Identifiable {
     enum CodingKeys: String, CodingKey {
         case id
         case displayName = "display_name"
-        case email
-        case phoneNumber = "phone_number"
         case friendIds = "friend_ids"
-        case fcmToken = "fcm_token"
         case createdAt = "created_at"
         case elo
         case deckStats = "deck_stats"
@@ -41,34 +49,61 @@ struct TreacheryUser: Codable, Identifiable {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         id = try container.decodeIfPresent(String.self, forKey: .id) ?? ""
         displayName = try container.decode(String.self, forKey: .displayName)
-        email = try container.decodeIfPresent(String.self, forKey: .email)
-        phoneNumber = try container.decodeIfPresent(String.self, forKey: .phoneNumber)
         friendIds = try container.decodeIfPresent([String].self, forKey: .friendIds) ?? []
-        fcmToken = try container.decodeIfPresent(String.self, forKey: .fcmToken)
         createdAt = try container.decode(Date.self, forKey: .createdAt)
-        elo = try container.decodeIfPresent(Int.self, forKey: .elo) ?? 1500
-        deckStats = try container.decodeIfPresent([String: DeckStat].self, forKey: .deckStats)
+        elo = try container.decodeIfPresent(Int.self, forKey: .elo) ?? Self.startingElo
+        deckStats = Self.readableDeckStats(in: container)
     }
 
     init(
         id: String,
         displayName: String,
-        email: String?,
-        phoneNumber: String?,
         friendIds: [String],
-        fcmToken: String? = nil,
         createdAt: Date,
-        elo: Int = 1500,
+        elo: Int = Self.startingElo,
         deckStats: [String: DeckStat]? = nil
     ) {
         self.id = id
         self.displayName = displayName
-        self.email = email
-        self.phoneNumber = phoneNumber
         self.friendIds = friendIds
-        self.fcmToken = fcmToken
         self.createdAt = createdAt
         self.elo = elo
         self.deckStats = deckStats
+    }
+
+    // MARK: - Deck Stats Decoding
+
+    /// The entries of `deck_stats` that are complete `DeckStat`s. Any other
+    /// entry is skipped rather than failing the whole profile, which would
+    /// hide the user from friend lists and search and leave their Profile
+    /// unreadable. Servers before 65d46e4 wrote a commander name containing
+    /// "." as a nested map instead of a stat. Nil when `deck_stats` is
+    /// absent or isn't a map.
+    private static func readableDeckStats(in container: KeyedDecodingContainer<CodingKeys>) -> [String: DeckStat]? {
+        guard let entries = try? container.nestedContainer(keyedBy: DeckName.self, forKey: .deckStats) else {
+            return nil
+        }
+        let stats = entries.allKeys.reduce(into: [String: DeckStat]()) { stats, deck in
+            stats[deck.stringValue] = try? entries.decode(DeckStat.self, forKey: deck)
+        }
+        let skipped = entries.allKeys.count - stats.count
+        if skipped > 0 {
+            logger.notice("Skipped \(skipped, privacy: .public) unreadable deck_stats entries")
+        }
+        return stats
+    }
+
+    /// A `deck_stats` key: the commander's name.
+    private struct DeckName: CodingKey {
+        let stringValue: String
+        var intValue: Int? { nil }
+
+        init(stringValue: String) {
+            self.stringValue = stringValue
+        }
+
+        init?(intValue: Int) {
+            nil
+        }
     }
 }

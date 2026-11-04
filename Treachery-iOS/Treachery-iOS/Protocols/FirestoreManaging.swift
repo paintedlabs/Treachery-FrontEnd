@@ -2,9 +2,25 @@ import Foundation
 
 protocol FirestoreManaging {
     // Users
-    func createUser(_ user: TreacheryUser) async throws
+
+    /// Creates the public profile `users/{uid}`, and stores the account's
+    /// email and phone number, if any, only in the owner-only
+    /// `users/{uid}/private/data`.
+    func createUser(_ user: TreacheryUser, email: String?, phoneNumber: String?) async throws
+    /// The profile for display, or nil when it is missing, incomplete or
+    /// can't be decoded. `getUserDocument(id:)` tells those apart.
     func getUser(id: String) async throws -> TreacheryUser?
-    func updateUser(_ user: TreacheryUser) async throws
+    /// What `users/{id}` holds, read from the server and never from the local
+    /// cache: provisioning decides from it whether to create or repair the
+    /// profile, and a stale cached copy could make it overwrite a newer one.
+    func getUserDocument(id: String) async throws -> UserDocument
+    /// Writes the repair's fields onto an existing `users/{id}` and touches
+    /// nothing else. Fails, rather than create the document, if it no longer
+    /// exists.
+    func repairUserProfile(id: String, with repair: ProfileRepair) async throws
+    /// Renames the user by writing `display_name` and nothing else. Fails,
+    /// rather than create the document, if the profile doesn't exist.
+    func updateDisplayName(_ name: String, forUserId userId: String) async throws
     func searchUsers(byDisplayName name: String) async throws -> [TreacheryUser]
 
     // Friend Requests

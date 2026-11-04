@@ -86,13 +86,27 @@ private struct GameHistoryRow: View {
         return players.first { $0.userId == userId }
     }
 
-    private var didWin: Bool {
-        guard let myRole = currentPlayerInGame?.role,
-              let winRole = winningRole else { return false }
-        if winRole == .leader {
-            return myRole == .leader || myRole == .guardian
+    /// "Victory" or "Defeat", or nil when the game had no winner or the
+    /// user's result isn't known (their seat didn't load, say): the row then
+    /// claims neither.
+    private var result: (label: String, color: Color)? {
+        guard let currentUserId else { return nil }
+        switch game.outcome(forUserId: currentUserId, role: currentPlayerInGame?.role) {
+        case .won: return ("Victory", Color.mtgSuccess)
+        case .lost: return ("Defeat", Color.mtgError)
+        case .noWinner, .unknown: return nil
         }
-        return myRole == winRole
+    }
+
+    private var resultAccessibilityLabel: String {
+        var parts = ["Game on \(game.createdAt.formatted(.dateTime))"]
+        if let result {
+            parts.append(result.label)
+        }
+        if let winningRole {
+            parts.append("\(winningRole.displayName) team won")
+        }
+        return parts.joined(separator: ", ")
     }
 
     var body: some View {
@@ -112,26 +126,30 @@ private struct GameHistoryRow: View {
                 Spacer()
 
                 // Win/Loss badge
-                if let winRole = winningRole {
+                if result != nil || winningRole != nil {
                     VStack(alignment: .trailing, spacing: 2) {
-                        Text(didWin ? "Victory" : "Defeat")
-                            .font(.subheadline)
-                            .fontWeight(.bold)
-                            .foregroundStyle(didWin ? Color.mtgSuccess : Color.mtgError)
+                        if let result {
+                            Text(result.label)
+                                .font(.subheadline)
+                                .fontWeight(.bold)
+                                .foregroundStyle(result.color)
+                        }
 
-                        HStack(spacing: 4) {
-                            Circle()
-                                .fill(winRole.color)
-                                .frame(width: 8, height: 8)
-                            Text("\(winRole.displayName) Won")
-                                .font(.caption)
-                                .foregroundStyle(winRole.color)
+                        if let winRole = winningRole {
+                            HStack(spacing: 4) {
+                                Circle()
+                                    .fill(winRole.color)
+                                    .frame(width: 8, height: 8)
+                                Text("\(winRole.displayName) Won")
+                                    .font(.caption)
+                                    .foregroundStyle(winRole.color)
+                            }
                         }
                     }
                 }
             }
             .accessibilityElement(children: .combine)
-            .accessibilityLabel("Game on \(game.createdAt, format: .dateTime), \(didWin ? "Victory" : "Defeat"), \(winningRole?.displayName ?? "Unknown") team won")
+            .accessibilityLabel(resultAccessibilityLabel)
 
             // Player summary
             if !players.isEmpty {
