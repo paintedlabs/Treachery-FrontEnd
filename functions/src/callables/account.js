@@ -1,5 +1,7 @@
 // Account callables: deleteAccount, the in-app account deletion App Store
 // Review Guideline 5.1.1(v) requires of any app that lets people sign up.
+// Its steps live in deleteAccountFor, which scripts/delete-account.js also
+// runs, for an account whose owner asked by email to have it deleted.
 //
 // The order of the steps is the design. Every check that can refuse the
 // deletion runs before the first write. Firestore data goes before the Auth
@@ -45,6 +47,28 @@ async function commitInBatches(writes) {
 }
 
 /**
+ * Every game `uid` is listed in or hosts, as a Map from game id to its data,
+ * keyed by id because a game can match both queries. Single-field queries
+ * only, so Firestore's automatic indexes serve them and no composite index
+ * has to be deployed first; game state is filtered here instead of in the
+ * query.
+ */
+async function findGames(uid) {
+  const [seatedSnap, hostedSnap] = await Promise.all([
+    db.collection("games").where("player_ids", "array-contains", uid).get(),
+    db.collection("games").where("host_id", "==", uid).get(),
+  ]);
+  return new Map(
+    [...seatedSnap.docs, ...hostedSnap.docs].map((doc) => [doc.id, doc.data()])
+  );
+}
+
+/** The ids of the games in `games` (from findGames) in state `state`. */
+function gameIdsInState(games, state) {
+  return [...games].filter(([, game]) => game.state === state).map(([gameId]) => gameId);
+}
+
+/**
  * Runs leaveGame's transaction for one lobby the caller is listed in or
  * hosts. Holding no seat is not an error here: the caller still comes off
  * player_ids, and a seatless host still hands the lobby to the lowest
@@ -86,10 +110,10 @@ async function findSeats(gameIds, uid) {
 }
 
 /**
- * Drops `uid` from every friend list and deletes every friend request to or
- * from them. Resolves to how many of each this pass found.
+ * The profiles whose friend lists hold `uid`, and every friend request to or
+ * from them.
  */
-async function unlinkSocialData(uid) {
+async function findSocialData(uid) {
   const [friendsSnap, sentSnap, receivedSnap] = await Promise.all([
     db.collection("users").where("friend_ids", "array-contains", uid).get(),
     db.collection("friend_requests").where("from_user_id", "==", uid).get(),
@@ -100,58 +124,86 @@ async function unlinkSocialData(uid) {
   const requestRefs = new Map(
     [...sentSnap.docs, ...receivedSnap.docs].map((doc) => [doc.ref.path, doc.ref])
   );
+  return {
+    friendRefs: friendsSnap.docs.map((doc) => doc.ref),
+    requestRefs: [...requestRefs.values()],
+  };
+}
+
+/**
+ * Drops `uid` from every friend list and deletes every friend request to or
+ * from them. Resolves to how many of each this pass found.
+ */
+async function unlinkSocialData(uid) {
+  const { friendRefs, requestRefs } = await findSocialData(uid);
   await commitInBatches([
-    ...friendsSnap.docs.map((doc) => (batch) =>
-      batch.update(doc.ref, { friend_ids: FieldValue.arrayRemove(uid) })
+    ...friendRefs.map((ref) => (batch) =>
+      batch.update(ref, { friend_ids: FieldValue.arrayRemove(uid) })
     ),
-    ...[...requestRefs.values()].map((ref) => (batch) => batch.delete(ref)),
+    ...requestRefs.map((ref) => (batch) => batch.delete(ref)),
   ]);
-  return { friends: friendsSnap.size, requests: requestRefs.size };
+  return { friends: friendRefs.length, requests: requestRefs.length };
+}
+
+/**
+ * users/{uid} and every document under it that exists: what step 5's
+ * recursiveDelete removes. listDocuments also returns documents that don't
+ * exist but have subcollections, so documents under those are found too.
+ */
+async function findProfileDocs(uid) {
+  const found = [];
+  async function visit(ref) {
+    const [snap, collections] = await Promise.all([ref.get(), ref.listCollections()]);
+    if (snap.exists) found.push(ref);
+    const children = await Promise.all(collections.map((collection) => collection.listDocuments()));
+    for (const child of children.flat()) {
+      // Deliberate sequential await (no-await-in-loop).
+      await visit(child);
+    }
+  }
+  await visit(db.doc(`users/${uid}`));
+  return found;
 }
 
 // ════════════════════════════════════════════════════════════════
-// CLOUD FUNCTION: deleteAccount
-// Deletes the caller's account: leaves their waiting lobbies,
-// anonymizes their seats in played games, unlinks friends and
-// friend requests, deletes the profile, then the sign-in account.
-// Refused while the caller is in or hosts a game in progress.
+// SHARED: deleteAccountFor
+// The deletion itself, for the deleteAccount callable (the caller's
+// own account) and scripts/delete-account.js (an account named on
+// its command line). Leaves the account's waiting lobbies,
+// anonymizes its seats in played games, unlinks friends and friend
+// requests, deletes the profile, then the sign-in account. Refused
+// while the account is in or hosts a game in progress.
 // ════════════════════════════════════════════════════════════════
 
-exports.deleteAccount = onCall(callableOptions, async (request) => {
-  const uid = request.auth?.uid;
-  if (!uid) throw new HttpsError("unauthenticated", "Must be signed in.");
-
-  // Every game the caller is listed in or hosts, keyed by id because a game
-  // can match both queries. Single-field queries only, so Firestore's
-  // automatic indexes serve them and no composite index has to be deployed
-  // first; game state is filtered here instead of in the query.
-  const [seatedSnap, hostedSnap] = await Promise.all([
-    db.collection("games").where("player_ids", "array-contains", uid).get(),
-    db.collection("games").where("host_id", "==", uid).get(),
-  ]);
-  const games = new Map(
-    [...seatedSnap.docs, ...hostedSnap.docs].map((doc) => [doc.id, doc.data()])
-  );
+/**
+ * Deletes the account `uid`. Throws failed-precondition with the message the
+ * clients show while the account is in or hosts a game in progress. Resolves
+ * to what it did: the waiting lobbies it left (`lobbyIds`), the seats it
+ * anonymized (`seatPaths`), how many friend lists it dropped the account
+ * from (`friends`) and friend requests it deleted (`requests`), and whether
+ * it deleted the sign-in account (`signInDeleted`, false when an earlier run
+ * already had).
+ */
+async function deleteAccountFor(uid) {
+  const games = await findGames(uid);
 
   // 1. Refuse during a live game, before anything is written: deleting
   //    mid-game would leave a ghost seat in a game others are still playing.
-  //    A game the caller only hosts counts too. startGame does not need the
+  //    A game the account only hosts counts too. startGame does not need the
   //    host to hold a seat, and endGame is host-only, so a live game whose
   //    host is deleted could never be ended.
-  if ([...games.values()].some((game) => game.state === "in_progress")) {
+  if (gameIdsInState(games, "in_progress").length > 0) {
     throw new HttpsError("failed-precondition", GAME_IN_PROGRESS_MESSAGE);
   }
 
   // 2. Leave waiting lobbies with leaveGame's own transaction.
-  const lobbyIds = [...games]
-    .filter(([, game]) => game.state === "waiting")
-    .map(([gameId]) => gameId);
+  const lobbyIds = gameIdsInState(games, "waiting");
   for (const gameId of lobbyIds) {
     // Deliberate sequential await (no-await-in-loop).
     await leaveLobby(gameId, uid);
   }
 
-  // 3. Anonymize the caller's seats in every game they played or hosted.
+  // 3. Anonymize the account's seats in every game it played or hosted.
   //    user_id, role, life and results stay, so other players' history and
   //    stats remain coherent.
   const seatRefs = await findSeats([...games.keys()], uid);
@@ -178,19 +230,75 @@ exports.deleteAccount = onCall(callableOptions, async (request) => {
   // 5. Delete the profile, including private/* (email, phone, FCM token).
   await db.recursiveDelete(db.doc(`users/${uid}`));
 
-  // 6. Delete the sign-in account last. If this throws, the caller is still
-  //    signed in and can retry; an account that is already gone means an
-  //    earlier run got this far, which counts as done.
+  // 6. Delete the sign-in account last. If this throws, the account still
+  //    exists, so its owner is still signed in and can retry; an account
+  //    that is already gone means an earlier run got this far, which counts
+  //    as done.
+  let signInDeleted = true;
   try {
     await getAuth().deleteUser(uid);
   } catch (error) {
     if (error?.code !== "auth/user-not-found") throw error;
+    signInDeleted = false;
   }
 
+  return {
+    lobbyIds,
+    seatPaths: seatRefs.map((ref) => ref.path),
+    friends: social.friends,
+    requests: social.requests,
+    signInDeleted,
+  };
+}
+
+/**
+ * What deleteAccountFor(uid) would do, found without writing anything: the
+ * dry run of scripts/delete-account.js. `inProgressGameIds` lists the games
+ * that would make it refuse, `lobbies` the waiting lobbies it would leave
+ * (and whether the account hosts each), and `profilePaths` the documents
+ * step 5 would delete. Leaving a lobby deletes the account's seat in it, so
+ * `seatPaths` lists only the seats in the other games: the ones step 3
+ * anonymizes.
+ */
+async function planAccountDeletion(uid) {
+  const games = await findGames(uid);
+  const lobbyIds = gameIdsInState(games, "waiting");
+  const otherGameIds = [...games.keys()].filter((gameId) => !lobbyIds.includes(gameId));
+  const [seatRefs, social, profileRefs] = await Promise.all([
+    findSeats(otherGameIds, uid),
+    findSocialData(uid),
+    findProfileDocs(uid),
+  ]);
+  return {
+    inProgressGameIds: gameIdsInState(games, "in_progress"),
+    lobbies: lobbyIds.map((gameId) => ({ gameId, hosted: games.get(gameId).host_id === uid })),
+    seatPaths: seatRefs.map((ref) => ref.path),
+    friendPaths: social.friendRefs.map((ref) => ref.path),
+    requestPaths: social.requestRefs.map((ref) => ref.path),
+    profilePaths: profileRefs.map((ref) => ref.path),
+  };
+}
+
+// Not deployed functions: index.js lists every deployed name explicitly.
+exports.deleteAccountFor = deleteAccountFor;
+exports.planAccountDeletion = planAccountDeletion;
+
+// ════════════════════════════════════════════════════════════════
+// CLOUD FUNCTION: deleteAccount
+// Deletes the caller's account with deleteAccountFor. Refused
+// while the caller is in or hosts a game in progress.
+// ════════════════════════════════════════════════════════════════
+
+exports.deleteAccount = onCall(callableOptions, async (request) => {
+  const uid = request.auth?.uid;
+  if (!uid) throw new HttpsError("unauthenticated", "Must be signed in.");
+
+  const deleted = await deleteAccountFor(uid);
+
   console.log(
-    `deleteAccount: deleted ${uid} (left ${lobbyIds.length} lobbies, ` +
-      `anonymized ${seatRefs.length} seats, unlinked ${social.friends} friends, ` +
-      `deleted ${social.requests} friend requests)`
+    `deleteAccount: deleted ${uid} (left ${deleted.lobbyIds.length} lobbies, ` +
+      `anonymized ${deleted.seatPaths.length} seats, unlinked ${deleted.friends} friends, ` +
+      `deleted ${deleted.requests} friend requests)`
   );
   return { success: true };
 });
