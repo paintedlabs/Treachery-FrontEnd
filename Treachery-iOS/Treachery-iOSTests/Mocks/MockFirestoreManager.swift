@@ -50,6 +50,10 @@ final class MockFirestoreManager: FirestoreManaging {
     /// Thrown only by the friend request writes: `sendFriendRequest` and
     /// `updateFriendRequest`.
     var friendRequestWriteError: Error?
+    /// Runs once inside `getPendingFriendRequests(forUserId:)` after the
+    /// requests are read and before they're returned, so a test can change
+    /// things while an answer that is now out of date is on its way.
+    var whileReturningPendingFriendRequests: (@MainActor () async -> Void)?
 
     // MARK: - Call tracking
 
@@ -117,7 +121,15 @@ final class MockFirestoreManager: FirestoreManaging {
         sendFriendRequestCalls.append(request)
     }
 
-    func getPendingFriendRequests(forUserId userId: String) async throws -> [FriendRequest] { pendingRequestsToReturn }
+    func getPendingFriendRequests(forUserId userId: String) async throws -> [FriendRequest] {
+        let requests = pendingRequestsToReturn
+        if let inFlight = whileReturningPendingFriendRequests {
+            // One-shot, so a test can't recurse into it by accident.
+            whileReturningPendingFriendRequests = nil
+            await inFlight()
+        }
+        return requests
+    }
 
     func updateFriendRequest(_ request: FriendRequest) async throws {
         if let friendRequestWriteError { throw friendRequestWriteError }

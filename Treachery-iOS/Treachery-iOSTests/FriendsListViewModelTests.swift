@@ -9,6 +9,7 @@ struct FriendsListViewModelTests {
     private let firestore = MockFirestoreManager()
     private let cloudFunctions = MockCloudFunctions()
     private let analytics = AnalyticsEventSpy()
+    private let announcer = AnnouncementSpy()
     private let viewModel: FriendsListViewModel
 
     /// Firestore's `unavailable`, what a read reports when it can't reach the server.
@@ -19,7 +20,8 @@ struct FriendsListViewModelTests {
             retryProfileSetup: {},
             firestoreManager: firestore,
             cloudFunctions: cloudFunctions,
-            trackEvent: analytics.record
+            trackEvent: analytics.record,
+            announce: announcer.record
         )
         // The signed-in user's own profile, which holds their friends list.
         firestore.usersToReturn["u1"] = friend("u1", named: "Ada")
@@ -218,7 +220,7 @@ struct FriendsListViewModelTests {
 
         await viewModel.removeFriend(friend("f1"))
 
-        #expect(viewModel.actionFailure == FriendActionFailure(action: .removeFriend, error: .unknown))
+        #expect(viewModel.actionFailure == FriendActionFailure(action: .removeFriend(id: "f1"), error: .unknown))
         #expect(viewModel.overview.value?.friends.count == 1)
         #expect(analytics.events.isEmpty)
         // An action failure is not a load failure.
@@ -271,7 +273,7 @@ struct FriendsListViewModelTests {
         await viewModel.acceptRequest(request("r1"))
 
         #expect(viewModel.actionFailure == FriendActionFailure(
-            action: .acceptRequest,
+            action: .acceptRequest(id: "r1"),
             error: .requestAlreadyAnswered
         ))
         #expect(firestore.getFriendsCallCount == 1)
@@ -297,7 +299,7 @@ struct FriendsListViewModelTests {
 
         await viewModel.declineRequest(request("r1"))
 
-        #expect(viewModel.actionFailure == FriendActionFailure(action: .declineRequest, error: .notPermitted))
+        #expect(viewModel.actionFailure == FriendActionFailure(action: .declineRequest(id: "r1"), error: .notPermitted))
         #expect(viewModel.overview.value?.pendingRequests.map(\.id) == ["r1"])
     }
 
@@ -314,7 +316,7 @@ struct FriendsListViewModelTests {
         firestore.friendRequestWriteError = NSError(domain: "FIRFirestoreErrorDomain", code: 14)
         await viewModel.sendRequest(to: friend("u3", named: "Cy"))
 
-        #expect(viewModel.actionFailure == FriendActionFailure(action: .sendRequest, error: .serverUnreachable))
+        #expect(viewModel.actionFailure == FriendActionFailure(action: .sendRequest(toUserId: "u3"), error: .serverUnreachable))
         #expect(viewModel.sentRequestUserIds == ["u2"])
         #expect(analytics.events == ["send_friend_request"])
     }
@@ -327,12 +329,102 @@ struct FriendsListViewModelTests {
         await viewModel.loadData(userId: "u1")
         firestore.friendRequestWriteError = NSError(domain: "FIRFirestoreErrorDomain", code: 14)
         await viewModel.declineRequest(request("r1"))
-        #expect(viewModel.actionFailure?.action == .declineRequest)
+        #expect(viewModel.actionFailure?.action == .declineRequest(id: "r1"))
 
         await viewModel.removeFriend(friend("f1"))
 
         #expect(viewModel.actionFailure == nil)
         #expect(viewModel.overview.value?.friends.map(\.id) == ["f2"])
+    }
+
+    // MARK: - Actions in Flight
+
+    /// A second tap while Accept runs, as during a cold start, sends nothing:
+    /// a second call would fail on the server and report a failure for a
+    /// request that was accepted. Decline on the same row waits too.
+    @Test func secondTapWhileAcceptRunsSendsNothing() async {
+        let r1 = request("r1")
+        firestore.pendingRequestsToReturn = [r1, request("r2")]
+        await viewModel.loadData(userId: "u1")
+        var actionMidAccept: FriendAction?
+        var otherRowMidAccept: FriendAction?
+        cloudFunctions.whileAcceptingFriendRequest = { [viewModel] in
+            actionMidAccept = viewModel.actionInFlight(on: .request(id: "r1"))
+            otherRowMidAccept = viewModel.actionInFlight(on: .request(id: "r2"))
+            await viewModel.acceptRequest(r1)
+            await viewModel.declineRequest(r1)
+        }
+
+        await viewModel.acceptRequest(r1)
+
+        #expect(cloudFunctions.acceptFriendRequestCalls == ["r1"])
+        #expect(firestore.updateFriendRequestCalls.isEmpty)
+        #expect(actionMidAccept == .acceptRequest(id: "r1"))
+        #expect(otherRowMidAccept == nil)
+        #expect(viewModel.actionsInFlight.isEmpty)
+        #expect(viewModel.actionFailure == nil)
+    }
+
+    /// A reload that read the requests before Accept went through, and
+    /// answers after it, can't bring the accepted request back with a
+    /// working Accept.
+    @Test func reloadOverlappingAnAcceptDoesNotBringTheRequestBack() async {
+        let r1 = request("r1")
+        let newFriend = friend("f1")
+        firestore.pendingRequestsToReturn = [r1]
+        await viewModel.loadData(userId: "u1")
+        firestore.whileReturningPendingFriendRequests = { [viewModel, firestore] in
+            // This reload read r1 as pending. Now it's accepted, and the
+            // accept's own reload finds the new friend.
+            firestore.pendingRequestsToReturn = []
+            firestore.friendsToReturn = [newFriend]
+            await viewModel.acceptRequest(r1)
+        }
+
+        await viewModel.loadData(userId: "u1")
+
+        #expect(cloudFunctions.acceptFriendRequestCalls == ["r1"])
+        #expect(viewModel.overview.phase == .loaded)
+        #expect(viewModel.overview.value?.pendingRequests.isEmpty == true)
+        #expect(viewModel.overview.value?.friends.map(\.id) == ["f1"])
+    }
+
+    /// The same for a decline, which doesn't reload: the list stays as the
+    /// decline left it, and the reload still ends.
+    @Test func reloadOverlappingADeclineKeepsTheRequestDeclined() async {
+        let r1 = request("r1")
+        firestore.pendingRequestsToReturn = [r1, request("r2")]
+        await viewModel.loadData(userId: "u1")
+        firestore.whileReturningPendingFriendRequests = { [viewModel] in
+            await viewModel.declineRequest(r1)
+        }
+
+        await viewModel.loadData(userId: "u1")
+
+        #expect(firestore.updateFriendRequestCalls.map(\.id) == ["r1"])
+        #expect(viewModel.overview.phase == .loaded)
+        #expect(viewModel.overview.value?.pendingRequests.map(\.id) == ["r2"])
+    }
+
+    /// A failed action is said under its row and to VoiceOver, not only in
+    /// the alert: an alert raised while the Remove confirmation is still
+    /// closing may never appear.
+    @Test func failedRemoveIsSaidUnderTheFriendAndAnnounced() async {
+        firestore.friendsToReturn = [friend("f1"), friend("f2")]
+        await viewModel.loadData(userId: "u1")
+        cloudFunctions.errorToThrow = NSError(domain: "com.firebase.functions", code: 14)
+
+        await viewModel.removeFriend(friend("f1"))
+
+        let message = "Couldn't remove this friend. Couldn't reach the server. Check your connection and try again."
+        #expect(viewModel.actionFailureMessage(on: .friend(userId: "f1")) == message)
+        #expect(viewModel.actionFailureMessage(on: .friend(userId: "f2")) == nil)
+        #expect(viewModel.actionFailureMessage(on: .searchResult(userId: "f1")) == nil)
+        #expect(announcer.announcements == [message])
+
+        // Closing the alert clears the line too.
+        viewModel.dismissActionFailure()
+        #expect(viewModel.actionFailureMessage(on: .friend(userId: "f1")) == nil)
     }
 
     // MARK: - Fixtures

@@ -25,17 +25,74 @@ struct PlayerSearch {
     let matchedSignedInUser: Bool
 }
 
-/// A friend action that didn't go through, for the alert that says so.
-struct FriendActionFailure: Equatable {
-    enum Action: Equatable {
-        case sendRequest
-        case acceptRequest
-        case declineRequest
-        case removeFriend
+/// A friend action, with the request or player it acts on.
+enum FriendAction: Hashable {
+    case sendRequest(toUserId: String)
+    case acceptRequest(id: String)
+    case declineRequest(id: String)
+    case removeFriend(id: String)
+
+    /// The row an action belongs to on screen.
+    enum Target: Hashable {
+        /// A friend request, by id: accepting or declining it.
+        case request(id: String)
+        /// A player found by search, by user id: sending them a request.
+        case searchResult(userId: String)
+        /// A friend, by user id: removing them.
+        case friend(userId: String)
     }
 
-    let action: Action
+    var target: Target {
+        switch self {
+        case .sendRequest(let userId): .searchResult(userId: userId)
+        case .acceptRequest(let id), .declineRequest(let id): .request(id: id)
+        case .removeFriend(let id): .friend(userId: id)
+        }
+    }
+
+    /// The action's name for the log, without the ids it carries.
+    var logName: String {
+        switch self {
+        case .sendRequest: "sendRequest"
+        case .acceptRequest: "acceptRequest"
+        case .declineRequest: "declineRequest"
+        case .removeFriend: "removeFriend"
+        }
+    }
+}
+
+/// A friend action that didn't go through, for the alert and the line under
+/// its row that say so.
+struct FriendActionFailure: Equatable {
+    let action: FriendAction
     let error: UserFacingError
+
+    /// What the line under the row says, and VoiceOver hears: what didn't
+    /// happen, then why.
+    var message: String {
+        switch action {
+        case .sendRequest:
+            String(
+                localized: "Your friend request wasn't sent. \(error.message)",
+                comment: "Shown under a search result when sending a friend request failed. The argument says why."
+            )
+        case .acceptRequest:
+            String(
+                localized: "Couldn't accept this request. \(error.message)",
+                comment: "Shown under a friend request when accepting it failed. The argument says why."
+            )
+        case .declineRequest:
+            String(
+                localized: "Couldn't decline this request. \(error.message)",
+                comment: "Shown under a friend request when declining it failed. The argument says why."
+            )
+        case .removeFriend:
+            String(
+                localized: "Couldn't remove this friend. \(error.message)",
+                comment: "Shown under a friend when removing them failed. The argument says why."
+            )
+        }
+    }
 }
 
 @MainActor
@@ -47,6 +104,10 @@ final class FriendsListViewModel: ObservableObject {
     @Published private(set) var search: Loadable<PlayerSearch, UserFacingError> = .idle
     @Published var searchText = ""
     @Published private(set) var sentRequestUserIds: Set<String> = []
+    /// The friend actions running. A row with one running can't start
+    /// another, so a second tap can't send a second call that fails and
+    /// reports a failure for an action that went through.
+    @Published private(set) var actionsInFlight: Set<FriendAction> = []
     /// The last friend action that failed, until its alert is dismissed or
     /// another action starts. Starting one clears it, so that action's own
     /// failure always shows, even if an earlier alert never presented.
@@ -55,10 +116,16 @@ final class FriendsListViewModel: ObservableObject {
     // MARK: - Properties
 
     private var userId: String?
+    /// Counts loads, and the changes friend actions make to what's shown, so
+    /// a load can tell whether what it read is still the newest (`finishLoad`).
+    private var overviewRevision = 0
+    /// The revision the newest load started at.
+    private var newestLoadRevision = 0
     private let retryProfileSetup: () async -> Void
     private let firestoreManager: FirestoreManaging
     private let cloudFunctions: CloudFunctionsProtocol
     private let trackEvent: (String) -> Void
+    private let announce: @MainActor (String) -> Void
 
     private static let logger = Logger(subsystem: "com.Solomon.Treachery-iOS", category: "Friends")
 
@@ -69,16 +136,19 @@ final class FriendsListViewModel: ObservableObject {
     ///     returns once it's over: the friends list is part of the profile.
     ///     In the app this is `AuthViewModel.retryProfileSetup()`.
     ///   - trackEvent: Records an analytics event by name.
+    ///   - announce: Says a message to VoiceOver.
     init(
         retryProfileSetup: @escaping () async -> Void,
         firestoreManager: FirestoreManaging = FirestoreManager(),
         cloudFunctions: CloudFunctionsProtocol = CloudFunctions(),
-        trackEvent: @escaping (String) -> Void = { AnalyticsService.trackEvent($0) }
+        trackEvent: @escaping (String) -> Void = { AnalyticsService.trackEvent($0) },
+        announce: @escaping @MainActor (String) -> Void = { FailureMessage.announce($0) }
     ) {
         self.retryProfileSetup = retryProfileSetup
         self.firestoreManager = firestoreManager
         self.cloudFunctions = cloudFunctions
         self.trackEvent = trackEvent
+        self.announce = announce
     }
 
     // MARK: - Data Loading
@@ -87,19 +157,48 @@ final class FriendsListViewModel: ObservableObject {
     /// stays while this runs and if it fails.
     func loadData(userId: String) async {
         self.userId = userId
+        overviewRevision += 1
+        let revision = overviewRevision
+        newestLoadRevision = revision
         overview.startLoading()
 
+        let result: Result<FriendsOverview, UserFacingError>
         do {
             async let friendsTask = firestoreManager.getFriends(forUserId: userId)
             async let requestsTask = firestoreManager.getPendingFriendRequests(forUserId: userId)
 
             let friends = try await friendsTask
             let pendingRequests = try await requestsTask
-            overview = .loaded(FriendsOverview(friends: friends, pendingRequests: pendingRequests))
+            result = .success(FriendsOverview(friends: friends, pendingRequests: pendingRequests))
         } catch {
             Self.logger.error("Loading friends failed: \(String(describing: error), privacy: .private)")
-            overview.fail(with: UserFacingError(error))
+            result = .failure(UserFacingError(error))
         }
+        finishLoad(startedAt: revision, with: result)
+    }
+
+    /// Shows what the load that started at `revision` found, unless something
+    /// newer is shown or on its way:
+    /// - A newer load is running: that one shows its result instead.
+    /// - A friend action changed the list after this load read it: the
+    ///   change is newer, so the list stays as the action left it, and only
+    ///   the load's ending shows. Otherwise an accepted request could come
+    ///   back, with an Accept that the server would refuse.
+    private func finishLoad(startedAt revision: Int, with result: Result<FriendsOverview, UserFacingError>) {
+        guard revision == newestLoadRevision else { return }
+        switch result {
+        case .success(let loaded):
+            overview = .loaded(revision == overviewRevision ? loaded : overview.value ?? loaded)
+        case .failure(let failure):
+            overview.fail(with: failure)
+        }
+    }
+
+    /// Applies a friend action's change to the friends or requests shown, and
+    /// makes any load already running older than it.
+    private func changeOverview(_ change: (inout FriendsOverview) -> Void) {
+        overview.updateValue(change)
+        overviewRevision += 1
     }
 
     /// Try Again or pull to refresh. A profile that couldn't be set up at
@@ -133,7 +232,8 @@ final class FriendsListViewModel: ObservableObject {
 
     func sendRequest(to user: TreacheryUser) async {
         guard let userId else { return }
-        actionFailure = nil
+        let action = FriendAction.sendRequest(toUserId: user.id)
+        guard start(action) else { return }
 
         do {
             let currentUser = try await firestoreManager.getUser(id: userId)
@@ -146,11 +246,13 @@ final class FriendsListViewModel: ObservableObject {
                 createdAt: Date()
             )
             try await firestoreManager.sendFriendRequest(request)
-            trackEvent("send_friend_request")
-            sentRequestUserIds.insert(user.id)
         } catch {
-            fail(.sendRequest, with: error)
+            finish(action, failingWith: error)
+            return
         }
+        finish(action)
+        trackEvent("send_friend_request")
+        sentRequestUserIds.insert(user.id)
     }
 
     /// Accepts the request, then reloads so the new friend appears. The
@@ -158,21 +260,25 @@ final class FriendsListViewModel: ObservableObject {
     /// it there to be accepted again.
     func acceptRequest(_ request: FriendRequest) async {
         guard let userId else { return }
-        actionFailure = nil
+        let action = FriendAction.acceptRequest(id: request.id)
+        guard start(action) else { return }
 
         do {
             try await cloudFunctions.acceptFriendRequest(requestId: request.id)
-            trackEvent("accept_friend_request")
         } catch {
-            fail(.acceptRequest, with: error)
+            finish(action, failingWith: error)
             return
         }
-        overview.updateValue { $0.pendingRequests.removeAll { $0.id == request.id } }
+        finish(action)
+        trackEvent("accept_friend_request")
+        changeOverview { $0.pendingRequests.removeAll { $0.id == request.id } }
         await loadData(userId: userId)
     }
 
     func declineRequest(_ request: FriendRequest) async {
-        actionFailure = nil
+        let action = FriendAction.declineRequest(id: request.id)
+        guard start(action) else { return }
+
         do {
             let updatedRequest = FriendRequest(
                 id: request.id,
@@ -183,31 +289,68 @@ final class FriendsListViewModel: ObservableObject {
                 createdAt: request.createdAt
             )
             try await firestoreManager.updateFriendRequest(updatedRequest)
-            overview.updateValue { $0.pendingRequests.removeAll { $0.id == request.id } }
         } catch {
-            fail(.declineRequest, with: error)
+            finish(action, failingWith: error)
+            return
         }
+        finish(action)
+        changeOverview { $0.pendingRequests.removeAll { $0.id == request.id } }
     }
 
     func removeFriend(_ friend: TreacheryUser) async {
-        actionFailure = nil
+        let action = FriendAction.removeFriend(id: friend.id)
+        guard start(action) else { return }
+
         do {
             try await cloudFunctions.removeFriend(friendId: friend.id)
-            trackEvent("remove_friend")
-            overview.updateValue { $0.friends.removeAll { $0.id == friend.id } }
         } catch {
-            fail(.removeFriend, with: error)
+            finish(action, failingWith: error)
+            return
         }
+        finish(action)
+        trackEvent("remove_friend")
+        changeOverview { $0.friends.removeAll { $0.id == friend.id } }
     }
 
-    /// Closes the alert for the last failed action.
+    /// The action running on `target`'s row, if any.
+    func actionInFlight(on target: FriendAction.Target) -> FriendAction? {
+        actionsInFlight.first { $0.target == target }
+    }
+
+    /// Why the last action on `target`'s row didn't go through, if it
+    /// didn't. It shows under the row as well as in the alert: an alert
+    /// raised while the Remove confirmation is still closing may never
+    /// appear.
+    func actionFailureMessage(on target: FriendAction.Target) -> String? {
+        guard let actionFailure, actionFailure.action.target == target else { return nil }
+        return actionFailure.message
+    }
+
+    /// Closes the alert, and the line under the row, for the last failed
+    /// action.
     func dismissActionFailure() {
         actionFailure = nil
     }
 
-    private func fail(_ action: FriendActionFailure.Action, with error: any Error) {
-        Self.logger.error("Friend action \(String(describing: action), privacy: .public) failed: \(String(describing: error), privacy: .private)")
-        actionFailure = FriendActionFailure(action: action, error: UserFacingError(error))
+    /// Starts `action`, unless its row has one running already, as after a
+    /// second tap, and clears the last failure so this action's own shows.
+    /// Returns whether it started.
+    private func start(_ action: FriendAction) -> Bool {
+        guard actionInFlight(on: action.target) == nil else { return false }
+        actionsInFlight.insert(action)
+        actionFailure = nil
+        return true
+    }
+
+    /// Ends `action`, and if it failed, says why under its row and to
+    /// VoiceOver: the failure appears away from the button that was tapped.
+    private func finish(_ action: FriendAction, failingWith error: (any Error)? = nil) {
+        actionsInFlight.remove(action)
+        guard let error else { return }
+        Self.logger.error("Friend action \(action.logName, privacy: .public) failed: \(String(describing: error), privacy: .private)")
+        let failure = FriendActionFailure(action: action, error: UserFacingError(error))
+        actionFailure = failure
+        announce(failure.message)
     }
 
     // MARK: - Helpers

@@ -129,7 +129,16 @@ final class MockCloudFunctions: CloudFunctionsProtocol {
         ))
     }
 
+    /// Runs once inside `acceptFriendRequest` while the call is in flight,
+    /// so a test can act mid-call (for example, tap Accept again).
+    var whileAcceptingFriendRequest: (@MainActor () async -> Void)?
+
     func acceptFriendRequest(requestId: String) async throws {
+        if let inFlight = whileAcceptingFriendRequest {
+            // One-shot, so a broken repeat-tap guard fails the test instead of recursing.
+            whileAcceptingFriendRequest = nil
+            await inFlight()
+        }
         if let error = errorToThrow { throw error }
         acceptFriendRequestCalls.append(requestId)
     }

@@ -59,8 +59,9 @@ struct FriendsListView: View {
         } message: { friend in
             Text("Remove \(friend.displayName) from your friends? You will be removed from their friends list too.")
         }
-        // An alert rather than a banner: the button that failed can be
-        // anywhere in the list, and a banner there could be off screen.
+        // An alert, because the row that failed can be off screen, and also a
+        // line under that row (`actionFailureLine`), because an alert raised
+        // while the Remove confirmation is still closing may never appear.
         .alert(
             viewModel.actionFailure?.action.failureTitle ?? "",
             isPresented: isShowingActionFailure,
@@ -217,30 +218,37 @@ struct FriendsListView: View {
     }
 
     private func searchResultRow(for user: TreacheryUser) -> some View {
-        AdaptiveRow {
-            Text(user.displayName)
-                .foregroundStyle(Color.mtgTextPrimary)
-        } trailing: {
-            if viewModel.isFriend(user) {
-                Text("Friends")
-                    .font(.caption)
-                    .foregroundStyle(Color.mtgSuccess)
-            } else if viewModel.sentRequestUserIds.contains(user.id) {
-                Text("Request Sent")
-                    .font(.caption)
-                    .foregroundStyle(Color.mtgGold)
-            } else {
-                Button {
-                    Task { await viewModel.sendRequest(to: user) }
-                } label: {
-                    CapsuleButtonLabel(title: "Add", style: .filled(Color.mtgGold))
+        let target = FriendAction.Target.searchResult(userId: user.id)
+        return VStack(spacing: 0) {
+            AdaptiveRow {
+                Text(user.displayName)
+                    .foregroundStyle(Color.mtgTextPrimary)
+            } trailing: {
+                if viewModel.isFriend(user) {
+                    Text("Friends")
+                        .font(.caption)
+                        .foregroundStyle(Color.mtgSuccess)
+                } else if viewModel.sentRequestUserIds.contains(user.id) {
+                    Text("Request Sent")
+                        .font(.caption)
+                        .foregroundStyle(Color.mtgGold)
+                } else if let action = viewModel.actionInFlight(on: target) {
+                    ActionProgress(action: action)
+                } else {
+                    Button {
+                        Task { await viewModel.sendRequest(to: user) }
+                    } label: {
+                        CapsuleButtonLabel(title: "Add", style: .filled(Color.mtgGold))
+                    }
+                    .accessibilityLabel("Send friend request to \(user.displayName)")
                 }
-                .accessibilityLabel("Send friend request to \(user.displayName)")
             }
+            .padding(.vertical, 6)
+            .accessibilityElement(children: .combine)
+
+            actionFailureLine(on: target)
         }
         .padding(.horizontal, 16)
-        .padding(.vertical, 6)
-        .accessibilityElement(children: .combine)
     }
 
     // MARK: - Friends and Requests
@@ -291,24 +299,33 @@ struct FriendsListView: View {
                 .padding(.bottom, 8)
 
             ForEach(requests) { request in
-                AdaptiveRow {
-                    VStack(alignment: .leading) {
-                        Text(request.fromDisplayName)
-                            .fontWeight(.medium)
-                            .foregroundStyle(Color.mtgTextPrimary)
-                        Text("Wants to be friends")
-                            .font(.caption)
-                            .foregroundStyle(Color.mtgTextSecondary)
+                let target = FriendAction.Target.request(id: request.id)
+                VStack(spacing: 0) {
+                    AdaptiveRow {
+                        VStack(alignment: .leading) {
+                            Text(request.fromDisplayName)
+                                .fontWeight(.medium)
+                                .foregroundStyle(Color.mtgTextPrimary)
+                            Text("Wants to be friends")
+                                .font(.caption)
+                                .foregroundStyle(Color.mtgTextSecondary)
+                        }
+                    } trailing: {
+                        if let action = viewModel.actionInFlight(on: target) {
+                            ActionProgress(action: action)
+                        } else {
+                            // The two buttons stack too when even they don't fit side by side.
+                            ViewThatFits(in: .horizontal) {
+                                HStack(spacing: 8) { requestButtons(for: request) }
+                                VStack(alignment: .leading, spacing: 0) { requestButtons(for: request) }
+                            }
+                        }
                     }
-                } trailing: {
-                    // The two buttons stack too when even they don't fit side by side.
-                    ViewThatFits(in: .horizontal) {
-                        HStack(spacing: 8) { requestButtons(for: request) }
-                        VStack(alignment: .leading, spacing: 0) { requestButtons(for: request) }
-                    }
+                    .padding(.vertical, 8)
+
+                    actionFailureLine(on: target)
                 }
                 .padding(.horizontal, 16)
-                .padding(.vertical, 8)
             }
         }
         .mtgCardFrame()
@@ -362,19 +379,28 @@ struct FriendsListView: View {
 
     private func friendRows(_ friends: [TreacheryUser]) -> some View {
         ForEach(friends) { friend in
-            AdaptiveRow {
-                Text(friend.displayName)
-                    .foregroundStyle(Color.mtgTextPrimary)
-            } trailing: {
-                Button {
-                    friendToRemove = friend
-                } label: {
-                    CapsuleButtonLabel(title: "Remove", style: .destructive)
+            let target = FriendAction.Target.friend(userId: friend.id)
+            VStack(spacing: 0) {
+                AdaptiveRow {
+                    Text(friend.displayName)
+                        .foregroundStyle(Color.mtgTextPrimary)
+                } trailing: {
+                    if let action = viewModel.actionInFlight(on: target) {
+                        ActionProgress(action: action)
+                    } else {
+                        Button {
+                            friendToRemove = friend
+                        } label: {
+                            CapsuleButtonLabel(title: "Remove", style: .destructive)
+                        }
+                        .accessibilityLabel("Remove \(friend.displayName) from friends")
+                    }
                 }
-                .accessibilityLabel("Remove \(friend.displayName) from friends")
+                .padding(.vertical, 4)
+
+                actionFailureLine(on: target)
             }
             .padding(.horizontal, 16)
-            .padding(.vertical, 4)
 
             if friend.id != friends.last?.id {
                 Rectangle()
@@ -382,6 +408,41 @@ struct FriendsListView: View {
                     .frame(height: 1)
                     .padding(.horizontal, 16)
             }
+        }
+    }
+}
+
+// MARK: - Action Failure and Progress
+
+extension FriendsListView {
+    /// Why the last action on `target`'s row didn't go through, under the
+    /// row, if it didn't. The view model announces it.
+    @ViewBuilder fileprivate func actionFailureLine(on target: FriendAction.Target) -> some View {
+        if let message = viewModel.actionFailureMessage(on: target) {
+            FailureMessage(message: message)
+                .padding(.bottom, 8)
+        }
+    }
+}
+
+/// In place of a row's buttons while one of its actions runs: the row can't
+/// start another, and says what it's doing.
+private struct ActionProgress: View {
+    let action: FriendAction
+
+    var body: some View {
+        ProgressView()
+            .tint(Color.mtgGold)
+            .frame(minWidth: 44, minHeight: 44)
+            .accessibilityLabel(label)
+    }
+
+    private var label: String {
+        switch action {
+        case .sendRequest: String(localized: "Sending friend request", comment: "VoiceOver label while a friend request is being sent")
+        case .acceptRequest: String(localized: "Accepting friend request", comment: "VoiceOver label while a friend request is being accepted")
+        case .declineRequest: String(localized: "Declining friend request", comment: "VoiceOver label while a friend request is being declined")
+        case .removeFriend: String(localized: "Removing friend", comment: "VoiceOver label while a friend is being removed")
         }
     }
 }
@@ -439,7 +500,7 @@ private struct CapsuleButtonLabel: View {
 
 // MARK: - Action Failure Titles
 
-private extension FriendActionFailure.Action {
+private extension FriendAction {
     var failureTitle: String {
         switch self {
         case .sendRequest: String(localized: "Couldn't Send Friend Request", comment: "Alert title when sending a friend request failed")
