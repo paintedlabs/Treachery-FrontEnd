@@ -158,6 +158,18 @@ service cloud.firestore {
     }
 
     // ============================================================
+    // CLIENT CONFIG
+    // Operator-set values the apps read at launch. config/ios holds the
+    // iOS minimum build (docs/DEPLOYMENT.md, "Forcing an iOS update").
+    // The app reads it before anyone signs in, so it is public; nothing
+    // in it is sensitive. Only the Firebase console (Admin) writes it.
+    // ============================================================
+    match /config/{doc} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    // ============================================================
     // HELPER FUNCTIONS
     // ============================================================
     function isGameHost(gameId) {
