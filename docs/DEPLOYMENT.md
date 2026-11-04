@@ -48,7 +48,9 @@ Practical implications of the path filters:
 Publish a GitHub release. That single event fans out to production web
 hosting, App Store submission, and Play production. There is no partial
 promote — cut the release when *all three* clients are ready for what's on
-`main`.
+`main`. That includes the iOS version number: if it doesn't match the
+release's tag, the App Store run stops while web and Play still deploy (see
+[iOS version numbers](#ios-version-numbers)).
 
 ## iOS version numbers
 
@@ -67,6 +69,26 @@ pipelines only bump the build number, so the version is yours to manage:
    (e.g. `1.3.0` → `1.3.1`) in a PR. App Store Connect rejects uploads whose
    version is not higher than the last approved one, so every TestFlight
    upload from `main` fails until the bump lands.
+
+### When the App Store run stops on the version check
+
+The check stops only the App Store run: web hosting and Play production still
+deploy from the same release. Don't publish the release again, or a
+replacement, because every `release: published` event deploys web and Play
+production again. Ship the iOS app on its own instead, here for version
+`1.3.0`:
+
+1. If `MARKETING_VERSION` isn't `1.3.0`, set it in a PR and merge it.
+2. Tag the commit to ship `v1.3.0`, usually that merge commit. The App Store
+   build contains everything up to it. If the release already owns the tag,
+   this moves it, and the release then points at that commit too:
+   `git tag -f v1.3.0 <commit>`, then `git push --force origin v1.3.0`. No
+   workflow runs on tag pushes.
+3. Run the App Store workflow on the tag:
+   `gh workflow run deploy-appstore.yml --ref v1.3.0`, or **Run workflow** on
+   the workflow's page with the tag picked under **Use workflow from**. On a
+   tag, the run's `GITHUB_REF_NAME` is the tag, so the lane checks the version
+   again before it builds. Run on a branch, it would skip the check.
 
 ## iOS phased rollout
 

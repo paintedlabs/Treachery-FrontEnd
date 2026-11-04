@@ -192,8 +192,9 @@ platform :ios do
   # to its tag, which Release Drafter writes as vX.Y.Z. The App Store version
   # comes from MARKETING_VERSION, so stop before anything builds when a
   # release's tag has another shape or names another version. Runs started by
-  # hand (workflow_dispatch) on a branch carry its name instead and skip the
-  # check.
+  # hand (workflow_dispatch) carry the ref they run on: a vX.Y.Z tag is checked
+  # the same way, which is how to resume after this check stops a release, and
+  # a branch skips the check.
   private_lane :ensure_version_matches_release_tag do
     tag = ENV["GITHUB_REF_NAME"].to_s
     unless tag.match?(/\Av\d+\.\d+\.\d+\z/)
@@ -201,8 +202,10 @@ platform :ios do
 
       UI.user_error!(
         "Release tag #{tag.inspect} is not vX.Y.Z, so it can't be checked against " \
-        "MARKETING_VERSION. Publish the release with a tag such as v1.3.0. " \
-        "See docs/DEPLOYMENT.md."
+        "MARKETING_VERSION. Don't publish the release again, or a replacement: " \
+        "that deploys web and Play production a second time. To send this commit " \
+        "to the App Store, tag it vX.Y.Z to match MARKETING_VERSION and run the " \
+        "App Store workflow by hand on that tag. See docs/DEPLOYMENT.md."
       )
     end
 
@@ -212,9 +215,11 @@ platform :ios do
 
     UI.user_error!(
       "Release #{tag} expects version #{expected}, but MARKETING_VERSION of the " \
-      "Treachery-iOS target is #{actual}. Set it to #{expected} (Debug and Release) " \
-      "in a PR, merge it, then publish the release from a commit that includes the " \
-      "bump. See docs/DEPLOYMENT.md."
+      "Treachery-iOS target is #{actual}. Don't publish the release again, or a " \
+      "replacement: that deploys web and Play production a second time. Set " \
+      "MARKETING_VERSION to #{expected} (Debug and Release) in a PR and merge it, " \
+      "move the #{tag} tag to that commit, then run the App Store workflow by hand " \
+      "on #{tag}. See docs/DEPLOYMENT.md."
     )
   end
 
