@@ -6,12 +6,13 @@
 # track the XCODEPROJ/SCHEME constants the other lanes use, and the lane carries
 # the warning about these tests hitting production Firebase.
 
-# Devices to capture (App Store requires specific display sizes)
+# Devices to capture (App Store requires specific display sizes). The app is
+# iPhone-only (TARGETED_DEVICE_FAMILY = 1), so App Store Connect needs no iPad
+# screenshots.
 devices([
   "iPhone 16 Pro Max",   # 6.9" — required for App Store
   "iPhone 16 Pro",       # 6.3"
-  "iPhone 16",           # 6.1"
-  "iPad Pro 13-inch (M4)" # iPad — if you want iPad screenshots
+  "iPhone 16"            # 6.1"
 ])
 
 # Languages / locales
