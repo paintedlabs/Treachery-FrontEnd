@@ -96,15 +96,24 @@ Store actually offers to every blocked user, whatever iOS version they run:
 
 1. In App Store Connect, open the iOS version that is live on the App Store
    and note its build number. Check its minimum iOS version, which the App
-   Store page lists under Compatibility, against the iOS versions people run
-   (Firebase Analytics, which the app uses, reports them). If some people
-   still run an older iOS than that, use the build number of the newest App
-   Store release that supports their iOS instead, unless you mean to lock
-   them out. That's the newest version the App Store offers them, as long as
-   it's still selected under Pricing and Availability > Last-Compatible
-   Version Settings. A TestFlight-only build in between never counts. An
-   older release's minimum iOS is `IPHONEOS_DEPLOYMENT_TARGET` in the Xcode
-   project at its release tag.
+   Store page lists under Compatibility, against the iOS versions people
+   run. Two places show them:
+   - App Store Connect's Analytics tab, using its Platform Version filter.
+     It counts only people who share usage data with app developers.
+   - Firebase Analytics, but only for builds whose `GoogleService-Info.plist`
+     names `com.Solomon.Treachery-iOS`, the iOS app registered in Firebase.
+     It doesn't count builds with the old file, which include v1.1.0 and
+     earlier.
+
+   Neither counts everyone, so an older iOS missing from both doesn't mean
+   no one runs it. If some people still run an older iOS than the live
+   release needs, use the build number of the newest App Store release that
+   supports their iOS instead, unless you mean to lock them out. That's the
+   newest version the App Store offers them, as long as it's still selected
+   under Pricing and Availability > Last-Compatible Version Settings. A
+   TestFlight-only build in between never counts. An older release's
+   minimum iOS is `IPHONEOS_DEPLOYMENT_TARGET` in the Xcode project at its
+   release tag.
 2. In the Firebase console, open Firestore Database > Data. Open the `config`
    collection (start it if it doesn't exist), then the document `ios`.
 3. Set the fields:
