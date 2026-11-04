@@ -129,7 +129,16 @@ final class MockCloudFunctions: CloudFunctionsProtocol {
         ))
     }
 
+    /// Runs once inside `acceptFriendRequest` while the call is in flight,
+    /// so a test can act mid-call (for example, tap Accept again).
+    var whileAcceptingFriendRequest: (@MainActor () async -> Void)?
+
     func acceptFriendRequest(requestId: String) async throws {
+        if let inFlight = whileAcceptingFriendRequest {
+            // One-shot, so a broken repeat-tap guard fails the test instead of recursing.
+            whileAcceptingFriendRequest = nil
+            await inFlight()
+        }
         if let error = errorToThrow { throw error }
         acceptFriendRequestCalls.append(requestId)
     }
@@ -137,5 +146,24 @@ final class MockCloudFunctions: CloudFunctionsProtocol {
     func removeFriend(friendId: String) async throws {
         if let error = errorToThrow { throw error }
         removeFriendCalls.append(friendId)
+    }
+
+    // Account
+
+    /// Every `deleteAccount` attempt, including ones that throw, so tests can
+    /// count retries and prove repeat taps never sent a second request.
+    var deleteAccountCallCount = 0
+    /// Runs once inside `deleteAccount` while the request is in flight, so a
+    /// test can act mid-request (for example, tap Delete again).
+    var whileDeletingAccount: (@MainActor () async -> Void)?
+
+    func deleteAccount() async throws {
+        deleteAccountCallCount += 1
+        if let inFlight = whileDeletingAccount {
+            // One-shot, so a broken repeat-tap guard fails the test instead of recursing.
+            whileDeletingAccount = nil
+            await inFlight()
+        }
+        if let error = errorToThrow { throw error }
     }
 }

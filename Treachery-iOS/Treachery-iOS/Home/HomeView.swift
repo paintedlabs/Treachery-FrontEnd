@@ -75,7 +75,10 @@ struct HomeView: View {
             .tag(AppTab.history)
 
             NavigationStack {
-                FriendsListView()
+                FriendsListView(
+                    retryProfileSetup: { [authViewModel] in await authViewModel.retryProfileSetup() },
+                    profileSetupState: { [authViewModel] in authViewModel.profileSetupState }
+                )
             }
             .tabItem {
                 Label("Friends", systemImage: "person.2.fill")
@@ -83,7 +86,11 @@ struct HomeView: View {
             .tag(AppTab.friends)
 
             NavigationStack {
-                ProfileView()
+                ProfileView(viewModel: ProfileViewModel(
+                    session: authViewModel,
+                    retryProfileSetup: { [authViewModel] in await authViewModel.retryProfileSetup() },
+                    profileSetupState: { [authViewModel] in authViewModel.profileSetupState }
+                ))
             }
             .tabItem {
                 Label("Profile", systemImage: "person.circle.fill")

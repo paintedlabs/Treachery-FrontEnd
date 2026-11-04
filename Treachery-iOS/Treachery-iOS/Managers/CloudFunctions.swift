@@ -6,7 +6,9 @@
 //
 
 import Foundation
+import FirebaseAuth
 import FirebaseFunctions
+import os
 
 struct JoinGameResult {
     let action: String // "joined" or "already_joined"
@@ -21,8 +23,42 @@ struct PhenomenonResult {
     let secondaryPlaneId: String? // For Spatial Merging
 }
 
+/// The `deleteAccount` failures the app tells apart. Every other failure (a
+/// server error, or a network failure that can come once the request was
+/// sent, such as a lost connection or going offline) propagates unchanged
+/// and is treated as retryable.
+enum AccountDeletionError: Error, Equatable {
+    /// The server refused because the user is in a game that is still in
+    /// progress. `message` is the server's sentence telling them they can delete
+    /// the account once that game ends; show it verbatim.
+    case inProgressGame(message: String)
+    /// The request never left this device, so the server deleted nothing.
+    /// Only failures that can't come after the request was written count:
+    /// - Firebase Auth's: the SDK gets the sign-in token the request
+    ///   carries before it builds the request.
+    /// - The server's name not resolving (`cannotFindHost`,
+    ///   `dnsLookupFailed`), or no connection to it being made
+    ///   (`cannotConnectToHost`).
+    ///
+    /// Being offline (`notConnectedToInternet`) or barred from cellular
+    /// data (`dataNotAllowed`, `internationalRoamingOff`) doesn't count:
+    /// URLSession also fails a request it already wrote with these when the
+    /// network drops mid-request. The server may have that request, so like
+    /// a lost connection (`networkConnectionLost`) they're left unmapped:
+    /// the outcome is unknown.
+    case notSent
+    /// The request ran out of time, on the server or on the way there. The
+    /// server may have finished anyway; deletion is idempotent, so retrying
+    /// completes it either way.
+    case timedOut
+    /// The server answered with something other than `{ success: true }`.
+    case unexpectedResponse
+}
+
 struct CloudFunctions: CloudFunctionsProtocol {
     private let functions = Functions.functions()
+
+    private static let logger = Logger(subsystem: "com.Solomon.Treachery-iOS", category: "AccountDeletion")
 
     func createGame(
         gameMode: String,
@@ -190,4 +226,80 @@ struct CloudFunctions: CloudFunctionsProtocol {
         let callable = functions.httpsCallable("removeFriend")
         _ = try await callable.call(["friendId": friendId])
     }
+
+    // MARK: - Account
+
+    func deleteAccount() async throws {
+        // The SDK's default 70 s timeout is kept on purpose: it outlasts the
+        // function's own 60 s default, so the app normally hears the server's
+        // outcome instead of giving up while the server is still working.
+        let callable = functions.httpsCallable("deleteAccount")
+        let result: HTTPSCallableResult
+        do {
+            // No arguments: send `{}`, as the contract specifies, rather than null.
+            result = try await callable.call([String: Any]())
+        } catch {
+            guard let deletionError = AccountDeletionError(callableError: error) else { throw error }
+            if deletionError == .notSent {
+                // Several causes become notSent, from a failed DNS lookup to
+                // a keychain error getting the sign-in token, and only this
+                // log keeps which. The domain and code hold no personal data,
+                // so they stay readable in a sysdiagnose; the rest is private.
+                let nsError = error as NSError
+                let cause = "\(nsError.domain) \(nsError.code)"
+                Self.logger.error("deleteAccount couldn't be sent (\(cause, privacy: .public)): \(String(describing: error), privacy: .private)")
+            }
+            throw deletionError
+        }
+        try Self.validateDeleteAccountResponse(result.data)
+    }
+
+    /// Accepts only an explicit `{ success: true }`, the one answer that means
+    /// the account is gone, and throws `AccountDeletionError.unexpectedResponse`
+    /// for anything else. The caller signs out on success, which must never
+    /// happen for an account that still exists.
+    static func validateDeleteAccountResponse(_ data: Any?) throws {
+        guard let payload = data as? [String: Any], payload["success"] as? Bool == true else {
+            throw AccountDeletionError.unexpectedResponse
+        }
+    }
+}
+
+extension AccountDeletionError {
+    /// Recognizes the callable errors the app tells apart: the server's
+    /// refusal during a live game (`failed-precondition`, whose localized
+    /// description is the server's message), a timeout
+    /// (`deadline-exceeded`, which the SDK also reports when the request
+    /// itself times out), and a request that never left this device.
+    /// Returns nil for any other error.
+    init?(callableError error: Error) {
+        let nsError = error as NSError
+        switch nsError.domain {
+        case FunctionsErrorDomain:
+            switch FunctionsErrorCode(rawValue: nsError.code) {
+            case .failedPrecondition:
+                self = .inProgressGame(message: nsError.localizedDescription)
+            case .deadlineExceeded:
+                self = .timedOut
+            default:
+                return nil
+            }
+        case AuthErrors.domain:
+            // The SDK gets the sign-in token before it builds the request.
+            self = .notSent
+        case NSURLErrorDomain where Self.noConnectionCodes.contains(URLError.Code(rawValue: nsError.code)):
+            self = .notSent
+        default:
+            return nil
+        }
+    }
+
+    /// The URL errors that come only before a connection to the server is
+    /// made, so before the request is written. See `notSent` for those left
+    /// out, and why.
+    private static let noConnectionCodes: Set<URLError.Code> = [
+        .cannotFindHost,
+        .dnsLookupFailed,
+        .cannotConnectToHost,
+    ]
 }

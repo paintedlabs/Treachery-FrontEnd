@@ -7,8 +7,11 @@
 
 import Foundation
 import FirebaseAuth
+import os
 
 struct FirebaseManager: AuthManaging {
+
+    private static let logger = Logger(subsystem: "com.Solomon.Treachery-iOS", category: "Auth")
 
     var currentUser: User? {
         Auth.auth().currentUser
@@ -70,6 +73,52 @@ struct FirebaseManager: AuthManaging {
     func removeAuthStateListener(_ handle: Any) {
         if let handle = handle as? AuthStateDidChangeListenerHandle {
             Auth.auth().removeStateDidChangeListener(handle)
+        }
+    }
+
+    // MARK: - Account Status
+
+    func reloadAccount(userId: String) async -> AccountStatus {
+        guard let user = Auth.auth().currentUser, user.uid == userId else {
+            Self.logger.notice("Not reloading the account: it is no longer the signed-in one")
+            return .unknown
+        }
+        do {
+            try await user.reload()
+            return .exists
+        } catch {
+            let nsError = error as NSError
+            Self.logger.notice("Reloading the account failed: \(nsError.domain, privacy: .public) \(nsError.code, privacy: .public)")
+            return AccountStatus(reloadError: error)
+        }
+    }
+}
+
+extension AccountStatus {
+    /// Classifies a failed `User.reload()`.
+    /// - Only the errors FirebaseAuth itself treats as the end of a session
+    ///   (`User.signOutIfTokenIsInvalid`) mean the account is gone.
+    /// - `keychainError` means the account exists: reload throws it only
+    ///   when saving the user locally fails, after the server has refreshed
+    ///   the account's token or returned its details.
+    /// - Anything else, such as being offline, says nothing about the
+    ///   account. Deliberately stricter than "create unless offline": a
+    ///   profile created for an account deleted elsewhere would bring its
+    ///   data back.
+    init(reloadError error: Error) {
+        let error = error as NSError
+        guard error.domain == AuthErrors.domain,
+              let code = AuthErrorCode(rawValue: error.code) else {
+            self = .unknown
+            return
+        }
+        switch code {
+        case .userNotFound, .userDisabled, .invalidUserToken, .userTokenExpired:
+            self = .gone
+        case .keychainError:
+            self = .exists
+        default:
+            self = .unknown
         }
     }
 }

@@ -7,6 +7,7 @@
 
 import Foundation
 import FirebaseFirestore
+import os
 
 /// Wraps a Firebase ListenerRegistration as a ListenerCancellable.
 private struct FirestoreListenerHandle: ListenerCancellable {
@@ -17,6 +18,8 @@ private struct FirestoreListenerHandle: ListenerCancellable {
 final class FirestoreManager: FirestoreManaging {
     private let db = Firestore.firestore()
 
+    private static let logger = Logger(subsystem: "com.Solomon.Treachery-iOS", category: "Profile")
+
     // MARK: - Collection References
 
     private var usersCollection: CollectionReference { db.collection("users") }
@@ -24,6 +27,21 @@ final class FirestoreManager: FirestoreManaging {
 
     private func playersCollection(gameId: String) -> CollectionReference {
         gamesCollection.document(gameId).collection("players")
+    }
+
+    // MARK: - List Reads
+
+    /// The documents of a list read whose empty answer a screen shows as
+    /// "none", such as "No games yet". Offline, Firestore answers a query
+    /// from the local cache, where an empty answer only means that nothing
+    /// was cached, so that throws `FirestoreReadError.nothingCachedOffline`
+    /// instead. A cached answer that isn't empty is returned: stale beats
+    /// blank.
+    private static func documents(of snapshot: QuerySnapshot) throws -> [QueryDocumentSnapshot] {
+        if snapshot.isEmpty && snapshot.metadata.isFromCache {
+            throw FirestoreReadError.nothingCachedOffline
+        }
+        return snapshot.documents
     }
 
     // MARK: - Users
@@ -45,13 +63,12 @@ final class FirestoreManager: FirestoreManaging {
         return publicData
     }
 
-    func createUser(_ user: TreacheryUser) async throws {
+    func createUser(_ user: TreacheryUser, email: String?, phoneNumber: String?) async throws {
         try await usersCollection.document(user.id).setData(publicUserData(user))
 
         var privateData: [String: Any] = [:]
-        if let email = user.email { privateData["email"] = email }
-        if let phone = user.phoneNumber { privateData["phone_number"] = phone }
-        if let fcm = user.fcmToken { privateData["fcm_token"] = fcm }
+        if let email { privateData["email"] = email }
+        if let phoneNumber { privateData["phone_number"] = phoneNumber }
         if !privateData.isEmpty {
             try await usersCollection.document(user.id)
                 .collection("private").document("data")
@@ -61,24 +78,67 @@ final class FirestoreManager: FirestoreManaging {
 
     func getUser(id: String) async throws -> TreacheryUser? {
         let snapshot = try await usersCollection.document(id).getDocument()
-        guard snapshot.exists else { return nil }
-        guard var user = try? snapshot.data(as: TreacheryUser.self) else { return nil }
-        user.id = snapshot.documentID
+        guard case .complete(let user) = userDocument(from: snapshot) else { return nil }
         return user
     }
 
-    func updateUser(_ user: TreacheryUser) async throws {
-        // Explicit field list rather than encoding the whole model: on a legacy
-        // doc that still holds PII, re-encoding echoes those values straight back
-        // onto the public doc. Rules allow it (an unchanged value is not in
-        // diff().affectedKeys(), so doesNotWritePii() passes) — which is exactly
-        // why the allowlist has to do the withholding.
-        //
-        // Deliberately not awaited: the completion handler for a write does not
-        // fire while the client is offline, so awaiting it would wedge the
-        // Profile and onboarding rename screens on their spinner until the
-        // network came back. The local write applies immediately regardless.
-        usersCollection.document(user.id).setData(publicUserData(user), merge: true, completion: nil)
+    func getUserDocument(id: String) async throws -> UserDocument {
+        let snapshot = try await usersCollection.document(id).getDocument(source: .server)
+        return userDocument(from: snapshot)
+    }
+
+    func repairUserProfile(id: String, with repair: ProfileRepair) async throws {
+        var fields: [String: Any] = [:]
+        if let displayName = repair.displayName { fields[ProfileField.displayName.rawValue] = displayName }
+        if let createdAt = repair.createdAt { fields[ProfileField.createdAt.rawValue] = Timestamp(date: createdAt) }
+        if let elo = repair.elo { fields[ProfileField.elo.rawValue] = elo }
+        guard !fields.isEmpty else { return }
+        // updateData, not setData(merge:): it fails instead of creating the
+        // document if the profile was deleted after it was read.
+        try await usersCollection.document(id).updateData(fields)
+    }
+
+    func updateDisplayName(_ name: String, forUserId userId: String) async throws {
+        // One field, never a copy of the whole profile: elo, deck_stats and
+        // friend_ids change on the server, and writing them back from an
+        // earlier read would roll them back. An update also never creates the
+        // document, so a rename still queued when the account is deleted
+        // can't bring the profile back.
+        try await usersCollection.document(userId).updateData([ProfileField.displayName.rawValue: name])
+    }
+
+    private func userDocument(from snapshot: DocumentSnapshot) -> UserDocument {
+        Self.userDocument(fromData: snapshot.data(), id: snapshot.documentID)
+    }
+
+    /// Sorts the fields of a `users/{uid}` document into the states
+    /// provisioning tells apart, logging any document that isn't a complete
+    /// profile. Only `.missing` may lead to a new profile, so a document
+    /// that exists is never reported as missing, however broken it is.
+    /// - Parameters:
+    ///   - data: The document's fields, or nil when there is no document.
+    ///   - id: The document id, which becomes the profile's `id`.
+    static func userDocument(fromData data: [String: Any]?, id: String) -> UserDocument {
+        guard let data else { return .missing }
+
+        let missingFields = Set(ProfileField.allCases.filter { field in
+            guard let value = data[field.rawValue] else { return true }
+            return value is NSNull
+        })
+        if missingFields.contains(.displayName) || missingFields.contains(.createdAt) {
+            logger.notice("Profile \(id, privacy: .private) lacks display_name or created_at")
+            return .incomplete(missingFields: missingFields)
+        }
+
+        do {
+            // What `DocumentSnapshot.data(as:)` does with the same fields.
+            var user = try Firestore.Decoder().decode(TreacheryUser.self, from: data)
+            user.id = id
+            return .complete(user)
+        } catch {
+            logger.error("Profile \(id, privacy: .private) can't be decoded: \(String(describing: error), privacy: .private)")
+            return .undecodable
+        }
     }
 
     func searchUsers(byDisplayName name: String) async throws -> [TreacheryUser] {
@@ -88,7 +148,7 @@ final class FirestoreManager: FirestoreManaging {
             .whereField("display_name", isLessThan: end)
             .limit(to: 20)
             .getDocuments()
-        return snapshot.documents.compactMap { doc -> TreacheryUser? in
+        return try Self.documents(of: snapshot).compactMap { doc -> TreacheryUser? in
             guard var user = try? doc.data(as: TreacheryUser.self) else { return nil }
             user.id = doc.documentID
             return user
@@ -138,32 +198,56 @@ final class FirestoreManager: FirestoreManaging {
     }
 
     func getFriends(forUserId userId: String) async throws -> [TreacheryUser] {
-        guard let user = try await getUser(id: userId) else { return [] }
+        // Without the profile there's no friends list to read, which is not
+        // the same as having no friends.
+        guard let user = try await getUser(id: userId) else { throw FirestoreReadError.profileUnavailable }
         guard !user.friendIds.isEmpty else { return [] }
 
-        // Run all batch queries in parallel
+        // One read per 30 ids, the most an `in` filter takes, all in parallel.
         let chunks = stride(from: 0, to: user.friendIds.count, by: 30).map { start in
             Array(user.friendIds[start..<min(start + 30, user.friendIds.count)])
         }
 
-        let friends = try await withThrowingTaskGroup(of: [TreacheryUser].self) { group in
+        let reads = try await withThrowingTaskGroup(of: FriendsRead.self) { group in
             for ids in chunks {
                 group.addTask {
                     let snapshot = try await self.usersCollection
                         .whereField(FieldPath.documentID(), in: ids)
                         .getDocuments()
-                    return snapshot.documents.compactMap { doc -> TreacheryUser? in
+                    let friends = snapshot.documents.compactMap { doc -> TreacheryUser? in
                         guard var user = try? doc.data(as: TreacheryUser.self) else { return nil }
                         user.id = doc.documentID
                         return user
                     }
+                    return FriendsRead(friends: friends, isFromCache: snapshot.metadata.isFromCache)
                 }
             }
-            var result: [TreacheryUser] = []
-            for try await batch in group {
-                result += batch
+            var reads: [FriendsRead] = []
+            for try await read in group {
+                reads.append(read)
             }
-            return result
+            return reads
+        }
+        return try Self.friends(from: reads)
+    }
+
+    /// One of `getFriends`' reads, for up to 30 of the user's friends.
+    struct FriendsRead: Sendable {
+        let friends: [TreacheryUser]
+        /// Whether the answer came from the local cache, as it does offline.
+        let isFromCache: Bool
+    }
+
+    /// The friends `getFriends`' reads found, by name. The list-read rule
+    /// (`documents(of:)`) applies to the reads together, not one by one: with
+    /// more than 30 friends, a read that found none of its friends cached
+    /// doesn't hide the friends the other reads found. Only when no read
+    /// found any, and at least one answered from the cache, does this throw
+    /// `FirestoreReadError.nothingCachedOffline`.
+    static func friends(from reads: [FriendsRead]) throws -> [TreacheryUser] {
+        let friends = reads.flatMap(\.friends)
+        if friends.isEmpty && reads.contains(where: \.isFromCache) {
+            throw FirestoreReadError.nothingCachedOffline
         }
         return friends.sorted { $0.displayName < $1.displayName }
     }
@@ -242,7 +326,7 @@ final class FirestoreManager: FirestoreManaging {
             .order(by: "created_at", descending: true)
             .limit(to: 50)
             .getDocuments()
-        return snapshot.documents.compactMap { doc -> Game? in
+        return try Self.documents(of: snapshot).compactMap { doc -> Game? in
             guard var game = try? doc.data(as: Game.self) else { return nil }
             game.id = doc.documentID
             return game

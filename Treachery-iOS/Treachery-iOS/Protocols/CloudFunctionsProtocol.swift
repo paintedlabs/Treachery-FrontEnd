@@ -26,4 +26,15 @@ protocol CloudFunctionsProtocol {
     func updateGameSettings(gameId: String, maxPlayers: Int?, startingLife: Int?, gameMode: String?, maxTraitorRarity: String?) async throws
     func acceptFriendRequest(requestId: String) async throws
     func removeFriend(friendId: String) async throws
+    /// Permanently deletes the signed-in user's account and data on the
+    /// server. Returns only once the server confirms. Throws
+    /// `AccountDeletionError.inProgressGame` while the user is in a game that
+    /// is still in progress, `.notSent` only when the request certainly never
+    /// left this device (see `AccountDeletionError.notSent`: Auth token
+    /// failures and DNS or connect failures, not being offline), `.timedOut`
+    /// when it ran out of time, and `.unexpectedResponse` when the call
+    /// returns a result other than `{ success: true }`. Any other error,
+    /// including the server's own error answers, leaves the outcome unknown.
+    /// Safe to retry: the server side is idempotent.
+    func deleteAccount() async throws
 }

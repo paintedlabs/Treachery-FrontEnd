@@ -19,6 +19,16 @@ struct PhoneAuthView: View {
     private var isCodeStep: Bool { verificationID != nil }
 
     var body: some View {
+        // Scrolls when the form is taller than the screen, as at the
+        // largest text sizes.
+        FullHeightScrollView {
+            form
+        }
+        .mtgBackground()
+        .navigationBarBackButtonHidden(isLoading)
+    }
+
+    private var form: some View {
         VStack(alignment: .center, spacing: 16) {
             Spacer()
 
@@ -37,23 +47,38 @@ struct PhoneAuthView: View {
                 .multilineTextAlignment(.center)
 
             if let error = authViewModel.errorMessage {
-                MtgErrorBanner(message: error)
+                FailureMessage(message: error)
             }
 
             if !isCodeStep {
-                // Phone number entry
-                TextField("Phone number (e.g. +15551234567)", text: $phoneNumber)
-                    .textContentType(.telephoneNumber)
-                    .keyboardType(.phonePad)
-                    .padding()
-                    .background(Color.mtgSurface)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 8)
-                            .stroke(Color.mtgDivider, lineWidth: 1)
-                    )
-                    .cornerRadius(8)
-                    .foregroundStyle(Color.mtgTextPrimary)
-                    .disabled(isLoading)
+                // Phone number entry. The format goes under the field, where
+                // it wraps: as part of the placeholder it was cut off at the
+                // larger text sizes, and gone once typing started. The name
+                // goes above the field at the accessibility sizes.
+                VStack(alignment: .leading, spacing: 6) {
+                    LabeledField("Phone number") { placeholder in
+                        TextField("Phone number", text: $phoneNumber, prompt: placeholder)
+                            .textContentType(.telephoneNumber)
+                            .keyboardType(.phonePad)
+                            .padding()
+                            .background(Color.mtgSurface)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 8)
+                                    .stroke(Color.mtgDivider, lineWidth: 1)
+                            )
+                            .cornerRadius(8)
+                            .foregroundStyle(Color.mtgTextPrimary)
+                            .disabled(isLoading)
+                    }
+
+                    Text("Include your country code, like +15551234567.")
+                        .font(.footnote)
+                        .foregroundStyle(Color.mtgTextSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        // Grouped, so VoiceOver reads the number in parts.
+                        .accessibilityLabel("Include your country code, like +1 555 123 4567.")
+                }
 
                 Button {
                     sendCode()
@@ -103,18 +128,26 @@ struct PhoneAuthView: View {
                 .buttonStyle(MtgPrimaryButtonStyle(isDisabled: isLoading))
                 .disabled(isLoading)
 
-                Button("Use a different number") {
+                Button {
                     verificationID = nil
                     verificationCode = ""
                     authViewModel.errorMessage = nil
+                } label: {
+                    Text("Use a different number")
+                        .frame(minHeight: 44)
+                        .contentShape(Rectangle())
                 }
                 .font(.subheadline)
                 .foregroundStyle(Color.mtgGold)
                 .disabled(isLoading)
             }
 
-            Button("Back to Sign In") {
+            Button {
                 dismiss()
+            } label: {
+                Text("Back to Sign In")
+                    .frame(minHeight: 44)
+                    .contentShape(Rectangle())
             }
             .font(.subheadline)
             .foregroundStyle(Color.mtgGold)
@@ -123,15 +156,15 @@ struct PhoneAuthView: View {
             Spacer()
         }
         .padding()
-        .mtgBackground()
-        .navigationBarBackButtonHidden(isLoading)
     }
 
     private func sendCode() {
         let formatted = phoneNumber.trimmingCharacters(in: .whitespaces)
         let number = formatted.hasPrefix("+") ? formatted : "+1\(formatted)"
+        // Each failure appears above the form, away from the button.
         guard number.count >= 10 else {
             authViewModel.errorMessage = "Please enter a valid phone number."
+            FailureMessage.announce(authViewModel.errorMessage)
             return
         }
 
@@ -140,6 +173,7 @@ struct PhoneAuthView: View {
             let id = await authViewModel.verifyPhoneNumber(number)
             verificationID = id
             isLoading = false
+            FailureMessage.announce(authViewModel.errorMessage)
         }
     }
 
@@ -149,6 +183,7 @@ struct PhoneAuthView: View {
         Task {
             await authViewModel.signInWithPhoneCode(verificationID: id, code: verificationCode)
             isLoading = false
+            FailureMessage.announce(authViewModel.errorMessage)
         }
     }
 }

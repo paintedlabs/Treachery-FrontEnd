@@ -18,6 +18,16 @@ struct SignUpView: View {
     @State private var localError: String?
 
     var body: some View {
+        // Scrolls when the form is taller than the screen, as at the
+        // largest text sizes.
+        FullHeightScrollView {
+            form
+        }
+        .mtgBackground()
+        .navigationBarBackButtonHidden(isLoading)
+    }
+
+    private var form: some View {
         VStack(alignment: .center, spacing: 16) {
             Spacer()
 
@@ -33,47 +43,55 @@ struct SignUpView: View {
                 .foregroundStyle(Color.mtgTextSecondary)
 
             if let error = localError ?? authViewModel.errorMessage {
-                MtgErrorBanner(message: error)
+                FailureMessage(message: error)
             }
 
-            TextField("Email", text: $email)
-                .textContentType(.emailAddress)
-                .keyboardType(.emailAddress)
-                .autocapitalization(.none)
-                .disableAutocorrection(true)
-                .padding()
-                .background(Color.mtgSurface)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 8)
-                        .stroke(Color.mtgDivider, lineWidth: 1)
-                )
-                .cornerRadius(8)
-                .foregroundStyle(Color.mtgTextPrimary)
-                .disabled(isLoading)
+            // Each field's name goes above it at the accessibility text
+            // sizes, where "Confirm Password" no longer fits as a placeholder.
+            LabeledField("Email") { placeholder in
+                TextField("Email", text: $email, prompt: placeholder)
+                    .textContentType(.emailAddress)
+                    .keyboardType(.emailAddress)
+                    .autocapitalization(.none)
+                    .disableAutocorrection(true)
+                    .padding()
+                    .background(Color.mtgSurface)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 8)
+                            .stroke(Color.mtgDivider, lineWidth: 1)
+                    )
+                    .cornerRadius(8)
+                    .foregroundStyle(Color.mtgTextPrimary)
+                    .disabled(isLoading)
+            }
 
-            SecureField("Password", text: $password)
-                .textContentType(.newPassword)
-                .padding()
-                .background(Color.mtgSurface)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 8)
-                        .stroke(Color.mtgDivider, lineWidth: 1)
-                )
-                .cornerRadius(8)
-                .foregroundStyle(Color.mtgTextPrimary)
-                .disabled(isLoading)
+            LabeledField("Password") { placeholder in
+                SecureField("Password", text: $password, prompt: placeholder)
+                    .textContentType(.newPassword)
+                    .padding()
+                    .background(Color.mtgSurface)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 8)
+                            .stroke(Color.mtgDivider, lineWidth: 1)
+                    )
+                    .cornerRadius(8)
+                    .foregroundStyle(Color.mtgTextPrimary)
+                    .disabled(isLoading)
+            }
 
-            SecureField("Confirm Password", text: $confirmPassword)
-                .textContentType(.newPassword)
-                .padding()
-                .background(Color.mtgSurface)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 8)
-                        .stroke(Color.mtgDivider, lineWidth: 1)
-                )
-                .cornerRadius(8)
-                .foregroundStyle(Color.mtgTextPrimary)
-                .disabled(isLoading)
+            LabeledField("Confirm Password") { placeholder in
+                SecureField("Confirm Password", text: $confirmPassword, prompt: placeholder)
+                    .textContentType(.newPassword)
+                    .padding()
+                    .background(Color.mtgSurface)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 8)
+                            .stroke(Color.mtgDivider, lineWidth: 1)
+                    )
+                    .cornerRadius(8)
+                    .foregroundStyle(Color.mtgTextPrimary)
+                    .disabled(isLoading)
+            }
 
             Button {
                 signUp()
@@ -92,8 +110,13 @@ struct SignUpView: View {
             .buttonStyle(MtgPrimaryButtonStyle(isDisabled: isLoading))
             .disabled(isLoading)
 
-            Button("Already have an account? Sign In") {
+            Button {
                 dismiss()
+            } label: {
+                Text("Already have an account? Sign In")
+                    .multilineTextAlignment(.center)
+                    .frame(minHeight: 44)
+                    .contentShape(Rectangle())
             }
             .font(.subheadline)
             .foregroundStyle(Color.mtgGold)
@@ -102,8 +125,6 @@ struct SignUpView: View {
             Spacer()
         }
         .padding()
-        .mtgBackground()
-        .navigationBarBackButtonHidden(isLoading)
     }
 
     private func signUp() {
@@ -112,12 +133,15 @@ struct SignUpView: View {
 
         guard !email.isEmpty, !password.isEmpty else { return }
 
+        // Each failure appears above the form, away from Create Account.
         guard password == confirmPassword else {
             localError = "Passwords do not match."
+            FailureMessage.announce(localError)
             return
         }
         guard password.count >= 6 else {
             localError = "Password must be at least 6 characters."
+            FailureMessage.announce(localError)
             return
         }
 
@@ -125,6 +149,7 @@ struct SignUpView: View {
         Task {
             await authViewModel.signUp(email: email, password: password)
             isLoading = false
+            FailureMessage.announce(authViewModel.errorMessage)
         }
     }
 }

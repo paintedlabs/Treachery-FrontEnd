@@ -25,10 +25,27 @@ struct RootView: View {
                     }
                 }
             case .authenticated:
-                if authViewModel.isNewUser {
-                    OnboardingFlow()
-                } else {
+                // The name prompt covers the tabs rather than replacing them:
+                // a profile set up late, by a retry, can need a name while a
+                // game is open, and replacing the tabs would close it. So
+                // the tabs stay as they were, and Profile and Friends load
+                // again once the setup is finished.
+                ZStack {
                     HomeView()
+                        .accessibilityHidden(authViewModel.isNewUser)
+                    if authViewModel.isNewUser {
+                        OnboardingFlow()
+                            // Modal, as AccountDeletionOverlay is: VoiceOver
+                            // stays in the prompt, out of the tabs beneath.
+                            .accessibilityElement(children: .contain)
+                            .accessibilityAddTraits(.isModal)
+                            // A field focused in the tabs, such as Friends'
+                            // search, would keep the keyboard, and what's
+                            // typed would go where no one can see it.
+                            .onAppear {
+                                UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+                            }
+                    }
                 }
             case .unauthenticated:
                 NavigationStack {
@@ -37,7 +54,16 @@ struct RootView: View {
             }
         }
         .preferredColorScheme(.dark)
+        // Back in the app, the connection may be back too, so a postponed
+        // profile setup tries again now rather than at its next retry.
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active {
+                authViewModel.retryPostponedProfileSetup()
+            }
+        }
     }
+
+    @Environment(\.scenePhase) private var scenePhase
 }
 
 // MARK: - Onboarding Flow

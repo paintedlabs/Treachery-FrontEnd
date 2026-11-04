@@ -145,10 +145,9 @@ class AuthViewModel @Inject constructor(
         return try {
             val existingUser = firestoreRepository.getUser(user.uid)
             if (existingUser == null) {
-                val displayName = user.displayName ?: user.email ?: "Guest"
                 val newUser = TreacheryUser(
                     id = user.uid,
-                    displayName = displayName,
+                    displayName = initialDisplayName(user.displayName, user.isAnonymous),
                     email = user.email,
                     phoneNumber = user.phoneNumber,
                     friendIds = emptyList(),
@@ -165,3 +164,15 @@ class AuthViewModel @Inject constructor(
         }
     }
 }
+
+/**
+ * The public name a new profile starts with until the user picks one: the
+ * Auth display name if the account has one, else "Guest" or "Player".
+ *
+ * Never the email or phone number: every signed-in user can read
+ * `users/{uid}`, and the name is copied into lobbies and notifications. The
+ * name prompt still offers the email's local part, which the user sees and
+ * can edit before saving.
+ */
+internal fun initialDisplayName(authDisplayName: String?, isAnonymous: Boolean): String =
+    authDisplayName?.trim()?.takeIf { it.isNotEmpty() } ?: if (isAnonymous) "Guest" else "Player"

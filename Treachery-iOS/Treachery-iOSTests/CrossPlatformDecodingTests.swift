@@ -230,7 +230,7 @@ struct CrossPlatformUserDecodingTests {
         """.utf8)
         let user = try decoder.decode(TreacheryUser.self, from: json)
         #expect(user.id == "")
-        #expect(user.phoneNumber == "+15551234567")
+        #expect(user.elo == 1550)
         #expect(user.friendIds == ["f1", "f2"])
         #expect(user.deckStats?["Krenko"]?.wins == 5)
     }
