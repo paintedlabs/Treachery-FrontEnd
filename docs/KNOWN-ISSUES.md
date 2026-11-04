@@ -81,9 +81,9 @@ Not all individually test-encoded; from the audit report.
 - Planar die cost displays the previous roller's count, not the caller's actual (often free) cost
 - ~~Stale/deleted game link → infinite spinner with the web back button trapped~~
   — **fixed** (web): a game the server reports missing on first load gets the
-  board's *Game Unavailable* or the lobby's closed notice, each with a way
-  Home (`e2e/deleted-game.spec.ts`). Android's `LobbyViewModel` and
-  `GameBoardViewModel` still count a missing game only after a first snapshot
+  board's or results screen's *Game Unavailable*, or the lobby's closed notice,
+  each with a way Home (`e2e/deleted-game.spec.ts`). Android's `LobbyViewModel`
+  and `GameBoardViewModel` still count a missing game only after a first snapshot
 - Client-side game-code generation is check-then-act racy; duplicate codes make one game unjoinable by code (**fixed** for createGame callable path)
 - New-user onboarding skippable via a `createUserDocumentIfNeeded` double-invocation race
 - `useConnectionStatus` watches only `navigator.onLine`, never Firestore sync state

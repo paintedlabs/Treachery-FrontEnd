@@ -4,6 +4,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '@/hooks/useAuth';
 import { useGameBoard } from '@/hooks/useGameBoard';
+import { GameUnavailableScreen } from '@/components/GameUnavailableScreen';
 import { LoadingScreen } from '@/components/LoadingScreen';
 import { ROLE_COLORS, ROLE_DISPLAY_NAMES } from '@/constants/roles';
 import { colors, spacing, fonts, contentMaxWidths } from '@/constants/theme';
@@ -17,10 +18,16 @@ export default function GameOverScreen() {
   const { currentUserId } = useAuth();
 
   const { isDesktop } = useResponsive();
-  const { game, players, winningTeam, isGameFinished } = useGameBoard(
+  const { game, players, winningTeam, isGameFinished, isGameUnavailable } = useGameBoard(
     gameId!,
     currentUserId,
   );
+
+  // A deleted game's players can never load (their read rule checks the
+  // game doc), so without this its link would stay on the spinner below.
+  if (isGameUnavailable) {
+    return <GameUnavailableScreen onReturnHome={() => router.replace('/(app)')} />;
+  }
 
   if (players.length === 0) {
     return <LoadingScreen message="Loading results..." />;
