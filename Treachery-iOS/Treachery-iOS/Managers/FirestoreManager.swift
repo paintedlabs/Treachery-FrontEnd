@@ -250,36 +250,31 @@ final class FirestoreManager: FirestoreManaging {
     }
 
     func listenToGame(id: String, onChange: @escaping @MainActor (DocumentEvent<Game>) -> Void) -> ListenerCancellable {
-        // A "doesn't exist" read from the local cache isn't proof the game is
-        // gone: we may be offline, or have never cached it. gameEvent skips
-        // those, so the server has to confirm. When it does, often only the
-        // snapshot's metadata changes (isFromCache flips), and without
-        // includeMetadataChanges Firestore wouldn't deliver that at all.
         let reg = gamesCollection.document(id)
-            .addSnapshotListener(includeMetadataChanges: true) { snapshot, error in
-                guard let event = Self.gameEvent(snapshot: snapshot, error: error) else { return }
+            .addSnapshotListener(includeMetadataChanges: Self.gameListenerIncludesMetadataChanges) { snapshot, error in
+                let event: DocumentEvent<Game>?
+                if let error {
+                    event = .failed(.listenerStopped(error))
+                } else if let snapshot {
+                    event = Self.gameEvent(
+                        exists: snapshot.exists,
+                        isFromCache: snapshot.metadata.isFromCache,
+                        hasPendingWrites: snapshot.metadata.hasPendingWrites,
+                        decoded: Result {
+                            var game = try snapshot.data(as: Game.self)
+                            game.id = snapshot.documentID
+                            return game
+                        }
+                    )
+                } else {
+                    event = nil
+                }
+                guard let event else { return }
                 // Firestore calls listeners on the main queue, its default;
                 // this app never sets FirestoreSettings.dispatchQueue.
                 MainActor.assumeIsolated { onChange(event) }
             }
         return FirestoreListenerHandle(registration: reg)
-    }
-
-    /// Turns one game listener callback into a DocumentEvent, or nil when
-    /// there's nothing to report yet (a cache-only miss).
-    private static func gameEvent(snapshot: DocumentSnapshot?, error: Error?) -> DocumentEvent<Game>? {
-        if let error { return .failed(.listenerStopped(error)) }
-        guard let snapshot else { return nil }
-        guard snapshot.exists else {
-            return snapshot.metadata.isFromCache ? nil : .missing
-        }
-        do {
-            var game = try snapshot.data(as: Game.self)
-            game.id = snapshot.documentID
-            return .loaded(game)
-        } catch {
-            return .failed(.unreadable(error))
-        }
     }
 
     // MARK: - Players
@@ -318,29 +313,25 @@ final class FirestoreManager: FirestoreManaging {
         let reg = playersCollection(gameId: gameId)
             .order(by: "order_id")
             .addSnapshotListener { snapshot, error in
-                guard let result = Self.playersResult(snapshot: snapshot, error: error) else { return }
+                let result: Result<[Player], ListenerFailure>?
+                if let error {
+                    result = .failure(.listenerStopped(error))
+                } else if let snapshot {
+                    result = Self.playersResult(decoded: snapshot.documents.map { document in
+                        Result {
+                            var player = try document.data(as: Player.self)
+                            player.id = document.documentID
+                            return player
+                        }
+                    })
+                } else {
+                    result = nil
+                }
+                guard let result else { return }
                 // Main queue, as for listenToGame.
                 MainActor.assumeIsolated { onChange(result) }
             }
         return FirestoreListenerHandle(registration: reg)
-    }
-
-    /// One unreadable player makes the whole snapshot unreadable. Dropping
-    /// it would silently remove a seat from the board, with nothing to say
-    /// why; the screens ask for an update instead.
-    private static func playersResult(snapshot: QuerySnapshot?, error: Error?) -> Result<[Player], ListenerFailure>? {
-        if let error { return .failure(.listenerStopped(error)) }
-        guard let snapshot else { return nil }
-        do {
-            let players = try snapshot.documents.map { doc in
-                var player = try doc.data(as: Player.self)
-                player.id = doc.documentID
-                return player
-            }
-            return .success(players)
-        } catch {
-            return .failure(.unreadable(error))
-        }
     }
 
     // MARK: - Batch Updates
@@ -372,4 +363,61 @@ final class FirestoreManager: FirestoreManaging {
         }
     }
 
+}
+
+// MARK: - Listener Outcomes
+//
+// What each listener callback reports, decided over plain values so every
+// branch can be tested without the SDK's snapshot types. The listeners above
+// only take their snapshots apart for these.
+
+extension FirestoreManager {
+
+    /// Lets the game listener hear the server confirm a miss. That often
+    /// changes nothing but the snapshot's metadata (isFromCache flips), and
+    /// Firestore delivers such a change only to a listener that asks for
+    /// metadata changes. Without it, a screen opened on a game that's gone
+    /// would wait for the confirmation forever.
+    static let gameListenerIncludesMetadataChanges = true
+
+    /// What a game snapshot reports, or nil when there's nothing to report
+    /// yet.
+    ///
+    /// Only the server can say a game doesn't exist. A miss read from the
+    /// local cache isn't proof: the device may be offline, or have never
+    /// cached the game. Nor is one that shows this device's own write before
+    /// the server has acknowledged it.
+    ///
+    /// - Parameters:
+    ///   - exists: Whether the snapshot found the document.
+    ///   - isFromCache: Whether the snapshot came from the local cache alone.
+    ///   - hasPendingWrites: Whether it shows writes from this device that
+    ///     the server hasn't acknowledged.
+    ///   - decoded: The document decoded as a game; read only when it exists.
+    static func gameEvent(
+        exists: Bool,
+        isFromCache: Bool,
+        hasPendingWrites: Bool,
+        decoded: @autoclosure () -> Result<Game, any Error>
+    ) -> DocumentEvent<Game>? {
+        guard exists else {
+            return isFromCache || hasPendingWrites ? nil : .missing
+        }
+        switch decoded() {
+        case .success(let game): return .loaded(game)
+        case .failure(let error): return .failed(.unreadable(error))
+        }
+    }
+
+    /// What a players snapshot reports: every player, in order, or
+    /// unreadable when any one of them can't be decoded. Dropping that one
+    /// would silently remove a seat from the board, with nothing to say why;
+    /// the screens ask for an update instead.
+    static func playersResult(decoded: [Result<Player, any Error>]) -> Result<[Player], ListenerFailure> {
+        do {
+            return .success(try decoded.map { try $0.get() })
+        } catch {
+            return .failure(.unreadable(error))
+        }
+    }
 }
