@@ -61,6 +61,20 @@ console edits. The change loop:
    `cd firestore-tests && npm test` (~3s)
 3. Merge — the staging workflow deploys rules to the shared project
 
+## Local development
+
+```bash
+# Web app against local emulators (auth, firestore, functions):
+cd Treachery
+npm run web            # expo dev server; set EXPO_PUBLIC_USE_EMULATOR=true
+
+# Or a full emulator-backed built app + 4 signed-in players:
+npm run playtest       # see docs/TESTING.md
+```
+
+Manual deploys (`firebase deploy ...`) work as a fallback but the workflows
+are the normal path; prefer merging to `main` so CI gates the change.
+
 ## Scheduled cleanup and its indexes
 
 `cleanupStaleGames` (`functions/src/triggers.js`) runs every hour and deletes
@@ -92,17 +106,3 @@ swept since the job shipped in March 2026. After that deploy:
    `cleanupStaleGames: skipped "<state>" games this run:` with the query and
    Firestore's error (for a missing index, a console link that creates it),
    and the run is marked failed; the other state is still swept.
-
-## Local development
-
-```bash
-# Web app against local emulators (auth, firestore, functions):
-cd Treachery
-npm run web            # expo dev server; set EXPO_PUBLIC_USE_EMULATOR=true
-
-# Or a full emulator-backed built app + 4 signed-in players:
-npm run playtest       # see docs/TESTING.md
-```
-
-Manual deploys (`firebase deploy ...`) work as a fallback but the workflows
-are the normal path; prefer merging to `main` so CI gates the change.
