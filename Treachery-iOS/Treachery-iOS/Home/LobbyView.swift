@@ -15,6 +15,7 @@ struct LobbyView: View {
     @State private var showShareSheet = false
     @State private var showColorPicker = false
     @State private var isConfirmingHostLeave = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     init(gameId: String, isHost: Bool, navigationPath: Binding<NavigationPath>) {
         _viewModel = StateObject(wrappedValue: LobbyViewModel(gameId: gameId, isHost: isHost))
@@ -415,7 +416,7 @@ struct LobbyView: View {
                                 Task { await viewModel.saveCommanderName() }
                             }
                         )
-                        .transition(.asymmetric(
+                        .transition(reduceMotion ? .opacity : .asymmetric(
                             insertion: .move(edge: .trailing).combined(with: .opacity),
                             removal: .opacity
                         ))

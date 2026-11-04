@@ -34,6 +34,7 @@ struct GameOverView: View {
     @ScaledMetric(relativeTo: .largeTitle) private var summaryTitleSize: CGFloat = 36
     @ScaledMetric(relativeTo: .title) private var inProgressTitleSize: CGFloat = 28
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         ZStack {
@@ -79,8 +80,12 @@ struct GameOverView: View {
         .onAppear {
             AnalyticsService.trackScreen("GameOver")
             viewModel.currentUserId = authViewModel.currentUserId
-            withAnimation(.spring(response: 0.6, dampingFraction: 0.6).delay(0.2)) {
-                trophyScale = 1.0
+            // With Reduce Motion the trophy is simply there; the rest still
+            // fades in.
+            if !reduceMotion {
+                withAnimation(.spring(response: 0.6, dampingFraction: 0.6).delay(0.2)) {
+                    trophyScale = 1.0
+                }
             }
             withAnimation(.easeOut(duration: 0.5).delay(0.4)) {
                 contentOpacity = 1.0
@@ -181,7 +186,7 @@ struct GameOverView: View {
                     .foregroundStyle(winningTeam.color)
                     .shadow(color: winningTeam.color.opacity(0.5), radius: 16, x: 0, y: 0)
                     .shadow(color: winningTeam.color.opacity(0.3), radius: 32, x: 0, y: 0)
-                    .scaleEffect(trophyScale)
+                    .scaleEffect(reduceMotion ? 1 : trophyScale)
 
                 Text("Game Over")
                     .font(.system(size: titleSize, weight: .bold, design: .serif))
@@ -301,7 +306,7 @@ struct GameOverView: View {
                 .font(.system(size: symbolSize))
                 .foregroundStyle(Color.mtgGold)
                 .shadow(color: Color.mtgGold.opacity(0.4), radius: 16, x: 0, y: 0)
-                .scaleEffect(trophyScale)
+                .scaleEffect(reduceMotion ? 1 : trophyScale)
 
             Text("Game Over")
                 .font(.system(size: summaryTitleSize, weight: .bold, design: .serif))

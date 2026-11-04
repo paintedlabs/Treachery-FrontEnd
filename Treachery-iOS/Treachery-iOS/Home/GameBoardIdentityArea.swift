@@ -11,6 +11,7 @@ struct GameBoardIdentityArea: View {
     @ObservedObject var viewModel: GameBoardViewModel
     let onShowCard: () -> Void
     let onGoHome: () -> Void
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         switch viewModel.identityArea {
@@ -24,11 +25,14 @@ struct GameBoardIdentityArea: View {
                     IdentityCardHeader(card: card, player: player)
                 }
                 .buttonStyle(.plain)
+                // The header turns edge-on, then back face-up. With Reduce
+                // Motion it fades out and back in instead.
                 .rotation3DEffect(
-                    .degrees(viewModel.unveilProgress == .flippingAway ? 90 : 0),
+                    .degrees(!reduceMotion && viewModel.unveilProgress == .flippingAway ? 90 : 0),
                     axis: (x: 0, y: 1, z: 0),
                     perspective: 0.5
                 )
+                .opacity(reduceMotion && viewModel.unveilProgress == .flippingAway ? 0 : 1)
                 .animation(
                     viewModel.unveilProgress == .flippingAway ? .easeIn(duration: 0.3) : .easeOut(duration: 0.3),
                     value: viewModel.unveilProgress
@@ -50,12 +54,12 @@ struct GameBoardIdentityArea: View {
                                     .shadow(color: (player.role?.color ?? Color.mtgGuardian).opacity(0.6), radius: 12)
                             )
                     }
-                    .transition(.scale.combined(with: .opacity))
+                    .transition(reduceMotion ? .opacity : .scale.combined(with: .opacity))
                     .zIndex(1)
                 }
             }
             .animation(
-                viewModel.unveilProgress == .revealing
+                viewModel.unveilProgress == .revealing && !reduceMotion
                     ? .spring(response: 0.4, dampingFraction: 0.6)
                     : .easeOut(duration: 0.5),
                 value: viewModel.unveilProgress

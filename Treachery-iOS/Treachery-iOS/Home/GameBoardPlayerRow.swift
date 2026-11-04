@@ -11,6 +11,7 @@ struct GameBoardPlayerRow: View {
     @Binding var showColorPicker: Bool
     var onViewCard: ((Player) -> Void)?
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private var isCurrentUser: Bool {
         player.userId == viewModel.currentUserId
@@ -64,7 +65,7 @@ struct GameBoardPlayerRow: View {
                     Task { await viewModel.updatePlayerColor(hex) }
                 }
                 .padding(.top, 8)
-                .transition(.asymmetric(
+                .transition(reduceMotion ? .opacity : .asymmetric(
                     insertion: .move(edge: .top).combined(with: .opacity),
                     removal: .opacity
                 ))
@@ -221,8 +222,10 @@ struct GameBoardPlayerRow: View {
                     .foregroundStyle(Color.mtgTextPrimary)
                     .frame(minWidth: 52)
                     .multilineTextAlignment(.center)
-                    .contentTransition(.numericText())
-                    .animation(.spring(response: 0.3, dampingFraction: 0.6), value: player.lifeTotal)
+                    // Rolling digits and a spring, or with Reduce Motion a
+                    // cross-fade.
+                    .contentTransition(reduceMotion ? .opacity : .numericText())
+                    .animation(reduceMotion ? .easeInOut(duration: 0.2) : .spring(response: 0.3, dampingFraction: 0.6), value: player.lifeTotal)
 
                 Button {
                     viewModel.adjustLife(for: player.id, by: 1)

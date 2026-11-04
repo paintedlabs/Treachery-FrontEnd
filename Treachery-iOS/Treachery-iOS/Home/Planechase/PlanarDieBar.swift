@@ -9,13 +9,14 @@ import SwiftUI
 /// and last roller info.
 struct PlanarDieBar: View {
     @ObservedObject var viewModel: GameBoardViewModel
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         VStack(spacing: 8) {
             // Die result display
             if let result = viewModel.dieRollResult {
                 dieResultView(result: result)
-                    .transition(.scale.combined(with: .opacity))
+                    .transition(reduceMotion ? .opacity : .scale.combined(with: .opacity))
             }
 
             HStack(spacing: 16) {
@@ -78,7 +79,7 @@ struct PlanarDieBar: View {
                 .frame(height: 1),
             alignment: .top
         )
-        .animation(.spring(response: 0.4, dampingFraction: 0.7), value: viewModel.dieRollResult)
+        .animation(reduceMotion ? .easeInOut(duration: 0.2) : .spring(response: 0.4, dampingFraction: 0.7), value: viewModel.dieRollResult)
     }
 
     /// Spectators can't roll, and nobody can while a roll is under way.
@@ -94,7 +95,8 @@ struct PlanarDieBar: View {
             dieIcon(for: result)
                 .font(.title)
                 .foregroundStyle(dieColor(for: result))
-                .symbolEffect(.bounce, value: result)
+                // A value that never changes never bounces.
+                .symbolEffect(.bounce, value: reduceMotion ? nil : result)
 
             Text(dieLabel(for: result))
                 .font(.system(.headline, design: .serif))

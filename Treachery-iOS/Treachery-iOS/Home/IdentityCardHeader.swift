@@ -8,6 +8,7 @@ import SwiftUI
 struct IdentityCardHeader: View {
     let card: IdentityCard
     let player: Player
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     /// Leaders are always face-up; unveiled players show openly; face-down cards (from ability swaps) stay hidden.
     private var isAlwaysVisible: Bool {
@@ -41,7 +42,7 @@ struct IdentityCardHeader: View {
                     Text("\(player.lifeTotal)")
                         .font(.system(size: 28, weight: .bold, design: .serif))
                         .foregroundStyle(Color.mtgTextPrimary)
-                        .contentTransition(.numericText())
+                        .contentTransition(reduceMotion ? .opacity : .numericText())
                 }
             }
 
@@ -82,8 +83,8 @@ struct IdentityCardHeader: View {
                     Text("\(player.lifeTotal)")
                         .font(.system(size: 30, weight: .bold, design: .serif))
                         .foregroundStyle(Color.mtgTextPrimary)
-                        .contentTransition(.numericText())
-                        .animation(.spring(response: 0.3, dampingFraction: 0.6), value: player.lifeTotal)
+                        .contentTransition(reduceMotion ? .opacity : .numericText())
+                        .animation(reduceMotion ? .easeInOut(duration: 0.2) : .spring(response: 0.3, dampingFraction: 0.6), value: player.lifeTotal)
                 }
             }
 

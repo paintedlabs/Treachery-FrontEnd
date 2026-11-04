@@ -16,6 +16,7 @@ struct LobbyPlayerRow: View {
     /// saves straight away.
     var onCommanderNameSubmit: () -> Void
     @FocusState private var isEditingCommanderName: Bool
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         VStack(spacing: 0) {
@@ -61,7 +62,7 @@ struct LobbyPlayerRow: View {
                     onColorChange(hex)
                 }
                 .padding(.top, 8)
-                .transition(.asymmetric(
+                .transition(reduceMotion ? .opacity : .asymmetric(
                     insertion: .move(edge: .top).combined(with: .opacity),
                     removal: .opacity
                 ))
