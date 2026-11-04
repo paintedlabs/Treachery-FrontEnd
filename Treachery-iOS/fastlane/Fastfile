@@ -173,6 +173,13 @@ platform :ios do
     )
   end
 
+  # Whether a version of the app is live on the App Store. Uses the token that
+  # app_store_connect_api_key sets for Spaceship, so call it after that.
+  private_lane :app_store_version_live do
+    app = Spaceship::ConnectAPI::App.find("com.Solomon.Treachery-iOS")
+    !app&.get_live_app_store_version(platform: Spaceship::ConnectAPI::Platform::IOS).nil?
+  end
+
   desc "Build and submit to App Store review"
   lane :release do
     ensure_version_matches_release_tag
@@ -232,11 +239,17 @@ platform :ios do
       skip_build_archive: true
     )
 
-    # Upload and submit for review
+    # Upload and submit for review. Phased release only paces automatic updates
+    # for people who already have the app, so App Store Connect has none for an
+    # app's first version, and deliver fails if asked to create one. Request it
+    # only once a version is live: the first version goes to everyone when
+    # approved, and later ones roll out over Apple's 7 days. Pause or finish a
+    # rollout in App Store Connect (see docs/DEPLOYMENT.md).
     upload_to_app_store(
       api_key: api_key,
       submit_for_review: true,
       automatic_release: true,
+      phased_release: app_store_version_live,
       force: true,
       precheck_include_in_app_purchases: false,
       submission_information: {

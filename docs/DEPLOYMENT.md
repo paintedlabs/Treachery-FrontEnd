@@ -68,6 +68,30 @@ pipelines only bump the build number, so the version is yours to manage:
    version is not higher than the last approved one, so every TestFlight
    upload from `main` fails until the bump lands.
 
+## iOS phased rollout
+
+Once a version of the app is live, the App Store lane submits each update with
+Apple's 7-day phased release: automatic updates reach 1%, 2%, 5%, 10%, 20%,
+50% and then 100% of users. App Store Connect offers phased release only for
+updates, so the app's first version goes to everyone as soon as it is
+approved. Phased release only paces automatic updates; anyone can still
+download the new version from the App Store.
+
+Whoever published the release checks Crashlytics (or Xcode Organizer) and
+player reports every day of the rollout, and pauses it from the version's
+page in App Store Connect when any of these happens:
+
+- crash-free sessions for the new version fall below 99.9%, or a new crash
+  hits more than one user;
+- a player reports they can't sign in, create or join a lobby, or keep a game
+  in sync;
+- the Cloud Functions logs show a rise in errors from callables the new
+  version uses.
+
+Pauses add up to at most 30 days, and a resumed rollout continues where it
+stopped. Fix forward with a new version, or choose "Release to All Users" once
+the cause turns out to be harmless.
+
 ## Rules changes
 
 `firestore.rules` in the repo is the source of truth. **Never edit rules in
