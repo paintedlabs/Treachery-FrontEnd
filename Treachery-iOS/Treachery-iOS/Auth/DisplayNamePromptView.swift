@@ -110,12 +110,12 @@ struct DisplayNamePromptView: View {
     }
 
     private func prefillName() {
-        if case .authenticated(let user) = authViewModel.authState {
-            if let email = user.email, !email.isEmpty {
+        if case .authenticated(let account) = authViewModel.authState {
+            if let email = account.email, !email.isEmpty {
                 let prefix = email.components(separatedBy: "@").first ?? ""
                 let capitalized = prefix.prefix(1).uppercased() + prefix.dropFirst()
                 displayName = capitalized
-            } else if user.isAnonymous {
+            } else if account.isAnonymous {
                 displayName = "Guest"
             } else {
                 displayName = "Player"

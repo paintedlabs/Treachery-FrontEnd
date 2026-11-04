@@ -200,6 +200,7 @@ final class ProfileViewModel: ObservableObject {
     private let firestoreManager: FirestoreManaging
     private let cloudFunctions: CloudFunctionsProtocol
     private let trackEvent: (String) -> Void
+    private let announce: @MainActor (String) -> Void
 
     private static let logger = Logger(subsystem: "com.Solomon.Treachery-iOS", category: "AccountDeletion")
     private static let profileLogger = Logger(subsystem: "com.Solomon.Treachery-iOS", category: "Profile")
@@ -211,16 +212,19 @@ final class ProfileViewModel: ObservableObject {
     ///     account is deleted, and says whether it is a guest's. In the app
     ///     this is `AuthViewModel`, the single source of auth state.
     ///   - trackEvent: Records an analytics event by name.
+    ///   - announce: Says a message to VoiceOver.
     init(
         session: SessionEnding,
         firestoreManager: FirestoreManaging = FirestoreManager(),
         cloudFunctions: CloudFunctionsProtocol = CloudFunctions(),
-        trackEvent: @escaping (String) -> Void = { AnalyticsService.trackEvent($0) }
+        trackEvent: @escaping (String) -> Void = { AnalyticsService.trackEvent($0) },
+        announce: @escaping @MainActor (String) -> Void = { FailureMessage.announce($0) }
     ) {
         self.session = session
         self.firestoreManager = firestoreManager
         self.cloudFunctions = cloudFunctions
         self.trackEvent = trackEvent
+        self.announce = announce
     }
 
     // MARK: - Data Loading
@@ -329,7 +333,9 @@ final class ProfileViewModel: ObservableObject {
     }
 
     /// On success the auth state listener replaces this screen with the
-    /// signed-out one.
+    /// signed-out one. A failure is announced after every attempt: it shows
+    /// under Sign Out, away from VoiceOver focus, and a repeated failure
+    /// changes nothing on screen.
     private func endSessionForSignOut() {
         do {
             try session.endSession()
@@ -337,6 +343,9 @@ final class ProfileViewModel: ObservableObject {
         } catch {
             Self.profileLogger.error("Signing out failed: \(String(describing: error), privacy: .private)")
             signOutState = .failed(UserFacingError(error))
+            if let signOutFailureMessage {
+                announce(signOutFailureMessage)
+            }
         }
     }
 

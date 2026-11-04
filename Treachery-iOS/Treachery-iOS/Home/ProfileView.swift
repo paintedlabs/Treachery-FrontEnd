@@ -38,16 +38,14 @@ struct ProfileView: View {
                     profileContent
 
                     // Sign Out, About and Delete Account stay reachable even
-                    // when the profile can't load.
-                    // A failed sign-out is announced after every attempt: a
-                    // repeated failure changes nothing on screen.
+                    // when the profile can't load. The view model announces
+                    // a failed sign-out after every attempt.
                     SignOutSection(
                         isEnabled: !isAccountDeletionUnderway,
                         isGuest: authViewModel.isGuest,
                         failureMessage: viewModel.signOutFailureMessage
                     ) {
                         viewModel.requestSignOut()
-                        FailureMessage.announce(viewModel.signOutFailureMessage)
                     }
                     .confirmationDialog(
                         "Sign Out of Guest Account?",
@@ -56,7 +54,6 @@ struct ProfileView: View {
                     ) {
                         Button("Sign Out", role: .destructive) {
                             viewModel.confirmGuestSignOut()
-                            FailureMessage.announce(viewModel.signOutFailureMessage)
                         }
                         Button("Cancel", role: .cancel) {
                             viewModel.cancelSignOut()

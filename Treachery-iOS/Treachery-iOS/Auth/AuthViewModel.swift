@@ -11,7 +11,12 @@ import os
 
 enum AuthState {
     case loading
-    case authenticated(User)
+    /// Signed in. The account is as Firebase Auth reported it at sign-in, a
+    /// value tests can build, unlike FirebaseAuth's `User`. Firebase Auth
+    /// reports again only when another account signs in, so a change to this
+    /// one, such as a guest account later upgraded by linking, would need
+    /// reporting here too.
+    case authenticated(SignedInAccount)
     case unauthenticated
 }
 
@@ -35,8 +40,8 @@ final class AuthViewModel: ObservableObject {
     }
 
     var currentUserId: String? {
-        if case .authenticated(let user) = authState {
-            return user.uid
+        if case .authenticated(let account) = authState {
+            return account.uid
         }
         return nil
     }
@@ -44,8 +49,8 @@ final class AuthViewModel: ObservableObject {
     /// Whether the signed-in account is a guest's (Firebase anonymous auth).
     /// A guest account can't be signed back into once signed out.
     var isGuest: Bool {
-        if case .authenticated(let user) = authState {
-            return user.isAnonymous
+        if case .authenticated(let account) = authState {
+            return account.isAnonymous
         }
         return false
     }
@@ -80,7 +85,7 @@ final class AuthViewModel: ObservableObject {
             Task { @MainActor in
                 if let user = user {
                     let account = SignedInAccount(user)
-                    self?.authState = .authenticated(user)
+                    self?.authState = .authenticated(account)
                     AnalyticsService.setUserId(user.uid)
                     AnalyticsService.setUserProperties(["auth_method": account.authMethod.rawValue])
                     await self?.provisionProfile(for: account)

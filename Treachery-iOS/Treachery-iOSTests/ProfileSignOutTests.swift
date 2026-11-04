@@ -96,21 +96,33 @@ struct ProfileSignOutTests {
         #expect(viewModel.signOutFailureMessage == nil)
     }
 
-    /// The screen announces a failed sign-out after every attempt, because a
-    /// repeated failure changes nothing on screen; each attempt still leaves
-    /// the message for it to say.
-    @Test func repeatedFailedSignOutStillHasAMessageToAnnounce() {
-        session.isGuest = true
+    /// A failed sign-out is announced after every attempt. A repeated
+    /// failure changes nothing on screen, and for an email or phone account
+    /// the message never clears between attempts, so announcing on a change
+    /// would say only the first.
+    @Test("Every failed sign-out is announced", arguments: [false, true])
+    func everyFailedSignOutIsAnnounced(isGuest: Bool) {
+        var announcements: [String] = []
+        let viewModel = ProfileViewModel(
+            session: session,
+            firestoreManager: MockFirestoreManager(),
+            cloudFunctions: cloudFunctions,
+            trackEvent: { _ in },
+            announce: { announcements.append($0) }
+        )
+        session.isGuest = isGuest
         session.errorToThrow = NSError(domain: "FIRAuthErrorDomain", code: 17_995)
-        viewModel.requestSignOut()
-        viewModel.confirmGuestSignOut()
-        #expect(viewModel.signOutFailureMessage == "Couldn't sign out. Something went wrong. Try again.")
 
-        viewModel.requestSignOut()
-        viewModel.confirmGuestSignOut()
+        for _ in 1...2 {
+            viewModel.requestSignOut()
+            if isGuest {
+                viewModel.confirmGuestSignOut()
+            }
+        }
 
         #expect(session.endSessionCallCount == 2)
-        #expect(viewModel.signOutFailureMessage == "Couldn't sign out. Something went wrong. Try again.")
+        let failure = "Couldn't sign out. Something went wrong. Try again."
+        #expect(announcements == [failure, failure])
     }
 
     // MARK: - Account deletion

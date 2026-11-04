@@ -72,7 +72,30 @@ struct AuthViewModelErrorTests {
         #expect(viewModel.errorMessage == UserFacingError.unknown.message)
     }
 
+    // MARK: - Guests
+
+    /// Profile asks a guest to confirm signing out, because their account
+    /// can't be signed back into; `isGuest` decides who gets asked.
+    @Test("Only an account signed in anonymously is a guest's", arguments: [true, false])
+    func guestIsAnAnonymousAccount(isAnonymous: Bool) {
+        viewModel.authState = .authenticated(SignedInAccount(
+            uid: "u1",
+            authDisplayName: nil,
+            isAnonymous: isAnonymous,
+            email: isAnonymous ? nil : "ada@example.com",
+            phoneNumber: nil,
+            providerIDs: isAnonymous ? [] : ["password"],
+            creationDate: nil
+        ))
+
+        #expect(viewModel.isGuest == isAnonymous)
+    }
+
     @Test func nobodySignedInIsNotAGuest() {
+        #expect(!viewModel.isGuest)
+
+        viewModel.authState = .unauthenticated
+
         #expect(!viewModel.isGuest)
     }
 }
