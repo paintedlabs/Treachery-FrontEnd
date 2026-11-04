@@ -111,9 +111,10 @@ final class LobbyViewModel: ObservableObject {
     /// opened after creation shows the real value, not a hardcoded default.
     @Published var maxTraitorRarity: Rarity = .special
     /// The commander name field, or nil until the first players snapshot
-    /// that includes the current player. Filled only once: a later snapshot
-    /// (another player joining, or the echo of our own write) must never
-    /// refill a field the player has just cleared.
+    /// that includes the current player. Later snapshots bring in a name
+    /// changed elsewhere (on another device, say), but only while the
+    /// player hasn't edited the field: a snapshot must never refill a field
+    /// the player has just edited or cleared.
     @Published private var commanderNameField: CommanderNameField?
     /// The last game snapshot that decoded; `status` decides what to show.
     @Published private var latestGame: Game?
@@ -446,9 +447,14 @@ final class LobbyViewModel: ObservableObject {
         await updateCommanderName(name)
     }
 
+    /// Fills the commander name field with the server's name, and refreshes
+    /// it when that name changes while the field is unedited. An edited or
+    /// cleared field is left alone, and the echo of the player's own save
+    /// already matches what they typed.
     private func loadCommanderNameIfNeeded() {
-        guard commanderNameField == nil, let player = currentPlayer else { return }
+        guard let player = currentPlayer else { return }
         let name = player.commanderName ?? ""
+        if let field = commanderNameField, field.isEdited || field.synced == name { return }
         commanderNameField = CommanderNameField(draft: name, synced: name)
     }
 

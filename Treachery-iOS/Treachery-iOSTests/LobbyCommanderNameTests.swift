@@ -112,4 +112,36 @@ struct LobbyCommanderNameTests {
 
         #expect(mockFS.updateCommanderNameCalls.map(\.name) == ["Zur the Enchanter"])
     }
+
+    // MARK: - Names changed elsewhere
+
+    @Test func untouchedFieldShowsANameChangedElsewhere() async {
+        // The name changes on another device after the field has filled.
+        // The field used to keep the old one, though it was never sent.
+        let (vm, mockFS) = makeLobby()
+        mockFS.emitPlayers(.success(players(commanderName: "Atraxa")), gameId: "game1")
+
+        #expect(vm.commanderNameDraft == "Atraxa")
+        // Showing it isn't an edit: nothing is written back.
+        await vm.saveCommanderName()
+        #expect(mockFS.updateCommanderNameCalls.isEmpty)
+    }
+
+    @Test func editedFieldKeepsWhatThePlayerTyped() {
+        let (vm, mockFS) = makeLobby()
+        vm.commanderNameDraft = "Zur the Enchanter"
+
+        mockFS.emitPlayers(.success(players(commanderName: "Atraxa")), gameId: "game1")
+
+        #expect(vm.commanderNameDraft == "Zur the Enchanter")
+    }
+
+    @Test func clearedFieldStaysClear() {
+        let (vm, mockFS) = makeLobby()
+        vm.commanderNameDraft = ""
+
+        mockFS.emitPlayers(.success(players(commanderName: "Atraxa")), gameId: "game1")
+
+        #expect(vm.commanderNameDraft.isEmpty)
+    }
 }
