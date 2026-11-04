@@ -86,6 +86,18 @@ final class LobbyViewModel: ObservableObject {
         case gameMissing
     }
 
+    /// What the commander name field holds, and what it held when it was
+    /// filled or last saved. The player has edited it since when the two
+    /// differ, and only then is it saved: a name changed elsewhere (on
+    /// another device, say) mustn't be overwritten by a draft nobody
+    /// touched.
+    private struct CommanderNameField {
+        var draft: String
+        var synced: String
+
+        var isEdited: Bool { draft != synced }
+    }
+
     @Published private(set) var players: [Player] = []
     @Published private(set) var requestFailure: RequestFailure?
     /// Why the last commander name save failed, until the next save starts.
@@ -98,16 +110,11 @@ final class LobbyViewModel: ObservableObject {
     /// (absent on the doc means the server default, "special") so a lobby
     /// opened after creation shows the real value, not a hardcoded default.
     @Published var maxTraitorRarity: Rarity = .special
-    /// The commander name being edited, or nil until the first players
-    /// snapshot that includes the current player. Filled only once: a later
-    /// snapshot (another player joining, or the echo of our own write) must
-    /// never refill a field the player has just cleared.
-    @Published private var commanderNameEdit: String?
-    /// What the field held when it was filled, or after its last save. The
-    /// player has edited it since when the draft differs, and only then is
-    /// it saved: a name changed elsewhere (on another device, say) mustn't
-    /// be overwritten by a draft nobody touched.
-    private var syncedCommanderName: String?
+    /// The commander name field, or nil until the first players snapshot
+    /// that includes the current player. Filled only once: a later snapshot
+    /// (another player joining, or the echo of our own write) must never
+    /// refill a field the player has just cleared.
+    @Published private var commanderNameField: CommanderNameField?
     /// The last game snapshot that decoded; `status` decides what to show.
     @Published private var latestGame: Game?
     @Published private var interruption: Interruption?
@@ -222,10 +229,12 @@ final class LobbyViewModel: ObservableObject {
         return .passesHost(to: nextHost.displayName)
     }
 
-    /// Bound to the commander name field.
+    /// Bound to the commander name field. The field shows only in the
+    /// current player's row, which needs the snapshot that fills it, so
+    /// there's nothing to edit before then.
     var commanderNameDraft: String {
-        get { commanderNameEdit ?? "" }
-        set { commanderNameEdit = newValue }
+        get { commanderNameField?.draft ?? "" }
+        set { commanderNameField?.draft = newValue }
     }
 
     init(
@@ -414,7 +423,7 @@ final class LobbyViewModel: ObservableObject {
         commanderNameFailure = nil
         do {
             try await firestoreManager.updateCommanderName(gameId: gameId, playerId: player.id, name: name)
-            syncedCommanderName = name ?? ""
+            commanderNameField?.synced = name ?? ""
         } catch {
             logger.error("updateCommanderName failed: \(String(describing: error), privacy: .public)")
             commanderNameFailure = "Couldn't save your commander name. Check your connection and try again."
@@ -429,22 +438,21 @@ final class LobbyViewModel: ObservableObject {
     /// lobby has closed: there's no seat left to name.
     func saveCommanderName() async {
         guard pendingAction != .leaving, game != nil,
-              let draft = commanderNameEdit, draft != syncedCommanderName,
+              let field = commanderNameField, field.isEdited,
               let player = currentPlayer else { return }
-        let name = draft.isEmpty ? nil : draft
+        let name = field.draft.isEmpty ? nil : field.draft
         guard name != player.commanderName else {
             // The server already has it.
-            syncedCommanderName = draft
+            commanderNameField?.synced = field.draft
             return
         }
         await updateCommanderName(name)
     }
 
     private func loadCommanderNameIfNeeded() {
-        guard commanderNameEdit == nil, let player = currentPlayer else { return }
+        guard commanderNameField == nil, let player = currentPlayer else { return }
         let name = player.commanderName ?? ""
-        commanderNameEdit = name
-        syncedCommanderName = name
+        commanderNameField = CommanderNameField(draft: name, synced: name)
     }
 
     func updateGameSettings(maxPlayers: Int? = nil, startingLife: Int? = nil, gameMode: String? = nil, maxTraitorRarity: String? = nil) async {
