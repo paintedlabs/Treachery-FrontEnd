@@ -249,14 +249,37 @@ final class FirestoreManager: FirestoreManaging {
         }
     }
 
-    func listenToGame(id: String, onChange: @escaping (Game?) -> Void) -> ListenerCancellable {
-        let reg = gamesCollection.document(id).addSnapshotListener { snapshot, _ in
-            guard let snapshot = snapshot else { return }
-            var game = try? snapshot.data(as: Game.self)
-            game?.id = snapshot.documentID
-            onChange(game)
-        }
+    func listenToGame(id: String, onChange: @escaping @MainActor (DocumentEvent<Game>) -> Void) -> ListenerCancellable {
+        // A "doesn't exist" read from the local cache isn't proof the game is
+        // gone: we may be offline, or have never cached it. gameEvent skips
+        // those, so the server has to confirm. When it does, often only the
+        // snapshot's metadata changes (isFromCache flips), and without
+        // includeMetadataChanges Firestore wouldn't deliver that at all.
+        let reg = gamesCollection.document(id)
+            .addSnapshotListener(includeMetadataChanges: true) { snapshot, error in
+                guard let event = Self.gameEvent(snapshot: snapshot, error: error) else { return }
+                // Firestore calls listeners on the main queue, its default;
+                // this app never sets FirestoreSettings.dispatchQueue.
+                MainActor.assumeIsolated { onChange(event) }
+            }
         return FirestoreListenerHandle(registration: reg)
+    }
+
+    /// Turns one game listener callback into a DocumentEvent, or nil when
+    /// there's nothing to report yet (a cache-only miss).
+    private static func gameEvent(snapshot: DocumentSnapshot?, error: Error?) -> DocumentEvent<Game>? {
+        if let error { return .failed(.listenerStopped(error)) }
+        guard let snapshot else { return nil }
+        guard snapshot.exists else {
+            return snapshot.metadata.isFromCache ? nil : .missing
+        }
+        do {
+            var game = try snapshot.data(as: Game.self)
+            game.id = snapshot.documentID
+            return .loaded(game)
+        } catch {
+            return .failed(.unreadable(error))
+        }
     }
 
     // MARK: - Players
@@ -290,20 +313,34 @@ final class FirestoreManager: FirestoreManaging {
 
     func listenToPlayers(
         gameId: String,
-        onChange: @escaping ([Player]) -> Void
+        onChange: @escaping @MainActor (Result<[Player], ListenerFailure>) -> Void
     ) -> ListenerCancellable {
         let reg = playersCollection(gameId: gameId)
             .order(by: "order_id")
-            .addSnapshotListener { snapshot, _ in
-                guard let snapshot = snapshot else { return }
-                let players = snapshot.documents.compactMap { doc -> Player? in
-                    guard var player = try? doc.data(as: Player.self) else { return nil }
-                    player.id = doc.documentID
-                    return player
-                }
-                onChange(players)
+            .addSnapshotListener { snapshot, error in
+                guard let result = Self.playersResult(snapshot: snapshot, error: error) else { return }
+                // Main queue, as for listenToGame.
+                MainActor.assumeIsolated { onChange(result) }
             }
         return FirestoreListenerHandle(registration: reg)
+    }
+
+    /// One unreadable player makes the whole snapshot unreadable. Dropping
+    /// it would silently remove a seat from the board, with nothing to say
+    /// why; the screens ask for an update instead.
+    private static func playersResult(snapshot: QuerySnapshot?, error: Error?) -> Result<[Player], ListenerFailure>? {
+        if let error { return .failure(.listenerStopped(error)) }
+        guard let snapshot else { return nil }
+        do {
+            let players = try snapshot.documents.map { doc in
+                var player = try doc.data(as: Player.self)
+                player.id = doc.documentID
+                return player
+            }
+            return .success(players)
+        } catch {
+            return .failure(.unreadable(error))
+        }
     }
 
     // MARK: - Batch Updates

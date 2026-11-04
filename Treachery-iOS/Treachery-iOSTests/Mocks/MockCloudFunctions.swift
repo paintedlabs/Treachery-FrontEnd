@@ -10,7 +10,15 @@ final class MockCloudFunctions: CloudFunctionsProtocol {
     )
 
     var joinGameResult = JoinGameResult(action: "joined", gameId: "mock-game-id")
+    /// When set, joinGame parses this server-shaped payload with the
+    /// production parser instead of returning `joinGameResult`.
+    var joinGamePayload: [String: Any]?
     var createGameResult = "mock-created-game-id"
+
+    /// When set, these calls wait at the gate until the test releases them,
+    /// so a test can act while one is in flight.
+    var startGameGate: CallGate?
+    var leaveGameGate: CallGate?
 
     // Call tracking
     var createGameCalls: [(gameMode: String, maxPlayers: Int, startingLife: Int, maxTraitorRarity: String?)] = []
@@ -40,10 +48,14 @@ final class MockCloudFunctions: CloudFunctionsProtocol {
     func joinGame(gameCode: String) async throws -> JoinGameResult {
         if let error = errorToThrow { throw error }
         joinGameCalls.append(gameCode)
+        if let joinGamePayload {
+            return try JoinGameResult(payload: joinGamePayload)
+        }
         return joinGameResult
     }
 
     func startGame(gameId: String) async throws {
+        if let startGameGate { await startGameGate.hold() }
         if let error = errorToThrow { throw error }
         startGameCalls.append(gameId)
     }
@@ -64,6 +76,7 @@ final class MockCloudFunctions: CloudFunctionsProtocol {
     }
 
     func leaveGame(gameId: String) async throws {
+        if let leaveGameGate { await leaveGameGate.hold() }
         if let error = errorToThrow { throw error }
         leaveGameCalls.append(gameId)
     }

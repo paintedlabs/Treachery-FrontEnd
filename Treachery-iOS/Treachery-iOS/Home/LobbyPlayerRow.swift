@@ -12,8 +12,10 @@ struct LobbyPlayerRow: View {
     @Binding var showColorPicker: Bool
     @Binding var commanderNameInput: String
     var onColorChange: (String?) -> Void
-    var onCommanderNameChange: (String) -> Void
-    var onCommanderNameSubmit: (String) -> Void
+    /// Typing is debounced by LobbyView through the bound text; submitting
+    /// saves straight away.
+    var onCommanderNameSubmit: () -> Void
+    @FocusState private var isEditingCommanderName: Bool
 
     var body: some View {
         VStack(spacing: 0) {
@@ -96,23 +98,27 @@ struct LobbyPlayerRow: View {
 
     private var commanderNameField: some View {
         TextField("Commander name...", text: $commanderNameInput)
+            .focused($isEditingCommanderName)
             .font(.system(.caption, design: .serif))
             .italic()
             .foregroundStyle(Color.mtgTextPrimary)
             .padding(.horizontal, 10)
             .padding(.vertical, 6)
-            .background(Color.mtgCardElevated)
-            .clipShape(RoundedRectangle(cornerRadius: 6))
+            // At least 44pt tall so it's easy to hit. The text line sits in
+            // the middle; a tap anywhere else in the box focuses it too.
+            .frame(minHeight: 44)
+            .background {
+                RoundedRectangle(cornerRadius: 6)
+                    .fill(Color.mtgCardElevated)
+                    .onTapGesture { isEditingCommanderName = true }
+            }
             .overlay(
                 RoundedRectangle(cornerRadius: 6)
                     .stroke(Color.mtgDivider, lineWidth: 1)
             )
             .padding(.top, 6)
             .onSubmit {
-                onCommanderNameSubmit(commanderNameInput)
-            }
-            .onChange(of: commanderNameInput) { _, newValue in
-                onCommanderNameChange(newValue)
+                onCommanderNameSubmit()
             }
     }
 }
