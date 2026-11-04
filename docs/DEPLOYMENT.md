@@ -61,6 +61,38 @@ console edits. The change loop:
    `cd firestore-tests && npm test` (~3s)
 3. Merge — the staging workflow deploys rules to the shared project
 
+## Scheduled cleanup and its indexes
+
+`cleanupStaleGames` (`functions/src/triggers.js`) runs every hour and deletes
+`waiting` and `in_progress` games with no activity for 24 hours, together
+with their `players` docs. `finished` games are never touched.
+
+Its queries pair `state ==` with a range filter on `last_activity_at` or
+`created_at`, so each needs a composite index from `firestore.indexes.json`:
+`games (state, last_activity_at)` and `games (state, created_at)`. The
+staging workflow deploys them along with the functions. The emulator never
+enforces indexes, so a missing one fails only in the real project;
+`npm test` in `functions/` checks that both are declared.
+
+**First deploy with the indexes (November 2026).** They were never declared
+before, so every run failed with `FAILED_PRECONDITION` and nothing has been
+swept since the job shipped in March 2026. After that deploy:
+
+1. The indexes build for a few minutes (Firebase console → Firestore →
+   Indexes shows them as *Building*). Runs during the build still fail.
+2. The next runs purge the backlog since March 2026, oldest first. Each of
+   the four queries (two per state) reads at most 100 games per hourly run,
+   so one run deletes at most 400 games and a large backlog drains over
+   several runs. Finished games are never touched.
+3. Confirm in Cloud Logging. In Logs Explorer, filter on
+   `resource.type="cloud_run_revision"` and
+   `resource.labels.service_name="cleanupstalegames"`. Every run should log
+   `cleanupStaleGames: deleted N stale games.`, with N above 0 while the
+   backlog drains. A failing query logs
+   `cleanupStaleGames: skipped "<state>" games this run:` with the query and
+   Firestore's error (for a missing index, a console link that creates it),
+   and the run is marked failed; the other state is still swept.
+
 ## Local development
 
 ```bash
