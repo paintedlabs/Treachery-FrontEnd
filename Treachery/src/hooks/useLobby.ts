@@ -37,10 +37,16 @@ function lobbyErrorMessage(error: unknown, failed: string): string {
   if (error instanceof FunctionsError) {
     switch (error.code as FunctionsErrorCode) {
       // The lobby callables write these refusals for players, such as
-      // "Cannot set max players below the current lobby size."
+      // "Cannot set max players below the current lobby size." Only a
+      // sentence the server wrote is shown: when a response carries no
+      // message, the SDK falls back to the bare code or status
+      // ("invalid-argument", "FAILED_PRECONDITION"), which isn't for players.
       case 'functions/failed-precondition':
-      case 'functions/invalid-argument':
-        return error.message;
+      case 'functions/invalid-argument': {
+        const message = error.message.trim();
+        const isBareCode = /^[A-Za-z_-]+$/.test(message);
+        return message && !isBareCode ? message : `${failed} Try again.`;
+      }
       // Offline, timed out, or the server failed.
       case 'functions/internal':
       case 'functions/unavailable':
